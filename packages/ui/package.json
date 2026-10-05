@@ -1,0 +1,17 @@
+{
+  "name": "@nivel/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "react": "catalog:",
+    "@types/react": "catalog:"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "extends": "../config/tsconfig.package.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../domain"
+    },
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../i18n"
+    },
+    {
+      "path": "../ui"
+    }
+  ]
+}

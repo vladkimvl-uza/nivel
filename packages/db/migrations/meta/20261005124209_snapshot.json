@@ -1,0 +1,26 @@
+{
+  "id": "29c67a5d-a761-40ab-8312-0e034c698416",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {},
+  "enums": {},
+  "schemas": {
+    "ai": "ai",
+    "bot": "bot",
+    "catalog": "catalog",
+    "content": "content",
+    "ops": "ops",
+    "pricing": "pricing",
+    "sales": "sales"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

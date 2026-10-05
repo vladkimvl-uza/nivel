@@ -1,0 +1,16 @@
+{
+  "name": "@nivel/pdf",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@nivel/contracts": "workspace:*",
+    "@nivel/domain": "workspace:*",
+    "@nivel/i18n": "workspace:*",
+    "@nivel/ui": "workspace:*"
+  }
+}

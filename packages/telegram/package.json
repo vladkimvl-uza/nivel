@@ -1,0 +1,14 @@
+{
+  "name": "@nivel/telegram",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@nivel/contracts": "workspace:*",
+    "@nivel/i18n": "workspace:*"
+  }
+}

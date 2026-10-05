@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "title": "Nivel — kompyuter va ish joyini yigʻib beramiz",
+    "description": "Toshkentda kompyuter va ish joyini tanlash, xarid qilish va yigʻish."
+  },
+  "home": {
+    "heading": "Nivel",
+    "lead": "Kompyuter va ish joyini yigʻib beramiz: tanlash, chek boʻyicha xarid, yigʻish va kafolat.",
+    "draft": "Sayt ishlab chiqilmoqda. Matnlar — qoralama."
+  },
+  "lang": {
+    "uz": "Oʻzbekcha",
+    "ru": "Русский",
+    "switch": "Til"
+  }
+}

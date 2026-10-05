@@ -1,0 +1,24 @@
+{
+  "name": "@nivel/domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./autobuild": "./src/autobuild/index.ts",
+    "./calendar": "./src/calendar/index.ts",
+    "./cancel": "./src/cancel/index.ts",
+    "./catalog": "./src/catalog/index.ts",
+    "./compat": "./src/compat/index.ts",
+    "./errors": "./src/errors.ts",
+    "./fee": "./src/fee/index.ts",
+    "./market": "./src/market/index.ts",
+    "./money": "./src/money/index.ts",
+    "./order": "./src/order/index.ts",
+    "./reserve": "./src/reserve/index.ts",
+    "./text": "./src/text/index.ts",
+    "./threshold": "./src/threshold/index.ts",
+    "./warranty": "./src/warranty/index.ts"
+  }
+}

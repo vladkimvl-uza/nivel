@@ -1,0 +1,27 @@
+{
+  "name": "@nivel/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "dependencies": {
+    "@nivel/contracts": "workspace:*",
+    "@nivel/domain": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "drizzle-kit": "catalog:",
+    "@types/pg": "catalog:",
+    "@nivel/config": "workspace:*"
+  },
+  "scripts": {
+    "generate": "node ../../tools/dev-run.mjs migrator -- drizzle-kit generate",
+    "migrate": "node ../../tools/dev-run.mjs migrator -- drizzle-kit migrate",
+    "generate:custom": "node ../../tools/dev-run.mjs migrator -- drizzle-kit generate --custom"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@nivel/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts",
+    "./tsconfig.package.json": "./tsconfig.package.json",
+    "./tsconfig.next.json": "./tsconfig.next.json",
+    "./biome.base.json": "./biome.base.json"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  }
+}

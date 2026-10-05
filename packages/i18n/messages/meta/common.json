@@ -1,0 +1,42 @@
+{
+  "meta.title": {
+    "context": "<title> of the home page",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "meta.description": {
+    "context": "meta description",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "home.heading": {
+    "context": "brand name, not translated",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "home.lead": {
+    "context": "one-line pitch under the heading",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "home.draft": {
+    "context": "badge: the site is a draft",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "lang.uz": {
+    "context": "language switch label, always in Uzbek",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "lang.ru": {
+    "context": "language switch label, always in Russian",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "lang.switch": {
+    "context": "aria-label of the language switch",
+    "maxLen": 20,
+    "status": "draft"
+  }
+}
