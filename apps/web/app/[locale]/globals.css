@@ -1,0 +1,44 @@
+/* WP-00 placeholder styles. Colors come from theme files and semantic tokens of packages/ui (WP-09);
+   until then only system colors are used, no raw HEX outside themes (tools/check-antilist.mjs). */
+:root {
+  color-scheme: light;
+  --nv-gutter: 16px;
+  --nv-maxw: 960px;
+}
+
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+  font-family: var(--nv-font-text), system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+.page {
+  max-width: var(--nv-maxw);
+  margin: 0 auto;
+  padding: 48px var(--nv-gutter);
+}
+
+h1 {
+  font-family: var(--nv-font-text-semibold), var(--nv-font-text), system-ui, sans-serif;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.badge {
+  display: inline-block;
+  border: 1px solid currentColor;
+  padding: 2px 8px;
+  font-size: 14px;
+}
+
+.langs {
+  display: flex;
+  gap: 16px;
+}
+
+.langs a[aria-current="page"] {
+  font-weight: 600;
+  text-decoration: none;
+}

@@ -53,3 +53,9 @@ export function appPort(app, slot) {
   if (offset === undefined) throw new Error(`Unknown app "${app}"`);
   return portBase(slot) + offset;
 }
+
+/** True when the module is the script node was started with (not imported by a test). */
+export function isMain(metaUrl) {
+  if (!process.argv[1]) return false;
+  return resolve(fileURLToPath(metaUrl)).toLowerCase() === resolve(process.argv[1]).toLowerCase();
+}

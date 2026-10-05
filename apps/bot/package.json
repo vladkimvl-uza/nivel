@@ -1,0 +1,19 @@
+{
+  "name": "@nivel/bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../tools/dev-run.mjs bot -- node --watch src/main.ts",
+    "start": "node ../../tools/dev-run.mjs bot -- node src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grammyjs/auto-retry": "catalog:",
+    "@grammyjs/runner": "catalog:",
+    "@nivel/config": "workspace:*",
+    "@nivel/db": "workspace:*",
+    "grammy": "catalog:",
+    "pino": "catalog:"
+  }
+}

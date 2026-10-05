@@ -11,9 +11,6 @@
     },
     {
       "path": "../contracts"
-    },
-    {
-      "path": "../config"
     }
   ]
 }

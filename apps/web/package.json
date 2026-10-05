@@ -1,0 +1,26 @@
+{
+  "name": "@nivel/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../tools/dev-run.mjs web -- next dev",
+    "build": "node ../../tools/dev-run.mjs web -- next build",
+    "start": "node ../../tools/dev-run.mjs web -- next start",
+    "typecheck": "node ../../tools/dev-run.mjs web -- next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@nivel/config": "workspace:*",
+    "@nivel/db": "workspace:*",
+    "@nivel/i18n": "workspace:*",
+    "@nivel/ui": "workspace:*",
+    "next": "catalog:",
+    "next-intl": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:"
+  }
+}

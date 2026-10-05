@@ -1,0 +1,23 @@
+{
+  "name": "@nivel/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../tools/dev-run.mjs admin -- next dev",
+    "build": "node ../../tools/dev-run.mjs admin -- next build",
+    "start": "node ../../tools/dev-run.mjs admin -- next start",
+    "typecheck": "node ../../tools/dev-run.mjs admin -- next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@nivel/config": "workspace:*",
+    "@nivel/db": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:"
+  }
+}

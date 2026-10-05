@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./health": "./src/health.ts",
     "./schema": "./src/schema/index.ts"
   },
   "dependencies": {
@@ -16,8 +17,7 @@
   },
   "devDependencies": {
     "drizzle-kit": "catalog:",
-    "@types/pg": "catalog:",
-    "@nivel/config": "workspace:*"
+    "@types/pg": "catalog:"
   },
   "scripts": {
     "generate": "node ../../tools/dev-run.mjs migrator -- drizzle-kit generate",

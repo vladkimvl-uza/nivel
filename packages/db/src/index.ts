@@ -1,4 +1,5 @@
 export { createDb, type Db } from "./client.ts";
+export { type DbHealth, pingDatabase } from "./health.ts";
 export { MIGRATIONS_DIR, runMigrations } from "./migrate.ts";
 export * from "./schema/index.ts";
 

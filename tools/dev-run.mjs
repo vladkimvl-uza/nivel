@@ -14,6 +14,8 @@ const slot = slotFromEnv();
 // Long-running apps get PORT_BASE + offset; one-off processes (migrator) get no port.
 if (app in APP_PORT_OFFSETS) process.env.PORT = String(appPort(app, slot));
 process.env.NIVEL_APP = app;
+// No telemetry to external services from the developer machine (Next.js collects it by default).
+process.env.NEXT_TELEMETRY_DISABLED ??= "1";
 
 // Run "node" with the same Node binary (24.x from devEngines), other commands through the shell (.cmd shims on Windows).
 const [bin, ...args] = command;

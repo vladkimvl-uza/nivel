@@ -1,0 +1,17 @@
+{
+  "name": "@nivel/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../tools/dev-run.mjs worker -- node --watch src/main.ts",
+    "start": "node ../../tools/dev-run.mjs worker -- node src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nivel/config": "workspace:*",
+    "@nivel/db": "workspace:*",
+    "pg-boss": "catalog:",
+    "pino": "catalog:"
+  }
+}
