@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nivel · выбор направления</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%231D1D1B' d='M2 4h13v2h-13Z'/%3E%3Cpath fill='%23D9501A' d='M2 6L10 6L6 10Z'/%3E%3Cpath fill='%231D1D1B' d='M1 10h14v2h-14Z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F1EFEA; --sheet:#F8F7F3; --ink:#1D1D1B; --ink2:#55534E; --ink3:#8A867E;
+  --rule:#CBC6BB; --rule2:#DFDBD2; --orange:#D9501A; --orange-text:#B5441A;
+  --sans:"Fira Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.55 var(--sans)}
+a{color:inherit}
+.wrap{max-width:1240px;margin:0 auto;padding:0 32px}
+header.top{border-bottom:1px solid var(--rule);padding:22px 0}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+header.top svg{height:30px;width:auto;display:block}
+.meta{font:400 13px/1.4 var(--mono);color:var(--ink2)}
+.intro{padding:48px 0 24px}
+h1{font:500 40px/1.15 var(--sans);margin:0 0 14px;letter-spacing:-.01em;max-width:22ch}
+.lead{max-width:68ch;color:var(--ink2);margin:0}
+.toc{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 0;padding:0;list-style:none}
+.toc a{display:inline-block;padding:7px 14px;border:1px solid var(--ink);text-decoration:none;font:500 14px/1.3 var(--sans)}
+.toc a:hover{background:var(--ink);color:var(--paper)}
+.note{font:400 12.5px/1.5 var(--mono);color:var(--ink2);margin-top:18px;max-width:90ch}
+
+section.mk{border-top:2px solid var(--ink);padding:40px 0 48px;margin-top:32px}
+.mk-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.mk-head h2{font:500 32px/1.2 var(--sans);margin:0}
+.mk-head h2 .ltr{color:var(--orange-text)}
+.open{display:inline-block;background:var(--ink);color:var(--paper);text-decoration:none;padding:11px 20px;font:500 15px/1.2 var(--sans)}
+.open:hover{background:var(--orange)}
+.oneline{font-size:18px;margin:-8px 0 26px;max-width:75ch}
+
+.shots{display:grid;grid-template-columns:minmax(0,1fr) 228px;gap:20px;align-items:start}
+figure{margin:0}
+figure img{display:block;width:100%;height:auto;border:1px solid var(--rule);background:var(--sheet)}
+figcaption{font:400 12.5px/1.5 var(--mono);color:var(--ink2);margin-top:8px}
+figcaption a{color:var(--ink);text-underline-offset:2px}
+.states{font:400 12.5px/1.8 var(--mono);color:var(--ink2);margin-top:14px}
+.states a{display:inline-block;color:var(--ink);margin-right:10px;white-space:nowrap;text-underline-offset:2px}
+
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:32px}
+.cols h3{font:600 13px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink2);margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--rule)}
+.cols ul{margin:0;padding-left:18px}
+.cols li{margin-bottom:7px}
+.cols p{margin:0 0 10px}
+.fonts dt{font:500 15px/1.3 var(--sans)}
+.fonts dd{margin:0 0 9px;color:var(--ink2);font-size:14px}
+.fonts dl{margin:0}
+.sw{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.sw span{display:flex;flex-direction:column;gap:4px;font:400 11px/1.2 var(--mono);color:var(--ink2);width:64px}
+.sw i{display:block;height:36px;border:1px solid rgba(29,29,27,.18)}
+.score{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.score b{font:500 34px/1 var(--mono)}
+.score small{font:400 13px/1.3 var(--mono);color:var(--ink2)}
+.pro,.con{font-size:14.5px}
+.con li::marker{color:var(--orange)}
+.sub{font:600 12px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);margin:14px 0 6px}
+
+section.cmp{border-top:2px solid var(--ink);padding:40px 0 24px;margin-top:32px}
+section.cmp h2{font:500 32px/1.2 var(--sans);margin:0 0 8px}
+.tbl{overflow-x:auto;margin-top:22px;border:1px solid var(--rule);background:var(--sheet)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14.5px}
+th,td{padding:14px 16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule2)}
+thead th{font:500 15px/1.3 var(--sans);border-bottom:1px solid var(--ink);background:var(--paper)}
+tbody th{font:500 14.5px/1.35 var(--sans);width:22%}
+tbody th small{display:block;font:400 12px/1.4 var(--mono);color:var(--ink2);margin-top:3px}
+tr:last-child td,tr:last-child th{border-bottom:0}
+.dots{font:500 13px/1 var(--mono);letter-spacing:2px;white-space:nowrap;display:block;margin-bottom:5px}
+.dots .on{color:var(--ink)} .dots .off{color:var(--rule)}
+td.best{background:#EFEBE3}
+.hint{display:none}
+@media (max-width:860px){.hint{display:block}}
+.rec{margin-top:28px;padding:22px 24px;border:1px solid var(--ink);background:var(--sheet);max-width:900px}
+.rec h3{margin:0 0 8px;font:500 19px/1.3 var(--sans)}
+.rec p{margin:0 0 8px}
+footer{border-top:1px solid var(--rule);margin-top:40px;padding:22px 0 40px;font:400 12.5px/1.6 var(--mono);color:var(--ink2)}
+
+@media (max-width:960px){
+  .cols{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .wrap{padding:0 16px}
+  h1{font-size:29px}
+  .mk-head h2,section.cmp h2{font-size:25px}
+  .shots{grid-template-columns:minmax(0,1fr) 38%;gap:12px}
+  .oneline{font-size:16px}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#1D1D1B" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#D9501A" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+    <div class="meta">Выбор визуального направления · 05.10.2026 · 3 макета</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <h1>Три направления сайта. Нужно выбрать одно.</h1>
+    <p class="lead">Каждый макет — одна страница: первый экран с прокруткой по пяти шагам (смета, закупка, сборка, тест, сдача), конфигуратор с платой по шкале, путь от заявки, паспорт сборки, идеи, цены. После ревью арт-директора все три доработаны по списку правок. Ниже — как каждое ощущается, на чём держится и где риски; в конце — сравнение.</p>
+    <ul class="toc">
+      <li><a href="#b-pasport">Б «Паспорт сборки»</a></li>
+      <li><a href="#a-masterskaya">А «Мастерская»</a></li>
+      <li><a href="#v-noch">В «Ночная съёмка»</a></li>
+      <li><a href="#sravnenie">Сравнение</a></li>
+    </ul>
+    <p class="note">Оценка арт-директора (из 10) поставлена до правок; список доработок ниже — что сделано после. Цены во всех макетах — пример, не оферта. 3D-сцены и чертежи — визуализация. Скриншоты сняты в headless Edge; 3D у А и В — на программном рендере, на реальной видеокарте чище.</p>
+  </div>
+
+  <!-- ============ Б ============ -->
+  <section class="mk" id="b-pasport">
+    <div class="mk-head">
+      <h2><span class="ltr">Б</span> «Паспорт сборки»</h2>
+      <a class="open" href="b-pasport/index.html">Открыть макет</a>
+    </div>
+    <p class="oneline">Сайт как техническая документация: лист чертежа со штампом, в котором по мере прокрутки проставляются печати этапов.</p>
+    <div class="shots">
+      <figure>
+        <a href="b-pasport/shots/desktop-full.png"><img src="b-pasport/shots/desktop-hero.png" alt="Б, первый экран на десктопе 1440×900" loading="lazy"></a>
+        <figcaption>Десктоп 1440×900 · <a href="b-pasport/shots/desktop-full.png">вся страница</a></figcaption>
+      </figure>
+      <figure>
+        <a href="b-pasport/shots/mobile-full.png"><img src="b-pasport/shots/mobile-hero.png" alt="Б, первый экран на телефоне 390×844" loading="lazy"></a>
+        <figcaption>Телефон 390 · <a href="b-pasport/shots/mobile-full.png">вся страница</a></figcaption>
+      </figure>
+    </div>
+    <div class="states">Шаги первого экрана:
+      <a href="b-pasport/shots/state-1.png">1 смета</a><a href="b-pasport/shots/state-2.png">2 закупка</a><a href="b-pasport/shots/state-3.png">3 сборка</a><a href="b-pasport/shots/state-4.png">4 тест</a><a href="b-pasport/shots/state-5.png">5 сдача</a>
+      · телефон: <a href="b-pasport/shots/state-1-mobile.png">1</a><a href="b-pasport/shots/state-2-mobile.png">2</a><a href="b-pasport/shots/state-3-mobile.png">3</a><a href="b-pasport/shots/state-4-mobile.png">4</a><a href="b-pasport/shots/state-5-mobile.png">5</a>
+      · <a href="b-pasport/shots/uz-mobile.png">UZ на телефоне</a><a href="b-pasport/shots/laptop-1280x720.png">ноутбук 1280×720</a>
+    </div>
+    <div class="cols">
+      <div>
+        <h3>Как ощущается</h3>
+        <ul>
+          <li>Как техзадание и акт приёмки: всё измерено, подписано, датировано. Доверие идёт от документов, а не от фото.</li>
+          <li>Сюжет первого экрана — сама услуга: разнесённая схема с ценами → детали по чекам, сумма 17 650 000 и возврат 140 000 → размеры 455×470 → таймер теста 8:00:00 → сетап с отметками ±0.000 / +0.750 / +1.190.</li>
+          <li>Спокойно и сухо, по-инженерному. Меньше «красиво», больше «понятно, за что плачу».</li>
+          <li>На телефоне под чертежом идёт ведомость: строки сметы, галочки по чекам, итог — цифры читаются без зума.</li>
+        </ul>
+      </div>
+      <div class="fonts">
+        <h3>Шрифты и палитра</h3>
+        <dl>
+          <dt>Fira Sans Extra Condensed 500–700</dt><dd>заголовки, печати, прописными</dd>
+          <dt>Fira Sans 400–600</dt><dd>текст, ведомость на телефоне</dd>
+          <dt>IBM Plex Mono 400–600</dt><dd>цифры, цены, серийные номера</dd>
+        </dl>
+        <div class="sw">
+          <span><i style="background:#F1EFEA"></i>#F1EFEA</span>
+          <span><i style="background:#F8F7F3"></i>#F8F7F3</span>
+          <span><i style="background:#1D1D1B"></i>#1D1D1B</span>
+          <span><i style="background:#D9501A"></i>#D9501A</span>
+          <span><i style="background:#B5441A"></i>#B5441A</span>
+          <span><i style="background:#C9A878"></i>#C9A878 крафт</span>
+          <span><i style="background:#DCD7CC"></i>#DCD7CC</span>
+        </div>
+      </div>
+      <div>
+        <h3>Оценка арт-директора</h3>
+        <div class="score"><b>7,5</b><small>/ 10 · «доработать» → правки внесены</small></div>
+        <ul class="pro">
+          <li>Точнее всех попадает в направление и в обещание «одним окном»: смета, чеки, тест, сдача видны в одной картинке.</li>
+          <li>Без WebGL: SVG и CSS. Быстрее всех на телефоне, нет ошибок в консоли, нет горизонтальной прокрутки на 360–1536.</li>
+          <li>Шкала платы и демо-арифметика сходятся; честные пометки «концепт», «ОБРАЗЕЦ».</li>
+        </ul>
+        <div class="sub">Осталось</div>
+        <ul class="con">
+          <li>Риск — выглядеть холодно и «для инженеров»; эстетику сетапа передаёт хуже, чем А и В.</li>
+          <li>График температур в паспорте на телефоне ~6 px; на 390×844 над и под чертежом пустые полосы ~30 px.</li>
+          <li>UZ — черновик: описания деталей и разделы ниже первого экрана на русском.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ А ============ -->
+  <section class="mk" id="a-masterskaya">
+    <div class="mk-head">
+      <h2><span class="ltr">А</span> «Мастерская»</h2>
+      <a class="open" href="a-masterskaya/index.html">Открыть макет</a>
+    </div>
+    <p class="oneline">Светлая предметная мастерская: дубовый стол при дневном свете, на нём по шагам собирается ПК, потом всё рабочее место.</p>
+    <div class="shots">
+      <figure>
+        <a href="a-masterskaya/shots/desktop-full.png"><img src="a-masterskaya/shots/desktop-hero.png" alt="А, первый экран на десктопе" loading="lazy"></a>
+        <figcaption>Десктоп 1440×900 · <a href="a-masterskaya/shots/desktop-full.png">вся страница</a></figcaption>
+      </figure>
+      <figure>
+        <a href="a-masterskaya/shots/mobile-full.png"><img src="a-masterskaya/shots/mobile-hero.png" alt="А, первый экран на телефоне" loading="lazy"></a>
+        <figcaption>Телефон 390 · <a href="a-masterskaya/shots/mobile-full.png">вся страница</a></figcaption>
+      </figure>
+    </div>
+    <div class="states">Шаги первого экрана:
+      <a href="a-masterskaya/shots/state-1.png">1 стол</a><a href="a-masterskaya/shots/state-2.png">2 корпус</a><a href="a-masterskaya/shots/state-3.png">3 детали</a><a href="a-masterskaya/shots/state-4.png">4 монитор и свет</a><a href="a-masterskaya/shots/state-5.png">5 сетап</a>
+      · промежуточные: <a href="a-masterskaya/shots/state-p030.png">p 0.30</a><a href="a-masterskaya/shots/state-p070.png">p 0.70</a>
+      · телефон: <a href="a-masterskaya/shots/mobile-state-3.png">3</a><a href="a-masterskaya/shots/mobile-state-5.png">5</a><a href="a-masterskaya/shots/mobile-uz-hero.png">UZ</a>
+      · <a href="a-masterskaya/shots/uz-configurator-setup.png">конфигуратор сетапа UZ</a><a href="a-masterskaya/shots/uz-ideas.png">идеи UZ</a><a href="a-masterskaya/shots/static-mode.png">без анимации</a>
+    </div>
+    <div class="cols">
+      <div>
+        <h3>Как ощущается</h3>
+        <ul>
+          <li>Тёплый дневной свет, дуб, войлок, тень оконной рамы — как съёмка интерьерного журнала, а не магазин железа.</li>
+          <li>Продаёт рабочее место целиком: в финале кресло, колонки, полка, лампа, паспорт на столе.</li>
+          <li>Премиально и спокойно: антиква Brygada 1918 в заголовках, много воздуха.</li>
+          <li>Самый полный продукт: конфигуратор «Только ПК / Сетап» с отдельной строкой «монтаж места 15 %», UZ на всю страницу.</li>
+        </ul>
+      </div>
+      <div class="fonts">
+        <h3>Шрифты и палитра</h3>
+        <dl>
+          <dt>Brygada 1918</dt><dd>заголовки</dd>
+          <dt>Roboto Flex</dt><dd>текст; ʻ — отдельным span с поправкой</dd>
+          <dt>IBM Plex Mono</dt><dd>цифры, даты, пометки</dd>
+        </dl>
+        <div class="sw">
+          <span><i style="background:#F1EFEA"></i>#F1EFEA</span>
+          <span><i style="background:#FBF9F4"></i>#FBF9F4</span>
+          <span><i style="background:#1D1D1B"></i>#1D1D1B</span>
+          <span><i style="background:#D9501A"></i>#D9501A</span>
+          <span><i style="background:#6E4B2F"></i>#6E4B2F орех</span>
+          <span><i style="background:#D8CBB6"></i>#D8CBB6 песок</span>
+          <span><i style="background:#5E574D"></i>#5E574D</span>
+          <span><i style="background:#C49A6A"></i>#C49A6A дуб, 3D</span>
+        </div>
+      </div>
+      <div>
+        <h3>Оценка арт-директора</h3>
+        <div class="score"><b>7</b><small>/ 10 · «доработать» → правки внесены</small></div>
+        <ul class="pro">
+          <li>Лучше всех передаёт «эстетичный сетап» и при этом остаётся светлым и честным.</li>
+          <li>Паспорт сборки на фоне ореха — самый сильный блок страницы.</li>
+          <li>Одна эталонная сборка везде: 26,83 млн + плата 3 млн (минимум) = 29,83 млн.</li>
+        </ul>
+        <div class="sub">Осталось</div>
+        <ul class="con">
+          <li>Сцена процедурная (three.js): для прода нужны модели или съёмка в том же свете — дорого.</li>
+          <li>FPS на реальном среднем Android не мерили; автопереход в лёгкий режим не проверен на устройстве.</li>
+          <li>Узбекский перевод не вычитан носителем языка.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ В ============ -->
+  <section class="mk" id="v-noch">
+    <div class="mk-head">
+      <h2><span class="ltr">В</span> «Ночная съёмка»</h2>
+      <a class="open" href="v-noch/index.html">Открыть макет</a>
+    </div>
+    <p class="oneline">Тёмная комната, одна тёплая лампа 2900 K. Щелчок — и свет по шагам раскрывает сборку и рабочее место.</p>
+    <div class="shots">
+      <figure>
+        <a href="v-noch/shots/desktop-full.png"><img src="v-noch/shots/desktop-hero.png" alt="В, первый экран на десктопе" loading="lazy"></a>
+        <figcaption>Десктоп 1440×900 · <a href="v-noch/shots/desktop-full.png">вся страница</a></figcaption>
+      </figure>
+      <figure>
+        <a href="v-noch/shots/mobile-full.png"><img src="v-noch/shots/mobile-hero.png" alt="В, первый экран на телефоне" loading="lazy"></a>
+        <figcaption>Телефон 390 · <a href="v-noch/shots/mobile-full.png">вся страница</a></figcaption>
+      </figure>
+    </div>
+    <div class="states">Шаги первого экрана:
+      <a href="v-noch/shots/state-0.png">00 свет</a><a href="v-noch/shots/state-1.png">01 смета</a><a href="v-noch/shots/state-2.png">02 закупка</a><a href="v-noch/shots/state-3.png">03 сборка и тест</a><a href="v-noch/shots/state-4.png">04 сетап</a>
+      · UZ: <a href="v-noch/shots/state-0-uz.png">00</a><a href="v-noch/shots/state-2-uz.png">02</a>
+      · телефон: <a href="v-noch/shots/state-2-mobile.png">02</a><a href="v-noch/shots/state-3-mobile.png">03</a><a href="v-noch/shots/fallback-no-webgl-mobile.png">без WebGL</a>
+    </div>
+    <div class="cols">
+      <div>
+        <h3>Как ощущается</h3>
+        <ul>
+          <li>Камерно и атмосферно: предметная ночная съёмка, тёплый чёрный, плёночное зерно, без неона и RGB.</li>
+          <li>Самый «дорогой» первый экран — если 3D доведено до уровня рендера; лампа — героиня сцены.</li>
+          <li>Ниже первого экрана — сдержанный тёмный интерфейс; паспорт на светлом листе, освещённом лампой, читается как контраст.</li>
+          <li>Ближе всех к языку игровой аудитории, но рискует уйти в «тёмный техносайт».</li>
+        </ul>
+      </div>
+      <div class="fonts">
+        <h3>Шрифты и палитра</h3>
+        <dl>
+          <dt>Roboto Flex 300, узкая ширина</dt><dd>заголовки RU</dd>
+          <dt>Fira Sans</dt><dd>текст; Fira Sans Condensed — заголовки UZ</dd>
+          <dt>IBM Plex Mono / Noto Sans Mono</dt><dd>цифры и метки RU / UZ (в Plex ʻ похож на акут)</dd>
+        </dl>
+        <div class="sw">
+          <span><i style="background:#121110"></i>#121110</span>
+          <span><i style="background:#1A1816"></i>#1A1816</span>
+          <span><i style="background:#2E2A26"></i>#2E2A26</span>
+          <span><i style="background:#A39C90"></i>#A39C90</span>
+          <span><i style="background:#F06A30"></i>#F06A30</span>
+          <span><i style="background:#E2A867"></i>#E2A867 лампа</span>
+          <span><i style="background:#F1EFEA"></i>#F1EFEA</span>
+        </div>
+      </div>
+      <div>
+        <h3>Оценка арт-директора</h3>
+        <div class="score"><b>7</b><small>/ 10 · «доработать» → правки внесены</small></div>
+        <ul class="pro">
+          <li>Направление выдержано честно: один тёплый свет, ни свечений, ни цветов из анти-списка.</li>
+          <li>3D переделано: фаски, кожух и рёбра видеокарты, ламели кулера, текстолит платы; детали проявляются на местах.</li>
+          <li>Есть текстовый запасной режим без WebGL и статичные кадры для reduced-motion.</li>
+        </ul>
+        <div class="sub">Осталось</div>
+        <ul class="con">
+          <li>Самое дорогое в производстве: для прода нужны glTF-модели или серия ночных рендеров и съёмка в той же гамме.</li>
+          <li>Самое тяжёлое на телефоне; таймер 3 с на медленном интернете может включить текстовый режим.</li>
+          <li>UZ — только шапка и первый экран; в запасном режиме справа пустое поле.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Сравнение ============ -->
+  <section class="cmp" id="sravnenie">
+    <h2>Сравнение</h2>
+    <p class="lead">Шкала из пяти: ● — оценка арт-директора по макетам и ревью. Для «сложности» и «риска» больше точек — хуже. Серым фоном отмечен лучший вариант в строке.</p>
+    <p class="note hint">Таблица листается вбок.</p>
+    <div class="tbl">
+      <table>
+        <thead>
+          <tr><th>Критерий</th><th>Б «Паспорт сборки»</th><th>А «Мастерская»</th><th>В «Ночная съёмка»</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>Доверие<small>чем подтверждается обещание</small></th>
+            <td class="best"><span class="dots"><span class="on">●●●●●</span></span>Документы вместо фото: смета, чеки, протокол теста, печати с датами.</td>
+            <td><span class="dots"><span class="on">●●●●</span><span class="off">●</span></span>Светло и открыто; паспорт — сильное доказательство. Сцена — визуализация.</td>
+            <td><span class="dots"><span class="on">●●●</span><span class="off">●●</span></span>Атмосфера сильнее фактов; тёмная подача у части людей вызывает настороженность.</td>
+          </tr>
+          <tr>
+            <th>Премиальность<small>ощущение дорогой студии</small></th>
+            <td><span class="dots"><span class="on">●●●</span><span class="off">●●</span></span>Аккуратно и точно, но инженерно; эстетику места передаёт слабее.</td>
+            <td class="best"><span class="dots"><span class="on">●●●●</span><span class="off">●</span></span>Дуб, дневной свет, антиква — интерьерный журнал.</td>
+            <td class="best"><span class="dots"><span class="on">●●●●</span><span class="off">●</span></span>Самый эффектный кадр — при условии качественных моделей и рендера.</td>
+          </tr>
+          <tr>
+            <th>Скорость на телефоне<small>83 % аудитории — Android</small></th>
+            <td class="best"><span class="dots"><span class="on">●●●●●</span><span class="off"></span></span>SVG + CSS, без WebGL. Проверено на 360×640.</td>
+            <td><span class="dots"><span class="on">●●●</span><span class="off">●●</span></span>three.js с лёгким режимом и контролем FPS; на устройстве не мерили.</td>
+            <td><span class="dots"><span class="on">●●</span><span class="off">●●●</span></span>three.js, тёмные тени, 390vh прокрутки; запасной режим по таймеру 3 с.</td>
+          </tr>
+          <tr>
+            <th>Сложность контента<small>что нужно делать на каждую сборку</small></th>
+            <td class="best"><span class="dots"><span class="on">●●</span><span class="off">●●●</span></span>Чертежи по шаблону и данные теста; фото сетапов не обязательны.</td>
+            <td><span class="dots"><span class="on">●●●●</span><span class="off">●</span></span>Модели или дневная предметная съёмка в одном свете.</td>
+            <td><span class="dots"><span class="on">●●●●●</span><span class="off"></span></span>Ночная съёмка с одним источником света или glTF-рендеры — самое трудоёмкое.</td>
+          </tr>
+          <tr>
+            <th>Риск «вида ИИ»<small>шаблонность, «техносайт»</small></th>
+            <td class="best"><span class="dots"><span class="on">●</span><span class="off">●●●●</span></span>Жанр чертежа редок для студий ПК; узнаваемо.</td>
+            <td><span class="dots"><span class="on">●●</span><span class="off">●●●</span></span>Низкий; процедурная 3D может выглядеть стоково, если не довести.</td>
+            <td><span class="dots"><span class="on">●●●</span><span class="off">●●</span></span>Тёмный фон + 3D + тёплый свет ближе всего к типовым «тёмным» лендингам.</td>
+          </tr>
+          <tr>
+            <th>Оценка арт-директора<small>до правок</small></th>
+            <td class="best">7,5 / 10</td>
+            <td>7 / 10</td>
+            <td>7 / 10</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rec">
+      <h3>Мнение арт-директора</h3>
+      <p>Самый надёжный старт — <b>Б «Паспорт сборки»</b>: он лучше всех доказывает обещание «Смета до покупки. Тесты до передачи», быстрее всех на телефоне и дешевле в контенте. Его слабость — холодность. Её можно закрыть элементами А: паспорт на фоне ореха, тёплая бумага, финальный кадр рабочего места.</p>
+      <p>Если главное — продавать эстетику сетапа и есть бюджет на съёмку, выбирайте <b>А</b>. <b>В</b> имеет смысл только с заказанными рендерами или съёмкой: на процедурной сцене он теряет больше всех.</p>
+      <p>Решение за владельцем.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">Nivel · страница сравнения макетов, 05.10.2026. Все цены в макетах — пример, цены на дату, не оферта. Сцены и чертежи — визуализация. Отзывов, клиентов и чужих фото в макетах нет; реквизиты ИП — после регистрации.</div>
+</footer>
+</body>
+</html>

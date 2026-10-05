@@ -1,0 +1,1851 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nivel — ПК и рабочие места под задачу, Ташкент</title>
+<meta name="description" content="Nivel: подбор, закупка по цене чеков, сборка, тесты и монтаж ПК и рабочих мест в Ташкенте. Смета до покупки. Тесты до передачи. Одно окно за результат.">
+<meta name="theme-color" content="#121110">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%231D1D1B' d='M2 4h13v2h-13Z'/%3E%3Cpath fill='%23D9501A' d='M2 6L10 6L6 10Z'/%3E%3Cpath fill='%231D1D1B' d='M1 10h14v2h-14Z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Mono:wght@400;500&family=Fira+Sans+Condensed:wght@300;400&family=Roboto+Flex:opsz,wdth,wght@8..144,25..151,100..1000&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<style>
+:root{
+  /* ядро бренда */
+  --asphalt:#1D1D1B; --signal:#D9501A; --signal-dark:#F06A30; --paper:#F1EFEA;
+  /* направление «Ночная съёмка» */
+  --night:#121110;      /* тёплый чёрный, фон */
+  --room:#0B0A09;       /* тень комнаты, первый экран */
+  --surface:#1A1816;    /* поверхности */
+  --surface-2:#211E1B;
+  --line:#2E2A26;
+  --line-2:#3B3631;
+  --text:#F1EFEA;
+  --muted:#A39C90;      /* 6,9:1 на фоне */
+  --lamp:#E2A867;       /* свет лампы 2900 K: только в сцене и тонких отметках */
+  --accent:#F06A30;
+  --gut:clamp(16px, 4vw, 56px);
+  --maxw:1280px;
+  --display:"Roboto Flex", "Fira Sans", system-ui, sans-serif;
+  --sans:"Fira Sans", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+}
+/* в IBM Plex Mono знак ʻ похож на акут — для узбекского берём Noto Sans Mono */
+/* в Roboto Flex знак ʻ рисуется как акут с широкими полями — узбекские заголовки набираем Fira Sans Condensed */
+html[lang="uz-Latn"]{--mono:"Noto Sans Mono", ui-monospace, monospace;--display:"Fira Sans Condensed","Fira Sans",system-ui,sans-serif}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:auto}
+body{margin:0;background:var(--night);color:var(--text);font-family:var(--sans);font-size:17px;line-height:1.55;font-weight:400;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+img,svg{display:block}
+button{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-feature-settings:"zero" 0}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
+::selection{background:var(--accent);color:var(--night)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* ---------- кнопки ---------- */
+.btn{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 22px;border-radius:2px;border:1px solid var(--line-2);background:transparent;text-decoration:none;font-weight:500;font-size:15px;letter-spacing:.01em;cursor:pointer;transition:background .2s,border-color .2s,color .2s;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--night)}
+.btn-primary:hover{background:#F5814E;border-color:#F5814E}
+.btn .tri{width:9px;height:9px;flex:none}
+.tri{display:inline-block;width:10px;height:10px;background:currentColor;clip-path:polygon(0 0,100% 0,50% 100%)}
+.tri-o{color:var(--accent)}
+
+/* ---------- шапка ---------- */
+.hdr{position:fixed;inset:0 0 auto 0;z-index:50;transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
+.hdr.solid{background:rgba(18,17,16,.97);border-bottom-color:var(--line)}
+.hdr-in{height:68px;display:flex;align-items:center;gap:28px;max-width:1440px;margin:0 auto;padding:0 var(--gut)}
+.logo{display:block;width:118px;flex:none}
+.logo svg{width:100%;height:auto}
+.nav{display:flex;gap:26px;margin-left:12px}
+.nav a{text-decoration:none;font-size:15px;color:var(--muted);transition:color .2s}
+.nav a:hover{color:var(--text)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.lang{display:flex;border:1px solid var(--line-2);border-radius:2px;overflow:hidden}
+.lang button{background:none;border:0;padding:0 10px;height:32px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--muted);cursor:pointer}
+.lang button[aria-pressed="true"]{background:var(--paper);color:var(--night)}
+.hdr .btn{height:40px;padding:0 16px;font-size:14px}
+.burger{display:none;background:none;border:1px solid var(--line-2);height:36px;padding:0 12px;border-radius:2px;font-size:14px;cursor:pointer}
+.mnav{display:none}
+@media (max-width:980px){
+  .nav,.hdr-right .btn{display:none}
+  .burger{display:inline-flex;align-items:center}
+  .hdr-in{height:60px;gap:12px}
+  .logo{width:96px}
+  .mnav{position:fixed;inset:60px 0 auto 0;background:var(--night);border-bottom:1px solid var(--line);padding:8px var(--gut) 22px;flex-direction:column;z-index:49}
+  .mnav.open{display:flex}
+  .mnav a{padding:14px 0;border-bottom:1px solid var(--line);text-decoration:none;font-size:18px}
+  .mnav .btn{margin-top:18px;justify-content:center}
+}
+
+/* ---------- первый экран ---------- */
+.hero{position:relative;height:400vh;background:var(--room)}
+.hero-stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;background:var(--room)}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+.grain{position:absolute;inset:-50%;pointer-events:none;opacity:.075;background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .45 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.vignette{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(11,10,9,.72) 0%,rgba(11,10,9,.35) 30%,rgba(11,10,9,0) 52%)}
+.copy{position:absolute;left:var(--gut);top:50%;transform:translateY(-50%);width:min(540px,40vw);z-index:3}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:10px;align-items:flex-start;margin:0 0 22px}
+.kicker .tri{width:8px;height:8px;flex:none;margin-top:4px}
+.h1{font-family:var(--display);font-weight:300;font-variation-settings:"wdth" 94,"opsz" 96;font-size:clamp(42px,5.4vw,84px);line-height:.98;letter-spacing:-.012em;margin:0 0 26px}
+.h1 em{font-style:normal;color:var(--muted)}
+.lede{font-size:clamp(16px,1.35vw,19px);color:#D8D2C7;max-width:30em;margin:0 0 30px}
+.promise{list-style:none;padding:0;margin:0 0 34px;display:grid;gap:8px;font-family:var(--mono);font-size:13px;letter-spacing:.02em}
+.promise li{display:flex;gap:12px;align-items:baseline}
+.promise b{font-weight:500;color:var(--text)}
+.promise span{color:var(--muted)}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap}
+.caps{position:absolute;left:var(--gut);top:50%;transform:translateY(-50%);width:min(500px,38vw);z-index:3;pointer-events:none}
+.cap{position:absolute;left:0;top:50%;transform:translateY(-50%);width:100%;opacity:0;visibility:hidden}
+.cap .num{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.cap h2{font-family:var(--display);font-weight:300;font-variation-settings:"wdth" 88,"opsz" 72;font-size:clamp(34px,3.9vw,60px);line-height:1;letter-spacing:-.02em;margin:0 0 18px}
+.cap p{margin:0 0 14px;color:#D8D2C7;font-size:clamp(15px,1.2vw,18px);max-width:28em}
+.cap .facts{font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:18px;display:grid;gap:6px}
+.cap .facts b{color:var(--text);font-weight:500}
+.cap .cta-row{pointer-events:auto;margin-top:24px}
+.labels{position:absolute;inset:0;pointer-events:none;z-index:2}
+.lbl{position:absolute;left:0;top:0;font-family:var(--mono);font-size:12px;line-height:1.35;color:var(--text);white-space:nowrap;opacity:0;transition:opacity .25s;padding-left:16px;will-change:transform}
+.lbl::before{content:"";position:absolute;left:0;top:4px;width:8px;height:8px;background:var(--accent);clip-path:polygon(0 0,100% 0,50% 100%)}
+.lbl span{display:block;color:var(--muted)}
+.hud{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:0 var(--gut) 22px;pointer-events:none}
+.ticks{display:flex;gap:4px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted)}
+.ticks li{list-style:none;min-width:86px;padding-right:12px;white-space:nowrap;padding-top:10px;border-top:1px solid var(--line-2);position:relative;transition:color .3s,border-color .3s}
+.ticks li.on{color:var(--text);border-top-color:var(--text)}
+.ticks li.now::before{content:"";position:absolute;left:0;top:-1px;width:9px;height:9px;background:var(--accent);clip-path:polygon(0 0,100% 0,50% 100%)}
+.ticks{padding:0;margin:0}
+.meter{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;display:grid;gap:4px;justify-items:end}
+.meter .sum{color:var(--text);font-size:13px;opacity:0;transition:opacity .3s}
+.meter .viz{border:1px solid var(--line-2);padding:4px 8px;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+.skip{position:absolute;right:var(--gut);top:84px;z-index:4;display:inline-flex;align-items:center;gap:10px;height:38px;padding:0 14px;border:1px solid var(--line-2);border-radius:2px;background:rgba(11,10,9,.72);font-size:14px;font-weight:500;color:var(--text);text-decoration:none;transition:border-color .2s}
+.skip .tri{width:8px;height:8px;color:var(--accent)}
+.skip:hover{border-color:var(--muted)}
+.scroll-hint{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:30px;display:flex;align-items:center;gap:10px}
+.scroll-hint i{display:block;width:1px;height:28px;background:var(--line-2);position:relative;overflow:hidden}
+.scroll-hint i::after{content:"";position:absolute;left:0;top:-10px;width:1px;height:10px;background:var(--text);animation:drip 2.2s ease-in-out infinite}
+@keyframes drip{to{top:28px}}
+/* запасной режим: нет WebGL, не загрузился three.js или сцена не готова за 3 с */
+.no-webgl .hero{height:auto}
+.no-webgl .hero-stage{position:relative;height:auto;padding:150px 0 40px;background:var(--room)}
+.no-webgl .copy{position:relative;left:auto;top:auto;bottom:auto;right:auto;transform:none!important;opacity:1!important;visibility:visible!important;width:auto;max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
+.no-webgl .copy>*{max-width:640px}
+.no-webgl #scene,.no-webgl .labels,.no-webgl .caps,.no-webgl .skip,.no-webgl .scroll-hint,.no-webgl .hud,.no-webgl .vignette{display:none}
+.no-webgl .stills{display:block;padding:24px 0 80px;background:var(--room)}
+.no-webgl .stills ol{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.no-webgl .stills figure{border-top:1px solid var(--line-2);padding-top:14px}
+.no-webgl .stills figcaption{margin-top:0}
+.no-webgl .stills figcaption i{display:block;font-style:normal;font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:8px}
+
+@media (max-width:760px){
+  .hero{height:390vh}
+  .vignette{background:linear-gradient(0deg,rgba(11,10,9,.94) 0%,rgba(11,10,9,.82) 34%,rgba(11,10,9,0) 58%)}
+  .copy,.caps{left:16px;right:16px;width:auto;top:auto;bottom:92px;transform:none}
+  .caps{height:0}
+  .cap{top:auto;bottom:0;transform:none}
+  .h1{font-size:40px;margin-bottom:16px}
+  .lede{font-size:15px;margin-bottom:18px}
+  .promise{display:none}
+  .kicker{margin-bottom:14px;font-size:11px}
+  .cap h2{font-size:32px;margin-bottom:12px}
+  .cap p{font-size:15px;margin-bottom:8px}
+  .cap .facts{font-size:12px;margin-top:10px}
+  .scroll-hint{display:none}
+  .btn{height:46px;padding:0 18px}
+  .ticks li{min-width:0;flex:1;font-size:0;padding-top:8px}
+  .ticks{flex:1}
+  .hud{padding-bottom:18px;align-items:center}
+  .meter{min-width:0}
+  .meter .sum{font-size:10.5px;white-space:nowrap}
+  .ticks{min-width:0}
+  .skip{top:70px;height:34px;font-size:13px;padding:0 12px}
+  .no-webgl .hero-stage{padding:110px 0 24px}
+  .no-webgl .promise{display:grid}
+  .labels{display:none}
+}
+
+/* ---------- кадры без анимации ---------- */
+.stills{display:none}
+.reduced .hero{height:auto}
+.reduced .hero-stage{position:relative;height:100vh;height:100svh}
+.reduced .caps,.reduced .labels,.reduced .skip,.reduced .scroll-hint,.reduced .ticks{display:none}
+.reduced .hud{justify-content:flex-end}
+.reduced .stills{display:block;padding:72px 0 24px;background:var(--room)}
+.stills ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
+.stills figure{margin:0}
+.stills img{width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;background:var(--surface)}
+.stills figcaption{font-size:14px;color:var(--muted);margin-top:10px}
+.stills figcaption b{display:block;color:var(--text);font-weight:500;font-size:15px}
+
+/* ---------- общие секции ---------- */
+section.sec{padding:clamp(80px,10vw,150px) 0;border-top:1px solid var(--line);position:relative}
+.sec-head{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:40px;align-items:end;margin-bottom:clamp(40px,5vw,72px)}
+.idx{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px;margin:0 0 18px}
+.h2{font-family:var(--display);font-weight:300;font-variation-settings:"wdth" 88,"opsz" 96;font-size:clamp(36px,4.6vw,68px);line-height:1;letter-spacing:-.022em;margin:0}
+.sec-head p{margin:0;color:var(--muted);max-width:36em}
+.sec-head p b{color:var(--text);font-weight:500}
+@media (max-width:860px){.sec-head{grid-template-columns:1fr;gap:18px}}
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .8s ease,transform .8s ease}
+.reveal.in{opacity:1;transform:none}
+.reduced .reveal,.flat .reveal{opacity:1;transform:none;transition:none}
+
+/* ---------- путь ---------- */
+.ruler{position:relative;height:56px;margin-bottom:6px}
+.ruler svg{width:100%;height:56px}
+.steps{list-style:none;margin:0;padding:0;border-bottom:1px solid var(--line)}
+.step{display:grid;grid-template-columns:70px minmax(0,1.05fr) minmax(0,1.7fr) 190px 200px;gap:28px;padding:28px 0;border-top:1px solid var(--line);align-items:baseline;transition:background .25s}
+.step:hover{background:linear-gradient(90deg,transparent,rgba(241,239,234,.025) 30%,transparent)}
+.step .n{font-family:var(--mono);font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center}
+.step .n .tri{opacity:0;transition:opacity .2s;width:8px;height:8px}
+.step:hover .n .tri{opacity:1}
+.step h3{font-family:var(--display);font-weight:400;font-variation-settings:"wdth" 92,"opsz" 32;font-size:clamp(22px,2vw,28px);line-height:1.1;letter-spacing:-.01em;margin:0}
+.step p{margin:0;color:#D0C9BD;font-size:16px}
+.step .when,.step .money{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.step .when b,.step .money b{display:block;color:var(--text);font-weight:500;font-size:14px;margin-bottom:2px}
+.path-note{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:20px}
+@media (max-width:1060px){
+  .step{grid-template-columns:52px minmax(0,1fr) minmax(0,1fr);gap:10px 18px}
+  .step p{grid-column:2/4}
+  .step .when{grid-column:2/3}
+  .step .money{grid-column:3/4}
+}
+@media (max-width:560px){
+  .step{grid-template-columns:38px 1fr;padding:22px 0}
+  .step p,.step .when,.step .money{grid-column:2/3}
+  .ruler{display:none}
+}
+
+/* ---------- конфигуратор ---------- */
+.cfg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:clamp(28px,4vw,64px);align-items:start}
+.cfg-ctrl{display:grid;gap:40px}
+.q{border:0;margin:0;padding:0;min-width:0}
+.q legend{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;padding:0;display:flex;gap:10px}
+.q legend b{color:var(--text);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0}
+.chip span{display:inline-flex;align-items:center;height:42px;padding:0 16px;border:1px solid var(--line-2);border-radius:2px;font-size:15px;color:#D8D2C7;transition:all .2s}
+.chip input:hover+span{border-color:var(--muted)}
+.chip input:checked+span{background:var(--paper);border-color:var(--paper);color:var(--night)}
+.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.budget-val{font-family:var(--display);font-weight:300;font-variation-settings:"wdth" 88,"opsz" 72;font-size:clamp(44px,4.6vw,64px);line-height:1;letter-spacing:-.02em;margin:0 0 18px;display:flex;align-items:baseline;gap:12px}
+.budget-val small{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:0}
+.range{position:relative;padding:8px 0 30px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:linear-gradient(90deg,var(--paper) var(--fill,30%),var(--line-2) var(--fill,30%))}
+input[type=range]::-moz-range-track{height:2px;background:var(--line-2)}
+input[type=range]::-moz-range-progress{height:2px;background:var(--paper)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-10px;background:var(--paper);border:5px solid var(--night);outline:1px solid var(--paper);border-radius:50%}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;background:var(--paper);border:4px solid var(--night);outline:1px solid var(--paper);border-radius:50%}
+.range-scale{position:absolute;left:0;right:0;bottom:0;height:24px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.range-scale span{position:absolute;transform:translateX(-50%);top:6px;white-space:nowrap}
+.range-scale span:first-child{transform:none}
+.range-scale span:last-child{transform:translateX(-100%)}
+.range-scale .edge{color:var(--text)}
+.range-scale .edge::before{content:"";position:absolute;left:50%;top:-12px;width:8px;height:8px;margin-left:-4px;background:var(--accent);clip-path:polygon(0 0,100% 0,50% 100%)}
+.style-grid{display:grid;gap:16px}
+.style-row{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center}
+.style-row>span{font-size:14px;color:var(--muted)}
+.seg{justify-self:start;display:inline-flex;border:1px solid var(--line-2);border-radius:2px;flex-wrap:wrap}
+.seg label{position:relative}
+.seg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.seg span{display:inline-flex;align-items:center;height:38px;padding:0 14px;font-size:14px;color:#D8D2C7;transition:all .2s}
+.seg input:checked+span{background:var(--paper);color:var(--night)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:-2px}
+
+.card{background:var(--surface);border:1px solid var(--line);padding:clamp(20px,2.4vw,32px);position:relative}
+.card-top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:18px}
+.card-top h3{font-family:var(--display);font-weight:400;font-variation-settings:"wdth" 92,"opsz" 32;font-size:24px;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+.card-top .sub{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.case-pic{flex:none;width:96px;height:110px}
+.parts{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.parts li{display:grid;grid-template-columns:118px minmax(0,1fr) auto;gap:14px;padding:11px 0;border-bottom:1px solid var(--line);align-items:baseline;font-size:15px}
+.parts .k{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.parts .v{color:var(--text)}
+.parts .p{font-family:var(--mono);font-size:14px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.parts li.chg .v,.parts li.chg .p{animation:flash .6s ease}
+@keyframes flash{from{color:var(--accent)}}
+.checks{font-family:var(--mono);font-size:12px;color:var(--muted);margin:14px 0 4px;display:flex;flex-wrap:wrap;gap:6px 18px}
+.checks span::before{content:"✓ ";color:var(--text)}
+.checks span.warn{color:var(--accent)}
+.checks span.warn::before{content:"! ";color:var(--accent)}
+.totals{margin-top:16px;display:grid;gap:8px}
+.totals div{display:flex;justify-content:space-between;gap:16px;font-size:15px;color:#D8D2C7}
+.totals .p{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.totals .fee small{display:block;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.totals .all{border-top:1px solid var(--line-2);padding-top:14px;margin-top:6px;color:var(--text);align-items:baseline}
+.totals .all small{display:block;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.totals .all .p{font-family:var(--display);font-weight:400;font-variation-settings:"wdth" 92,"opsz" 48;font-size:32px;letter-spacing:-.01em}
+.note{font-family:var(--mono);font-size:12px;color:var(--muted);margin:14px 0 20px;line-height:1.6}
+.note .tag{display:inline-block;border:1px solid var(--line-2);padding:2px 7px;margin-right:6px;color:var(--text);text-transform:uppercase;letter-spacing:.06em;font-size:10.5px}
+.over{display:none;border-left:2px solid var(--accent);padding:8px 0 8px 14px;margin:14px 0 0;font-size:14px;color:#D8D2C7}
+.over.show{display:block}
+.card .btn{width:100%;justify-content:center}
+@media (max-width:900px){.cfg{grid-template-columns:1fr}}
+@media (max-width:480px){
+  .parts li{grid-template-columns:1fr auto;gap:2px 12px}
+  .parts .k{grid-column:1/3}
+  .style-row{grid-template-columns:1fr}
+  .case-pic{width:70px;height:80px}
+  .totals .all .p{font-size:26px}
+}
+
+/* ---------- паспорт ---------- */
+.pass{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(30px,5vw,80px);align-items:center}
+.pass-list{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:0;border-top:1px solid var(--line)}
+.pass-list li{padding:16px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:28px 1fr;gap:10px;color:#D0C9BD;font-size:16px}
+.pass-list li .mono{color:var(--muted);font-size:12px;padding-top:4px}
+.sheet-wrap{position:relative;padding:20px 0}
+/* пятно света лампы на столе под листом: мягкий спад, без ореолов по контуру */
+.sheet-wrap::before{content:"";position:absolute;left:-22%;top:-20%;width:110%;height:120%;pointer-events:none;background:radial-gradient(closest-side,rgba(226,168,103,.13) 0%,rgba(226,168,103,.06) 45%,rgba(226,168,103,0) 100%)}
+.sheet{position:relative;background:var(--paper);color:#1D1D1B;padding:clamp(20px,3vw,40px);transform:rotate(-1.2deg);box-shadow:0 40px 80px -20px rgba(0,0,0,.75),0 2px 0 rgba(0,0,0,.4);overflow:hidden}
+.sheet::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;mix-blend-mode:multiply;background:radial-gradient(140% 120% at 12% -6%,rgba(255,214,160,.22) 0%,rgba(255,228,196,0) 34%,rgba(120,92,64,.16) 62%,rgba(52,38,26,.46) 100%)}
+.sheet::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;background:radial-gradient(70% 55% at 14% 4%,rgba(255,240,214,.20) 0%,rgba(255,240,214,0) 100%)}
+.sheet>*:not(.wm){position:relative;z-index:1}
+.sheet .wm{position:absolute;left:50%;top:52%;font-family:var(--display);font-weight:700;font-variation-settings:"wdth" 60;font-size:clamp(56px,7vw,104px);letter-spacing:.06em;color:rgba(29,29,27,.06);transform:translate(-50%,-50%) rotate(-14deg);pointer-events:none;white-space:nowrap}
+.sheet-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:2px solid #1D1D1B;padding-bottom:14px;margin-bottom:14px}
+.sheet-head .t{font-family:var(--display);font-weight:500;font-variation-settings:"wdth" 80,"opsz" 32;font-size:clamp(20px,2vw,26px);letter-spacing:-.005em;line-height:1.1}
+.sheet-head .t small{display:block;font-family:var(--mono);font-weight:400;font-size:11.5px;letter-spacing:.04em;color:#5A564F;margin-top:6px}
+.sheet-head svg{width:30px;flex:none}
+.badge{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid #1D1D1B;padding:2px 6px;margin-left:8px;vertical-align:middle;color:#1D1D1B;font-weight:500}
+.meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 18px;font-size:13px;margin-bottom:14px}
+.meta div span{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#6A655D}
+.ptab{width:100%;border-collapse:collapse;font-size:13px}
+.ptab th{text-align:left;font-family:var(--mono);font-weight:500;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#6A655D;padding:8px 8px 6px 0;border-bottom:1px solid #1D1D1B}
+.ptab td{padding:9px 8px 9px 0;border-bottom:1px solid rgba(29,29,27,.2);vertical-align:top}
+.ptab td:first-child{font-weight:500;width:26%}
+.ptab td.m{font-family:var(--mono);font-size:12px}
+.ok{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#1D1D1B;white-space:nowrap}
+.ok::before{content:"";display:inline-block;width:7px;height:7px;background:#D9501A;clip-path:polygon(0 0,100% 0,50% 100%);margin-right:6px;vertical-align:1px}
+.sign{display:grid;grid-template-columns:1fr 1fr auto;gap:20px;align-items:end;margin-top:22px;font-size:12px;color:#5A564F}
+.sign .ln{border-bottom:1px solid #1D1D1B;height:34px;position:relative}
+.sign .ln svg{position:absolute;left:8px;bottom:2px;width:120px;height:30px}
+.stamp{width:108px;height:108px;transform:rotate(-12deg);opacity:.88;mix-blend-mode:multiply}
+@media (max-width:900px){.pass{grid-template-columns:1fr}}
+@media (max-width:560px){
+  .meta{grid-template-columns:1fr 1fr}
+  .ptab td:first-child{width:auto}
+  .ptab th:nth-child(2),.ptab td:nth-child(2){display:none}
+  .sign{grid-template-columns:1fr 1fr;gap:14px}
+  .stamp{grid-column:1/3;grid-row:1;justify-self:end;width:76px;height:76px;margin:-6px 0 -18px}
+  .sheet{transform:none}
+}
+
+/* ---------- идеи ---------- */
+.ideas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.idea{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line)}
+.idea .bar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--muted)}
+.idea .bar b{color:var(--text);font-weight:500}
+.idea .pic{aspect-ratio:4/5;position:relative;background:#141210}
+.idea .pic svg{width:100%;height:100%}
+.idea .pic .ph{position:absolute;left:10px;bottom:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line-2);padding:3px 7px;background:#141210}
+.idea .body{padding:16px 14px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.idea h3{font-family:var(--display);font-weight:400;font-variation-settings:"wdth" 92,"opsz" 28;font-size:20px;line-height:1.15;margin:0}
+.idea .by{font-size:13px;color:var(--muted)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tags span{font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);padding:2px 7px;color:#D0C9BD}
+.idea .est{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:auto}
+.idea .est b{display:block;color:var(--text);font-weight:500;font-size:14px}
+.idea .btn{height:42px;font-size:14px;justify-content:center;padding:0 12px;white-space:normal;text-align:center;line-height:1.2}
+.idea .btn .tri{color:var(--accent);width:8px;height:8px}
+.cfg-next{border-top:1px solid var(--line);padding-top:22px;font-size:15px;color:var(--muted);display:grid;gap:10px}
+.cfg-next b{color:var(--text);font-weight:500}
+.cfg-next>span{display:grid;grid-template-columns:18px 1fr;gap:8px}
+.cfg-next .tri{width:8px;height:8px;margin-top:8px;color:var(--line-2)}
+.ideas-note{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:20px;max-width:70em}
+@media (max-width:1100px){.ideas{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){
+  .ideas{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;margin:0 calc(-1 * var(--gut));padding:0 var(--gut) 14px;scroll-padding:0 var(--gut);-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .idea{flex:0 0 82%;scroll-snap-align:start}
+  .idea .pic{aspect-ratio:4/3}
+  .idea .pic svg{transform:scale(1.1)}
+}
+.ideas-hint{display:none;font-family:var(--mono);font-size:12px;color:var(--muted);margin:0 0 12px}
+@media (max-width:560px){.ideas-hint{display:block}}
+
+/* ---------- цены ---------- */
+#ceny{background:radial-gradient(46% 52% at 84% 22%,rgba(226,168,103,.06) 0%,rgba(226,168,103,.025) 50%,rgba(226,168,103,0) 100%)}
+.prices{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(30px,5vw,80px)}
+.scale{width:100%;border-collapse:collapse}
+.scale th{text-align:left;font-family:var(--mono);font-weight:400;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 16px 12px 0;border-bottom:1px solid var(--line-2)}
+.scale td{padding:22px 16px 22px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.scale .rate{font-family:var(--display);font-weight:300;font-variation-settings:"wdth" 88,"opsz" 72;font-size:clamp(36px,3.6vw,52px);line-height:1;letter-spacing:-.02em;white-space:nowrap}
+.scale .rate small{display:block;font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:0;margin-top:8px;white-space:normal}
+.scale .ex{font-family:var(--mono);font-size:13px;color:#D0C9BD;line-height:1.7;white-space:nowrap}
+.scale td:first-child{font-size:16px}
+.scale td:first-child span{display:block;font-size:13px;color:var(--muted);margin-top:4px}
+.rules{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:12px}
+.rules li{display:grid;grid-template-columns:18px 1fr;gap:10px;color:#D0C9BD;font-size:16px}
+.rules li .tri{width:8px;height:8px;margin-top:9px;color:var(--muted)}
+.rules li b{color:var(--text);font-weight:500}
+.warranty{background:var(--surface);border:1px solid var(--line);padding:clamp(22px,3vw,40px)}
+.warranty .big{font-family:var(--display);font-weight:300;font-variation-settings:"wdth" 88,"opsz" 96;font-size:clamp(64px,8vw,120px);line-height:.9;letter-spacing:-.04em;margin:0}
+.warranty .big small{font-size:.28em;letter-spacing:0;color:var(--muted);font-weight:400;margin-left:10px}
+.warranty h3{font-family:var(--display);font-weight:400;font-variation-settings:"wdth" 92,"opsz" 32;font-size:24px;margin:14px 0 8px;letter-spacing:-.01em}
+.warranty>p{color:#D0C9BD;margin:0 0 22px}
+.wl{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.wl li{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.wl li span:last-child{font-family:var(--mono);font-size:13px;text-align:right;color:var(--text);white-space:nowrap}
+.wl li span:first-child{color:#D0C9BD}
+.wl li.key span:last-child{color:var(--accent)}
+@media (max-width:900px){.prices{grid-template-columns:1fr}}
+@media (max-width:560px){.scale th:nth-child(3){display:none}.scale td{display:block;padding:0 0 12px}.scale tr{display:block;padding:20px 0;border-bottom:1px solid var(--line)}.scale td{border:0}.scale thead{display:none}.wl li{flex-direction:column;gap:2px}.wl li span:last-child{text-align:left}}
+
+/* ---------- заявка ---------- */
+.ask{padding:clamp(80px,9vw,130px) 0;border-top:1px solid var(--line)}
+.ask-in{display:grid;grid-template-columns:minmax(0,1.3fr) auto;gap:40px;align-items:end}
+.ask .h2{font-size:clamp(34px,4.2vw,62px)}
+.ask p{color:var(--muted);margin:18px 0 0;max-width:36em}
+@media (max-width:760px){.ask-in{grid-template-columns:1fr}}
+
+/* ---------- подвал ---------- */
+.ftr{border-top:1px solid var(--line);padding:56px 0 40px;font-size:14px;color:var(--muted)}
+.ftr-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.2fr;gap:36px}
+.ftr .logo{width:140px;margin-bottom:18px}
+.ftr h4{font-family:var(--mono);font-weight:400;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+.ftr ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ftr a{text-decoration:none;color:#D0C9BD}
+.ftr a:hover{color:var(--text)}
+.ftr .req{font-family:var(--mono);font-size:12px;line-height:1.7}
+.ftr-bot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:44px;padding-top:20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px}
+.ftr-bot button{background:none;border:0;border-bottom:1px solid var(--line-2);padding:0 0 1px;color:var(--muted);cursor:pointer;font-family:var(--mono);font-size:12px}
+@media (max-width:900px){.ftr-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.ftr-grid{grid-template-columns:1fr}}
+
+@media (prefers-reduced-motion:reduce){
+  .scroll-hint i::after{animation:none}
+  .reveal{opacity:1;transform:none;transition:none}
+}
+</style>
+</head>
+<body>
+
+<header class="hdr" id="hdr">
+  <div class="hdr-in">
+    <a class="logo" href="#top" aria-label="Nivel — на главную">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово для тёмного фона #1D1D1B</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#F1EFEA" d="M8 16h52v8h-52Z"/><path fill="#F06A30" d="M8 24L24 24L24 40Z"/><path fill="#F1EFEA" d="M24 24L40 24L24 40Z"/><path fill="#F1EFEA" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#F1EFEA" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#F06A30" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+    </a>
+    <nav class="nav" aria-label="Основное меню">
+      <a href="#konfigurator" data-i18n="nav1">Конфигуратор</a>
+      <a href="#idei" data-i18n="nav2">Идеи</a>
+      <a href="#put" data-i18n="nav3">Как работаем</a>
+      <a href="#ceny" data-i18n="nav4">Цены</a>
+    </nav>
+    <div class="hdr-right">
+      <div class="lang" role="group" aria-label="Язык">
+        <button type="button" data-lang="ru" aria-pressed="true">RU</button>
+        <button type="button" data-lang="uz" aria-pressed="false">UZ</button>
+      </div>
+      <a class="btn btn-primary" href="#konfigurator" data-i18n="cta">Рассчитать сетап</a>
+      <button class="burger" type="button" aria-expanded="false" aria-controls="mnav" data-i18n="menu">Меню</button>
+    </div>
+  </div>
+</header>
+<nav class="mnav" id="mnav" aria-label="Меню">
+  <a href="#konfigurator" data-i18n="nav1">Конфигуратор</a>
+  <a href="#idei" data-i18n="nav2">Идеи</a>
+  <a href="#put" data-i18n="nav3">Как работаем</a>
+  <a href="#ceny" data-i18n="nav4">Цены</a>
+  <a class="btn btn-primary" href="#konfigurator" data-i18n="cta">Рассчитать сетап</a>
+</nav>
+
+<main>
+<section class="hero" id="top" aria-label="Первый экран">
+  <div class="hero-stage">
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <p class="sr" data-i18n="alt">Визуализация. Рабочее место в полутьме: настольная лампа, стол, монитор и тёмный корпус ПК. При прокрутке корпус открывается, детали встают на места, затем свет раскрывает весь сетап. Пример сборки, не выполненный заказ.</p>
+    <div class="vignette"></div>
+    <div class="grain"></div>
+    <a class="skip" href="#put"><span class="tri"></span><span data-i18n="skip">Пропустить анимацию</span></a>
+
+    <div class="copy" id="copy0">
+      <p class="kicker"><span class="tri tri-o"></span><span data-i18n="kicker">Ташкент · ПК и рабочие места · первые сборки — с ноября 2026</span></p>
+      <h1 class="h1" data-i18n="h1">Рабочее место под&nbsp;вашу задачу.</h1>
+      <p class="lede" data-i18n="lede">Подбираем, покупаем, собираем, тестируем и ставим ПК и весь сетап. Отвечаем за результат сами.</p>
+      <ul class="promise">
+        <li><b data-i18n="pr1">Смета до покупки.</b><span data-i18n="pr1s">цены магазинов на дату</span></li>
+        <li><b data-i18n="pr2">Тесты до передачи.</b><span data-i18n="pr2s">8 часов под нагрузкой</span></li>
+        <li><b data-i18n="pr3">Одно окно за результат.</b><span data-i18n="pr3s">гарантия 12 месяцев</span></li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#konfigurator" data-i18n="cta">Рассчитать сетап</a>
+        <a class="btn" href="#put" data-i18n="how">Как работаем</a>
+      </div>
+      <p class="scroll-hint"><i></i><span data-i18n="hint">Прокрутите — ПК соберётся на столе</span></p>
+    </div>
+
+    <div class="caps" aria-live="off">
+      <div class="cap" data-cap="1">
+        <p class="num"><span class="tri tri-o"></span>01 / 04</p>
+        <h2 data-i18n="c1h">Смета до покупки</h2>
+        <p data-i18n="c1p">Подбираем детали под задачу и бюджет. Цены магазинов Ташкента с датой и временем, курс ЦБ. Смета действует 24 часа.</p>
+        <div class="facts"><span data-i18n="c1f">Плата за работу — отдельной строкой: <b>15 %</b> до 20 млн сум</span></div>
+      </div>
+      <div class="cap" data-cap="2">
+        <p class="num"><span class="tri tri-o"></span>02 / 04</p>
+        <h2 data-i18n="c2h">Закупка по цене чеков</h2>
+        <p data-i18n="c2p">Покупаем сами за 1–2 рабочих дня. Отчёт с чеками, гарантийными талонами и серийными номерами — за 24–48 часов.</p>
+        <div class="facts"><span data-i18n="c2f">Чеки дешевле сметы — <b>разница ваша</b></span></div>
+      </div>
+      <div class="cap" data-cap="3">
+        <p class="num"><span class="tri tri-o"></span>03 / 04</p>
+        <h2 data-i18n="c3h">Сборка и тест 8 часов</h2>
+        <p data-i18n="c3p">Кабели уложены, BIOS обновлён, профиль памяти включён. Нагрузка 8 часов, протокол — в паспорте сборки.</p>
+        <div class="facts" id="testfacts"><span>CPU <b>81 °C</b> · GPU <b>72 °C</b> · <span data-i18n="c3f">ошибок</span> <b>0</b></span></div>
+      </div>
+      <div class="cap" data-cap="4">
+        <p class="num"><span class="tri tri-o"></span>04 / 04</p>
+        <h2 data-i18n="c4h">Одно окно за результат</h2>
+        <p data-i18n="c4p">Привозим, ставим и подключаем рабочее место. Гарантия 12 месяцев: случаи с магазинами решаем сами, вы по магазинам не ездите.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#konfigurator" data-i18n="cta">Рассчитать сетап</a>
+          <a class="btn" href="https://t.me/niveluzbot" data-i18n="tg">Написать в Telegram</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="labels" id="labels"></div>
+
+    <div class="hud">
+      <ol class="ticks" id="ticks">
+        <li data-i18n="t0">00 Свет</li><li data-i18n="t1">01 Смета</li><li data-i18n="t2">02 Закупка</li><li data-i18n="t3">03 Сборка</li><li data-i18n="t4">04 Сетап</li>
+      </ol>
+      <div class="meter">
+        <span class="sum" id="sum"></span>
+        <span class="viz" data-i18n="viz">Визуализация · пример</span>
+      </div>
+    </div>
+  </div>
+  <div class="stills" aria-label="Кадры без анимации">
+    <div class="wrap"><ol id="stills"></ol></div>
+  </div>
+</section>
+
+<!-- 3. Путь от заявки -->
+<section class="sec" id="put">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <p class="idx"><span class="tri tri-o"></span>Как работаем</p>
+        <h2 class="h2">Путь от заявки до&nbsp;рабочего места</h2>
+      </div>
+      <p>Шесть шагов, у каждого — срок и документ. Деньги на детали отделены от платы за работу: <b>детали по цене чеков, плата — по шкале</b>, отдельной строкой.</p>
+    </div>
+    <div class="ruler reveal" aria-hidden="true">
+      <svg viewBox="0 0 1200 56" preserveAspectRatio="none" id="ruler"></svg>
+    </div>
+    <ol class="steps">
+      <li class="step reveal"><span class="n"><span class="tri tri-o"></span>01</span><h3>Заявка</h3><p>Задача, бюджет, размеры комнаты, что уже есть. В Telegram или через конфигуратор. Ответ — в течение дня.</p><span class="when"><b>День 0</b>пн 02.11</span><span class="money"><b>Бесплатно</b>без предоплаты</span></li>
+      <li class="step reveal"><span class="n"><span class="tri tri-o"></span>02</span><h3>Смета</h3><p>Позиции, магазины, цены с датой и временем, курс ЦБ. Плата за работу — отдельной строкой. Три варианта: дешевле, расчётный, мощнее.</p><span class="when"><b>До 24 часов</b>вт 03.11</span><span class="money"><b>30 % платы</b>при утверждении сметы</span></li>
+      <li class="step reveal"><span class="n"><span class="tri tri-o"></span>03</span><h3>Оплата закупки</h3><p>Деньги на детали — на отдельный счёт под закупку: смета плюс резерв 3–5 % на изменение цен. Покупаем только после зачисления.</p><span class="when"><b>В день сметы</b>вт 03.11</span><span class="money"><b>Лимит закупки</b>смета + резерв</span></li>
+      <li class="step reveal"><span class="n"><span class="tri tri-o"></span>04</span><h3>Закупка и отчёт с чеками</h3><p>Покупаем сами. Отчёт: чеки, гарантийные талоны, фото серийных номеров. Остаток лимита возвращаем за 5 рабочих дней.</p><span class="when"><b>1–2 рабочих дня</b>ср–чт 04–05.11, отчёт пт 06.11</span><span class="money"><b>Возврат разницы</b>чеки дешевле — деньги ваши</span></li>
+      <li class="step reveal"><span class="n"><span class="tri tri-o"></span>05</span><h3>Сборка и тесты</h3><p>Сборка, укладка кабелей, BIOS, ОС, драйверы. Нагрузка 8 часов, память, накопитель, температуры — в протоколе.</p><span class="when"><b>1–2 дня</b>пт–сб 06–07.11</span><span class="money"><b>Оплата не требуется</b>видео ключевых шагов</span></li>
+      <li class="step reveal"><span class="n"><span class="tri tri-o"></span>06</span><h3>Сдача и гарантия</h3><p>Доставка, подключение и монтаж в Ташкенте. Акт, паспорт сборки, копии чеков и талонов. Гарантия «одно окно» на 12 месяцев.</p><span class="when"><b>пн 09.11</b>гарантия до 09.11.2027</span><span class="money"><b>70 % платы</b>при сдаче по акту</span></li>
+    </ol>
+    <p class="path-note">Пример сроков для заявки от 02.11.2026 — первые сборки начинаем в ноябре. Закупка зависит от наличия деталей в Ташкенте; срок подтверждаем в смете.</p>
+  </div>
+</section>
+
+<!-- 4. Конфигуратор -->
+<section class="sec" id="konfigurator">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <p class="idx"><span class="tri tri-o"></span>Конфигуратор · превью</p>
+        <h2 class="h2">Задача, бюджет, стиль — и&nbsp;смета на&nbsp;дату</h2>
+      </div>
+      <p>Три вопроса — и список деталей с ценой, платой за работу и итогом. Полный конфигуратор проверяет совместимость по 17 пунктам и даёт заменить любую деталь.</p>
+    </div>
+    <div class="cfg">
+      <form class="cfg-ctrl reveal" id="cfg" onsubmit="return false">
+        <fieldset class="q">
+          <legend><b>1</b> Задача</legend>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="task" value="games" checked><span>Игры</span></label>
+            <label class="chip"><input type="radio" name="task" value="3d"><span>3D и видео</span></label>
+            <label class="chip"><input type="radio" name="task" value="prog"><span>Программирование</span></label>
+            <label class="chip"><input type="radio" name="task" value="office"><span>Учёба и офис</span></label>
+            <label class="chip"><input type="radio" name="task" value="stream"><span>Стриминг</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="q">
+          <legend><b>2</b> Бюджет на детали</legend>
+          <p class="budget-val"><span id="bval">18,0</span><small>млн сум</small></p>
+          <div class="range">
+            <input type="range" id="budget" min="5" max="60" step="0.5" value="18" aria-label="Бюджет на детали, млн сум">
+            <div class="range-scale" aria-hidden="true">
+              <span style="left:0">5</span><span style="left:27.27%" class="edge">20 · граница шкалы</span><span style="left:63.6%">40</span><span style="left:100%">60 млн</span>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset class="q">
+          <legend><b>3</b> Стиль</legend>
+          <div class="style-grid">
+            <div class="style-row"><span>Корпус</span>
+              <div class="seg"><label><input type="radio" name="color" value="dark" checked><span>Тёмный</span></label><label><input type="radio" name="color" value="light"><span>Светлый</span></label></div></div>
+            <div class="style-row"><span>Подсветка</span>
+              <div class="seg"><label><input type="radio" name="light" value="off" checked><span>Выключена</span></label><label><input type="radio" name="light" value="on"><span>Тёплая белая</span></label></div></div>
+            <div class="style-row"><span>Размер</span>
+              <div class="seg"><label><input type="radio" name="size" value="compact"><span>Компактный</span></label><label><input type="radio" name="size" value="standard" checked><span>Обычный</span></label><label><input type="radio" name="size" value="large"><span>Большой</span></label></div></div>
+          </div>
+        </fieldset>
+        <div class="cfg-next">
+          <span><span class="tri"></span><span><b>Дальше в полном конфигураторе:</b> замена любой детали, две альтернативы — дешевле и мощнее, проверка совместимости.</span></span>
+          <span><span class="tri"></span><span><b>Смета:</b> ссылка на сборку и PDF на узбекском и русском. Мы проверяем цены и наличие за 24 часа.</span></span>
+        </div>
+      </form>
+
+      <article class="card reveal" aria-live="polite">
+        <div class="card-top">
+          <div>
+            <h3 id="bname">Игровой ПК</h3>
+            <div class="sub">Цены на 05.10.2026, медиана трёх продавцов</div>
+          </div>
+          <svg class="case-pic" id="casepic" viewBox="0 0 96 110" aria-hidden="true"></svg>
+        </div>
+        <ul class="parts" id="parts"></ul>
+        <div class="checks" id="checks"></div>
+        <div class="over" id="over"></div>
+        <div class="totals">
+          <div><span>Детали по цене чеков, оценка</span><span class="p" id="tparts">—</span></div>
+          <div class="fee"><span>Плата за работу<small id="tfeerule">15 % при смете до 20 млн сум</small></span><span class="p" id="tfee">—</span></div>
+          <div class="all"><span>Итого<small>детали + работа</small></span><span class="p" id="ttotal">—</span></div>
+        </div>
+        <p class="note"><span class="tag">Пример</span>Цены на дату, не оферта. К закупке добавляется резерв 3–5 % — остаток возвращаем по отчёту с чеками. Плата: 30 % при смете, 70 % при сдаче.</p>
+        <a class="btn btn-primary" id="tglink" href="https://t.me/niveluzbot" data-i18n="cfgbtn">Получить смету в Telegram</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Паспорт сборки -->
+<section class="sec" id="pasport">
+  <div class="wrap">
+    <div class="pass">
+      <div class="reveal">
+        <p class="idx"><span class="tri tri-o"></span>Паспорт сборки</p>
+        <h2 class="h2">Протокол вместо обещаний</h2>
+        <p style="color:var(--muted);margin:22px 0 0;max-width:30em">Перед передачей компьютер 8 часов работает под нагрузкой. Результаты записываем в паспорт — он лежит в папке с чеками и талонами.</p>
+        <ol class="pass-list">
+          <li><span class="mono">01</span>Нагрузка процессора и видеокарты — 8 часов без ошибок</li>
+          <li><span class="mono">02</span>Температуры в пике и в комнате на момент теста</li>
+          <li><span class="mono">03</span>Память: 4 прохода теста, профиль памяти включён и проверен</li>
+          <li><span class="mono">04</span>Накопитель: скорость и состояние по SMART — встроенной самодиагностике диска</li>
+          <li><span class="mono">05</span>Версия BIOS, серийные номера, подписи мастера и клиента</li>
+        </ol>
+      </div>
+      <div class="sheet-wrap reveal">
+        <div class="sheet" role="img" aria-label="Образец паспорта сборки">
+          <div class="wm" aria-hidden="true">ОБРАЗЕЦ</div>
+          <div class="sheet-head">
+            <div class="t">Паспорт сборки № 0001<span class="badge">образец</span><small>NIVEL · Ташкент · протокол тестов</small></div>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Nivel — Отметка уровня с полкой</title><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></svg>
+          </div>
+          <div class="meta">
+            <div><span>Задача</span>3D и видео</div>
+            <div><span>Сдача · пример</span>09.11.2026</div>
+            <div><span>Смета деталей</span>26 590 000 сум</div>
+            <div><span>Процессор</span>Ryzen 7 9700X</div>
+            <div><span>Видеокарта</span>RTX 5070 12 ГБ</div>
+            <div><span>Память</span>32 ГБ DDR5-6000</div>
+          </div>
+          <table class="ptab">
+            <thead><tr><th>Проверка</th><th>Чем</th><th>Результат</th></tr></thead>
+            <tbody>
+              <tr><td>Нагрузка CPU + GPU</td><td class="m">OCCT, 8 ч 00 мин</td><td>Без ошибок и перезагрузок <span class="ok">норма</span></td></tr>
+              <tr><td>Температуры, пик</td><td class="m">HWiNFO64</td><td class="m">CPU 81 °C · GPU 72 °C · SSD 54 °C · в комнате 26 °C</td></tr>
+              <tr><td>Память</td><td class="m">MemTest86, 4 прохода</td><td>0 ошибок <span class="ok">норма</span></td></tr>
+              <tr><td>Профиль памяти</td><td class="m">BIOS</td><td class="m">EXPO, DDR5-6000 CL30, стабильно</td></tr>
+              <tr><td>Накопитель</td><td class="m">CrystalDiskMark, SMART</td><td class="m">чтение 7 050 МБ/с · запись 6 280 МБ/с · SMART: норма</td></tr>
+              <tr><td>Версия BIOS</td><td class="m">—</td><td class="m">3.20 от 14.08.2026, обновлён при сборке</td></tr>
+              <tr><td>Шум, 1 м</td><td class="m">шумомер</td><td class="m">33 дБА простой · 39 дБА нагрузка</td></tr>
+            </tbody>
+          </table>
+          <div class="sign">
+            <div>Собрал и проверил<div class="ln"><svg viewBox="0 0 120 30" aria-hidden="true"><path d="M4 22c8-14 14-16 16-8s-4 12 2 6 10-14 14-10-2 12 4 10 8-8 14-6 6 6 12 2 10-6 16-4" fill="none" stroke="#1D1D1B" stroke-width="1.3" stroke-linecap="round"/></svg></div>мастер Nivel</div>
+            <div>Принял<div class="ln"></div>клиент, после проверки на месте</div>
+            <svg class="stamp" viewBox="0 0 120 120" aria-hidden="true">
+              <defs><path id="sc" d="M60 60 m-44 0 a44 44 0 1 1 88 0 a44 44 0 1 1 -88 0"/></defs>
+              <circle cx="60" cy="60" r="56" fill="none" stroke="#D9501A" stroke-width="2.5"/>
+              <circle cx="60" cy="60" r="34" fill="none" stroke="#D9501A" stroke-width="1.2"/>
+              <text font-family="IBM Plex Mono, monospace" font-size="9" letter-spacing="1.1" fill="#D9501A"><textPath href="#sc">NIVEL · ПРОВЕРЕНО · ТЕСТ 8 Ч · 07.11.2026 ·</textPath></text>
+              <g transform="translate(41 40) scale(.6)"><path fill="#D9501A" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#D9501A" d="M24 24L40 24L24 40Z"/><path fill="#D9501A" d="M4 40h56v8h-56Z"/></g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Идеи -->
+<section class="sec" id="idei">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <p class="idx"><span class="tri tri-o"></span>Идеи</p>
+        <h2 class="h2">Видели сетап в&nbsp;Instagram? Соберём похожий здесь</h2>
+      </div>
+      <p>Посты авторов — через официальное встраивание, с их разрешения и ссылкой на профиль. Мы разбираем сетап на позиции и подбираем замену с рынка Ташкента с ценой на дату.</p>
+    </div>
+    <p class="ideas-hint">Листайте вбок · 4 идеи</p>
+    <div class="ideas" id="ideas"></div>
+    <p class="ideas-note">Макет: карточки — заглушки встраивания, схемы нарисованы нами, чужих фото нет. Пост автора загружается по нажатию; без разрешения автора показываем только текстовую ссылку.</p>
+  </div>
+</section>
+
+<!-- 7. Цены и гарантия -->
+<section class="sec" id="ceny">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <p class="idx"><span class="tri tri-o"></span>Цены и гарантия</p>
+        <h2 class="h2">Детали — по&nbsp;цене чеков. Работа — по&nbsp;шкале</h2>
+      </div>
+      <p>Наценки на детали нет. Экономия на закупке — ваша. Плата фиксируется в сумах в смете и не растёт, если чеки вышли дороже в пределах лимита.</p>
+    </div>
+    <div class="prices">
+      <div class="reveal">
+        <table class="scale">
+          <thead><tr><th>Смета деталей</th><th>Плата</th><th>Пример</th></tr></thead>
+          <tbody>
+            <tr><td>До 20 млн сум<span>ПК, мониторы, периферия</span></td><td class="rate">15 %</td><td class="ex">10 млн → 1 500 000 сум<br>15 млн → 2 250 000 сум</td></tr>
+            <tr><td>От 20 млн сум<span>скачка на границе нет: 15 % от 20 млн = 3 млн</span></td><td class="rate">10 %<small>но не меньше 3 млн сум</small></td><td class="ex">25 млн → 3 000 000 сум<br>40 млн → 4 000 000 сум<br>60 млн → 6 000 000 сум</td></tr>
+            <tr><td>Монтаж сетапа<span>стол, кресло, кронштейны, свет, акустика</span></td><td class="rate">15 %</td><td class="ex">7,5 млн → 1 125 000 сум</td></tr>
+          </tbody>
+        </table>
+        <ul class="rules">
+          <li><span class="tri"></span><span><b>Входит в плату:</b> подбор, сверка цен, закупка и поездки, сборка, BIOS, ОС, драйверы, тест 8 часов, доставка и монтаж в Ташкенте, одна профилактика за год.</span></li>
+          <li><span class="tri"></span><span><b>Отдельно, только по вашему выбору:</b> лицензии программ — по чеку, грузовая доставка мебели, выезд за город.</span></li>
+          <li><span class="tri"></span><span><b>Оплата платы:</b> 30 % при утверждении сметы, 70 % при сдаче по акту.</span></li>
+        </ul>
+      </div>
+      <aside class="warranty reveal">
+        <p class="idx" style="margin-bottom:8px"><span class="tri tri-o"></span>Гарантия «одно окно»</p>
+        <p class="big">12<small>месяцев</small></p>
+        <h3>На работу, систему и все детали, купленные нами</h3>
+        <p>Обращаетесь к нам. С магазинами и сервисными центрами разбираемся сами.</p>
+        <ul class="wl">
+          <li><span>Ответ на обращение</span><span>1 рабочий день</span></li>
+          <li><span>Забираем ПК, за наш счёт</span><span>1–2 рабочих дня</span></li>
+          <li><span>Диагностика</span><span>2 рабочих дня</span></li>
+          <li class="key"><span>Подменный ПК или деталь на время ремонта</span><span>до 3 суток</span></li>
+          <li><span>После 12 месяцев — по талонам производителя</span><span>24–36 месяцев</span></li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="ask">
+  <div class="wrap ask-in reveal">
+    <div>
+      <h2 class="h2">Опишите задачу и бюджет. Пришлём три варианта в&nbsp;течение дня.</h2>
+      <p>Telegram-бот @niveluzbot: тот же конфигуратор, заявка и статус заказа.</p>
+    </div>
+    <a class="btn btn-primary" href="https://t.me/niveluzbot" data-i18n="tg">Написать в Telegram</a>
+  </div>
+</section>
+</main>
+
+<footer class="ftr">
+  <div class="wrap">
+    <div class="ftr-grid">
+      <div>
+        <a class="logo" href="#top" aria-label="Nivel">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово для тёмного фона #1D1D1B</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#F1EFEA" d="M8 16h52v8h-52Z"/><path fill="#F06A30" d="M8 24L24 24L24 40Z"/><path fill="#F1EFEA" d="M24 24L40 24L24 40Z"/><path fill="#F1EFEA" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#F1EFEA" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#F06A30" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+        </a>
+        <p style="margin:0;max-width:24em">Подбор, закупка, сборка, тесты и монтаж ПК и рабочих мест. Ташкент.</p>
+      </div>
+      <div>
+        <h4>Связь</h4>
+        <ul>
+          <li><a href="https://t.me/niveluzbot">Telegram-бот @niveluzbot</a></li>
+          <li><a href="https://nivel.uz">nivel.uz</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Документы</h4>
+        <ul>
+          <li><a href="#oferta">Оферта (UZ/RU)</a></li>
+          <li><a href="#privacy">Политика персональных данных</a></li>
+          <li><a href="#garantiya">Гарантия</a></li>
+          <li><a href="#vozvrat">Возврат</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Реквизиты</h4>
+        <p class="req">ИП: после регистрации<br>ИНН: после регистрации<br>Расчётный счёт: после регистрации<br>Адрес: после регистрации</p>
+      </div>
+    </div>
+    <div class="ftr-bot">
+      <span>© 2026 Nivel · цены на сайте — в сумах, на дату, не оферта</span>
+      <button type="button" id="motionbtn">Без анимации</button>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ---------- режимы ---------- */
+(function(){
+  var root = document.documentElement;
+  var force = window.__NIVEL_FORCE || null;
+  var reduced = false;
+  try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches || localStorage.getItem('nivel-motion') === 'off'; } catch(e){ reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  if (force && force.flat) root.classList.add('flat');
+  if (reduced && !force) root.classList.add('reduced');
+  window.NIVEL = { reduced: reduced && !force, force: force, lang: 'ru' };
+})();
+
+/* ---------- RU / UZ ---------- */
+var I18N = {
+  ru: {},
+  uz: {
+    nav1:'Konfigurator', nav2:'Gʻoyalar', nav3:'Qanday ishlaymiz', nav4:'Narxlar', cta:'Setapni hisoblash', menu:'Menyu',
+    kicker:'Toshkent · kompyuter va ish joylari · birinchi yigʻmalar — 2026-yil noyabridan',
+    h1:'Vazifangizga mos ish&nbsp;joyi.',
+    lede:'Kompyuter va butun setapni tanlaymiz, sotib olamiz, yigʻamiz, sinaymiz va oʻrnatamiz. Natija uchun oʻzimiz javob beramiz.',
+    pr1:'Xariddan oldin smeta.', pr1s:'doʻkon narxlari sanasi bilan',
+    pr2:'Topshirishdan oldin test.', pr2s:'8 soat yuklama ostida',
+    pr3:'Natija uchun yagona darcha.', pr3s:'12 oy kafolat',
+    how:'Qanday ishlaymiz', hint:'Pastga aylantiring — kompyuter stolda yigʻiladi', skip:'Animatsiyani oʻtkazib yuborish',
+    c1h:'Xariddan oldin smeta', c1p:'Qismlarni vazifa va byudjetga qarab tanlaymiz. Toshkent doʻkonlari narxlari sana va vaqt bilan, Markaziy bank kursi. Smeta 24 soat amal qiladi.',
+    c1f:'Ish haqi alohida qatorda: 20 mln soʻmgacha <b>15 %</b>',
+    c2h:'Chekdagi narxda xarid', c2p:'1–2 ish kunida oʻzimiz sotib olamiz. Cheklar, kafolat taloni va seriya raqamlari bilan hisobot — 24–48 soatda.',
+    c2f:'Cheklar smetadan arzon chiqsa — <b>farq sizniki</b>',
+    c3h:'Yigʻish va 8 soatlik test', c3p:'Kabellar joylangan, BIOS yangilangan, xotira profili yoqilgan. 8 soat yuklama, bayonnoma — yigʻma pasportida.', c3f:'xatolar',
+    c4h:'Natija uchun yagona darcha', c4p:'Ish joyini olib kelamiz, oʻrnatamiz va ulaymiz. 12 oy kafolat: doʻkonlar bilan masalalarni oʻzimiz hal qilamiz, siz doʻkonma-doʻkon yurmaysiz.',
+    tg:'Telegramda yozish', viz:'Vizualizatsiya · namuna',
+    t0:'00 Yorugʻlik', t1:'01 Smeta', t2:'02 Xarid', t3:'03 Yigʻish', t4:'04 Setap',
+    cfgbtn:'Smetani Telegramda olish', idbtn:'Toshkentda shunga oʻxshashini yigʻish',
+    alt:'Vizualizatsiya. Yarim qorongʻi ish joyi: stol chirogʻi, stol, monitor va kompyuter korpusi. Namuna yigʻma, bajarilgan buyurtma emas.',
+    sum:'Cheklar boʻyicha', cur:'soʻm', lb_mb:'Ona plata', lb_cool:'Protsessor sovutgichi', lb_ram:'Xotira', lb_gpu:'Videokarta', lb_psu:'Quvvat bloki',
+    ln_mb:'B650, ATX', ln_cool:'2 ta ventilyator', ln_ram:'32 GB DDR5-6000', ln_gpu:'RTX 5070, 12 GB', ln_psu:'850 Vt, Gold',
+    s0h:'Yorugʻlik', s0p:'Chiroq yonadi va stolni yoritadi',
+    s1h:'Smeta', s1p:'Korpus ochiq, qismlar smeta boʻyicha tanlangan',
+    s2h:'Xarid va yigʻish', s2p:'Qismlar oʻz joyiga oʻrnatiladi',
+    s3h:'8 soatlik test', s3p:'Panel yopiq, bayonnoma — pasportda',
+    s4h:'Setap', s4p:'Butun ish joyi yoritilgan',
+    vizs:'vizualizatsiya', nofb:'Animatsiya yuklanmadi — sahnaning qisqacha mazmuni'
+  }
+};
+(function(){
+  document.querySelectorAll('[data-i18n]').forEach(function(el){ I18N.ru[el.dataset.i18n] = el.innerHTML; });
+  Object.assign(I18N.ru, {sum:'По чекам', cur:'сум', idbtn:'Собрать похожий в Ташкенте', lb_mb:'Материнская плата', lb_cool:'Кулер процессора', lb_ram:'Память', lb_gpu:'Видеокарта', lb_psu:'Блок питания',
+    ln_mb:'B650, ATX', ln_cool:'2 вентилятора', ln_ram:'32 ГБ DDR5-6000', ln_gpu:'RTX 5070, 12 ГБ', ln_psu:'850 Вт, Gold',
+    s0h:'Свет', s0p:'Лампа включается и раскрывает стол',
+    s1h:'Смета', s1p:'Корпус открыт, детали подобраны по смете',
+    s2h:'Закупка и сборка', s2p:'Детали встают на свои места',
+    s3h:'Тест 8 часов', s3p:'Панель закрыта, протокол — в паспорте',
+    s4h:'Сетап', s4p:'Свет на всём рабочем месте',
+    vizs:'визуализация', nofb:'Анимация не загрузилась — коротко о том, что в ней'});
+})();
+function t(k){ var d = I18N[NIVEL.lang]; return (d && d[k] != null) ? d[k] : (I18N.ru[k] || k); }
+/* сумма для сцены и счётчика — валюта на языке интерфейса */
+function fmtL(n){ return n.toLocaleString('ru-RU').replace(/ | /g, ' ') + ' ' + t('cur'); }
+
+/* кадры без анимации: с картинками (reduced motion) или только текстом (запасной режим) */
+var STILL_IMGS = null;
+function renderStills(){
+  var ol = document.getElementById('stills'); if (!ol) return;
+  var html = '';
+  for (var i = 0; i < 5; i++){
+    var h = t('s' + i + 'h'), sp = t('s' + i + 'p');
+    html += '<li><figure>' + (STILL_IMGS ? '<img alt="' + t('vizs') + '. ' + h + ': ' + sp + '" src="' + STILL_IMGS[i] + '">' : '')
+      + '<figcaption>' + (STILL_IMGS ? '' : '<i>0' + i + '</i>') + '<b>' + h + '</b>' + sp + (STILL_IMGS ? ' · ' + t('vizs') : '') + '</figcaption></figure></li>';
+  }
+  ol.innerHTML = html;
+}
+window.NIVEL_stills = function(imgs){ STILL_IMGS = imgs; renderStills(); };
+window.NIVEL_fallback = function(why){
+  if (window.__NIVEL_FAIL || window.__NIVEL_SCENE) return;
+  window.__NIVEL_FAIL = why || 'fail';
+  document.documentElement.classList.add('no-webgl');
+  STILL_IMGS = null; renderStills();
+};
+document.addEventListener('nivel:lang', renderStills);
+/* сцена не готова за 3 секунды — показываем запасной режим */
+setTimeout(function(){ if (!window.__NIVEL_SCENE) window.NIVEL_fallback('timeout'); }, 3000);
+function setLang(l){
+  NIVEL.lang = l;
+  document.documentElement.lang = l === 'uz' ? 'uz-Latn' : 'ru';
+  document.querySelectorAll('[data-i18n]').forEach(function(el){ el.innerHTML = t(el.dataset.i18n); });
+  document.querySelectorAll('.lang button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.lang === l)); });
+  document.dispatchEvent(new CustomEvent('nivel:lang'));
+}
+document.querySelectorAll('.lang button').forEach(function(b){ b.addEventListener('click', function(){ setLang(b.dataset.lang); }); });
+if (NIVEL.force && NIVEL.force.lang) setLang(NIVEL.force.lang);
+
+/* ---------- шапка, меню ---------- */
+(function(){
+  var hdr = document.getElementById('hdr'), burger = document.querySelector('.burger'), mnav = document.getElementById('mnav');
+  function onScroll(){ hdr.classList.toggle('solid', window.scrollY > 40); }
+  addEventListener('scroll', onScroll, {passive:true}); onScroll();
+  burger.addEventListener('click', function(){ var o = mnav.classList.toggle('open'); burger.setAttribute('aria-expanded', String(o)); });
+  mnav.addEventListener('click', function(e){ if (e.target.closest('a')) { mnav.classList.remove('open'); burger.setAttribute('aria-expanded','false'); } });
+  document.getElementById('motionbtn').addEventListener('click', function(){
+    try { var off = localStorage.getItem('nivel-motion') === 'off'; localStorage.setItem('nivel-motion', off ? 'on' : 'off'); } catch(e){}
+    location.reload();
+  });
+  try { if (localStorage.getItem('nivel-motion') === 'off') document.getElementById('motionbtn').textContent = 'Включить анимацию'; } catch(e){}
+  if ('IntersectionObserver' in window && !NIVEL.reduced) {
+    var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {rootMargin:'0px 0px -8% 0px'});
+    document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  } else document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
+})();
+
+/* ---------- линейка сроков ---------- */
+(function(){
+  var s = document.getElementById('ruler'); if (!s) return;
+  var days = ['02.11','03.11','04.11','05.11','06.11','07.11','08.11','09.11'];
+  var marks = {0:'заявка',1:'смета · оплата',3:'закупка',4:'отчёт',5:'тесты',7:'сдача'};
+  var h = '<line x1="0" y1="40" x2="1200" y2="40" stroke="#3B3631" stroke-width="1"/>';
+  days.forEach(function(d,i){
+    var x = 8 + i * (1184/7);
+    var key = marks[i] != null;
+    h += '<line x1="'+x+'" y1="'+(key?28:34)+'" x2="'+x+'" y2="40" stroke="'+(key?'#F1EFEA':'#3B3631')+'" stroke-width="1"/>';
+    h += '<text x="'+x+'" y="54" fill="#A39C90" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="'+(i===0?'start':i===7?'end':'middle')+'">'+d+'</text>';
+    if (key) h += '<text x="'+x+'" y="20" fill="#F1EFEA" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="'+(i===0?'start':i===7?'end':'middle')+'">'+marks[i]+'</text>';
+    if (i===7) h += '<path d="M'+(x-5)+' 30 L'+(x+5)+' 30 L'+x+' 38Z" fill="#F06A30" transform="translate(-6 0)"/>';
+  });
+  for (var k=0;k<=56;k++){ var xx = 8 + k*(1184/56); if (k%8) h += '<line x1="'+xx+'" y1="37" x2="'+xx+'" y2="40" stroke="#3B3631"/>'; }
+  s.innerHTML = h;
+})();
+
+/* ---------- конфигуратор ---------- */
+(function(){
+  var M = 1e6;
+  var CPU = [
+    {n:'AMD Ryzen 5 5600GT, графика в процессоре', p:1150000, plat:'AM4', g:1, w:65, t:'office'},
+    {n:'AMD Ryzen 7 5700G, графика в процессоре', p:1750000, plat:'AM4', g:1, w:65, t:'office'},
+    {n:'AMD Ryzen 5 8500G, графика в процессоре', p:1750000, plat:'AM5', g:1, w:65, t:'office'},
+    {n:'AMD Ryzen 5 8600G, графика в процессоре', p:2300000, plat:'AM5', g:1, w:65, t:'office prog'},
+    {n:'AMD Ryzen 5 7500F', p:1950000, plat:'AM5', g:0, w:65, t:'games stream 3d'},
+    {n:'AMD Ryzen 5 9600X', p:2900000, plat:'AM5', g:1, w:88, t:'games stream 3d prog'},
+    {n:'AMD Ryzen 7 8700G, графика в процессоре', p:3300000, plat:'AM5', g:1, w:65, t:'office'},
+    {n:'AMD Ryzen 7 9700X', p:3800000, plat:'AM5', g:1, w:105, t:'games stream 3d prog'},
+    {n:'AMD Ryzen 9 9900X', p:5600000, plat:'AM5', g:1, w:120, t:'stream 3d prog'},
+    {n:'AMD Ryzen 7 9800X3D', p:6300000, plat:'AM5', g:1, w:120, t:'games'},
+    {n:'AMD Ryzen 9 9950X', p:7400000, plat:'AM5', g:1, w:170, t:'3d prog'}
+  ];
+  var MB = {
+    AM4:[{n:'A520M', p:850000},{n:'B550', p:1250000}],
+    AM5:[{n:'A620', p:1250000},{n:'B650', p:1900000},{n:'B850', p:2800000},{n:'X870', p:4100000}]
+  };
+  var RAM = {
+    AM4:[{n:'16 ГБ DDR4-3200, 2×8', p:900000},{n:'32 ГБ DDR4-3200, 2×16', p:1650000}],
+    AM5:[{n:'16 ГБ DDR5-5600, 2×8', p:1900000},{n:'32 ГБ DDR5-6000 CL30, 2×16', p:4700000},{n:'64 ГБ DDR5-6000, 2×32', p:9200000},{n:'96 ГБ DDR5-5600, 2×48', p:13500000}]
+  };
+  var GPU = [
+    {n:'Не нужна: графика в процессоре', p:0, w:0},
+    {n:'GeForce RTX 5060, 8 ГБ', p:5382000, w:145},
+    {n:'GeForce RTX 5060 Ti, 16 ГБ', p:6900000, w:180},
+    {n:'GeForce RTX 5070, 12 ГБ', p:10080000, w:250},
+    {n:'GeForce RTX 5070 Ti, 16 ГБ', p:13900000, w:300},
+    {n:'GeForce RTX 5080, 16 ГБ', p:21500000, w:360}
+  ];
+  var SSD = [{n:'NVMe 512 ГБ, PCIe 4.0', p:650000},{n:'NVMe 1 ТБ, PCIe 4.0', p:1150000},{n:'NVMe 2 ТБ, PCIe 4.0', p:2100000},{n:'NVMe 4 ТБ, PCIe 4.0', p:4200000}];
+  var PSU = [{n:'450 Вт, 80+ Bronze', p:550000, W:450},{n:'550 Вт, 80+ Bronze', p:650000, W:550},{n:'650 Вт, 80+ Gold', p:950000, W:650},{n:'750 Вт, 80+ Gold', p:1300000, W:750},{n:'850 Вт, 80+ Gold, ATX 3.1', p:1750000, W:850},{n:'1000 Вт, 80+ Gold, ATX 3.1', p:2400000, W:1000}];
+  var COOL = [{n:'Из комплекта процессора', p:0, box:1},{n:'Башенный, 1 вентилятор', p:350000},{n:'Башенный, 2 вентилятора', p:750000},{n:'Жидкостный, радиатор 360 мм', p:1600000, big:1}];
+  var WEIGHTS = {
+    games: {cpu:.16, cool:.04, mb:.09, ram:.12, gpu:.40, ssd:.07, psu:.06},
+    '3d':  {cpu:.22, cool:.05, mb:.09, ram:.20, gpu:.28, ssd:.10, psu:.05},
+    prog:  {cpu:.27, cool:.05, mb:.10, ram:.24, gpu:.12, ssd:.14, psu:.05},
+    office:{cpu:.26, cool:.03, mb:.16, ram:.22, gpu:0,   ssd:.18, psu:.08},
+    stream:{cpu:.21, cool:.05, mb:.10, ram:.15, gpu:.32, ssd:.09, psu:.05}
+  };
+  var NAMES = {games:'Игровой ПК', '3d':'ПК для 3D и видео', prog:'ПК для программирования', office:'ПК для учёбы и офиса', stream:'ПК для стриминга'};
+  var CATS = ['cpu','cool','mb','ram','gpu','ssd','psu'];
+  var LBL = {cpu:'Процессор', cool:'Кулер', mb:'Плата', ram:'Память', gpu:'Видеокарта', ssd:'Накопитель', psu:'Блок питания', cas:'Корпус', fan:'Вентиляторы'};
+
+  function lists(task, budget, st){
+    var plat = (task === 'office' && budget < 9) ? 'AM4' : 'AM5';
+    var L = {};
+    L.cpu = CPU.filter(function(c){ return c.plat === plat && c.t.indexOf(task) > -1; }).sort(function(a,b){return a.p-b.p;});
+    L.mb = MB[plat].map(function(m){ return {n:m.n + (st.size === 'compact' ? 'M, mATX' : ', ATX') + (plat==='AM5' ? ', AM5' : ', AM4'), p:m.p}; });
+    L.ram = RAM[plat];
+    L.gpu = task === 'office' ? [GPU[0]] : task === 'prog' ? GPU.slice(0,4) : GPU.slice(1);
+    if (st.size === 'compact') L.gpu = L.gpu.filter(function(g){ return g.w <= 300; });
+    L.ssd = SSD;
+    L.psu = PSU.filter(function(p){ return plat === 'AM4' ? p.W <= 650 : p.W >= 550; });
+    L.cool = COOL.filter(function(c){ return !(c.big && st.size === 'compact'); });
+    return L;
+  }
+  function enforce(s, L, task){
+    var cpu = L.cpu[s.cpu], gpu = L.gpu[s.gpu];
+    if (!cpu.g && gpu.p === 0) s.gpu = Math.max(s.gpu, 1);
+    if (!(cpu.g && /графика/.test(cpu.n))) s.cool = Math.max(s.cool, 1);
+    if (cpu.w >= 120) s.cool = Math.max(s.cool, 2);
+    if (cpu.w >= 120) s.mb = Math.max(s.mb, Math.min(1, L.mb.length-1));
+    if (task === '3d' && L.ram.length > 2) s.ram = Math.max(s.ram, 1);
+    if ((task === 'games' || task === 'stream') && L.gpu[s.gpu].p >= 10e6 && L.ram.length > 2) s.ram = Math.max(s.ram, 1);
+    var need = (L.cpu[s.cpu].w + L.gpu[s.gpu].w + 70) * 1.3;
+    while (s.psu < L.psu.length - 1 && L.psu[s.psu].W < need) s.psu++;
+    return s;
+  }
+  function fixed(st){
+    var size = st.size, col = st.color === 'light' ? 'светлый' : 'тёмный';
+    var cas = size === 'compact' ? {n:'Компактный mATX, '+col+', 32 л', p:750000} : size === 'large' ? {n:'Большая башня ATX, '+col+', место под 360 мм', p:1800000} : {n:'Средняя башня ATX, '+col+', 45 л', p:1150000};
+    var nf = size === 'compact' ? 2 : 3, on = st.light === 'on';
+    var fan = {n: nf + '×120 мм, ' + (on ? 'тёплая белая подсветка' : 'без подсветки'), p: (nf === 2 ? 240000 : 360000) + (on ? (nf===2?120000:180000) : 0)};
+    return {cas:cas, fan:fan};
+  }
+  function total(s, L, F){ var sum = F.cas.p + F.fan.p; CATS.forEach(function(c){ sum += L[c][s[c]].p; }); return sum; }
+  function build(task, budget, st){
+    var L = lists(task, budget, st), F = fixed(st), B = budget * M, W = WEIGHTS[task];
+    var s = enforce({cpu:0,cool:0,mb:0,ram:0,gpu:0,ssd:0,psu:0}, L, task);
+    for (var guard = 0; guard < 80; guard++){
+      var best = null, bestScore = -Infinity;
+      CATS.forEach(function(c){
+        if (s[c] >= L[c].length - 1) return;
+        var s2 = Object.assign({}, s); s2[c]++; enforce(s2, L, task);
+        if (total(s2, L, F) > B) return;
+        var target = W[c] * B, cur = L[c][s[c]].p;
+        var score = target > 0 ? (target - cur) / target : -5;
+        if (score > bestScore){ bestScore = score; best = s2; }
+      });
+      if (!best) break; s = best;
+    }
+    return {s:s, L:L, F:F, sum: total(s, L, F)};
+  }
+  function fee(sum){ return sum < 20 * M ? Math.round(sum * .15 / 1000) * 1000 : Math.max(Math.round(sum * .10 / 1000) * 1000, 3 * M); }
+  function fmt(n){ return n.toLocaleString('ru-RU').replace(/ | /g, ' ') + ' сум'; }
+  window.NIVEL_fmt = fmt; window.NIVEL_fee = fee;
+
+  var form = document.getElementById('cfg'), range = document.getElementById('budget');
+  var prev = {};
+  function state(){ var f = new FormData(form); return {task:f.get('task'), color:f.get('color'), light:f.get('light'), size:f.get('size'), budget: parseFloat(range.value)}; }
+  function casePic(st){
+    var light = st.color === 'light';
+    var fill = light ? '#D9D4CA' : '#24211E', stroke = light ? '#F1EFEA' : '#6F685E', inner = light ? '#BDB7AC' : '#151311';
+    var h = st.size === 'compact' ? 74 : st.size === 'large' ? 104 : 90, w = st.size === 'compact' ? 50 : st.size === 'large' ? 66 : 58;
+    var x = (96 - w) / 2, y = 108 - h;
+    var out = '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1"/>';
+    out += '<rect x="'+(x+5)+'" y="'+(y+5)+'" width="'+(w-10)+'" height="'+(h-24)+'" fill="'+inner+'" stroke="'+stroke+'" stroke-opacity=".5" stroke-width=".8"/>';
+    var nf = st.size === 'compact' ? 2 : 3, fh = (h - 30) / nf;
+    for (var i=0;i<nf;i++){ var cy = y + 6 + fh*i + fh/2, r = Math.min(fh, w-14)/2 - 2;
+      out += '<circle cx="'+(x+w/2)+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+stroke+'" stroke-opacity=".55" stroke-width=".8"/>'; }
+    if (st.light === 'on') out += '<line x1="'+(x+6)+'" y1="'+(y+h-15)+'" x2="'+(x+w-6)+'" y2="'+(y+h-15)+'" stroke="#E2A867" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>';
+    out += '<rect x="'+(x+3)+'" y="'+(y+h)+'" width="6" height="2" fill="'+stroke+'"/><rect x="'+(x+w-9)+'" y="'+(y+h)+'" width="6" height="2" fill="'+stroke+'"/>';
+    return out;
+  }
+  function render(){
+    var st = state();
+    range.style.setProperty('--fill', ((st.budget - 5) / 55 * 100) + '%');
+    document.getElementById('bval').textContent = st.budget.toFixed(1).replace('.', ',');
+    var r = build(st.task, st.budget, st);
+    var rows = [['cpu', r.L.cpu[r.s.cpu]], ['cool', r.L.cool[r.s.cool]], ['mb', r.L.mb[r.s.mb]], ['ram', r.L.ram[r.s.ram]], ['gpu', r.L.gpu[r.s.gpu]], ['ssd', r.L.ssd[r.s.ssd]], ['psu', r.L.psu[r.s.psu]], ['cas', r.F.cas], ['fan', r.F.fan]];
+    var html = '';
+    rows.forEach(function(x){
+      var changed = prev[x[0]] && prev[x[0]] !== x[1].n;
+      html += '<li' + (changed ? ' class="chg"' : '') + '><span class="k">' + LBL[x[0]] + '</span><span class="v">' + x[1].n + '</span><span class="p">' + (x[1].p ? fmt(x[1].p) : '—') + '</span></li>';
+      prev[x[0]] = x[1].n;
+    });
+    document.getElementById('parts').innerHTML = html;
+    document.getElementById('bname').textContent = NAMES[st.task];
+    document.getElementById('casepic').innerHTML = casePic(st);
+    var cpu = r.L.cpu[r.s.cpu], gpu = r.L.gpu[r.s.gpu], psu = r.L.psu[r.s.psu];
+    var load = cpu.w + gpu.w + 70, head = Math.round((psu.W / load - 1) * 100);
+    var plat = cpu.plat;
+    document.getElementById('checks').innerHTML = '<span>Сокет ' + plat + ' — плата и процессор</span><span>' + (plat === 'AM5' ? 'DDR5' : 'DDR4') + ' — тип памяти</span><span>Запас блока питания ' + head + ' %</span>' + (st.size === 'compact' && st.task !== 'office' && st.task !== 'prog' ? '<span>Длина карты под компактный корпус</span>' : '');
+    var sum = r.sum, f = fee(sum), over = document.getElementById('over');
+    if (sum > st.budget * M){
+      over.className = 'over show';
+      over.innerHTML = 'Минимальная сборка под эту задачу на 05.10.2026 — ' + fmt(sum) + ', это выше бюджета на ' + fmt(sum - st.budget * M) + '. Предложим учебную сборку или «Подбор» без закупки.';
+    } else { over.className = 'over'; over.textContent = ''; }
+    document.getElementById('tparts').textContent = fmt(sum);
+    document.getElementById('tfee').textContent = fmt(f);
+    document.getElementById('tfeerule').textContent = sum < 20 * M ? '15 % при смете до 20 млн сум' : (sum * .10 < 3 * M ? '10 % от 20 млн, но не меньше 3 млн сум' : '10 % при смете от 20 млн сум');
+    document.getElementById('ttotal').textContent = fmt(sum + f);
+    var q = encodeURIComponent([st.task, st.budget, st.color, st.light, st.size].join('_'));
+    document.getElementById('tglink').href = 'https://t.me/niveluzbot?start=cfg_' + q;
+  }
+  form.addEventListener('input', render);
+  form.addEventListener('change', render);
+  window.NIVEL_preset = function(o){
+    ['task','color','light','size'].forEach(function(k){ if (o[k]) { var el = form.querySelector('input[name="'+k+'"][value="'+o[k]+'"]'); if (el) el.checked = true; } });
+    if (o.budget) range.value = o.budget;
+    render();
+  };
+  render();
+})();
+
+/* ---------- идеи ---------- */
+(function(){
+  var S = 'stroke="#A39C90" stroke-width="1.4" fill="none" stroke-linejoin="round"';
+  var P = 'stroke="#F1EFEA" stroke-width="1.4" fill="none" stroke-linejoin="round"';
+  function dim(x1, x2, y, label){
+    return '<g><line x1="'+x1+'" y1="'+y+'" x2="'+x2+'" y2="'+y+'" stroke="#F06A30" stroke-width="1"/>'
+      + '<path d="M'+(x1)+' '+(y-6)+'h8l-4 6z" fill="#F06A30"/><path d="M'+(x2-8)+' '+(y-6)+'h8l-4 6z" fill="#F06A30"/>'
+      + '<text x="'+((x1+x2)/2)+'" y="'+(y+16)+'" fill="#F1EFEA" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle">'+label+'</text></g>';
+  }
+  var floor = '<line x1="0" y1="330" x2="320" y2="330" stroke="#2E2A26" stroke-width="1"/>';
+  var A = floor
+    + '<rect x="50" y="232" width="220" height="6" '+P+'/><line x1="58" y1="238" x2="58" y2="330" '+S+'/><line x1="262" y1="238" x2="262" y2="330" '+S+'/>'
+    + '<rect x="110" y="150" width="96" height="58" '+P+'/><line x1="158" y1="208" x2="158" y2="226" '+S+'/><line x1="140" y1="231" x2="176" y2="231" '+S+'/>'
+    + '<rect x="218" y="182" width="34" height="50" fill="#D9D4CA" stroke="#F1EFEA" stroke-width="1.2"/><circle cx="235" cy="198" r="9" stroke="#8A847A" fill="none"/>'
+    + '<rect x="118" y="222" width="60" height="6" '+S+'/><path d="M70 232 v-34 l14 -16" '+S+'/><path d="M84 182 l8 6 l-6 8 z" '+S+'/>'
+    + '<rect x="40" y="80" width="80" height="44" '+S+'/><line x1="40" y1="124" x2="120" y2="124" '+S+'/>'
+    + dim(50, 270, 290, '100 см');
+  var B = floor
+    + '<path d="M30 236 H200 L290 206 V212 L206 242 H30 Z" '+P+'/><line x1="40" y1="242" x2="40" y2="330" '+S+'/><line x1="196" y1="242" x2="196" y2="330" '+S+'/><line x1="284" y1="212" x2="284" y2="300" '+S+'/>'
+    + '<rect x="58" y="160" width="80" height="48" '+P+'/><rect x="144" y="156" width="84" height="52" '+P+'/><line x1="98" y1="208" x2="98" y2="232" '+S+'/><line x1="186" y1="208" x2="186" y2="232" '+S+'/>'
+    + '<path d="M240 200 L256 140 L230 120" '+S+'/><rect x="222" y="108" width="12" height="20" rx="6" '+P+'/>'
+    + '<rect x="40" y="70" width="42" height="56" '+S+'/><line x1="61" y1="126" x2="61" y2="232" '+S+'/>'
+    + '<rect x="214" y="262" width="40" height="66" fill="#24211E" stroke="#A39C90" stroke-width="1.2"/>'
+    + dim(30, 290, 120 + 200, '160 × 120 см');
+  var C = floor
+    + '<rect x="24" y="230" width="272" height="6" '+P+'/><line x1="34" y1="236" x2="34" y2="330" '+S+'/><line x1="286" y1="236" x2="286" y2="330" '+S+'/>'
+    + '<path d="M60 150 Q150 140 240 150 V206 Q150 198 60 206 Z" '+P+'/><line x1="150" y1="204" x2="150" y2="226" '+S+'/><line x1="128" y1="229" x2="172" y2="229" '+S+'/>'
+    + '<rect x="250" y="120" width="34" height="80" '+P+'/><line x1="267" y1="200" x2="267" y2="226" '+S+'/>'
+    + '<rect x="236" y="250" width="52" height="78" fill="#24211E" stroke="#A39C90" stroke-width="1.2"/><circle cx="262" cy="270" r="9" stroke="#6F685E" fill="none"/><circle cx="262" cy="292" r="9" stroke="#6F685E" fill="none"/>'
+    + '<path d="M40 230 v-26 l12 -12" '+S+'/>'
+    + dim(60, 240, 120, '34″ · 3440 × 1440');
+  var D = floor
+    + '<rect x="40" y="40" width="110" height="140" '+S+'/><line x1="95" y1="40" x2="95" y2="180" '+S+'/><line x1="40" y1="110" x2="150" y2="110" '+S+'/>'
+    + '<rect x="70" y="232" width="170" height="6" '+P+'/><line x1="78" y1="238" x2="78" y2="330" '+S+'/><line x1="232" y1="238" x2="232" y2="330" '+S+'/>'
+    + '<path d="M150 228 l14 -30 h46 l-6 30 z" '+P+'/><rect x="168" y="150" width="62" height="40" '+P+'/><line x1="199" y1="190" x2="199" y2="200" '+S+'/>'
+    + '<path d="M250 330 v-40 h44 v40 M256 290 v-70 q16 -8 32 0 v70" '+S+'/>'
+    + '<rect x="96" y="222" width="34" height="10" '+S+'/>'
+    + dim(70, 240, 290, '80 см у окна');
+  var IDEAS = [
+    {t:'Светлый компактный сетап', tags:['светлый','компактный','24″'], est:'от 14,8 млн сум', svg:A, pre:{task:'office', budget:12, color:'light', light:'off', size:'compact'}},
+    {t:'Угловой стол для стрима', tags:['стрим','2 монитора','свет'], est:'от 31,5 млн сум', svg:B, pre:{task:'stream', budget:26, color:'dark', light:'on', size:'standard'}},
+    {t:'Место для 3D и видео', tags:['3D','34″','тихий'], est:'от 46,2 млн сум', svg:C, pre:{task:'3d', budget:40, color:'dark', light:'off', size:'large'}},
+    {t:'Учёба в маленькой комнате', tags:['учёба','80 см','у окна'], est:'от 8,9 млн сум', svg:D, pre:{task:'office', budget:7, color:'light', light:'off', size:'compact'}}
+  ];
+  var box = document.getElementById('ideas'), html = '';
+  IDEAS.forEach(function(it, i){
+    html += '<article class="idea reveal">'
+      + '<div class="bar"><span>Instagram · <b>@ник_автора</b></span><span>пост ' + (i+1) + '/4</span></div>'
+      + '<div class="pic"><svg viewBox="0 0 320 400" aria-hidden="true">' + it.svg + '</svg><span class="ph">Схема · заглушка встраивания</span></div>'
+      + '<div class="body"><h3>' + it.t + '</h3><p class="by" style="margin:0">Схема по посту @ник_автора, публикуем с разрешения</p>'
+      + '<div class="tags">' + it.tags.map(function(x){ return '<span>' + x + '</span>'; }).join('') + '</div>'
+      + '<p class="est" style="margin:6px 0 4px"><b>' + it.est + '</b>похожий в Ташкенте, пример на 05.10.2026</p>'
+      + '<a class="btn" href="#konfigurator" data-pre="' + i + '"><span class="tri"></span><span data-i18n="idbtn">Собрать похожий в Ташкенте</span></a></div></article>';
+  });
+  box.innerHTML = html;
+  box.addEventListener('click', function(e){ var a = e.target.closest('[data-pre]'); if (a) window.NIVEL_preset(IDEAS[+a.dataset.pre].pre); });
+  if (NIVEL.lang !== 'ru') setLang(NIVEL.lang);
+  if ('IntersectionObserver' in window && !NIVEL.reduced) {
+    var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); });
+    box.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  } else box.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
+})();
+</script>
+
+<script type="module">
+/* Сцена «Ночная съёмка»: Three.js без внешних моделей. Продакшн: three.js — со своего домена, детали — glTF/Draco или серия рендеров. */
+const N = window.NIVEL;
+let THREE, RoundedBoxGeometry;
+try {
+  if (N.force && N.force.nocdn) throw new Error('проверка: CDN недоступен');
+  THREE = await import('three');
+  ({ RoundedBoxGeometry } = await import('three/addons/geometries/RoundedBoxGeometry.js'));
+} catch (e) { window.NIVEL_fallback('cdn'); }
+if (THREE && !window.__NIVEL_FAIL) boot();
+
+function boot(){
+const stage = document.querySelector('.hero-stage');
+const hero = document.querySelector('.hero');
+const canvas = document.getElementById('scene');
+let renderer;
+try {
+  if (N.force && N.force.nowebgl) throw new Error('проверка: нет WebGL');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: !!N.reduced });
+} catch (e) { window.NIVEL_fallback('webgl'); return; }
+
+/* --- детерминированный случай для текстур --- */
+let seed = 7;
+const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+const mobile = matchMedia('(max-width: 760px)').matches;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const BG = new THREE.Color(0x0b0a09);
+scene.background = BG.clone();
+scene.fog = new THREE.Fog(0x0b0a09, 3.6, 8.5);
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 30);
+
+/* --- текстуры --- */
+function canvasTex(w, h, draw, srgb = true){
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+function noise(g, w, h, amp){
+  const id = g.getImageData(0, 0, w, h), d = id.data;
+  for (let k = 0; k < d.length; k += 4){ const n = (rnd() - .5) * amp; d[k] += n; d[k+1] += n; d[k+2] += n; }
+  g.putImageData(id, 0, 0);
+}
+const woodTex = canvasTex(1024, 512, (g, w, h) => {
+  g.fillStyle = '#5a3b26'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 340; i++){
+    const y = rnd() * h, a = rnd() * .22, dark = rnd() < .6;
+    g.strokeStyle = dark ? `rgba(28,15,8,${a})` : `rgba(160,110,70,${a * .6})`;
+    g.lineWidth = .5 + rnd() * 2.6;
+    const amp = 1 + rnd() * 7, f = .002 + rnd() * .008, ph = rnd() * 6;
+    g.beginPath();
+    for (let x = 0; x <= w; x += 12){ const yy = y + Math.sin(x * f + ph) * amp + Math.sin(x * f * 3.1 + ph) * amp * .25; x ? g.lineTo(x, yy) : g.moveTo(x, yy); }
+    g.stroke();
+  }
+  noise(g, w, h, 12);
+});
+const plasterTex = canvasTex(512, 512, (g, w, h) => {
+  g.fillStyle = '#4a433c'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1400; i++){ g.fillStyle = `rgba(${rnd() < .5 ? '20,16,12' : '120,108,94'},${rnd() * .06})`; const r = 2 + rnd() * 18; g.beginPath(); g.arc(rnd() * w, rnd() * h, r, 0, 7); g.fill(); }
+  noise(g, w, h, 10);
+});
+plasterTex.wrapS = plasterTex.wrapT = THREE.RepeatWrapping; plasterTex.repeat.set(3, 1.5);
+const floorTex = canvasTex(512, 512, (g, w, h) => {
+  g.fillStyle = '#3a2b20'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 8; i++){ g.fillStyle = i % 2 ? 'rgba(0,0,0,.08)' : 'rgba(255,220,180,.03)'; g.fillRect(0, i * 64, w, 64); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, i * 64, w, 1.5); }
+  for (let i = 0; i < 300; i++){ g.strokeStyle = `rgba(20,10,5,${rnd() * .15})`; g.lineWidth = rnd() * 1.5; const y = rnd() * h; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + (rnd() - .5) * 6); g.stroke(); }
+  noise(g, w, h, 10);
+});
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(4, 4); floorTex.rotation = Math.PI / 2;
+const screenTex = canvasTex(1024, 576, (g, w, h) => {
+  g.fillStyle = '#17140f'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#221d17'; g.fillRect(0, 0, w, 34); g.fillRect(0, 34, 150, h);
+  g.fillStyle = '#2c251e'; for (let i = 0; i < 9; i++) g.fillRect(18, 60 + i * 30, 70 + (i * 37 % 50), 8);
+  g.fillStyle = '#3a2f25'; g.fillRect(176, 56, 600, 330);
+  g.fillStyle = '#6b5440'; g.fillRect(176, 286, 600, 100);
+  g.fillStyle = '#5c4838'; g.beginPath(); g.ellipse(560, 230, 90, 90, 0, 0, 7); g.fill();
+  g.fillStyle = '#251e18'; g.fillRect(300, 190, 70, 96);
+  g.fillStyle = '#221d17'; g.fillRect(800, 56, 200, 330);
+  g.fillStyle = '#3a3129'; for (let i = 0; i < 6; i++) g.fillRect(816, 74 + i * 26, 140 - (i * 23 % 60), 8);
+  g.fillStyle = '#1e1a15'; g.fillRect(176, 408, 824, 150);
+  const cols = ['#4a3e33', '#5d4d3f', '#3e352d', '#6a5644'];
+  for (let r = 0; r < 3; r++){ let x = 176; while (x < 990){ const ww = 60 + rnd() * 160; g.fillStyle = cols[(r + Math.floor(x)) % 4]; g.fillRect(x + 2, 420 + r * 44, Math.min(ww, 1000 - x) - 4, 34); x += ww; } }
+  g.fillStyle = '#F06A30'; g.fillRect(520, 408, 2, 150);
+});
+const meshTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#2a2723'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#0d0c0b'; for (let y = 4; y < h; y += 8) for (let x = (y / 8 % 2) * 4 + 4; x < w; x += 8){ g.beginPath(); g.arc(x, y, 2.4, 0, 7); g.fill(); }
+});
+meshTex.wrapS = meshTex.wrapT = THREE.RepeatWrapping; meshTex.repeat.set(2, 4);
+// текстолит платы: матовый чёрный, дорожки, переходные отверстия, шелкография
+const BW = .244, BH = .305;
+const pcbTex = canvasTex(640, 800, (g, w, h) => {
+  const sx = w / BW, X = x => (x + BW / 2) * sx, Y = y => (BH / 2 - y) * sx;
+  g.fillStyle = '#1b1a18'; g.fillRect(0, 0, w, h);
+  noise(g, w, h, 7);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (let i = 0; i < 70; i++){ // шины параллельных дорожек
+    const n = 4 + (rnd() * 9 | 0), x0 = rnd() * w, y0 = rnd() * h, len = 40 + rnd() * 170, len2 = 20 + rnd() * 80, hz = rnd() < .5, dir = rnd() < .5 ? 1 : -1;
+    g.strokeStyle = `rgba(74,68,60,${.35 + rnd() * .3})`; g.lineWidth = 1;
+    for (let k = 0; k < n; k++){
+      g.beginPath();
+      if (hz){ g.moveTo(x0, y0 + k * 3.2); g.lineTo(x0 + len, y0 + k * 3.2); g.lineTo(x0 + len + len2 * .7, y0 + k * 3.2 + dir * len2 * .7); }
+      else { g.moveTo(x0 + k * 3.2, y0); g.lineTo(x0 + k * 3.2, y0 + len); g.lineTo(x0 + k * 3.2 + dir * len2 * .7, y0 + len + len2 * .7); }
+      g.stroke();
+    }
+  }
+  g.fillStyle = 'rgba(128,116,98,.55)';
+  for (let i = 0; i < 900; i++){ g.beginPath(); g.arc(rnd() * w, rnd() * h, .8 + rnd() * .9, 0, 7); g.fill(); }
+  // шелкография: контуры и подписи
+  g.strokeStyle = 'rgba(214,206,192,.5)'; g.lineWidth = 1;
+  g.strokeRect(X(-.072), Y(.105), (.074) * sx, (.074) * sx); // зона сокета
+  g.fillStyle = 'rgba(214,206,192,.55)'; g.font = '600 10px monospace';
+  [['AM5', -.068, .032], ['DIMM_A1', .006, -.004], ['DIMM_B2', .046, -.004], ['PCIE_1', -.112, -.016], ['M2_1', -.112, -.046], ['PCIE_2', -.112, -.078], ['M2_2', -.112, -.103], ['ATX_24P', .086, .1], ['CPU_FAN', -.02, .147], ['SYS_FAN1', .07, -.14], ['BIOS', .02, -.13], ['NIVEL TEST', -.05, -.142]].forEach(([s, x, y]) => g.fillText(s, X(x), Y(y)));
+  for (let i = 0; i < 60; i++){ const x = rnd() * w, y = rnd() * h; g.strokeRect(x, y, 6 + rnd() * 8, 3 + rnd() * 4); }
+  // крепёжные отверстия
+  [[-.112, .142], [.112, .142], [-.112, -.142], [.112, -.142], [-.112, .0], [.04, .142], [.04, -.142]].forEach(([x, y]) => {
+    g.fillStyle = '#8a7356'; g.beginPath(); g.arc(X(x), Y(y), 9, 0, 7); g.fill();
+    g.fillStyle = '#0a0908'; g.beginPath(); g.arc(X(x), Y(y), 5, 0, 7); g.fill();
+  });
+});
+
+/* --- материалы --- */
+const std = o => new THREE.MeshStandardMaterial(o);
+const M = {
+  wood: std({ map: woodTex, roughness: .58, metalness: 0 }),
+  wall: std({ map: plasterTex, roughness: .96 }),
+  floor: std({ map: floorTex, roughness: .8 }),
+  steel: std({ color: 0x24221f, roughness: .38, metalness: .6 }),
+  black: std({ color: 0x1b1a18, roughness: .5, metalness: .25 }),
+  graph: std({ color: 0x2f2c29, roughness: .42, metalness: .55 }),
+  caseM: std({ color: 0x2c2926, roughness: .4, metalness: .45 }),
+  caseIn: std({ color: 0x1a1816, roughness: .7, metalness: .2 }),
+  rubber: std({ color: 0x0e0d0c, roughness: .9 }),
+  front: std({ map: meshTex, roughness: .7, metalness: .4 }),
+  glass: std({ color: 0x8a8278, roughness: .06, metalness: .1, transparent: true, opacity: .14, depthWrite: false }),
+  pcb: std({ map: pcbTex, roughness: .62, metalness: .15 }),
+  pcbPlain: std({ color: 0x1d1c1a, roughness: .6, metalness: .15 }),
+  heat: std({ color: 0x4a4540, roughness: .38, metalness: .65 }),
+  slot: std({ color: 0x141312, roughness: .55, metalness: .1 }),
+  alu: std({ color: 0xb4ada2, roughness: .32, metalness: .7 }),
+  fin: std({ color: 0x9c958b, roughness: .36, metalness: .7 }),
+  copper: std({ color: 0xb87a50, roughness: .3, metalness: 1 }),
+  fan: std({ color: 0x151413, roughness: .62, metalness: .1 }),
+  hub: std({ color: 0x24211f, roughness: .45, metalness: .3 }),
+  blade: std({ color: 0x1d1b19, roughness: .55, side: THREE.DoubleSide }),
+  ram: std({ color: 0x3a3631, roughness: .36, metalness: .55 }),
+  chip: std({ color: 0x0f0e0d, roughness: .45 }),
+  label: std({ color: 0x3e3a35, roughness: .85 }),
+  paper: std({ color: 0xd8d1c4, roughness: .9 }),
+  ceramic: std({ color: 0xcfc6b8, roughness: .32 }),
+  felt: std({ color: 0x24201c, roughness: 1 }),
+  keys: std({ color: 0x2b2825, roughness: .62 }),
+  keysMod: std({ color: 0x55504a, roughness: .62 }),
+  keysAcc: std({ color: 0xcfc6b8, roughness: .55 }),
+  cable: std({ color: 0x1c1a17, roughness: .7, metalness: .1 }),
+  strip: std({ color: 0x5a544c, roughness: .4, metalness: .5, emissive: 0xffc890, emissiveIntensity: 0 }),
+  bulb: std({ color: 0x332a20, emissive: 0xffc27a, emissiveIntensity: 0 }),
+  shadeOut: std({ color: 0x3b3733, roughness: .4, metalness: .45 }),
+  shadeIn: std({ color: 0xe6dccb, roughness: .7, side: THREE.BackSide, emissive: 0xffc890, emissiveIntensity: 0 }),
+  screen: std({ color: 0x020202, roughness: 1, metalness: 0, emissive: 0xffffff, emissiveMap: screenTex, emissiveIntensity: 0 }),
+  book: [0x5a2a20, 0x3d3a33, 0x8b7d66, 0x2a2f2c, 0x6e4b2f, 0x2b2622].map(c => std({ color: c, roughness: .85 }))
+};
+M.strip.name = 'strip';
+
+/* --- геометрия: фаски вместо голых брусков --- */
+const GEO = new Map();
+function rb(w, h, d, r = .002, seg = 2){
+  const rr = Math.min(r, Math.min(w, h, d) / 2 - 1e-5);
+  const key = [w, h, d, rr, seg].map(v => +v.toFixed(5)).join('|');
+  let g = GEO.get(key);
+  if (!g){ g = rr > .0003 ? new RoundedBoxGeometry(w, h, d, seg, rr) : new THREE.BoxGeometry(w, h, d); GEO.set(key, g); }
+  return g;
+}
+function mesh(geo, mat, x = 0, y = 0, z = 0, parent, shadow = true){
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = true;
+  (parent || scene).add(m); return m;
+}
+function box(w, h, d, mat, x, y, z, parent, shadow = true, r = .002){ return mesh(rb(w, h, d, r), mat, x, y, z, parent, shadow); }
+function cyl(rt, rb_, h, mat, x, y, z, parent, seg = 24){ return mesh(new THREE.CylinderGeometry(rt, rb_, h, seg), mat, x, y, z, parent); }
+function rrShape(w, d, r){
+  const s = new THREE.Shape(), x = -w / 2, y = -d / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+  s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s;
+}
+// плоская плита со скруглёнными углами в плане (коврик, блокнот)
+function slab(w, d, h, r, mat, x, y, z, parent){
+  const b = Math.min(.001, h / 3);
+  const geo = new THREE.ExtrudeGeometry(rrShape(w - 2 * b, d - 2 * b, Math.max(.001, r - b)), { depth: h - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 8 });
+  geo.rotateX(-Math.PI / 2); geo.center();
+  return mesh(geo, mat, x, y, z, parent);
+}
+function lathe(pts, mat, seg = 48){
+  const m = new THREE.Mesh(new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0], p[1])), seg), mat);
+  m.castShadow = true; m.receiveShadow = true; return m;
+}
+function rod(a, b, r, mat, parent){
+  const dir = new THREE.Vector3().subVectors(b, a), len = dir.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 14), mat);
+  m.position.copy(a).addScaledVector(dir, .5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  m.castShadow = true; m.receiveShadow = true; (parent || scene).add(m); return m;
+}
+// вентилятор: рамка со скруглением, ступица, 7 изогнутых лопастей; ось — локальная z
+const FANG = {};
+function fanGeo(size, depth){
+  const k = size + '|' + depth; if (FANG[k]) return FANG[k];
+  const r = size * .465;
+  const shape = rrShape(size - .002, size - .002, size * .1);
+  const hole = new THREE.Path(); hole.absarc(0, 0, r, 0, Math.PI * 2, true); shape.holes.push(hole);
+  const frame = new THREE.ExtrudeGeometry(shape, { depth: depth - .002, bevelEnabled: true, bevelThickness: .001, bevelSize: .001, bevelSegments: 2, curveSegments: 28 }); frame.center();
+  const hub = new THREE.CylinderGeometry(size * .17, size * .17, depth * .62, 32); hub.rotateX(Math.PI / 2);
+  const bs = new THREE.Shape();
+  bs.moveTo(size * .12, -size * .055); bs.quadraticCurveTo(r * .62, -size * .1, r * .97, -size * .03);
+  bs.quadraticCurveTo(r * .93, size * .09, r * .58, size * .115); bs.quadraticCurveTo(r * .3, size * .09, size * .12, size * .055); bs.closePath();
+  const blade = new THREE.ExtrudeGeometry(bs, { depth: .0012, bevelEnabled: false, curveSegments: 6 }); blade.translate(0, 0, -.0006);
+  return (FANG[k] = { frame, hub, blade });
+}
+function fan(size, depth, parent, x, y, z, axis = 'x'){
+  const g = new THREE.Group(), F = fanGeo(size, depth);
+  mesh(F.frame, M.fan, 0, 0, 0, g); mesh(F.hub, M.hub, 0, 0, 0, g);
+  for (let i = 0; i < 7; i++){
+    const piv = new THREE.Group(); piv.rotation.z = i / 7 * Math.PI * 2 + .3;
+    const b = new THREE.Mesh(F.blade, M.blade); b.rotation.x = .5; b.castShadow = true; piv.add(b); g.add(piv);
+  }
+  if (axis === 'x') g.rotation.y = Math.PI / 2; else if (axis === 'y') g.rotation.x = Math.PI / 2;
+  g.position.set(x, y, z); parent.add(g); return g;
+}
+function instanced(geo, mat, list, parent){
+  const im = new THREE.InstancedMesh(geo, mat, list.length), o = new THREE.Object3D();
+  list.forEach((p, i) => { o.position.set(p[0], p[1], p[2]); o.rotation.set(p[3] || 0, p[4] || 0, p[5] || 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+  im.castShadow = true; im.receiveShadow = true; (parent || scene).add(im); return im;
+}
+
+/* --- комната --- */
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), M.floor);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(14, 5), M.wall);
+wall.position.set(0, 2.5, -0.64); wall.receiveShadow = true; scene.add(wall);
+box(14, .08, .02, M.black, 0, .04, -.62, null, false, .004);
+
+// стол: дубовая столешница с фаской, стальная рама
+const TOP = .76;
+box(1.8, .034, .8, M.wood, 0, TOP - .017, -.22, null, true, .007);
+[[-.84, -.58], [.84, -.58], [-.84, .14], [.84, .14]].forEach(([x, z]) => box(.036, TOP - .034, .036, M.steel, x, (TOP - .034) / 2, z, null, true, .006));
+box(1.66, .03, .024, M.steel, 0, TOP - .07, -.58, null, true, .005);
+
+// полка с книгами, рамка
+box(1.0, .022, .2, M.wood, -.38, 1.62, -.54, null, true, .004);
+let bx = -.84;
+for (let i = 0; i < 11; i++){
+  const w = .022 + rnd() * .03, h = .17 + rnd() * .08;
+  const b = box(w, h, .15 + rnd() * .03, M.book[i % 6], bx + w / 2, 1.631 + h / 2, -.54, null, true, .003);
+  if (i === 7) { b.rotation.z = -.32; b.position.x += .03; b.position.y -= .01; }
+  bx += w + .004 + (i === 6 ? .03 : 0);
+}
+box(.12, .1, .1, M.ceramic, .0, 1.681, -.53, null, true, .01);
+box(.42, .56, .022, M.black, .52, 1.62, -.63, null, true, .004);
+{ const print = new THREE.Mesh(new THREE.PlaneGeometry(.34, .48), std({ color: 0xc9bfae, roughness: .95 })); print.position.set(.52, 1.62, -.618); scene.add(print); }
+box(.2, .006, .002, M.black, .52, 1.66, -.616, null, false, 0);
+box(.12, .006, .002, M.black, .52, 1.64, -.616, null, false, 0);
+
+// коврик
+slab(.86, .36, .004, .02, M.felt, -.1, TOP + .002, .0);
+
+// клавиатура 75 %: корпус со скруглением, скруглённые колпачки по рядам
+const KB = new THREE.Group(); KB.position.set(-.12, TOP + .004, .0); KB.rotation.x = .035; scene.add(KB);
+box(.312, .017, .124, M.graph, 0, .0085, 0, KB, true, .005);
+box(.296, .004, .108, M.black, 0, .0165, 0, KB, false, .0015);
+{
+  const U = .019, ROWS = [
+    [[1,'a'],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1,'m']],
+    [[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[2,'m']],
+    [[1.5,'m'],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1.5,'m']],
+    [[1.75,'m'],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[2.25,'a']],
+    [[2.25,'m'],[1],[1],[1],[1],[1],[1],[1],[1],[1],[1],[2.75,'m']],
+    [[1.25,'m'],[1.25,'m'],[1.25,'m'],[6.25],[1.25,'m'],[1.25,'m'],[1.25,'m'],[1.25,'m']]
+  ];
+  const groups = {};
+  ROWS.forEach((row, r) => {
+    let u = 0; const z = -.0475 + r * .019, y = .0215 - (r === 0 ? .0006 : 0);
+    row.forEach(([n, kind]) => {
+      const x = -15 * U / 2 + (u + n / 2) * U; u += n;
+      const key = n + (kind || 'k'); (groups[key] = groups[key] || { n, kind, list: [] }).list.push([x, y, z]);
+    });
+  });
+  Object.values(groups).forEach(gk => instanced(rb(gk.n * U - .0024, .0078, .0166, .0026, 2), gk.kind === 'm' ? M.keysMod : gk.kind === 'a' ? M.keysAcc : M.keys, gk.list, KB));
+}
+// мышь
+{ const ms = new THREE.Mesh(new THREE.SphereGeometry(.5, 32, 20), M.graph); ms.scale.set(.036, .02, .062); ms.position.set(.2, TOP + .011, .01); ms.castShadow = true; ms.receiveShadow = true; scene.add(ms); }
+
+// кружка (полая, с бортиком), блокнот, карандаш
+{ const mug = lathe([[0, 0], [.033, 0], [.036, .003], [.037, .088], [.0355, .092], [.0335, .0905], [.0325, .009], [0, .009]], M.ceramic, 40); mug.position.set(-.58, TOP, .05); scene.add(mug);
+  const h = new THREE.Mesh(new THREE.TorusGeometry(.024, .0055, 10, 24, Math.PI), M.ceramic); h.position.set(-.544, TOP + .048, .05); h.rotation.z = -Math.PI / 2; h.castShadow = true; scene.add(h); }
+{ const nb = slab(.15, .21, .012, .008, M.paper, -.4, TOP + .006, .07); nb.rotation.y = .18;
+  const band = box(.004, .0124, .212, M.black, -.36, TOP + .006, .077, null, false, .001); band.rotation.y = .18;
+  const pen = cyl(.0042, .0042, .14, M.steel, -.39, TOP + .016, .06, null, 14); pen.rotation.set(Math.PI / 2, 0, .9); }
+
+// монитор: тонкая панель с фаской, корпус-«горб», ножка и подставка
+const mon = new THREE.Group(); mon.position.set(-.12, TOP, -.4); scene.add(mon);
+box(.25, .01, .17, M.steel, 0, .005, 0, mon, true, .005);
+{ const neck = box(.046, .3, .018, M.steel, 0, .165, -.045, mon, true, .006); neck.rotation.x = -.06; }
+box(.38, .22, .03, M.black, 0, .31, -.025, mon, true, .012);
+box(.65, .38, .012, M.black, 0, .3, -.004, mon, true, .006);
+const scr = new THREE.Mesh(new THREE.PlaneGeometry(.636, .364), M.screen);
+scr.position.set(0, .302, .0026); mon.add(scr);
+
+// лампа-«архитектор»: тяжёлое основание, двойные штанги, плафон с отбортовкой
+const LBASE = new THREE.Vector3(-.78, TOP, -.36);
+const elbow = new THREE.Vector3(-.76, TOP + .44, -.46);
+const headP = new THREE.Vector3(-.54, TOP + .52, -.2);
+const lampTarget = new THREE.Vector3(-.1, TOP, -.06);
+{ const base = lathe([[0, 0], [.074, 0], [.078, .003], [.079, .012], [.074, .02], [.03, .026], [.012, .03], [0, .03]], M.steel, 48); base.position.copy(LBASE); scene.add(base);
+  cyl(.009, .009, .008, M.ceramic, LBASE.x + .042, TOP + .026, LBASE.z + .02, null, 16); // кнопка
+  const piv = new THREE.Vector3(LBASE.x, TOP + .03, LBASE.z);
+  const back = headP.clone().addScaledVector(new THREE.Vector3().subVectors(lampTarget, headP).normalize(), -.088);
+  const nrm = new THREE.Vector3().subVectors(elbow, piv).cross(new THREE.Vector3().subVectors(headP, elbow)).normalize().multiplyScalar(.009);
+  [1, -1].forEach(s => {
+    rod(piv.clone().addScaledVector(nrm, s), elbow.clone().addScaledVector(nrm, s), .0045, M.steel);
+    rod(elbow.clone().addScaledVector(nrm, s), back.clone().addScaledVector(nrm, s), .0045, M.steel);
+  });
+  const j = (p) => { const k = new THREE.Mesh(new THREE.CylinderGeometry(.013, .013, .03, 20), M.steel); k.position.copy(p); k.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), nrm.clone().normalize()); k.castShadow = true; scene.add(k); };
+  j(piv); j(elbow); j(back);
+  // шнур от основания к стене
+  const cord = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([[LBASE.x - .05, TOP + .004, LBASE.z], [LBASE.x - .14, TOP + .003, LBASE.z - .1], [LBASE.x - .18, TOP + .003, -.6]].map(p => new THREE.Vector3(...p))), 24, .0028, 8), M.cable);
+  cord.castShadow = true; scene.add(cord);
+}
+const head = new THREE.Group(); head.position.copy(headP); scene.add(head); head.lookAt(lampTarget);
+{ const prof = [[0, -.07], [.016, -.069], [.026, -.064], [.034, -.054], [.044, -.03], [.056, .0], [.068, .034], [.075, .05], [.077, .053]];
+  const out = lathe(prof, M.shadeOut, 48); out.rotation.x = Math.PI / 2; head.add(out);
+  const inn = lathe(prof.map(([r, y]) => [r * .96, y]), M.shadeIn, 48); inn.rotation.x = Math.PI / 2; inn.castShadow = false; head.add(inn);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(.014, .016, .02, 20), M.shadeOut); cap.rotation.x = Math.PI / 2; cap.position.z = -.078; head.add(cap);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(.021, 20, 14), M.bulb); bulb.position.z = .008; head.add(bulb); }
+
+/* --- ПК --- */
+const pc = new THREE.Group(); pc.position.set(.56, TOP, -.24); scene.add(pc);
+const L = .42, H = .46, W = .22, T = .008;
+box(L, T, W, M.caseM, 0, H - T / 2, 0, pc, true, .003);                    // крыша
+box(L - .06, .002, W - .05, M.front, 0, H + .0005, 0, pc, false, 0);         // фильтр сверху
+box(L, T, W, M.caseM, 0, T / 2 + .012, 0, pc, true, .003);                   // дно
+box(T, H - .012, W, M.front, L / 2 - T / 2, (H + .012) / 2, 0, pc, true, .003); // перёд, сетка
+box(T, H - .012, W, M.caseM, -L / 2 + T / 2, (H + .012) / 2, 0, pc, true, .003); // зад
+box(L, H - .012, T, M.caseIn, 0, (H + .012) / 2, -W / 2 + T / 2, pc, true, .003); // лоток платы
+[[-.17, -.08], [.17, -.08], [-.17, .08], [.17, .08]].forEach(([x, z]) => { const f = cyl(.013, .015, .012, M.rubber, x, .006, z, pc, 20); });
+box(L - .02, .006, W - .03, M.caseIn, .0, .108, -.0, pc, true, .002);       // кожух отсека БП
+// резиновые окна для кабелей в лотке
+[[.07, .2], [.07, .3], [.07, .39]].forEach(([x, y]) => box(.016, .05, .004, M.rubber, x, y, -W / 2 + T + .001, pc, false, .006));
+// заглушки слотов на задней стенке
+for (let i = 0; i < 6; i++) box(.004, .012, .08, M.graph, -L / 2 + T + .002, .16 + i * .02, -.03, pc, false, .001);
+// передние и задний вентиляторы
+for (let i = 0; i < 3; i++) fan(.118, .025, pc, L / 2 - .028, .17 + i * .12, -.01, 'x');
+fan(.118, .025, pc, -L / 2 + .022, .36, -.01, 'x');
+// стекло
+const glass = new THREE.Group(); pc.add(glass);
+{ const g = new THREE.Mesh(rb(L - .006, H - .02, .004, .0015), M.glass); g.position.set(0, (H + .012) / 2, W / 2 + .002); glass.add(g);
+  [[0, H - .016, L - .004, .012], [0, .024, L - .004, .012]].forEach(([x, y, w, h]) => { const b = new THREE.Mesh(rb(w, h, .006, .002), M.caseM); b.position.set(x, y, W / 2 + .002); b.castShadow = true; glass.add(b); }); }
+
+// детали: проявляются на своих местах, заходя через открытую боковую стенку на 6–10 см, без вращения
+const parts = [];
+function part(obj, a, b, off = [0, 0, .08]){
+  obj.userData.rest = obj.position.clone();
+  const mats = new Map();
+  obj.traverse(o => { if (o.isMesh){ let c = mats.get(o.material); if (!c){ c = o.material.clone(); mats.set(o.material, c); } o.material = c; } });
+  parts.push({ obj, a, b, off: new THREE.Vector3(...off), mats: [...mats.values()], op: -1 });
+  obj.visible = false; return obj;
+}
+const ZB = -W / 2 + T;   // плоскость лотка
+const MBX = -.07, MBY = .27;
+// материнская плата
+const mb = new THREE.Group(); mb.position.set(MBX, MBY, ZB + .006); pc.add(mb);
+box(BW, BH, .0016, M.pcb, 0, 0, 0, mb, true, .0007);
+// кожух разъёмов + радиаторы питания (VRM) с рёбрами
+box(.024, .11, .03, M.graph, -.106, .088, .016, mb, true, .004);
+box(.086, .022, .022, M.heat, -.034, .126, .012, mb, true, .003);
+box(.022, .07, .022, M.heat, -.084, .066, .012, mb, true, .003);
+for (let i = 0; i < 6; i++) box(.084, .0012, .0026, M.graph, -.034, .117 + i * .0036, .0235, mb, false, 0);
+// сокет AM5
+box(.054, .054, .004, M.slot, -.035, .07, .002, mb, true, .002);
+box(.05, .05, .0035, M.alu, -.035, .07, .004, mb, false, .0012);
+// конденсаторы вокруг сокета
+{ const cg = new THREE.CylinderGeometry(.0022, .0022, .006, 12); cg.rotateX(Math.PI / 2); const L2 = [];
+  for (let i = 0; i < 9; i++) L2.push([-.072 + i * .0072, .104, .004]);
+  for (let i = 0; i < 6; i++) L2.push([-.066, .03 + i * .0072, .004]);
+  instanced(cg, M.heat, L2, mb); }
+// слоты памяти (4) с защёлками
+for (let i = 0; i < 4; i++){ const x = .022 + i * .01; box(.006, .134, .007, M.slot, x, .07, .004, mb, true, .0012); box(.0062, .006, .009, M.graph, x, .14, .005, mb, false, .001); }
+// 24-pin
+box(.012, .052, .012, M.slot, .112, .06, .006, mb, true, .0015);
+// слоты PCIe: первый в стальной обойме
+box(.09, .007, .008, M.slot, -.065, -.03, .004, mb, true, .0015);
+box(.093, .0095, .0035, M.alu, -.065, -.03, .0072, mb, false, .001);
+box(.09, .007, .008, M.slot, -.065, -.09, .004, mb, true, .0015);
+box(.03, .006, .008, M.slot, .03, -.09, .004, mb, true, .0015);
+// радиатор M.2 с прорезями, радиатор чипсета
+box(.086, .024, .006, M.heat, -.04, -.06, .004, mb, true, .002);
+for (let i = 0; i < 5; i++) box(.07, .001, .001, M.graph, -.04, -.069 + i * .0045, .0072, mb, false, 0);
+box(.05, .05, .01, M.heat, .062, -.092, .006, mb, true, .004);
+box(.03, .003, .002, M.graph, .062, -.092, .0115, mb, false, 0);
+box(.018, .008, .01, M.slot, -.1, .146, .005, mb, true, .0015); // EPS 8-pin
+// разъём M.2 под второй накопитель
+box(.008, .024, .005, M.slot, .002, -.118, .003, mb, true, .001);
+part(mb, .30, .36, [0, 0, .1]);
+
+// процессор: крышка теплораспределителя
+const cpu = new THREE.Group(); cpu.position.set(MBX - .035, MBY + .07, ZB + .0125); pc.add(cpu);
+box(.04, .04, .0024, M.pcbPlain, 0, 0, -.0012, cpu, true, .001);
+box(.034, .034, .0034, M.alu, 0, 0, .0016, cpu, true, .0015);
+part(cpu, .345, .385, [0, 0, .06]);
+
+// башенный кулер: медное основание, тепловые трубки, 34 ламели, вентилятор
+const cool = new THREE.Group(); cool.position.set(MBX - .035, MBY + .07, ZB + .016); pc.add(cool);
+box(.042, .042, .012, M.copper, 0, 0, .006, cool, true, .002);
+box(.05, .02, .008, M.graph, 0, 0, .014, cool, true, .002);
+for (let i = 0; i < 4; i++) { const p = cyl(.003, .003, .14, M.copper, -.012 + i * .008, 0, .08, cool, 10); p.rotation.x = Math.PI / 2; }
+{ const L3 = []; for (let i = 0; i < 24; i++) L3.push([0, 0, .034 + i * .0054]); instanced(rb(.054, .124, .0013, 0), M.fin, L3, cool);
+}
+box(.056, .126, .005, M.graph, 0, 0, .165, cool, true, .0022);
+box(.056, .004, .0012, M.alu, 0, -.05, .1683, cool, false, 0);
+fan(.12, .025, cool, -.042, 0, .096, 'x');
+part(cool, .38, .44, [0, 0, .1]);
+
+// память: две планки с радиаторами, тёплая едва заметная полоса сверху
+const RAMZ = ZB + .006 + .021;
+function ramStick(x){
+  const g = new THREE.Group(); g.position.set(MBX + x, MBY + .07, RAMZ); pc.add(g);
+  box(.0068, .133, .034, M.ram, 0, 0, 0, g, true, .0018);
+  box(.0072, .12, .002, M.graph, 0, 0, .0172, g, false, .0006);
+  box(.0072, .133, .003, M.strip, 0, 0, .0182, g, false, .001);
+  return g;
+}
+const ram1 = ramStick(.032), ram2 = ramStick(.052);
+part(ram1, .43, .47, [0, 0, .07]); part(ram2, .45, .49, [0, 0, .07]);
+
+// накопитель M.2 (второй слот, открыт)
+const ssd = new THREE.Group(); ssd.position.set(MBX - .038, MBY - .118, ZB + .009); pc.add(ssd);
+box(.08, .022, .0016, M.pcbPlain, 0, 0, 0, ssd, true, .0006);
+box(.022, .016, .0016, M.chip, -.018, 0, .0015, ssd, false, .0005);
+box(.022, .016, .0016, M.chip, .012, 0, .0015, ssd, false, .0005);
+box(.03, .016, .0004, M.label, .002, 0, .0026, ssd, false, 0);
+part(ssd, .48, .52, [0, 0, .06]);
+
+// видеокарта: кожух, открытые рёбра радиатора, пластина сзади, крепёжная планка
+const gpu = new THREE.Group(); gpu.position.set(MBX + .01, MBY - .03 - .019, ZB + .072); pc.add(gpu);
+{
+  const GL = .3, GD = .122;
+  box(GL, .005, GD, M.graph, 0, .023, 0, gpu, true, .002);                          // пластина
+  box(GL - .01, .0016, GD - .006, M.pcbPlain, 0, .0195, 0, gpu, false, .0006);      // плата
+  const L4 = []; for (let i = 0; i < 70; i++) L4.push([-.138 + i * .0039, .004, .002]);
+  instanced(rb(.0011, .026, GD - .012, 0), M.fin, L4, gpu);                         // рёбра
+  [[-.06], [.06]].forEach(([x]) => { const tp = cyl(.0028, .0028, GL - .03, M.copper, 0, -.004 + (x > 0 ? .006 : 0), x * .5, gpu, 10); tp.rotation.z = Math.PI / 2; });
+  box(GL, .014, GD, M.black, 0, -.016, 0, gpu, true, .004);                          // кожух снизу
+  box(GL, .02, .006, M.black, 0, -.011, GD / 2 - .003, gpu, true, .003);            // боковая губа кожуха
+  box(GL - .04, .004, .003, M.graph, .01, .0, GD / 2 - .0008, gpu, false, .001);    // планка на рёбрах
+  box(.008, .028, .004, M.slot, .1, .028, GD / 2 - .024, gpu, true, .001);           // разъём питания
+  box(.0016, .05, GD, M.alu, -GL / 2 - .001, .0, 0, gpu, true, .0006);              // крепёжная планка
+  const gs = box(.2, .0026, .002, M.strip, .03, -.004, GD / 2 + .0002, gpu, false, .0008);
+  [-.08, .02, .12].forEach(x => fan(.09, .012, gpu, x, -.024, 0, 'y'));
+}
+part(gpu, .52, .58, [0, 0, .1]);
+
+// блок питания: скруглённый корпус, решётка, модульные разъёмы, наклейка
+const psu = new THREE.Group(); psu.position.set(-.115, .058, -.005); pc.add(psu);
+box(.15, .086, .15, M.black, 0, 0, 0, psu, true, .006);
+box(.09, .05, .0012, M.label, -.01, .0, .0752, psu, false, 0);
+for (let i = 0; i < 4; i++) box(.07, .0024, .0004, M.graph, -.01, .016 - i * .009, .0762, psu, false, 0);
+for (let i = 0; i < 6; i++) box(.004, .012, .022, M.slot, .0752, -.022 + (i % 2) * .016, -.05 + (i >> 1) * .03, psu, false, .001);
+box(.15, .003, .004, M.strip, 0, .036, .0752, psu, false, .001);
+part(psu, .56, .62, [0, 0, .1]);
+
+// кабели в оплётке
+const cables = [];
+function cable(pts, r){
+  const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
+  const geo = new THREE.TubeGeometry(curve, 64, r, 10, false);
+  const m = new THREE.Mesh(geo, M.cable); m.castShadow = true; m.receiveShadow = true; pc.add(m);
+  cables.push({ m, n: geo.index.count }); geo.setDrawRange(0, 0); return m;
+}
+// кабели уложены за лотком и выходят через резиновые окна короткими дугами
+cable([[.07, .3, ZB - .004], [.07, .31, ZB + .012], [.058, .325, ZB + .02], [MBX + .112 + .004, MBY + .06, ZB + .016]], .0075);
+cable([[.07, .2, ZB - .004], [.07, .21, ZB + .03], [.062, .232, ZB + .08], [MBX + .01 + .1, MBY - .03 - .019 + .03, ZB + .072 + .036]], .005);
+cable([[-.16, .438, ZB - .004], [-.155, .436, ZB + .006], [-.14, .432, ZB + .012], [MBX - .1, MBY + .148, ZB + .014]], .0042);
+const pcLight = new THREE.PointLight(0xffd2a0, 0, .5, 2); pcLight.position.set(0, .3, 0); pc.add(pcLight);
+const stripMats = []; scene.traverse(o => { if (o.isMesh && o.material && o.material.name === 'strip' && !stripMats.includes(o.material)) stripMats.push(o.material); });
+
+/* --- тёплое окружение для отражений металла --- */
+{
+  const envScene = new THREE.Scene();
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(5, 24, 16), new THREE.MeshBasicMaterial({ color: 0x1a120c, side: THREE.BackSide })));
+  const pan = (w, h, c, x, y, z) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); envScene.add(m); };
+  pan(1.2, .8, 0xffb070, -2, 3, 1); pan(3, 1.6, 0x5a4030, 3, 1, 2); pan(6, .6, 0x2a1d14, 0, -2, 0);
+  const pm = new THREE.PMREMGenerator(renderer);
+  scene.environment = pm.fromScene(envScene, .04).texture;
+  pm.dispose();
+}
+scene.environmentIntensity = .15;
+
+/* --- свет: лампа — главный и единственный тёплый источник в начале --- */
+const hemi = new THREE.HemisphereLight(0xffe0c0, 0x1a120c, .0); scene.add(hemi);
+const lampDir = new THREE.Vector3().subVectors(lampTarget, headP).normalize();
+const lamp = new THREE.SpotLight(0xffb36b, 0, 5, .95, .7, 2);
+lamp.position.copy(headP).addScaledVector(lampDir, .03);
+lamp.target.position.copy(lampTarget); scene.add(lamp, lamp.target);
+lamp.castShadow = true; lamp.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048); lamp.shadow.bias = -.0004; lamp.shadow.normalBias = .01; lamp.shadow.camera.near = .04; lamp.shadow.camera.far = 3;
+// рассеянный свет из-под плафона: подсвечивает штанги и стену за лампой
+const spill = new THREE.PointLight(0xffb36b, 0, 1.4, 2); spill.position.copy(headP).addScaledVector(lampDir, -.02).add(new THREE.Vector3(0, .02, 0)); scene.add(spill);
+const work = new THREE.SpotLight(0xffc690, 0, 4, .36, .75, 2);
+work.position.set(.82, 1.42, .95); work.target.position.set(.52, TOP + .25, -.24); scene.add(work, work.target);
+work.castShadow = true; work.shadow.mapSize.set(1024, 1024); work.shadow.bias = -.0005; work.shadow.normalBias = .01;
+const room = new THREE.PointLight(0xffc896, 0, 9, 2); room.position.set(-1.3, 2.4, 1.6); scene.add(room);
+const fill = new THREE.SpotLight(0xffd0a0, 0, 6, .9, 1, 2); fill.position.set(1.8, 2.2, 1.2); fill.target.position.set(0, TOP, -.3); scene.add(fill, fill.target);
+const scrLight = new THREE.PointLight(0xffe2c8, 0, 1.4, 2); scrLight.position.set(-.12, TOP + .3, -.25); scene.add(scrLight);
+
+/* --- камера по ключам; на крупных планах лампа вне кадра, на общем — видна целиком --- */
+const KEYS = [
+  { p: 0.00, t: [-.36, .98, -.26], d: [.12, .24, 1], w: 1.66, tm: [-.36, .98, -.22], dm: [.12, .55, 1], wm: 1.0 },
+  { p: 0.07, t: [-.35, .98, -.26], d: [.12, .24, 1], w: 1.6, tm: [-.35, .98, -.22], dm: [.12, .55, 1], wm: .97 },
+  { p: 0.25, t: [.62, 1.02, -.25], d: [.44, .3, 1], w: .82, tm: [.55, .99, -.24], dm: [.4, .42, 1], wm: .56 },
+  { p: 0.60, t: [.62, 1.015, -.25], d: [.36, .28, 1], w: .8, tm: [.55, .99, -.24], dm: [.34, .4, 1], wm: .54 },
+  { p: 0.82, t: [.5, .99, -.24], d: [.1, .22, 1], w: .96, tm: [.53, .99, -.23], dm: [.08, .38, 1], wm: .62 },
+  { p: 1.00, t: [.02, 1.02, -.28], d: [-.22, .26, 1], w: 2.95, tm: [.06, 1.02, -.28], dm: [-.2, .32, 1], wm: 1.85 }
+];
+const v3 = (a) => new THREE.Vector3(...a);
+const tmpT = new THREE.Vector3(), tmpD = new THREE.Vector3();
+let vw = 1, vh = 1;
+function camAt(p){
+  let i = 0; while (i < KEYS.length - 2 && p > KEYS[i + 1].p) i++;
+  const A = KEYS[i], B = KEYS[i + 1];
+  const k = ease(clamp((p - A.p) / (B.p - A.p)));
+  const asp = vw / vh, portrait = asp < 1;
+  tmpT.copy(v3(portrait ? A.tm : A.t)).lerp(v3(portrait ? B.tm : B.t), k);
+  tmpD.copy(v3(portrait ? A.dm : A.d).normalize()).lerp(v3(portrait ? B.dm : B.d).normalize(), k).normalize();
+  const wdt = portrait ? THREE.MathUtils.lerp(A.wm, B.wm, k) : THREE.MathUtils.lerp(A.w, B.w, k);
+  camera.fov = portrait ? 40 : 30;
+  const hh = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  let dist = wdt / (2 * hh * asp);
+  if (!portrait) dist *= 1 / .78;
+  camera.position.copy(tmpT).addScaledVector(tmpD, dist);
+  camera.lookAt(tmpT);
+  if (portrait) camera.setViewOffset(vw, vh, 0, vh * .2, vw, vh);
+  else camera.setViewOffset(vw, vh, -vw * (vw > 1100 ? .19 : .14), 0, vw, vh);
+  camera.updateProjectionMatrix();
+}
+
+/* --- подписи деталей --- */
+const labelsEl = document.getElementById('labels');
+const LBL = [
+  { key: 'lb_mb', nk: 'ln_mb', price: 1900000, obj: mb, at: [.1, -.13, .01], on: [.33, .47] },
+  { key: 'lb_cool', nk: 'ln_cool', price: 750000, obj: cool, at: [.045, .07, .1], on: [.42, .55] },
+  { key: 'lb_ram', nk: 'ln_ram', price: 4700000, obj: ram2, at: [.006, -.07, .02], on: [.47, .58] },
+  { key: 'lb_gpu', nk: 'ln_gpu', price: 10080000, obj: gpu, at: [.16, -.01, .06], on: [.56, .7] },
+  { key: 'lb_psu', nk: 'ln_psu', price: 1750000, obj: psu, at: [.08, -.03, .08], on: [.6, .72] }
+];
+const fmtL = window.fmtL;
+LBL.forEach(l => { l.el = document.createElement('div'); l.el.className = 'lbl'; labelsEl.appendChild(l.el); });
+function labelText(){ LBL.forEach(l => { l.el.innerHTML = `${window.t(l.key)} · ${fmtL(l.price)}<span>${window.t(l.nk)}</span>`; }); }
+labelText(); document.addEventListener('nivel:lang', () => { labelText(); lastP = -1; });
+const pv = new THREE.Vector3();
+
+/* --- HUD --- */
+const caps = [...document.querySelectorAll('.cap')], copy0 = document.getElementById('copy0');
+const ticks = [...document.querySelectorAll('#ticks li')], sumEl = document.getElementById('sum'), skipEl = document.querySelector('.skip');
+const CAPW = [[.11, .30], [.30, .60], [.60, .84], [.84, 9]];
+const BUILD = [1150000, 360000, 1900000, 3800000, 750000, 4700000, 2100000, 10080000, 1750000];
+function hud(p){
+  const f = .025;
+  const o0 = 1 - smooth(.05, .1, p);
+  copy0.style.opacity = o0; copy0.style.visibility = o0 < .01 ? 'hidden' : 'visible';
+  copy0.style.transform = (vw / vh < 1 ? '' : 'translateY(-50%) ') + `translateY(${-(1 - o0) * 30}px)`;
+  caps.forEach((c, i) => {
+    const [a, b] = CAPW[i];
+    const o = smooth(a, a + f + .02, p) * (1 - smooth(b - f, b, p));
+    c.style.opacity = o; c.style.visibility = o < .01 ? 'hidden' : 'visible';
+    c.style.pointerEvents = o > .5 ? 'auto' : 'none';
+    c.style.transform = (vw / vh < 1 ? '' : 'translateY(-50%) ') + `translateY(${(1 - o) * 18}px)`;
+  });
+  skipEl.style.opacity = 1 - smooth(.84, .9, p); skipEl.style.visibility = p > .9 ? 'hidden' : 'visible';
+  const si = p < .11 ? 0 : p < .30 ? 1 : p < .60 ? 2 : p < .84 ? 3 : 4;
+  ticks.forEach((tk, i) => { tk.classList.toggle('on', i <= si); tk.classList.toggle('now', i === si); });
+  // сумма по чекам растёт по мере того, как детали встают на места
+  let s = 0, n = 0;
+  if (p > .11) { s += BUILD[0] + BUILD[1]; n = 2; }
+  [[mb, 2], [cpu, 3], [cool, 4], [ram2, 5], [ssd, 6], [gpu, 7], [psu, 8]].forEach(([o, i]) => { const pp = parts.find(x => x.obj === o); if (p >= pp.b) { s += BUILD[i]; n++; } });
+  if (p > .11 && p < .995) { sumEl.style.opacity = 1; sumEl.textContent = `${window.t('sum')}: ${fmtL(s)} · ${n}/9`; }
+  else if (p >= .995) { sumEl.style.opacity = 1; sumEl.textContent = `${fmtL(26590000)} + ${fmtL(window.NIVEL_fee(26590000))}`; }
+  else sumEl.style.opacity = 0;
+}
+
+/* --- состояние сцены --- */
+let lampOn = 0, P = 0, lastP = -1, lastLamp = -1;
+const LAMP_I = 5.2, WORK_I = 9;
+function apply(p){
+  lamp.intensity = LAMP_I * lampOn;
+  spill.intensity = .22 * lampOn;
+  M.bulb.emissiveIntensity = 2.4 * lampOn;
+  M.shadeIn.emissiveIntensity = .5 * lampOn;
+  // боковая стенка уходит вперёд и вправо, затем возвращается
+  const open = smooth(.12, .25, p) * (1 - smooth(.7, .8, p));
+  glass.position.set(.46 * smooth(.3, 1, open), .0, .09 * smooth(0, .4, open));
+  glass.visible = open < .98;
+  // детали: короткий заход сбоку и быстрое проявление
+  parts.forEach(pt => {
+    const t = clamp((p - pt.a) / (pt.b - pt.a));
+    pt.obj.visible = t > .001;
+    const k = easeOut(t), op = smooth(0, .5, t);
+    pt.obj.position.copy(pt.obj.userData.rest).addScaledVector(pt.off, 1 - k);
+    if (Math.abs(op - pt.op) > 1e-4){
+      const tr = op < .999;
+      pt.mats.forEach(m => { if (m.transparent !== tr){ m.transparent = tr; m.needsUpdate = true; } m.opacity = op; });
+      pt.op = op;
+    }
+  });
+  cables.forEach((c, i) => { const t = smooth(.62 + i * .02, .7 + i * .02, p); c.m.geometry.setDrawRange(0, Math.floor(c.n * t / 3) * 3); c.m.visible = t > 0; });
+  // рабочий свет на ПК, затем общий свет комнаты
+  const fin = smooth(.84, .98, p);
+  work.intensity = WORK_I * smooth(.1, .24, p) * (1 - .55 * fin);
+  const test = smooth(.76, .84, p);
+  pcLight.intensity = .05 * test;
+  stripMats.forEach(m => { m.emissiveIntensity = .22 * test; });
+  hemi.intensity = .05 * lampOn + .42 * fin;
+  scene.environmentIntensity = (.12 + .25 * smooth(.1, .3, p) + .35 * fin) * Math.max(.25, lampOn);
+  room.intensity = 9 * fin;
+  fill.intensity = 3.5 * fin;
+  M.screen.emissiveIntensity = .04 + .42 * fin;
+  scrLight.intensity = .5 * fin;
+  scene.background.copy(BG).lerp(new THREE.Color(0x17130f), fin);
+  scene.fog.color.copy(scene.background);
+  camAt(p);
+  hud(p);
+  scene.updateMatrixWorld(); camera.updateMatrixWorld();
+  if (vw > 760) LBL.forEach(l => {
+    const o = smooth(l.on[0], l.on[0] + .03, p) * (1 - smooth(l.on[1] - .03, l.on[1], p));
+    if (o > .01) {
+      l.obj.localToWorld(pv.set(...l.at)); pv.project(camera);
+      const x = (pv.x * .5 + .5) * vw, y = (-pv.y * .5 + .5) * vh;
+      l.el.style.transform = `translate(${x}px, ${y}px)`;
+    }
+    l.el.style.opacity = o;
+  });
+}
+
+function resize(){
+  const r = stage.getBoundingClientRect();
+  vw = Math.max(1, Math.round(r.width)); vh = Math.max(1, Math.round(r.height));
+  renderer.setSize(vw, vh, false);
+  camera.aspect = vw / vh;
+  lastP = -1;
+}
+resize();
+let rto; addEventListener('resize', () => { clearTimeout(rto); rto = setTimeout(resize, 120); });
+
+function scrollProgress(){
+  const r = hero.getBoundingClientRect();
+  const total = hero.offsetHeight - stage.offsetHeight;
+  return clamp(-r.top / Math.max(1, total));
+}
+function ready(){ window.__NIVEL_SCENE = true; window.__NIVEL_READY = true; }
+
+/* --- режимы запуска --- */
+if (window.__NIVEL_FAIL) return;
+if (N.reduced) {
+  // статичные кадры вместо анимации
+  lampOn = 1;
+  const saveW = vw, saveH = vh;
+  vw = 960; vh = 600; renderer.setPixelRatio(1); renderer.setSize(vw, vh, false); camera.aspect = vw / vh;
+  const imgs = [0, .27, .5, .81, 1].map(p => { apply(p); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', .82); });
+  window.NIVEL_stills(imgs);
+  vw = saveW; vh = saveH; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); resize();
+  apply(0); renderer.render(scene, camera); ready();
+  addEventListener('resize', () => setTimeout(() => { apply(0); renderer.render(scene, camera); }, 200));
+} else if (N.force) {
+  lampOn = 1; P = N.force.p;
+  const draw = () => { apply(P); renderer.render(scene, camera); };
+  draw(); ready(); addEventListener('resize', () => setTimeout(draw, 200));
+} else {
+  // лампа включается: щелчок и короткое мерцание нити
+  const t0 = performance.now() + 650;
+  const lampCurve = (ms) => ms < 0 ? 0 : ms < 60 ? .35 : ms < 120 ? .05 : ms < 180 ? .6 : ms < 260 ? .4 : Math.min(1, .4 + (ms - 260) / 500 * .6);
+  let smoothP = scrollProgress();
+  apply(smoothP); renderer.render(scene, camera); ready();
+  const loop = (now) => {
+    lampOn = lampCurve(now - t0);
+    const target = scrollProgress();
+    smoothP += (target - smoothP) * .14;
+    if (Math.abs(target - smoothP) < .0004) smoothP = target;
+    if (Math.abs(smoothP - lastP) > 1e-5 || lampOn !== lastLamp){
+      apply(smoothP); renderer.render(scene, camera);
+      lastP = smoothP; lastLamp = lampOn;
+    }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1738 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nivel — Паспорт сборки</title>
+<meta name="description" content="Nivel: подбор, закупка, сборка, тесты и монтаж ПК и рабочих мест в Ташкенте. Смета до покупки. Тесты до передачи. Одно окно за результат. Макет направления Б «Паспорт сборки».">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%231D1D1B' d='M2 4h13v2h-13Z'/%3E%3Cpath fill='%23D9501A' d='M2 6L10 6L6 10Z'/%3E%3Cpath fill='%231D1D1B' d='M1 10h14v2h-14Z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans+Extra+Condensed:wght@500;600;700&family=Fira+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F1EFEA;      /* бумага — фон */
+  --paper-2:#E7E3DA;    /* подложки */
+  --paper-3:#DCD7CC;    /* плата, плашки */
+  --sheet:#F8F7F3;      /* лист документа */
+  --ink:#1D1D1B;        /* асфальт — линии и текст */
+  --ink-2:#55534E;      /* вторичный текст, 6,7:1 на бумаге */
+  --ink-3:#8A867E;      /* служебные линии */
+  --rule:#CBC6BB;       /* тонкие разделители */
+  --signal:#D9501A;     /* сигнальный оранжевый — крупные отметки, штампы */
+  --signal-ink:#B5441A; /* тот же оранжевый для мелкого текста, 4,8:1 */
+  --signal-dark:#F06A30;/* оранжевый на тёмном */
+  --kraft:#C9A878;      /* крафт — бирки */
+  --kraft-2:#B99563;
+  --f-head:"Fira Sans Extra Condensed","Fira Sans",Arial,sans-serif;
+  --f-text:"Fira Sans",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono","Noto Sans Mono",Consolas,monospace;
+  --hdr:68px;
+  --gut:32px;
+  --wrap:1320px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.55 var(--f-text);text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img,svg{display:block;max-width:100%}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--signal);outline-offset:3px}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--gut)}
+.mono{font-family:var(--f-mono);font-feature-settings:"tnum" 1}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.no{font-family:var(--f-text);font-weight:600;letter-spacing:0}
+.nw{white-space:nowrap}
+
+/* ---------- кнопки ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 22px;border:2px solid var(--ink);border-radius:2px;font:600 15px/1 var(--f-text);letter-spacing:.01em;text-decoration:none;cursor:pointer;transition:background .2s,color .2s,transform .2s;white-space:nowrap}
+.btn-solid{background:var(--ink);color:var(--paper)}
+.btn-solid:hover{background:#000}
+.btn-solid .tri{width:12px;height:9px;background:var(--signal-dark);clip-path:polygon(0 0,100% 0,50% 100%)}
+.btn-line{background:transparent;color:var(--ink)}
+.btn-line:hover{background:var(--ink);color:var(--paper)}
+.btn-sm{min-height:40px;padding:0 16px;font-size:14px}
+.arrow{font-family:var(--f-mono);font-weight:500}
+
+/* ---------- шапка ---------- */
+.hdr{position:fixed;inset:0 0 auto 0;height:var(--hdr);z-index:50;background:var(--paper);border-bottom:1px solid var(--ink)}
+.hdr .wrap{height:100%;display:flex;align-items:center;gap:28px;max-width:none;padding:0 var(--gut)}
+.logo{display:block;flex:none;line-height:0}
+.logo svg{height:28px;width:auto}
+.nav{display:flex;gap:26px;margin-left:24px}
+.nav a{font:500 15px/1 var(--f-text);text-decoration:none;padding:8px 0;border-bottom:2px solid transparent}
+.nav a:hover{border-bottom-color:var(--signal)}
+.hdr-end{margin-left:auto;display:flex;align-items:center;gap:14px}
+.lang{display:inline-flex;border:1.5px solid var(--ink);border-radius:2px;overflow:hidden}
+.lang button{border:0;background:transparent;padding:7px 10px;font:500 12px/1 var(--f-mono);letter-spacing:.06em;cursor:pointer}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.menu-btn{display:none;border:1.5px solid var(--ink);background:transparent;border-radius:2px;height:36px;padding:0 12px;font:500 12px/1 var(--f-mono);letter-spacing:.06em;cursor:pointer}
+.mnav{display:none}
+
+/* ---------- первый экран ---------- */
+.hero{position:relative;height:520vh;border-bottom:1px solid var(--ink)}
+.hero-stage{position:sticky;top:0;height:100vh;height:100svh;padding:calc(var(--hdr) + 22px) 0 22px;overflow:hidden}
+.hero-grid{height:100%;display:grid;grid-template-columns:minmax(360px,460px) minmax(0,1fr);grid-template-rows:1fr auto;grid-template-areas:"head sheet" "step sheet";column-gap:44px;max-width:none}
+.hero-head{grid-area:head;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}
+.eyebrow{display:flex;align-items:center;gap:10px;font:500 12px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.eyebrow .tag{display:inline-block;padding:4px 8px 4px 16px;background:var(--kraft);color:var(--ink);position:relative;clip-path:polygon(8px 0,100% 0,100% 100%,8px 100%,0 50%)}
+.eyebrow .tag:before{content:"";position:absolute;left:8px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:var(--paper)}
+h1{font:600 clamp(38px,min(3.6vw,6vh),54px)/.96 var(--f-head);text-transform:uppercase;letter-spacing:.004em;margin:20px 0 0}
+h1 em{font-style:normal;color:var(--signal);display:block}
+html[lang="uz-Latn"] h1{font-size:clamp(34px,min(3.2vw,5.3vh),48px)}
+.promise{list-style:none;margin:22px 0 0;padding:0;border-top:1.5px solid var(--ink)}
+.promise li{display:flex;gap:14px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--rule);font:500 15px/1.3 var(--f-text)}
+.promise li span{font:500 12px/1 var(--f-mono);color:var(--signal-ink);min-width:22px}
+.lead{margin:18px 0 0;color:var(--ink-2);font-size:16px;max-width:44ch}
+.hero-actions{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap}
+.hero-step{grid-area:step;border-top:1.5px solid var(--ink);padding-top:14px;margin-top:16px}
+.hs-top{display:flex;justify-content:space-between;align-items:baseline;font:500 12px/1 var(--f-mono);letter-spacing:.06em;color:var(--ink-2);text-transform:uppercase}
+.hs-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:10px 0 12px}
+.hs-bar i{display:block;height:4px;background:var(--rule);position:relative;overflow:hidden}
+.hs-bar i b{position:absolute;inset:0;background:var(--ink);transform-origin:left;transform:scaleX(0)}
+.hs-title{font:600 28px/1 var(--f-head);text-transform:uppercase;display:flex;gap:12px;align-items:baseline}
+.hs-title .n{font:500 14px/1 var(--f-mono);color:var(--signal-ink)}
+.hs-desc{margin:8px 0 0;color:var(--ink-2);font-size:15px;line-height:1.55;height:4.65em;overflow:hidden;max-width:46ch}
+.hs-hint{margin-top:10px;font:500 11px/1 var(--f-mono);letter-spacing:.06em;color:var(--ink-3);text-transform:uppercase}
+
+.sheet{grid-area:sheet;margin:0;min-height:0;display:flex;flex-direction:column;background:var(--sheet);border:1.5px solid var(--ink);padding:18px;position:relative}
+.sheet-in{flex:1;min-height:0;display:flex;flex-direction:column;border:1.5px solid var(--ink);position:relative}
+.zones{position:absolute;inset:0;pointer-events:none;font:500 10px/1 var(--f-mono);color:var(--ink-2)}
+.zones span{position:absolute}
+.zones .zt{top:4px;transform:translateX(-50%)}
+.zones .zl{left:5px;transform:translateY(-50%)}
+.zones .zt:after{content:"";position:absolute;left:50%;top:12px;width:1px;height:6px;background:var(--ink)}
+.scene-box{flex:1;min-height:0;position:relative}
+.scene{position:absolute;inset:0;width:100%;height:100%}
+.nt-s{display:none}
+.sheet-note{position:absolute;right:20px;bottom:2px;font:500 10.5px/14px var(--f-mono);color:var(--ink-2);letter-spacing:.02em;z-index:1}
+.tb{display:grid;grid-template-columns:1.6fr 1fr 1fr .7fr .7fr;border-top:1.5px solid var(--ink);font-family:var(--f-mono);background:var(--sheet)}
+.tb > div{border-right:1px solid var(--ink);padding:6px 10px;min-width:0}
+.tb > div:nth-child(5n){border-right:0}
+.tb .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb .v{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.tb-row2{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr) 1.9fr;border-top:1px solid var(--ink);border-right:0!important;padding:0!important}
+.tb-row2 > div{border-right:1px solid var(--ink);padding:6px 10px;position:relative;min-height:46px}
+.tb-row2 > div:last-child{border-right:0}
+.cell-d{display:inline-block;margin-top:3px;font-size:12px;font-weight:600;color:var(--ink-3);padding:1px 5px;border:1.5px dashed var(--rule);transition:all .25s}
+.cell.on .cell-d{color:var(--signal-ink);border:2px solid var(--signal);transform:rotate(-5deg);filter:url(#ink)}
+.cell:nth-child(2n).on .cell-d{transform:rotate(4deg)}
+.tb .sum{font-size:14px;font-weight:600}
+.tb .ret{font-size:11px;color:var(--signal-ink);display:block;min-height:14px}
+
+/* ведомость под чертежом (только телефон) */
+.ledger{display:none}
+.uz-note{background:var(--paper-2);border-bottom:1px solid var(--ink);padding:12px 0;font-size:14px;line-height:1.45}
+.uz-note .wrap{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+.uz-note b{font:600 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;border:1.5px solid var(--ink);padding:4px 7px}
+.uz-note[hidden]{display:none}
+
+/* SVG сцена */
+.scene text{font-family:var(--f-mono)}
+.scene .t-name{font:600 19px var(--f-head);text-transform:uppercase;letter-spacing:.02em;fill:var(--ink)}
+.scene .t-price{font:500 15px var(--f-mono);fill:var(--ink-2)}
+.scene .co-n{font:600 15px var(--f-mono);fill:var(--ink)}
+.scene .t-dim{font:500 16px var(--f-mono);fill:var(--ink)}
+.scene .t-note{font:500 13px var(--f-mono);fill:var(--ink-2)}
+.scene .t-lvl{font:600 16px var(--f-mono);fill:var(--ink)}
+.scene .st-main{font:700 27px var(--f-head);letter-spacing:.04em;fill:var(--signal)}
+.scene .st-sub{font:600 13px var(--f-mono);letter-spacing:.06em;fill:var(--signal)}
+.scene .tt-k{font:600 15px var(--f-head);letter-spacing:.06em;fill:var(--ink)}
+.scene .tt-v{font:600 30px var(--f-mono);fill:var(--ink)}
+.scene .tt-s{font:500 13px var(--f-mono);fill:var(--ink-2)}
+.scene .scr{font:600 11px var(--f-mono);fill:var(--ink)}
+.co,.st{transform-box:fill-box;transform-origin:center}
+.testbox,.lvlm{transform-box:fill-box}
+
+/* статичный режим (prefers-reduced-motion или «Без анимации») */
+.hero-static{display:none}
+.is-static .hero{height:auto}
+.is-static .hero-stage{position:relative;height:auto;min-height:0;padding-bottom:40px}
+.is-static .hero-grid{height:auto;grid-template-rows:auto;grid-template-areas:"head sheet";align-items:start}
+.is-static .sheet{height:640px}
+.is-static .hs-bar,.is-static .hs-hint,.is-static .hero-step{display:none}
+.is-static .hero-static{display:block;padding:8px 0 56px}
+.frames{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.frame{border:1.5px solid var(--ink);background:var(--sheet);margin:0}
+.frame svg{position:static;inset:auto;display:block;width:100%;height:auto;aspect-ratio:1000/880;border-bottom:1px solid var(--ink)}
+.frame figcaption{padding:10px 12px 12px;font-size:13px;line-height:1.4;color:var(--ink-2)}
+.frame figcaption b{display:block;font:600 18px/1.1 var(--f-head);text-transform:uppercase;color:var(--ink);margin-bottom:4px}
+.frame figcaption b span{font:500 12px var(--f-mono);color:var(--signal-ink);margin-right:8px}
+
+/* ---------- секции ---------- */
+section.sec{padding:112px 0;border-bottom:1px solid var(--ink)}
+.sec-h{display:grid;grid-template-columns:120px 1fr minmax(0,420px);gap:32px;align-items:end;margin-bottom:56px}
+.sec-n{font:500 13px/1 var(--f-mono);letter-spacing:.08em;color:var(--ink-2);align-self:start;padding-top:10px;border-top:3px solid var(--ink)}
+.sec-n b{color:var(--signal-ink);font-weight:600}
+h2{font:600 clamp(36px,4.2vw,62px)/.95 var(--f-head);text-transform:uppercase;margin:0;letter-spacing:.004em}
+.sec-lead{margin:0;color:var(--ink-2);font-size:16px}
+.note{font:500 12px/1.45 var(--f-mono);color:var(--ink-2)}
+.badge{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border:1.5px solid var(--signal);color:var(--signal-ink)}
+.badge.ink{border-color:var(--ink);color:var(--ink)}
+
+/* ---------- путь ---------- */
+.route{position:relative}
+.route-dim{display:grid;grid-template-columns:repeat(6,1fr);border-left:1.5px solid var(--ink);margin-bottom:18px}
+.route-dim span{position:relative;border-right:1.5px solid var(--ink);padding:0 10px 8px;font:500 12px/1.2 var(--f-mono);color:var(--ink-2)}
+.route-dim span:after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.5px;background:var(--ink)}
+.route-dim span:before{content:"";position:absolute;right:-6px;bottom:-5px;width:11px;height:11px;background:linear-gradient(45deg,transparent 45%,var(--ink) 45%,var(--ink) 58%,transparent 58%)}
+.steps{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border:1.5px solid var(--ink);background:var(--sheet)}
+.step{padding:22px 18px 24px;border-right:1px solid var(--ink);position:relative;display:flex;flex-direction:column;min-height:390px}
+.step:last-child{border-right:0}
+.step .num{font:600 44px/1 var(--f-mono);letter-spacing:-.02em}
+.step h3{font:600 24px/1.02 var(--f-head);text-transform:uppercase;margin:14px 0 10px;min-height:2.04em}
+.step p{margin:0 0 16px;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+.step dl{margin:auto 0 0;font-size:13px;border-top:1px solid var(--rule)}
+.step dt{font:500 10px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-top:10px}
+.step dd{margin:3px 0 0;font:500 13px/1.35 var(--f-mono)}
+.stamp-h{position:absolute;top:18px;right:14px;font:700 13px/1 var(--f-head);letter-spacing:.08em;color:var(--signal);border:2px solid var(--signal);padding:5px 7px 4px;transform:rotate(-7deg) scale(1);filter:url(#ink);opacity:.95;transition:transform .45s cubic-bezier(.2,1.4,.4,1),opacity .3s}
+.step:nth-child(2n) .stamp-h{transform:rotate(5deg)}
+.js-anim .stamp-h{opacity:0;transform:rotate(-7deg) scale(1.6)}
+.js-anim .step.in .stamp-h{opacity:.95;transform:rotate(-7deg) scale(1)}
+.js-anim .step.in:nth-child(2n) .stamp-h{transform:rotate(5deg) scale(1)}
+.route-foot{display:flex;justify-content:space-between;gap:24px;margin-top:20px;flex-wrap:wrap}
+.route-foot p{margin:0;font:500 14px/1.5 var(--f-mono)}
+
+/* ---------- конфигуратор ---------- */
+.cfg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,560px);gap:56px;align-items:start}
+.q{border-top:1.5px solid var(--ink);padding:18px 0 30px}
+.q-h{display:flex;gap:14px;align-items:baseline;margin-bottom:16px}
+.q-h .n{font:500 13px var(--f-mono);color:var(--signal-ink)}
+.q-h h3{margin:0;font:600 24px/1 var(--f-head);text-transform:uppercase}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--ink);background:transparent;padding:10px 14px;border-radius:2px;font:500 15px/1 var(--f-text);cursor:pointer;transition:background .15s,color .15s}
+.chip:hover{background:var(--paper-2)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:2px}
+.seg button{border:0;border-right:1.5px solid var(--ink);background:transparent;padding:10px 14px;font:500 14px/1 var(--f-text);cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.style-grid{display:grid;grid-template-columns:auto 1fr;gap:12px 20px;align-items:center}
+.style-grid .seg{justify-self:start}
+.style-grid .lbl{font:500 12px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.budget-v{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.budget-v b{font:600 44px/1 var(--f-mono);letter-spacing:-.02em}
+.budget-v span{font:500 14px var(--f-mono);color:var(--ink-2)}
+.range{position:relative;padding:8px 0 0}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--ink)}
+input[type=range]::-moz-range-track{height:2px;background:var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:22px;margin-top:-21px;background:var(--signal);clip-path:polygon(0 0,100% 0,50% 100%);border:0}
+input[type=range]::-moz-range-thumb{width:26px;height:22px;background:var(--signal);clip-path:polygon(0 0,100% 0,50% 100%);border:0;border-radius:0;transform:translateY(-11px)}
+.ticks{display:flex;justify-content:space-between;font:500 11px/1 var(--f-mono);color:var(--ink-2);margin-top:2px}
+.ticks span{position:relative;padding-top:8px}
+.ticks span:before{content:"";position:absolute;left:50%;top:0;width:1px;height:6px;background:var(--ink)}
+.ticks span:first-child:before{left:0}.ticks span:last-child:before{left:auto;right:0}
+.ticks .mid{color:var(--signal-ink)}
+
+.est{position:relative;background:var(--sheet);border:1.5px solid var(--ink);padding:26px 26px 22px;box-shadow:8px 8px 0 var(--paper-2)}
+.est-h{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:16px;border-bottom:1.5px solid var(--ink)}
+.est-h h3{margin:0;font:600 26px/1 var(--f-head);text-transform:uppercase}
+.est-h .meta{font:500 11.5px/1.5 var(--f-mono);color:var(--ink-2);margin-top:6px}
+.est-case{width:92px;flex:none}
+.est-cls{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule);font:500 13px/1.35 var(--f-mono)}
+.est-cls span:first-child{color:var(--ink-2)}
+.lines{list-style:none;margin:0;padding:0}
+.lines li{display:grid;grid-template-columns:30px 1fr auto;gap:10px;padding:9px 0;border-bottom:1px dashed var(--rule);align-items:baseline}
+.lines .i{font:500 11px var(--f-mono);color:var(--ink-3)}
+.lines .nm{font-size:14.5px;line-height:1.3}
+.lines .nm small{display:block;font:500 10.5px/1.3 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin-bottom:2px}
+.lines .pr{font:500 14px var(--f-mono);white-space:nowrap}
+.tot{margin-top:6px}
+.tot div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;font:500 14px/1.3 var(--f-mono)}
+.tot div span:first-child{font-family:var(--f-text);font-size:14.5px}
+.tot .fee{border-top:1.5px solid var(--ink)}
+.tot .fee em{font-style:normal;color:var(--signal-ink);font-family:var(--f-mono);font-size:12px;margin-left:6px}
+.tot .all{border-top:3px double var(--ink);padding-top:12px}
+.tot .all span:first-child{font:600 22px/1 var(--f-head);text-transform:uppercase}
+.tot .all span:last-child{font:600 24px/1 var(--f-mono)}
+.split{font:500 12px/1.5 var(--f-mono);color:var(--ink-2);margin:2px 0 14px}
+.warn{display:none;border:1.5px solid var(--signal);padding:10px 12px;font-size:14px;line-height:1.45;margin:12px 0 0}
+.warn.info{border-color:var(--ink);border-style:dashed}
+.warn.show{display:block}
+.est .btn{width:100%;margin-top:6px}
+.est .note{margin-top:12px}
+.kraft-tag{position:absolute;right:-14px;top:-22px;background:var(--kraft);padding:8px 14px 8px 26px;font:600 12px/1.25 var(--f-mono);letter-spacing:.04em;transform:rotate(3deg);clip-path:polygon(12px 0,100% 0,100% 100%,12px 100%,0 50%)}
+.kraft-tag:before{content:"";position:absolute;left:12px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--paper);box-shadow:inset 0 0 0 1.5px var(--kraft-2)}
+
+/* ---------- паспорт ---------- */
+.pp-wrap{position:relative;padding:10px 0 0;margin-bottom:96px}
+.pp-title .nw{white-space:nowrap}
+.pp-back{position:absolute;inset:22px -8px -14px 14px;background:var(--paper-2);border:1.5px solid var(--ink);transform:rotate(.8deg)}
+.pp{position:relative;background:var(--sheet);border:1.5px solid var(--ink);padding:40px 44px 36px}
+.pp-head{display:grid;grid-template-columns:auto 1fr auto;gap:28px;align-items:end;padding-bottom:20px;border-bottom:3px solid var(--ink)}
+.pp-head svg{height:46px;width:auto}
+.pp-title{font:600 40px/1 var(--f-head);text-transform:uppercase;margin:0}
+.pp-sub{font:500 12.5px/1.5 var(--f-mono);color:var(--ink-2);margin-top:6px}
+.sample{font:700 34px/1 var(--f-head);letter-spacing:.14em;color:var(--ink);border:3px solid var(--ink);padding:10px 16px 8px;transform:rotate(-6deg);filter:url(#ink);opacity:.85;align-self:center}
+.pp-meta{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1.5px solid var(--ink)}
+.pp-meta div{padding:10px 12px 10px 0;border-right:1px solid var(--rule)}
+.pp-meta div+div{padding-left:12px}
+.pp-meta div:last-child{border-right:0}
+.pp-meta .k{display:block;font:500 10px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.pp-meta .v{display:block;font:500 14px/1.3 var(--f-mono);margin-top:5px}
+.pp-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:40px;margin-top:28px}
+.pp h4{font:600 20px/1 var(--f-head);text-transform:uppercase;margin:0 0 12px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.pp h4 span{font:500 11px var(--f-mono);color:var(--ink-2);text-transform:none}
+table.doc{width:100%;border-collapse:collapse;font-size:13px}
+table.doc th{font:500 10px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);text-align:left;padding:0 8px 7px 0;border-bottom:1.5px solid var(--ink);vertical-align:bottom}
+table.doc td{padding:8px 8px 8px 0;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.35}
+table.doc td.m{font:500 12.5px/1.35 var(--f-mono);white-space:nowrap}
+table.doc td.ok{font:600 12.5px/1.35 var(--f-mono)}
+table.doc td.ok i{font-style:normal;display:inline-block;width:8px;height:8px;background:var(--ink);margin-right:6px;vertical-align:1px}
+.params{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-top:18px}
+.params div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.params div span:last-child{font:500 12.5px var(--f-mono);text-align:right}
+.chart-box{margin-top:22px;border:1px solid var(--ink);padding:14px 14px 8px}
+.chart-box .ct{display:flex;justify-content:space-between;font:500 11px/1.2 var(--f-mono);letter-spacing:.04em;color:var(--ink-2);margin-bottom:6px}
+.chart-box .ct b{color:var(--ink);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.pp-foot{display:grid;grid-template-columns:1.2fr 1fr auto;gap:32px;align-items:end;margin-top:34px;padding-top:22px;border-top:1.5px solid var(--ink)}
+.sign{position:relative}
+.sign .line{border-bottom:1.5px solid var(--ink);height:58px;position:relative}
+.sign svg{position:absolute;left:30px;bottom:-6px;width:190px;height:70px}
+.sign .cap{font:500 11px/1.4 var(--f-mono);color:var(--ink-2);margin-top:6px}
+.pp-docs{font:500 12.5px/1.6 var(--f-mono)}
+.pp-docs b{display:block;font:600 10px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:6px}
+.round-stamp{width:150px;height:150px;transform:rotate(-14deg);filter:url(#ink);margin:-30px 10px -10px 0}
+.pp-tag{position:absolute;left:45%;bottom:-132px;width:150px;background:var(--kraft);padding:30px 14px 14px;font:600 11.5px/1.45 var(--f-mono);transform:rotate(-6deg);clip-path:polygon(0 18px,18px 0,calc(100% - 18px) 0,100% 18px,100% 100%,0 100%);box-shadow:none;z-index:2}
+.pp-tag:before{content:"";position:absolute;left:50%;top:10px;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:var(--paper);box-shadow:inset 0 0 0 1.5px var(--kraft-2)}
+.pp-tag b{display:block;font:700 15px/1.1 var(--f-head);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+
+/* ---------- идеи ---------- */
+.ideas{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.idea{border:1.5px solid var(--ink);background:var(--sheet);display:flex;flex-direction:column}
+.idea-top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--ink)}
+.ava{width:30px;height:30px;border-radius:50%;border:1.5px dashed var(--ink-2);flex:none}
+.idea-top .who{font:600 13px/1.2 var(--f-mono)}
+.idea-top .src{font:500 10.5px/1.2 var(--f-mono);color:var(--ink-2);letter-spacing:.04em}
+.idea-prev{position:relative;background:var(--paper-2);aspect-ratio:4/3;border-bottom:1px solid var(--ink)}
+.idea-prev svg{width:100%;height:100%}
+.idea-prev .lab{position:absolute;left:10px;top:10px;font:600 10px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;background:var(--sheet);border:1px solid var(--ink);padding:4px 6px}
+.idea-prev .emb{position:absolute;right:10px;bottom:10px;font:500 10.5px/1 var(--f-mono);background:var(--ink);color:var(--paper);padding:5px 7px;border:0;cursor:pointer}
+.idea-b{padding:14px 14px 16px;display:flex;flex-direction:column;flex:1}
+.idea-b h3{font:600 21px/1.05 var(--f-head);text-transform:uppercase;margin:0 0 10px}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.tags span{font:500 11px/1 var(--f-mono);border:1px solid var(--ink-2);padding:4px 6px;color:var(--ink-2)}
+.idea-b .cr{font:500 11.5px/1.45 var(--f-mono);color:var(--ink-2);margin:0 0 12px}
+.idea-b .pr{font:500 13px/1.4 var(--f-mono);margin:auto 0 12px;padding-top:10px;border-top:1px solid var(--rule)}
+.idea-b .pr b{font-size:17px;font-weight:600}
+.idea-b .btn{width:100%;white-space:normal;text-align:center;line-height:1.2;padding:10px 12px}
+
+/* ---------- цены ---------- */
+.prices{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:48px}
+.panel{border:1.5px solid var(--ink);background:var(--sheet);padding:24px}
+.panel h3{font:600 24px/1 var(--f-head);text-transform:uppercase;margin:0 0 6px}
+.fee-chart{position:relative;margin-top:14px}
+.fee-chart svg{width:100%;height:auto;overflow:visible}
+.fee-chart text{font-family:var(--f-mono)}
+.fee-read{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;padding:12px 0 6px;border-top:1px solid var(--rule);margin-top:6px;font:500 14px var(--f-mono)}
+.fee-read b{font-size:22px;font-weight:600}
+.fee-read span{color:var(--ink-2)}
+table.ex{width:100%;border-collapse:collapse;margin-top:18px;font-size:14px}
+table.ex th{font:500 10px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);text-align:left;padding:0 0 7px;border-bottom:1.5px solid var(--ink)}
+table.ex td{padding:8px 0;border-bottom:1px solid var(--rule)}
+table.ex td.m,table.ex th.m{text-align:right;font-family:var(--f-mono);font-size:13.5px;white-space:nowrap;padding-left:16px}
+table.ex th.m{font-size:10px}
+.rules{list-style:none;padding:0;margin:0}
+.rules li{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:14px 0;border-bottom:1px solid var(--rule);font-size:15px}
+.rules li:first-child{padding-top:4px}
+.rules li span{font:500 12px/1.6 var(--f-mono);color:var(--signal-ink)}
+.rules li b{display:block;font:600 19px/1.1 var(--f-head);text-transform:uppercase;margin-bottom:3px}
+.receipt{margin-top:22px;border:1.5px dashed var(--ink);padding:16px 18px;background:var(--paper)}
+.receipt .r-row{display:flex;justify-content:space-between;gap:12px;font:500 14px/1.9 var(--f-mono)}
+.receipt .r-row.ret{color:var(--signal-ink);font-weight:600;border-top:1px solid var(--ink);margin-top:4px;padding-top:4px}
+.guar{display:grid;grid-template-columns:repeat(4,1fr);border:1.5px solid var(--ink);margin-top:48px;background:var(--sheet)}
+.guar > div{padding:22px 20px 24px;border-right:1px solid var(--ink)}
+.guar > div:last-child{border-right:0}
+.guar .big{font:600 52px/1 var(--f-mono);letter-spacing:-.03em}
+.guar .big small{font-size:18px;letter-spacing:0;margin-left:4px}
+.guar h3{font:600 20px/1.05 var(--f-head);text-transform:uppercase;margin:12px 0 8px}
+.guar p{margin:0;font-size:14px;color:var(--ink-2)}
+
+/* ---------- подвал ---------- */
+.ftr{background:var(--ink);color:var(--paper);padding:72px 0 28px}
+.ftr a{text-decoration:none}
+.ftr a:hover{color:var(--signal-dark)}
+.ftr-top{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.2fr;gap:40px}
+.ftr-top svg{height:40px;width:auto}
+.ftr-top p{color:#BDB9B0;font-size:14px;margin:18px 0 0;max-width:34ch}
+.ftr h4{font:500 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:#A9A59C;margin:6px 0 16px}
+.ftr ul{list-style:none;margin:0;padding:0}
+.ftr li{padding:5px 0;font-size:15px}
+.ftr li .mono{font-size:13px;color:#BDB9B0}
+.ftr .ph{color:#A9A59C;font:500 13px/1.6 var(--f-mono)}
+.ftr-bot{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-top:56px;padding-top:20px;border-top:1px solid #4A4844;font:500 11.5px/1.5 var(--f-mono);color:#A9A59C}
+.ftr-bot button{background:transparent;border:1.5px solid #A9A59C;color:var(--paper);padding:8px 12px;font:500 11.5px/1 var(--f-mono);cursor:pointer;border-radius:2px}
+.ftr-bot button[aria-pressed="true"]{background:var(--paper);color:var(--ink)}
+
+/* ---------- адаптив ---------- */
+@media (max-width:1180px){
+  .nav{gap:18px;margin-left:8px}
+  .hero-grid{grid-template-columns:minmax(320px,400px) minmax(0,1fr);column-gap:28px}
+  .steps{grid-template-columns:repeat(3,1fr)}
+  .step:nth-child(3){border-right:0}
+  .step:nth-child(-n+3){border-bottom:1px solid var(--ink)}
+  .route-dim{display:none}
+  .ideas{grid-template-columns:repeat(2,1fr)}
+  .cfg{grid-template-columns:1fr;gap:40px}
+  .est{max-width:620px}
+  .prices{grid-template-columns:1fr}
+  .guar{grid-template-columns:repeat(2,1fr)}
+  .guar > div:nth-child(2){border-right:0}
+  .guar > div:nth-child(-n+2){border-bottom:1px solid var(--ink)}
+  .pp-body{grid-template-columns:1fr}
+  .ftr-top{grid-template-columns:1fr 1fr}
+  .frames{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:960px){
+  .nav,.hdr .btn-hdr{display:none}
+  .menu-btn{display:inline-block}
+  .mnav{position:fixed;top:var(--hdr);left:0;right:0;z-index:49;background:var(--paper);border-bottom:1.5px solid var(--ink);padding:8px var(--gut) 20px}
+  .mnav.open{display:block}
+  .mnav a{display:block;padding:14px 0;border-bottom:1px solid var(--rule);font:600 22px/1 var(--f-head);text-transform:uppercase;text-decoration:none}
+  .mnav .btn{margin-top:16px;width:100%}
+  .hero{height:470vh}
+  .hero-stage{padding:calc(var(--hdr) + 14px) 0 12px}
+  .hero-grid{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"head" "sheet" "step";row-gap:12px}
+  .is-static .hero-grid{grid-template-areas:"head" "sheet";grid-template-rows:auto auto;row-gap:16px}
+  .hero-head .promise{display:none}
+  .hero-head .lead{font-size:14px;line-height:1.45;margin-top:8px}
+  .hero-actions{margin-top:14px}
+  .hero-step{margin-top:0;padding-top:10px}
+  .hs-hint{display:none}
+  .sec-h{grid-template-columns:1fr;gap:16px}
+  .sec-n{justify-self:start;padding-right:30px}
+  .pp-head{grid-template-columns:auto 1fr}
+  .pp-head .sample{grid-column:1/-1;justify-self:start}
+  .pp-tag{display:none}
+  .pp-wrap{margin-bottom:24px}
+}
+@media (max-width:640px){
+  :root{--gut:16px;--hdr:58px}
+  body{font-size:15px}
+  .logo svg{height:23px}
+  .lang button{padding:7px 8px}
+  .hdr .wrap{gap:10px}
+  /* первый экран: шапка героя — одна строка заголовка и кнопка; лист занимает всё остальное */
+  .hero-stage{padding:calc(var(--hdr) + 10px) 0 10px}
+  .hero-grid{display:flex;flex-direction:column;gap:10px}
+  .hero-head{flex:none}
+  .eyebrow,.hero-head .lead{display:none}
+  h1{font-size:26px;margin-top:0;line-height:.98}
+  .hero-actions .btn{min-height:40px;padding:0 14px;font-size:14px;flex:1}
+  .hero-actions{gap:8px;margin-top:10px}
+  .sheet{order:2;flex:1 1 auto;min-height:0;padding:6px}
+  .sheet-in{flex:1 1 auto}
+  .scene-box{flex:1 1 auto;min-height:0}
+  .zones{display:none}
+  .sheet-note{right:12px;top:11px;bottom:auto;font-size:9.5px;line-height:1.2;text-transform:uppercase;letter-spacing:.06em}
+  .nt-l{display:none}.nt-s{display:inline}
+  .hero-step{order:3;flex:none;margin:0;padding-top:8px}
+  .hs-top{display:none}
+  .hs-bar{margin:0 0 7px}
+  .hs-title{font-size:21px}
+  .hs-desc{font-size:13px;line-height:1.4;height:2.8em;margin-top:3px;max-width:none}
+  /* ведомость: номер, деталь, цена — то, что на компьютере подписано выносками */
+  .ledger{display:block;border-top:1px solid var(--ink);padding:3px 6px 2px;font:500 10.5px/1.3 var(--f-mono);font-feature-settings:"tnum" 1}
+  .lg-h,.lg-f{display:flex;justify-content:space-between;gap:8px;white-space:nowrap}
+  .lg-h{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+  .lg-h span:first-child{color:var(--ink);font-weight:600}
+  .lg-b{list-style:none;margin:3px 0 2px;padding:0;display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(4,15px);column-gap:10px}
+  .lg-b.one{grid-template-columns:1fr}
+  .lg-b li{display:flex;gap:4px;align-items:baseline;min-width:0;border-bottom:1px dotted var(--rule);line-height:14px}
+  .lg-b .i{flex:none;color:var(--ink-2);padding:0 1px}
+  .lg-b li.ok .i{background:var(--ink);color:var(--paper)}
+  .lg-b .nm{font:500 11.5px/14px var(--f-text);flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .lg-b .pr{flex:none}
+  .lg-f{border-top:1px solid var(--ink);padding-top:2px;font-weight:600;font-size:11px}
+  .lg-f #lgFk{font-weight:500;color:var(--ink-2)}
+  .lg-f .ret{color:var(--signal-ink)}
+  /* штамп чертежа: одна строка в одну строку с ячейками */
+  .tb{grid-template-columns:auto minmax(0,1fr)}
+  .tb > div.hide-m{display:none}
+  .tb > div.tb-sheet{border-right:1px solid var(--ink);padding:3px 7px}
+  .tb-row2{grid-column:auto;grid-template-columns:repeat(5,minmax(0,1fr));border-top:0}
+  .tb-row2 > div{padding:3px 3px 3px 5px;min-height:0}
+  .tb-row2 > div:nth-child(5){border-right:0}
+  .tb-row2 > div.sumcell{display:none}
+  .tb .k{font-size:8.5px;letter-spacing:.03em}
+  .tb .v{font-size:11.5px}
+  .cell-d{font-size:10px;line-height:1.2;padding:0 3px;margin-top:1px}
+  .scene .t-name,.scene .t-price,.scene .t-note{display:none}
+  .scene .co{transform:scale(2.1)}
+  .scene .t-dim{font-size:34px}
+  .scene .t-lvl{font-size:25px}
+  .scene .st{transform:scale(1.7)}
+  .scene .st-sub{display:none}
+  .scene .testbox{transform:scale(1.45);transform-origin:100% 0}
+  .pp-back{inset:16px 0 -10px 6px;transform:rotate(.6deg)}
+  section.sec{padding:72px 0}
+  .sec-h{margin-bottom:32px}
+  .steps{grid-template-columns:1fr}
+  .step{border-right:0;border-bottom:1px solid var(--ink);min-height:0;padding:20px 16px}
+  .step:last-child{border-bottom:0}
+  .step h3{min-height:0}
+  .step .num{font-size:34px}
+  .q-h h3{font-size:21px}
+  .budget-v b{font-size:34px}
+  .style-grid{grid-template-columns:1fr;gap:8px}
+  .style-grid .lbl{margin-top:8px}
+  .est{padding:20px 16px 18px;box-shadow:5px 5px 0 var(--paper-2)}
+  .kraft-tag{right:-4px}
+  .lines li{grid-template-columns:22px 1fr auto;gap:8px}
+  .lines .nm{font-size:13.5px}
+  .lines .pr{font-size:12.5px}
+  .tot .all span:last-child{font-size:19px}
+  .pp{padding:24px 16px 22px}
+  .pp-title{font-size:30px}
+  .pp-head{gap:14px}
+  .pp-head svg{height:34px}
+  .sample{font-size:24px}
+  .pp-meta{grid-template-columns:1fr 1fr}
+  table.ex th:nth-child(4),table.ex td:nth-child(4){display:none}
+  table.ex td{padding:9px 0}
+  table.ex td:first-child{padding-right:8px;line-height:1.3}
+  .pp-meta div{padding:8px 8px 8px 0!important;border-right:0;border-bottom:1px solid var(--rule)}
+  .params{grid-template-columns:1fr}
+  .doc-scroll{overflow-x:auto}
+  table.doc.comp td:nth-child(3),table.doc.comp th:nth-child(3){display:none}
+  table.doc.tests{font-size:12.5px}
+  table.doc.tests td.m{white-space:normal}
+  .pp-foot{grid-template-columns:1fr;gap:20px}
+  .round-stamp{margin:0}
+  .ideas{grid-template-columns:1fr}
+  .panel{padding:18px 14px}
+  .guar{grid-template-columns:1fr}
+  .guar > div{border-right:0!important;border-bottom:1px solid var(--ink)}
+  .guar > div:last-child{border-bottom:0}
+  .ftr-top{grid-template-columns:1fr}
+  .frames{grid-template-columns:1fr 1fr}
+  .is-static .sheet{height:auto;aspect-ratio:auto}
+  .is-static .scene-box{aspect-ratio:1000/880;flex:none}
+}
+@media (max-width:400px){
+  .hero-actions .btn-line{display:none}
+}
+@media (max-width:640px) and (max-height:720px){
+  h1 em{display:none}
+  h1{font-size:25px}
+}
+@media (max-height:860px) and (min-width:961px){
+  .hero-head .lead{display:none}
+}
+@media (max-height:800px) and (min-width:961px){
+  h1{font-size:clamp(34px,3.4vw,44px);margin-top:14px}
+  .promise{margin-top:16px}
+  .promise li{padding:5px 0;font-size:14px}
+  .hero-actions{margin-top:16px}
+  .hs-hint{display:none}
+}
+</style>
+</head>
+<body>
+<!-- общий фильтр «чернила штампа» -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="ink" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.4 2.15" result="m"/>
+      <feComposite in="SourceGraphic" in2="m" operator="in"/>
+    </filter>
+  </defs>
+</svg>
+
+<header class="hdr">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Nivel — на главную">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#1D1D1B" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#D9501A" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+    </a>
+    <nav class="nav" aria-label="Основное меню">
+      <a href="#config" data-i18n="nav.config">Конфигуратор</a>
+      <a href="#ideas" data-i18n="nav.ideas">Идеи</a>
+      <a href="#how" data-i18n="nav.how">Как работаем</a>
+      <a href="#prices" data-i18n="nav.prices">Цены</a>
+    </nav>
+    <div class="hdr-end">
+      <div class="lang" role="group" aria-label="Язык">
+        <button type="button" data-lang="ru" aria-pressed="true">RU</button>
+        <button type="button" data-lang="uz" aria-pressed="false" title="Oʻzbekcha — qoralama">UZ</button>
+      </div>
+      <a class="btn btn-solid btn-sm btn-hdr" href="#config"><span class="tri" aria-hidden="true"></span><span data-i18n="cta.calc">Рассчитать сетап</span></a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="mnav" data-i18n="nav.menu">МЕНЮ</button>
+    </div>
+  </div>
+</header>
+<nav class="mnav" id="mnav" aria-label="Меню">
+  <a href="#config" data-i18n="nav.config">Конфигуратор</a>
+  <a href="#ideas" data-i18n="nav.ideas">Идеи</a>
+  <a href="#how" data-i18n="nav.how">Как работаем</a>
+  <a href="#prices" data-i18n="nav.prices">Цены</a>
+  <a class="btn btn-solid" href="#config"><span class="tri" aria-hidden="true"></span><span data-i18n="cta.calc">Рассчитать сетап</span></a>
+</nav>
+
+<main>
+<!-- ======================= 1. ПЕРВЫЙ ЭКРАН ======================= -->
+<section class="hero" id="top" aria-label="Сборка по шагам">
+  <div class="hero-stage">
+    <div class="wrap hero-grid">
+      <div class="hero-head">
+        <div class="eyebrow"><span class="tag"><span data-i18n="hero.tag">Паспорт сборки</span> <span class="no">№</span>&nbsp;001</span><span data-i18n="hero.city">Ташкент · с октября 2026</span></div>
+        <h1><span data-i18n="hero.h1a">ПК и рабочее место под вашу задачу.</span> <em data-i18n="hero.h1b">Собираем и ставим в Ташкенте.</em></h1>
+        <ul class="promise">
+          <li><span>01</span><b data-i18n="pr.1" style="font-weight:500">Смета до покупки</b></li>
+          <li><span>02</span><b data-i18n="pr.2" style="font-weight:500">Тесты до передачи</b></li>
+          <li><span>03</span><b data-i18n="pr.3" style="font-weight:500">Одно окно за результат</b></li>
+        </ul>
+        <p class="lead" data-i18n="hero.lead">Подбираем, покупаем, собираем, тестируем и ставим на место. Детали — по цене чеков, экономия остаётся вам. Работа — 10–15 % по шкале, отдельной строкой в смете.</p>
+        <div class="hero-actions">
+          <a class="btn btn-solid" href="#config"><span class="tri" aria-hidden="true"></span><span data-i18n="cta.calc">Рассчитать сетап</span></a>
+          <a class="btn btn-line" href="#how" data-i18n="cta.how">Как работаем</a>
+        </div>
+      </div>
+
+      <div class="hero-step" aria-live="polite">
+        <div class="hs-top"><span data-i18n="hs.label">Шаг сборки</span><span class="mono" id="hsCount">01 / 05</span></div>
+        <div class="hs-bar" aria-hidden="true"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+        <div class="hs-title"><span class="n" id="hsNum">01</span><span id="hsTitle">Смета</span></div>
+        <p class="hs-desc" id="hsDesc"></p>
+        <div class="hs-hint" data-i18n="hs.hint">Прокрутите — сборка в 5 шагов ↓</div>
+      </div>
+
+      <figure class="sheet" aria-label="Технический чертёж: компьютер собирается и встаёт на стол">
+        <div class="zones" aria-hidden="true">
+          <span class="zt" style="left:12%">1</span><span class="zt" style="left:28%">2</span><span class="zt" style="left:44%">3</span><span class="zt" style="left:60%">4</span><span class="zt" style="left:76%">5</span><span class="zt" style="left:92%">6</span>
+          <span class="zl" style="top:18%">А</span><span class="zl" style="top:42%">Б</span><span class="zl" style="top:66%">В</span>
+        </div>
+        <div class="sheet-note"><span class="nt-l" data-i18n="hero.note">Схема — концепт, не конкретная модель</span><span class="nt-s" data-i18n="hero.noteS">концепт</span></div>
+        <div class="sheet-in">
+          <div class="scene-box">
+            <svg class="scene" id="scene" viewBox="100 -70 1000 880" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="sceneT">
+              <title id="sceneT">Схема ПК: разнесённый вид, сборка, установка на стол с монитором и лампой</title>
+              <defs>
+                <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="#D9501A"/></marker>
+                <marker id="tick" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="12" markerHeight="12" orient="auto" markerUnits="userSpaceOnUse"><path d="M2 10L10 2" stroke="#1D1D1B" stroke-width="2"/></marker>
+                <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(38)"><line x1="0" y1="0" x2="0" y2="9" stroke="#1D1D1B" stroke-width="1" opacity=".32"/></pattern>
+                <pattern id="ghatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="12" stroke="#1D1D1B" stroke-width="1.4"/></pattern>
+                <pattern id="perf" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.15" fill="#1D1D1B"/></pattern>
+                <pattern id="fins" width="10" height="6" patternUnits="userSpaceOnUse"><line x1="0" y1="3" x2="10" y2="3" stroke="#1D1D1B" stroke-width="1"/></pattern>
+                <pattern id="vfins" width="7" height="10" patternUnits="userSpaceOnUse"><line x1="3" y1="0" x2="3" y2="10" stroke="#1D1D1B" stroke-width="1.2"/></pattern>
+              </defs>
+
+              <!-- пол и стол (шаг 4) -->
+              <g data-k="floor" opacity="0">
+                <rect x="110" y="760" width="980" height="13" fill="url(#ghatch)"/>
+                <line x1="110" y1="760" x2="1090" y2="760" stroke="#1D1D1B" stroke-width="2.5"/>
+                <g class="lvlm"><path d="M1010 744h20l-10 16Z" fill="#1D1D1B"/><path d="M1010 744h10v16Z" fill="#D9501A"/><line x1="1006" y1="744" x2="1092" y2="744" stroke="#1D1D1B" stroke-width="1.5"/><text class="t-lvl" x="1092" y="737" text-anchor="end">±0.000</text></g>
+                
+              </g>
+              <g data-k="desk" opacity="0">
+                <rect x="140" y="400" width="20" height="360" fill="#1D1D1B"/>
+                <rect x="960" y="400" width="20" height="360" fill="#1D1D1B"/>
+                <rect x="140" y="392" width="840" height="10" fill="none" stroke="#1D1D1B" stroke-width="1.5"/>
+                <rect x="560" y="406" width="330" height="14" fill="none" stroke="#1D1D1B" stroke-width="1.4" stroke-dasharray="6 4"/>
+                <text class="t-note" x="725" y="440" text-anchor="middle" data-i18n="dr.cable">кабель-канал</text>
+                <path d="M120 396V520M1000 396V520" stroke="#1D1D1B" stroke-width="1"/>
+                <line x1="120" y1="508" x2="1000" y2="508" stroke="#1D1D1B" stroke-width="1.3" marker-start="url(#tick)" marker-end="url(#tick)"/>
+                <text class="t-dim" x="560" y="500" text-anchor="middle">1700</text>
+                <rect x="120" y="370" width="880" height="22" fill="#E7E3DA" stroke="#1D1D1B" stroke-width="2.5"/>
+                <line x1="1000" y1="370" x2="1092" y2="370" stroke="#1D1D1B" stroke-width="1" stroke-dasharray="10 4 2 4"/>
+                <g class="lvlm"><path d="M1010 354h20l-10 16Z" fill="#1D1D1B"/><path d="M1010 354h10v16Z" fill="#D9501A"/><line x1="1006" y1="354" x2="1092" y2="354" stroke="#1D1D1B" stroke-width="1.5"/><text class="t-lvl" x="1092" y="347" text-anchor="end">+0.750</text></g>
+              </g>
+              <!-- свет лампы: штриховка, без свечения -->
+              <g data-k="light" opacity="0"><path d="M292 184L338 206L566 370L262 370Z" fill="url(#hatch)"/></g>
+              <g data-k="lamp" opacity="0">
+                <rect x="150" y="361" width="66" height="9" rx="2" fill="#1D1D1B"/>
+                <path d="M183 362L228 222L318 178" fill="none" stroke="#1D1D1B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="228" cy="222" r="7" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2.5"/>
+                <path d="M300 158L356 186L338 208L284 180Z" fill="#1D1D1B"/>
+                <circle cx="318" cy="178" r="5" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+              </g>
+              <g data-k="mon" opacity="0">
+                <rect x="736" y="362" width="16" height="44" fill="#1D1D1B"/>
+                <path d="M744 366V216L690 234H600" fill="none" stroke="#1D1D1B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="400" y="140" width="317" height="190" rx="6" fill="#1D1D1B"/>
+                <rect x="408" y="148" width="301" height="166" fill="#F8F7F3"/>
+                <text class="scr" x="422" y="170" data-i18n="dr.scr">ПАСПОРТ NV-0001</text>
+                <text class="scr" x="694" y="170" text-anchor="end" fill="#B5441A" style="fill:#B5441A" data-i18n="dr.done">СДАНО</text>
+                <path d="M422 182h272M422 196h180M422 208h220M422 220h150" stroke="#1D1D1B" stroke-width="1" opacity=".55"/>
+                <path d="M422 296L450 270L478 262L506 258L534 256L562 257L590 255L618 256L646 255L694 255" fill="none" stroke="#1D1D1B" stroke-width="2"/>
+                <line x1="422" y1="300" x2="694" y2="300" stroke="#1D1D1B" stroke-width="1"/>
+                <circle cx="702" cy="322" r="2.5" fill="#F8F7F3"/>
+                <g class="lvlm"><line x1="112" y1="140" x2="400" y2="140" stroke="#1D1D1B" stroke-width="1" stroke-dasharray="10 4 2 4"/><path d="M120 124h20l-10 16Z" fill="#1D1D1B"/><path d="M120 124h10v16Z" fill="#D9501A"/><line x1="116" y1="124" x2="204" y2="124" stroke="#1D1D1B" stroke-width="1.5"/><text class="t-lvl" x="144" y="117">+1.190</text></g>
+              </g>
+              <g data-k="kbd" opacity="0">
+                <rect x="440" y="357" width="220" height="13" rx="3" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+                <line x1="450" y1="363.5" x2="650" y2="363.5" stroke="#1D1D1B" stroke-width="2" stroke-dasharray="9 3"/>
+                <path d="M684 370q0 -13 16 -13q16 0 16 13z" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+              </g>
+
+              <!-- основание корпуса (шаги 1–3) -->
+              <g data-k="base">
+                <line x1="360" y1="622" x2="820" y2="622" stroke="#1D1D1B" stroke-width="1.6"/>
+                <g class="lvlm"><path d="M362 606h20l-10 16Z" fill="#1D1D1B"/><path d="M362 606h10v16Z" fill="#D9501A"/><line x1="300" y1="606" x2="386" y2="606" stroke="#1D1D1B" stroke-width="1.5"/><text class="t-lvl" x="356" y="599" text-anchor="end">±0.000</text></g>
+              </g>
+
+              <!-- линии сборки -->
+              <g class="asm" stroke="#D9501A" stroke-width="2" stroke-dasharray="7 5" fill="none">
+                <line data-k="p-mobo" marker-end="url(#arr)"/>
+                <line data-k="p-cpu" marker-end="url(#arr)"/>
+                <line data-k="p-ram" marker-end="url(#arr)"/>
+                <line data-k="p-ssd" marker-end="url(#arr)"/>
+                <line data-k="p-gpu" marker-end="url(#arr)"/>
+                <line data-k="p-psu" marker-end="url(#arr)"/>
+                <line data-k="p-fans" marker-end="url(#arr)"/>
+              </g>
+
+              <!-- корпус и детали -->
+              <g data-k="case">
+                <rect x="400" y="170" width="400" height="440" rx="6" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="3"/>
+                <rect x="412" y="182" width="376" height="416" fill="none" stroke="#1D1D1B" stroke-width="1"/>
+                <rect x="400" y="170" width="16" height="440" fill="url(#perf)" stroke="#1D1D1B" stroke-width="2"/>
+                <path d="M470 176h300" stroke="#1D1D1B" stroke-width="3" stroke-dasharray="12 6"/>
+                <rect x="420" y="610" width="42" height="12" fill="#1D1D1B"/><rect x="738" y="610" width="42" height="12" fill="#1D1D1B"/>
+                <path d="M788 424h12M788 436h12M788 448h12M788 460h12M788 472h12M788 484h12M788 496h12M788 508h12" stroke="#1D1D1B" stroke-width="1.5"/>
+                <rect x="520" y="184" width="266" height="338" fill="none" stroke="#1D1D1B" stroke-width="1" stroke-dasharray="5 4"/>
+                <rect x="416" y="526" width="372" height="72" fill="#E7E3DA" stroke="#1D1D1B" stroke-width="2"/>
+                <circle data-k="led" cx="408" cy="188" r="4.5" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="1.5"/>
+                <circle cx="408" cy="204" r="5" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="1.5"/>
+
+                <g data-k="mobo">
+                  <rect x="530" y="190" width="250" height="312" rx="3" fill="#DCD7CC" stroke="#1D1D1B" stroke-width="2"/>
+                  <rect x="556" y="198" width="160" height="18" fill="#1D1D1B"/>
+                  <rect x="540" y="230" width="16" height="112" fill="#1D1D1B"/>
+                  <rect x="610" y="240" width="80" height="80" fill="none" stroke="#1D1D1B" stroke-width="1.2" stroke-dasharray="4 3"/>
+                  <rect x="706" y="226" width="10" height="138" fill="none" stroke="#1D1D1B" stroke-width="1"/>
+                  <rect x="722" y="226" width="10" height="138" fill="none" stroke="#1D1D1B" stroke-width="1"/>
+                  <rect x="762" y="200" width="18" height="120" fill="#1D1D1B"/>
+                  <rect x="560" y="470" width="196" height="9" fill="none" stroke="#1D1D1B" stroke-width="1.5"/>
+                  <rect x="560" y="488" width="120" height="7" fill="none" stroke="#1D1D1B" stroke-width="1.2"/>
+                  <rect x="764" y="338" width="10" height="60" fill="none" stroke="#1D1D1B" stroke-width="1.5"/>
+                  <circle cx="542" cy="490" r="3.5" fill="none" stroke="#1D1D1B" stroke-width="1.2"/><circle cx="770" cy="490" r="3.5" fill="none" stroke="#1D1D1B" stroke-width="1.2"/><circle cx="542" cy="356" r="3.5" fill="none" stroke="#1D1D1B" stroke-width="1.2"/><circle cx="746" cy="214" r="3.5" fill="none" stroke="#1D1D1B" stroke-width="1.2"/>
+                </g>
+                <g data-k="cables" opacity="0" fill="none" stroke="#1D1D1B" stroke-width="1.8" stroke-dasharray="3 4">
+                  <path d="M700 534C700 512 776 520 776 470L776 400"/>
+                  <path d="M660 534C660 500 650 440 652 406"/>
+                  <path d="M520 300H586V236"/>
+                </g>
+                <g data-k="cpu">
+                  <rect x="604" y="226" width="14" height="148" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+                  <path d="M607 238l8 18M607 268l8 18M607 298l8 18M607 328l8 18" stroke="#1D1D1B" stroke-width="1.2"/>
+                  <rect x="618" y="232" width="74" height="136" fill="url(#fins)" stroke="#1D1D1B" stroke-width="2"/>
+                  <path d="M638 368V236M655 368V236M672 368V236" stroke="#1D1D1B" stroke-width="2" opacity=".55"/>
+                  <rect x="628" y="366" width="54" height="10" fill="#1D1D1B"/>
+                </g>
+                <g data-k="ram">
+                  <rect x="706" y="230" width="10" height="132" rx="1.5" fill="#1D1D1B"/>
+                  <rect x="722" y="230" width="10" height="132" rx="1.5" fill="#1D1D1B"/>
+                  <path d="M706 244h10M722 244h10" stroke="#F8F7F3" stroke-width="1.5"/>
+                </g>
+                <g data-k="ssd">
+                  <rect x="610" y="389" width="92" height="12" rx="2" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="1.8"/>
+                  <path d="M616 395h80" stroke="#1D1D1B" stroke-width="1.2" stroke-dasharray="3 3"/>
+                </g>
+                <g data-k="gpu">
+                  <rect x="420" y="406" width="342" height="7" fill="#1D1D1B"/>
+                  <rect x="420" y="413" width="342" height="48" rx="3" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2.5"/>
+                  <rect x="432" y="438" width="318" height="17" fill="url(#vfins)"/>
+                  <path d="M436 425h150" stroke="#1D1D1B" stroke-width="1.5"/>
+                  <rect x="640" y="399" width="26" height="7" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="1.5"/>
+                  <rect x="762" y="400" width="12" height="76" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+                </g>
+                <g data-k="psu">
+                  <rect x="640" y="534" width="148" height="62" rx="3" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2.5"/>
+                  <rect x="650" y="542" width="52" height="46" fill="url(#vfins)"/>
+                  <rect x="712" y="548" width="64" height="32" fill="none" stroke="#1D1D1B" stroke-width="1.2"/>
+                  <text x="744" y="569" text-anchor="middle" style="font:600 13px var(--f-mono)">750 W</text>
+                </g>
+                <g data-k="fans">
+                  <rect x="418" y="196" width="22" height="134" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+                  <path d="M421 206l16 22M421 236l16 22M421 266l16 22M421 296l16 22" stroke="#1D1D1B" stroke-width="1.3"/>
+                  <rect x="418" y="342" width="22" height="134" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+                  <path d="M421 352l16 22M421 382l16 22M421 412l16 22M421 442l16 22" stroke="#1D1D1B" stroke-width="1.3"/>
+                </g>
+                <!-- габариты (шаг 3) -->
+                <g data-k="dims" opacity="0">
+                  <path d="M400 628V668M800 628V668M806 170H850M806 622H850" stroke="#1D1D1B" stroke-width="1"/>
+                  <line x1="400" y1="656" x2="800" y2="656" stroke="#1D1D1B" stroke-width="1.3" marker-start="url(#tick)" marker-end="url(#tick)"/>
+                  <text class="t-dim" x="600" y="648" text-anchor="middle">455</text>
+                  <line x1="838" y1="170" x2="838" y2="622" stroke="#1D1D1B" stroke-width="1.3" marker-start="url(#tick)" marker-end="url(#tick)"/>
+                  <text class="t-dim" x="830" y="396" text-anchor="middle" transform="rotate(-90 830 396)">470</text>
+                  <text class="t-note" x="440" y="700" data-i18n="dr.view">Вид слева · боковая панель условно не показана</text>
+                </g>
+              </g>
+
+              <!-- выноски с ценами (шаг 1) -->
+              <g data-k="l-mobo"><g class="co"><circle cx="858" cy="128" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="858" y="133" text-anchor="middle">01</text></g><text class="t-name" x="882" y="124" data-i18n="p.mobo">Материнская плата</text><text class="t-price" x="882" y="143">2 100 000</text></g>
+              <g data-k="l-cpu"><g class="co"><circle cx="562" cy="-34" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="562" y="-29" text-anchor="middle">02</text></g><text class="t-name" x="540" y="-38" text-anchor="end" data-i18n="p.cpu">Процессор и кулер</text><text class="t-price" x="540" y="-19" text-anchor="end">2 950 000</text></g>
+              <g data-k="l-ram"><g class="co"><circle cx="824" cy="-18" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="824" y="-13" text-anchor="middle">03</text></g><text class="t-name" x="846" y="-22" data-i18n="p.ram">Память 32 ГБ</text><text class="t-price" x="846" y="-3">1 420 000</text></g>
+              <g data-k="l-ssd"><g class="co"><circle cx="944" cy="566" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="944" y="571" text-anchor="middle">04</text></g><text class="t-name" x="966" y="562" data-i18n="p.ssd">SSD 2 ТБ</text><text class="t-price" x="966" y="581">1 760 000</text></g>
+              <g data-k="l-gpu"><g class="co"><circle cx="436" cy="756" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="436" y="761" text-anchor="middle">05</text></g><text class="t-name" x="460" y="752" data-i18n="p.gpu">Видеокарта</text><text class="t-price" x="460" y="771">6 900 000</text></g>
+              <g data-k="l-psu"><g class="co"><circle cx="954" cy="676" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="954" y="681" text-anchor="middle">06</text></g><text class="t-name" x="976" y="672" data-i18n="p.psu">Блок питания</text><text class="t-price" x="976" y="691">1 290 000</text></g>
+              <g data-k="l-fans"><g class="co"><circle cx="159" cy="512" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="159" y="517" text-anchor="middle">07</text></g><text class="t-name" x="182" y="508" data-i18n="p.fans">Вентиляторы</text><text class="t-price" x="182" y="527">390 000</text></g>
+              <g data-k="l-case"><g class="co"><circle cx="420" cy="134" r="15" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/><text class="co-n" x="420" y="139" text-anchor="middle">08</text></g><text class="t-name" x="444" y="130" data-i18n="p.case">Корпус ATX</text><text class="t-price" x="444" y="149">980 000</text></g>
+
+              <!-- протокол теста (шаг 4) -->
+              <g data-k="test" opacity="0">
+                <path d="M842 58L772 108" stroke="#1D1D1B" stroke-width="1.5"/>
+                <circle cx="772" cy="108" r="3" fill="#1D1D1B"/>
+                <g class="testbox">
+                  <rect x="836" y="-58" width="252" height="116" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>
+                  <text class="tt-k" x="852" y="-34" data-i18n="tt.k">ТЕСТ ПОД НАГРУЗКОЙ</text>
+                  <text class="tt-v" data-k="timer" x="852" y="4">00:00:00</text>
+                  <text class="tt-s" x="852" y="28">CPU 78 °C · GPU 71 °C</text>
+                  <text class="tt-s" x="852" y="46" data-i18n="tt.err">ошибок: 0 · из 8 ч</text>
+                </g>
+              </g>
+
+              <!-- штампы стадий -->
+              <g data-k="st0" opacity="0"><g class="st" filter="url(#ink)"><rect class="sr1" x="-140" y="-42" width="280" height="84" fill="none" stroke="#D9501A" stroke-width="3.5"/><rect class="sr2" x="-133" y="-35" width="266" height="70" fill="none" stroke="#D9501A" stroke-width="1.3"/><text class="st-main" x="0" y="0" text-anchor="middle" data-st="0">СМЕТА УТВЕРЖДЕНА</text><text class="st-sub" x="0" y="24" text-anchor="middle">05.10.2026 · NV-0001</text></g></g>
+              <g data-k="st1" opacity="0"><g class="st" filter="url(#ink)"><rect class="sr1" x="-140" y="-42" width="280" height="84" fill="none" stroke="#D9501A" stroke-width="3.5"/><rect class="sr2" x="-133" y="-35" width="266" height="70" fill="none" stroke="#D9501A" stroke-width="1.3"/><text class="st-main" x="0" y="0" text-anchor="middle" data-st="1">ЗАКУПЛЕНО · ЧЕКИ 8/8</text><text class="st-sub" x="0" y="24" text-anchor="middle">07.10.2026 · NV-0001</text></g></g>
+              <g data-k="st2" opacity="0"><g class="st" filter="url(#ink)"><rect class="sr1" x="-140" y="-42" width="280" height="84" fill="none" stroke="#D9501A" stroke-width="3.5"/><rect class="sr2" x="-133" y="-35" width="266" height="70" fill="none" stroke="#D9501A" stroke-width="1.3"/><text class="st-main" x="0" y="0" text-anchor="middle" data-st="2">СОБРАНО · 8/8 НА МЕСТЕ</text><text class="st-sub" x="0" y="24" text-anchor="middle">08.10.2026 · NV-0001</text></g></g>
+              <g data-k="st3" opacity="0"><g class="st" filter="url(#ink)"><rect class="sr1" x="-140" y="-42" width="280" height="84" fill="none" stroke="#D9501A" stroke-width="3.5"/><rect class="sr2" x="-133" y="-35" width="266" height="70" fill="none" stroke="#D9501A" stroke-width="1.3"/><text class="st-main" x="0" y="0" text-anchor="middle" data-st="3">ТЕСТ 8 Ч · 0 ОШИБОК</text><text class="st-sub" x="0" y="24" text-anchor="middle">09.10.2026 · NV-0001</text></g></g>
+              <g data-k="st4" opacity="0"><g class="st" filter="url(#ink)"><rect class="sr1" x="-140" y="-42" width="280" height="84" fill="none" stroke="#D9501A" stroke-width="3.5"/><rect class="sr2" x="-133" y="-35" width="266" height="70" fill="none" stroke="#D9501A" stroke-width="1.3"/><text class="st-main" x="0" y="0" text-anchor="middle" data-st="4">СДАНО · ГАРАНТИЯ 12 МЕС</text><text class="st-sub" x="0" y="24" text-anchor="middle">12.10.2026 · NV-0001</text></g></g>
+            </svg>
+          </div>
+          <div class="ledger" id="ledger" aria-hidden="true">
+            <div class="lg-h"><span id="lgT">Смета · 8 позиций</span><span id="lgD">цены на 05.10.2026</span></div>
+            <ol class="lg-b" id="lgB"></ol>
+            <div class="lg-f"><span id="lgFk">Итого по смете</span><span id="lgFv">17 790 000</span></div>
+          </div>
+          <div class="tb" id="tb">
+            <div class="hide-m"><span class="k" data-i18n="tb.item">Изделие</span><span class="v" data-i18n="tb.itemv">ПК и рабочее место</span></div>
+            <div class="hide-m"><span class="k" data-i18n="tb.code">Обозначение</span><span class="v">NV-0001</span></div>
+            <div class="hide-m"><span class="k" data-i18n="tb.stage">Стадия</span><span class="v" id="tbStage">Смета</span></div>
+            <div class="tb-sheet"><span class="k" data-i18n="tb.sheet">Лист</span><span class="v" id="tbSheet">1 / 5</span></div>
+            <div class="hide-m"><span class="k" data-i18n="tb.scale">Масштаб</span><span class="v" id="tbScale">1:2</span></div>
+            <div class="tb-row2">
+              <div class="cell" data-c="0"><span class="k" data-i18n="s.0">Смета</span><span class="cell-d">05.10</span></div>
+              <div class="cell" data-c="1"><span class="k" data-i18n="s.1">Закупка</span><span class="cell-d">07.10</span></div>
+              <div class="cell" data-c="2"><span class="k" data-i18n="s.2">Сборка</span><span class="cell-d">08.10</span></div>
+              <div class="cell" data-c="3"><span class="k" data-i18n="s.3">Тест</span><span class="cell-d">09.10</span></div>
+              <div class="cell" data-c="4"><span class="k" data-i18n="s.4">Сдача</span><span class="cell-d">12.10</span></div>
+              <div class="sumcell"><span class="k" data-i18n="tb.sum">Смета 17 790 000 · по чекам</span><span class="v sum" id="tbSum">—</span><span class="ret" id="tbRet"></span></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </div>
+  <div class="hero-static wrap" id="heroStatic" aria-label="Сборка по шагам, статичные кадры">
+    <div class="frames" id="frames"></div>
+  </div>
+</section>
+<div class="uz-note" id="uzNote" hidden><div class="wrap"><b>UZ · qoralama</b><span>Oʻzbekcha: birinchi ekran, tugmalar, boʻlim sarlavhalari va konfigurator. Batafsil matnlar hozircha rus tilida — tarjima ona tilida soʻzlashuvchi tomonidan tekshiriladi.</span></div></div>
+
+<!-- ======================= 2. ПУТЬ ОТ ЗАЯВКИ ======================= -->
+<section class="sec" id="how">
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="sec-n"><b>02</b> / 06</div>
+      <h2 data-i18n-html="h.how">Путь от заявки<br>до сданного места</h2>
+      <p class="sec-lead">Шесть шагов, у каждого — срок, деньги и документ. ПК из деталей в наличии — 5–8 рабочих дней от подтверждения сметы; сетап с мебелью — 10–15.</p>
+    </div>
+    <div class="route">
+      <div class="route-dim" aria-hidden="true"><span>день 0</span><span>1–2&nbsp;раб.&nbsp;дн.</span><span>день согласования</span><span>1–2&nbsp;раб.&nbsp;дн.</span><span>2–3&nbsp;раб.&nbsp;дн.</span><span>день выдачи</span></div>
+      <ol class="steps" style="list-style:none;margin:0;padding:0">
+        <li class="step"><span class="stamp-h">ЗАЯВКА</span><span class="num">01</span><h3>Заявка</h3><p>Задача, бюджет, район. На сайте или в боте @niveluzbot. Регистрация не нужна.</p>
+          <dl><dt>Срок</dt><dd>ответ в течение 2 ч, пн–сб 10–19</dd><dt>Деньги</dt><dd>0 сум</dd><dt>Документ</dt><dd>заявка</dd></dl></li>
+        <li class="step"><span class="stamp-h">СМЕТА</span><span class="num">02</span><h3>Смета</h3><p>Позиции, магазины, цены с датой и курсом ЦБ. Плата за работу — отдельной строкой в сумах.</p>
+          <dl><dt>Срок</dt><dd>1–2&nbsp;раб.&nbsp;дн.; действует 24&nbsp;ч</dd><dt>Деньги</dt><dd>0 сум</dd><dt>Документ</dt><dd>смета и оферта</dd></dl></li>
+        <li class="step"><span class="stamp-h">АВАНС</span><span class="num">03</span><h3>Оплата закупки</h3><p>30 % платы и деньги на детали: смета плюс резерв 3–5 % на колебание цен.</p>
+          <dl><dt>Срок</dt><dd>в день согласования</dd><dt>Деньги</dt><dd>30 % платы + лимит закупки</dd><dt>Документ</dt><dd>фискальный чек на аванс</dd></dl></li>
+        <li class="step"><span class="stamp-h">ЧЕКИ</span><span class="num">04</span><h3>Закупка и отчёт с&nbsp;чеками</h3><p>Покупаем сами. Фото чеков, гарантийных талонов и серийных номеров — вам.</p>
+          <dl><dt>Срок</dt><dd>1–2&nbsp;раб.&nbsp;дн.; отчёт за 24–48&nbsp;ч</dd><dt>Деньги</dt><dd>остаток — вам за 5&nbsp;раб.&nbsp;дн.</dd><dt>Документ</dt><dd>отчёт с чеками</dd></dl></li>
+        <li class="step"><span class="stamp-h">ПРОТОКОЛ</span><span class="num">05</span><h3>Сборка и тесты</h3><p>Сборка, BIOS, профиль памяти, Windows. 8 часов под нагрузкой, тест памяти — на ночь.</p>
+          <dl><dt>Срок</dt><dd>2–3&nbsp;раб.&nbsp;дн.</dd><dt>Деньги</dt><dd>—</dd><dt>Документ</dt><dd>протокол тестов</dd></dl></li>
+        <li class="step"><span class="stamp-h">АКТ</span><span class="num">06</span><h3>Сдача и гарантия</h3><p>Привозим сами, включаем, ставим сетап. 15–20 минут показываем, что где.</p>
+          <dl><dt>Срок</dt><dd>день выдачи</dd><dt>Деньги</dt><dd>70 % платы</dd><dt>Документ</dt><dd>акт, паспорт сборки, гарантия 12 мес.</dd></dl></li>
+      </ol>
+      <div class="route-foot">
+        <p>Детали становятся вашими сразу после покупки. До сдачи вы платите треть платы за работу.</p>
+        <p class="note">Сроки — при наличии деталей; мебель под заказ — до 4 недель</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 3. КОНФИГУРАТОР ======================= -->
+<section class="sec" id="config">
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="sec-n"><b>03</b> / 06</div>
+      <h2 data-i18n-html="h.cfg">Конфигуратор:<br>ориентир за минуту</h2>
+      <p class="sec-lead">Три вопроса — и карточка сборки с ценами на дату. Точную смету с наличием проверяет мастер до предоплаты.</p>
+    </div>
+    <div class="cfg">
+      <div class="cfg-q">
+        <div class="q">
+          <div class="q-h"><span class="n">01</span><h3 data-i18n="c.task">Задача</h3></div>
+          <div class="chips" role="group" aria-label="Задача" id="taskChips">
+            <button class="chip" type="button" data-task="games" aria-pressed="true" data-i18n="t.games">Игры</button>
+            <button class="chip" type="button" data-task="3d" aria-pressed="false" data-i18n="t.3d">3D и видео</button>
+            <button class="chip" type="button" data-task="code" aria-pressed="false" data-i18n="t.code">Программирование</button>
+            <button class="chip" type="button" data-task="office" aria-pressed="false" data-i18n="t.office">Учёба и офис</button>
+            <button class="chip" type="button" data-task="stream" aria-pressed="false" data-i18n="t.stream">Стриминг</button>
+          </div>
+        </div>
+        <div class="q">
+          <div class="q-h"><span class="n">02</span><h3 data-i18n="c.budget">Бюджет на детали</h3></div>
+          <div class="budget-v"><b class="mono" id="budgetV">18</b><span data-i18n="c.mln">млн сум</span></div>
+          <div class="range">
+            <label class="sr" for="budget">Бюджет на комплектующие, млн сум</label>
+            <input type="range" id="budget" min="5" max="60" step="0.5" value="18">
+            <div class="ticks" aria-hidden="true"><span>5</span><span>15</span><span class="mid">20 · 10 %</span><span>30</span><span>45</span><span>60</span></div>
+          </div>
+        </div>
+        <div class="q">
+          <div class="q-h"><span class="n">03</span><h3 data-i18n="c.style">Стиль</h3></div>
+          <div class="style-grid">
+            <span class="lbl" data-i18n="c.case">Корпус</span>
+            <div class="seg" role="group" aria-label="Цвет корпуса" data-opt="color"><button type="button" data-v="light" aria-pressed="true" data-i18n="c.lightc">Светлый</button><button type="button" data-v="dark" aria-pressed="false" data-i18n="c.dark">Тёмный</button></div>
+            <span class="lbl" data-i18n="c.light">Подсветка</span>
+            <div class="seg" role="group" aria-label="Подсветка" data-opt="light"><button type="button" data-v="off" aria-pressed="true" data-i18n="c.off">Выкл</button><button type="button" data-v="on" aria-pressed="false" data-i18n="c.on">Вкл, тёплая белая</button></div>
+            <span class="lbl" data-i18n="c.size">Размер</span>
+            <div class="seg" role="group" aria-label="Размер корпуса" data-opt="size"><button type="button" data-v="compact" aria-pressed="false" data-i18n="c.compact">Компактный</button><button type="button" data-v="mid" aria-pressed="true" data-i18n="c.mid">Средний</button><button type="button" data-v="full" aria-pressed="false" data-i18n="c.full">Большой</button></div>
+          </div>
+        </div>
+        <p class="note">Автоматическая сборка — фильтр совместимости. Каждую сборку до предоплаты проверяет мастер: сокет, длина видеокарты, высота кулера, мощность блока питания.</p>
+      </div>
+
+      <article class="est" aria-live="polite">
+        <div class="kraft-tag"><span data-i18n="c.tag">ОРИЕНТИР</span><br><span id="estNo"><span class="no">№</span>&nbsp;0510-180</span></div>
+        <div class="est-h">
+          <div>
+            <h3 data-i18n="c.card">Карточка сборки</h3>
+            <div class="meta" data-i18n="c.meta">Цены на 05.10.2026, медиана трёх продавцов Ташкента</div>
+            <div style="margin-top:10px"><span class="badge" data-i18n="c.badge">Пример · цены на дату · не оферта</span></div>
+          </div>
+          <svg class="est-case" id="estCase" viewBox="0 0 92 110" aria-hidden="true"></svg>
+        </div>
+        <div class="est-cls"><span data-i18n="c.cls">Класс (оценка)</span><span id="estCls">—</span></div>
+        <ol class="lines" id="estLines"></ol>
+        <div class="tot">
+          <div><span data-i18n="c.parts">Детали — по цене чеков</span><span id="estParts">—</span></div>
+          <div class="fee"><span><span data-i18n="c.fee">Плата за работу</span><em id="estRate">15 %</em></span><span id="estFee">—</span></div>
+          <div class="all"><span data-i18n="c.total">Итого</span><span id="estTotal">—</span></div>
+        </div>
+        <div class="split" id="estSplit"></div>
+        <div class="warn" id="estWarn"></div>
+        <a class="btn btn-solid" id="tgBtn" href="https://t.me/niveluzbot?start=demo" target="_blank" rel="noopener"><span class="tri" aria-hidden="true"></span><span data-i18n="cta.tg">Получить смету в Telegram</span></a>
+        <p class="note">Чеки дешевле сметы — разница ваша, плата не меняется. Подтверждённая смета действует 24 часа. Монтаж сетапа (стол, свет, кронштейны) — 15 % от его сметы, считается отдельно.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 4. ПАСПОРТ СБОРКИ ======================= -->
+<section class="sec" id="passport">
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="sec-n"><b>04</b> / 06</div>
+      <h2 data-i18n-html="h.pp">Паспорт сборки:<br>что вы получите</h2>
+      <p class="sec-lead">Документ к каждому ПК: состав с серийными номерами, протокол тестов, версия BIOS, профиль памяти, подпись мастера. Ниже — образец, данные условные.</p>
+    </div>
+    <div class="pp-wrap">
+      <div class="pp-back" aria-hidden="true"></div>
+      <div class="pp-tag" aria-hidden="true"><b>Бирка</b>NV-0001<br>сдан 12.10.2026<br>гарантия до<br>12.10.2027</div>
+      <article class="pp">
+        <div class="pp-head">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></svg>
+          <div>
+            <h3 class="pp-title">Паспорт сборки <span class="nw">№&nbsp;NV-0001</span></h3>
+            <div class="pp-sub">Игровой ПК 1440p · смета 17 790 000 сум · по чекам 17 650 000 сум</div>
+          </div>
+          <div class="sample" aria-label="Образец">ОБРАЗЕЦ</div>
+        </div>
+        <div class="pp-meta">
+          <div><span class="k">Заказчик</span><span class="v">— (образец)</span></div>
+          <div><span class="k">Смета утверждена</span><span class="v">05.10.2026</span></div>
+          <div><span class="k">Тесты</span><span class="v">09.10–10.10.2026</span></div>
+          <div><span class="k">Сдан по акту</span><span class="v">12.10.2026</span></div>
+          <div><span class="k">Гарантия «одно окно»</span><span class="v">до 12.10.2027</span></div>
+        </div>
+        <div class="pp-body">
+          <div>
+            <h4>Комплектация <span>серийные номера скрыты в образце</span></h4>
+            <div class="doc-scroll">
+            <table class="doc comp">
+              <thead><tr><th>Позиция</th><th>S/N</th><th>Гарантия магазина</th></tr></thead>
+              <tbody>
+                <tr><td>Процессор AMD Ryzen 5 7600</td><td class="m">9M41••••0217</td><td class="m">до 07.10.2029</td></tr>
+                <tr><td>Кулер башенный, 2×120 мм</td><td class="m">CL25••••8841</td><td class="m">до 07.10.2028</td></tr>
+                <tr><td>Плата AM5 B650 с Wi-Fi, ATX</td><td class="m">MB26••••3390</td><td class="m">до 07.10.2029</td></tr>
+                <tr><td>Память DDR5 32 ГБ, 6000 CL30</td><td class="m">RM6K••••1102</td><td class="m">пожизненно*</td></tr>
+                <tr><td>SSD NVMe 2 ТБ, PCIe 4.0</td><td class="m">S7HC••••5520</td><td class="m">до 07.10.2031</td></tr>
+                <tr><td>Видеокарта RTX 5060 Ti, 16 ГБ</td><td class="m">GV61••••7745</td><td class="m">до 07.10.2029</td></tr>
+                <tr><td>Блок питания 750 Вт, Gold, ATX 3.1</td><td class="m">PS75••••0938</td><td class="m">до 07.10.2033</td></tr>
+                <tr><td>Корпус ATX, 48 л + 3 вентилятора</td><td class="m">CS48••••6614</td><td class="m">до 07.10.2028</td></tr>
+              </tbody>
+            </table>
+            </div>
+            <div class="params">
+              <div><span>Версия BIOS</span><span>F12 · AGESA 1.2.0.3</span></div>
+              <div><span>Дата прошивки</span><span>14.08.2026</span></div>
+              <div><span>Профиль памяти</span><span>EXPO I · 6000 CL30 · 1,35 В</span></div>
+              <div><span>Windows</span><span>11 Pro, Retail, по чеку</span></div>
+              <div><span>Температура в комнате</span><span>24 °C</span></div>
+              <div><span>Шум в простое, 1 м</span><span>31 дБА</span></div>
+            </div>
+            <p class="note" style="margin-top:10px">* по условиям производителя памяти; гарантия Nivel — 12 месяцев на всё.</p>
+          </div>
+          <div>
+            <h4>Протокол испытаний <span>OCCT Pro, HWiNFO Pro, MemTest86</span></h4>
+            <div class="doc-scroll">
+            <table class="doc tests">
+              <thead><tr><th>Проверка</th><th>Время</th><th>Результат</th></tr></thead>
+              <tbody>
+                <tr><td>Процессор, полная нагрузка</td><td class="m">8:00:00</td><td class="ok"><i></i>0 ошибок · макс. 78 °C</td></tr>
+                <tr><td>Видеокарта, 3D-нагрузка</td><td class="m">1:00:00</td><td class="ok"><i></i>0 ошибок · 71 °C, hotspot 83 °C</td></tr>
+                <tr><td>Система и блок питания</td><td class="m">1:00:00</td><td class="ok"><i></i>без перезагрузок · пик 468 Вт</td></tr>
+                <tr><td>Память, 4 прохода</td><td class="m">9:40:00</td><td class="ok"><i></i>0 ошибок</td></tr>
+                <tr><td>Накопитель: скорость, SMART</td><td class="m">0:20:00</td><td class="ok"><i></i>7 050 / 6 300 МБ/с · здоровье 100 % · 3 ч</td></tr>
+                <tr><td>Порты, Wi-Fi, сон, звук</td><td class="m">вручную</td><td class="ok"><i></i>норма</td></tr>
+              </tbody>
+            </table>
+            </div>
+            <div class="chart-box">
+              <div class="ct"><b>Температура процессора, 8 ч</b><span>°C · запись HWiNFO, шаг 1 мин</span></div>
+              <svg id="tempChart" viewBox="0 0 560 190" role="img" aria-label="График температуры процессора за 8 часов: рост до 76 °C за 15 минут, далее 75–78 °C, предел 95 °C не достигнут"></svg>
+            </div>
+          </div>
+        </div>
+        <div class="pp-foot">
+          <div class="sign">
+            <div class="line">
+              <svg viewBox="0 0 190 70" aria-hidden="true"><path d="M6 52C18 20 30 14 34 30S28 62 40 50 58 18 66 26 62 54 74 46 92 24 100 32 98 52 110 46C124 38 128 30 138 34S150 50 162 40 178 30 186 34" fill="none" stroke="#1D1D1B" stroke-width="2.2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="cap">Собрал и проверил: мастер Nivel · 10.10.2026<br>Клиент принял: ________ · 12.10.2026</div>
+          </div>
+          <div class="pp-docs"><b>Приложено</b>Копии чеков: 8 из 8<br>Гарантийные талоны: 8<br>Фото серийных номеров: 8<br>Акт сдачи, гарантийное обязательство</div>
+          <svg class="round-stamp" viewBox="0 0 150 150" aria-label="Отметка: тест пройден">
+            <defs><path id="rs" d="M75 75m-54 0a54 54 0 1 1 108 0a54 54 0 1 1 -108 0"/></defs>
+            <circle cx="75" cy="75" r="70" fill="none" stroke="#D9501A" stroke-width="3.5"/>
+            <circle cx="75" cy="75" r="40" fill="none" stroke="#D9501A" stroke-width="1.5"/>
+            <text style="font:700 13.5px var(--f-head);letter-spacing:.16em" fill="#D9501A"><textPath href="#rs">NIVEL · ТАШКЕНТ · ТЕСТ ПРОЙДЕН · 8 Ч ·</textPath></text>
+            <g transform="translate(55 52) scale(.62)"><path fill="#D9501A" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#D9501A" d="M24 24L40 24L24 40Z" opacity=".55"/><path fill="#D9501A" d="M4 40h56v8h-56Z"/></g>
+            <text x="75" y="102" text-anchor="middle" style="font:600 10px var(--f-mono)" fill="#D9501A">10.10.2026</text>
+          </svg>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 5. ИДЕИ ======================= -->
+<section class="sec" id="ideas">
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="sec-n"><b>05</b> / 06</div>
+      <h2 data-i18n-html="h.ideas">Идеи: увидели —<br>соберём в Ташкенте</h2>
+      <p class="sec-lead">Сетапы из Instagram показываем только официальным встраиванием, с автором и его разрешением. Мы разбираем состав и подбираем аналоги с рынка Ташкента.</p>
+    </div>
+    <div class="ideas" id="ideasGrid"></div>
+    <p class="note" style="margin-top:18px">Карточки — заглушки встраивания. Пост загрузится по нажатию, без разрешения автора — только текстовая ссылка. Превью — схема Nivel, не фото автора.</p>
+  </div>
+</section>
+
+<!-- ======================= 6. ЦЕНЫ И ГАРАНТИЯ ======================= -->
+<section class="sec" id="prices">
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="sec-n"><b>06</b> / 06</div>
+      <h2 data-i18n-html="h.prices">Цены и гарантия</h2>
+      <p class="sec-lead">Мы не продаём детали: магазины нам не платят, все скидки — в вашем чеке. Наш доход — плата за работу по шкале, одной суммой в смете.</p>
+    </div>
+    <div class="prices">
+      <div class="panel">
+        <h3>Шкала платы за работу</h3>
+        <p class="note">Прейскурант на 05.10.2026 · процент от сметы, фиксируется в сумах</p>
+        <div class="fee-chart">
+          <svg id="feeChart" viewBox="0 0 640 300" role="img" aria-label="График: плата за работу в зависимости от сметы. До 20 млн — 15 %, от 20 до 30 млн — 3 млн сум, от 30 млн — 10 %"></svg>
+        </div>
+        <div class="fee-read" aria-live="polite">
+          <span>Смета</span><b id="frS">25,0 млн</b><span>→ плата</span><b id="frF">3,00 млн</b><span id="frR">12 % от сметы</span>
+        </div>
+        <label class="sr" for="feeRange">Смета, млн сум</label>
+        <input type="range" id="feeRange" min="4.5" max="60" step="0.5" value="25">
+        <table class="ex">
+          <thead><tr><th>Пример заказа</th><th class="m">Смета</th><th class="m">Плата</th><th class="m">Ставка</th></tr></thead>
+          <tbody>
+            <tr><td>Учебный ПК</td><td class="m">5 млн</td><td class="m">0,75 млн</td><td class="m">15 %</td></tr>
+            <tr><td>Игровой Full HD</td><td class="m">10 млн</td><td class="m">1,50 млн</td><td class="m">15 %</td></tr>
+            <tr><td>Игровой 2K–4K</td><td class="m">25 млн</td><td class="m">3,00 млн</td><td class="m">12&nbsp;% (мин.)</td></tr>
+            <tr><td>Рабочая станция</td><td class="m">40 млн</td><td class="m">4,00 млн</td><td class="m">10 %</td></tr>
+            <tr><td>Сетап: ПК 17,5 + монтаж 7,5</td><td class="m">25 млн</td><td class="m">3,75 млн</td><td class="m">15 %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <ul class="rules">
+          <li><span>01</span><div><b>15 % при смете до 20 млн сум</b>ПК, мониторы, периферия, ИБП. Полный цикл — от 6,7 млн сум.</div></li>
+          <li><span>02</span><div><b>10 % от 20 млн, но не меньше 3 млн</b>На границе скачка нет: 15 % от 20 млн — те же 3 млн сум.</div></li>
+          <li><span>03</span><div><b>15 % за монтаж сетапа</b>Стол, кресло, кронштейны, свет, акустика, кабель-каналы — с установкой у вас.</div></li>
+          <li><span>04</span><div><b>30 % при смете, 70 % при сдаче</b>Деньги на детали — отдельно, по лимиту закупки. Детали — ваши с момента покупки.</div></li>
+        </ul>
+        <div class="receipt">
+          <div class="note" style="margin-bottom:6px">Детали по цене чеков, экономия — клиенту · пример NV-0001</div>
+          <div class="r-row"><span>Смета, детали</span><span>17 790 000</span></div>
+          <div class="r-row"><span>По чекам</span><span>17 650 000</span></div>
+          <div class="r-row ret"><span>Возврат вам, до 5&nbsp;раб.&nbsp;дн.</span><span>140 000</span></div>
+          <div class="r-row"><span>Плата за работу, 15 %</span><span>2 668 500</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="guar">
+      <div><div class="big">12<small>мес.</small></div><h3>Гарантия «одно окно»</h3><p>На работу и на все детали, купленные нами. По магазинам ездим мы, вы — нет.</p></div>
+      <div><div class="big">3<small>сут.</small></div><h3>Подменный ПК</h3><p>На время ремонта — подменный компьютер или деталь в течение 3 суток.</p></div>
+      <div><div class="big">1<small>раб.&nbsp;дн.</small></div><h3>Ответ и забор</h3><p>Отвечаем за 1 рабочий день. Забираем ПК за 1–2 дня за свой счёт, диагностика — 2 дня.</p></div>
+      <div><div class="big">1<small>раз</small></div><h3>Профилактика</h3><p>Чистка, термопаста, проверка температур — один раз за 12 месяцев, входит в плату.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ======================= ПОДВАЛ ======================= -->
+<footer class="ftr">
+  <div class="wrap">
+    <div class="ftr-top">
+      <div>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово для тёмного фона #1D1D1B</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#F1EFEA" d="M8 16h52v8h-52Z"/><path fill="#F06A30" d="M8 24L24 24L24 40Z"/><path fill="#F1EFEA" d="M24 24L40 24L24 40Z"/><path fill="#F1EFEA" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#F1EFEA" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#F06A30" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+        <p>Подбор, закупка, сборка, тесты и монтаж ПК и рабочих мест. Ташкент и область.</p>
+      </div>
+      <div>
+        <h4>Связь</h4>
+        <ul>
+          <li><a href="https://t.me/niveluzbot" target="_blank" rel="noopener">Telegram-бот @niveluzbot</a></li>
+          <li><a href="#top">nivel.uz</a></li>
+          <li><span class="mono">пн–сб 10:00–19:00</span></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Документы</h4>
+        <ul>
+          <li><a href="#">Оферта (UZ)</a> · <a href="#">Оферта (RU)</a></li>
+          <li><a href="#">Политика персональных данных</a></li>
+          <li><a href="#">Гарантия</a></li>
+          <li><a href="#">Возврат</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Реквизиты ИП</h4>
+        <div class="ph">ИП — после регистрации<br>ИНН — после регистрации<br>Р/с — после регистрации<br>Адрес — после регистрации</div>
+      </div>
+    </div>
+    <div class="ftr-bot">
+      <span>© 2026 Nivel · макет, направление Б «Паспорт сборки» · цены — пример на 05.10.2026, не оферта · узбекский текст — черновик для вычитки носителем</span>
+      <button type="button" id="motionBtn" aria-pressed="false" data-i18n="motion">Без анимации</button>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js" defer></script>
+<script>
+(function(){
+"use strict";
+var doc = document, root = doc.documentElement;
+root.classList.add('js-anim');
+var $ = function(s, r){ return (r||doc).querySelector(s); };
+var $$ = function(s, r){ return Array.prototype.slice.call((r||doc).querySelectorAll(s)); };
+var clamp = function(v,a,b){ return v<a?a:v>b?b:v; };
+var ease = function(x){ return x<.5 ? 4*x*x*x : 1-Math.pow(-2*x+2,3)/2; };
+var eout = function(x){ return 1-Math.pow(1-x,3); };
+var NB = ' ';
+var fmt = function(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, NB); };
+function store(k, v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
+
+/* ---------------- i18n ---------------- */
+var I18N = {
+  ru:{
+    'nav.config':'Конфигуратор','nav.ideas':'Идеи','nav.how':'Как работаем','nav.prices':'Цены','nav.menu':'МЕНЮ',
+    'cta.calc':'Рассчитать сетап','cta.how':'Как работаем','cta.tg':'Получить смету в Telegram','cta.like':'Собрать похожий в Ташкенте',
+    'hero.tag':'Паспорт сборки','hero.city':'Ташкент · с октября 2026',
+    'hero.h1a':'ПК и рабочее место под вашу задачу.','hero.h1b':'Собираем и ставим в Ташкенте.',
+    'pr.1':'Смета до покупки','pr.2':'Тесты до передачи','pr.3':'Одно окно за результат',
+    'hero.lead':'Подбираем, покупаем, собираем, тестируем и ставим на место. Детали — по цене чеков, экономия остаётся вам. Работа — 10–15 % по шкале, отдельной строкой в смете.',
+    'hs.label':'Шаг сборки','hs.hint':'Прокрутите — сборка в 5 шагов ↓','hero.note':'Схема — концепт, не конкретная модель','hero.noteS':'концепт',
+    'tb.item':'Изделие','tb.itemv':'ПК и рабочее место','tb.code':'Обозначение','tb.stage':'Стадия','tb.sheet':'Лист','tb.scale':'Масштаб','tb.sum':'Смета 17 790 000 · по чекам',
+    's.0':'Смета','s.1':'Закупка','s.2':'Сборка','s.3':'Тест','s.4':'Сдача',
+    'd.0':'Разнесённый вид: 8 позиций с ценами на 05.10.2026 — медиана трёх продавцов. Плата за работу — отдельной строкой.',
+    'd.1':'Покупаем сами за 1–2 рабочих дня. Чеки, гарантийные талоны и серийные номера — в отчёт для вас.',
+    'd.2':'Детали встают на место. Кабели — за поддоном. BIOS, профиль памяти, Windows с лицензией по чеку.',
+    'd.3':'8 часов под нагрузкой, память — на ночь. Протокол с подписью — в паспорт сборки.',
+    'd.4':'Привозим, ставим на стол, подключаем монитор и свет. Гарантия 12 месяцев — одно окно.',
+    'p.mobo':'Материнская плата','p.cpu':'Процессор и кулер','p.ram':'Память 32 ГБ','p.ssd':'SSD 2 ТБ','p.gpu':'Видеокарта','p.psu':'Блок питания','p.fans':'Вентиляторы','p.case':'Корпус ATX',
+    'st.0':'СМЕТА УТВЕРЖДЕНА','st.1':'ЗАКУПЛЕНО · ЧЕКИ 8/8','st.2':'СОБРАНО · 8/8 НА МЕСТЕ','st.3':'ТЕСТ 8 Ч · 0 ОШИБОК','st.4':'СДАНО · ГАРАНТИЯ 12 МЕС',
+    'ss.0':'СМЕТА','ss.1':'ЧЕКИ 8/8','ss.2':'СОБРАНО','ss.3':'ТЕСТ 8 Ч','ss.4':'СДАНО',
+    'm.0':'Разнесённый вид: 8 позиций, цены на 05.10.2026 — медиана трёх продавцов.',
+    'm.1':'Покупаем сами за 1–2 рабочих дня. Чеки, талоны и серийные номера — вам.',
+    'm.2':'Детали на местах, кабели за поддоном. BIOS, профиль памяти, Windows по чеку.',
+    'm.3':'8 часов под нагрузкой, память — на ночь. Протокол — в паспорт сборки.',
+    'm.4':'Привозим, ставим на стол, подключаем монитор и свет. Гарантия 12 месяцев.',
+    'q.mobo':'Плата','q.cpu':'ЦП, кулер','q.ram':'ОЗУ 32 ГБ','q.ssd':'SSD 2 ТБ','q.gpu':'Видеокарта','q.psu':'БП 750 Вт','q.fans':'Вент. ×3','q.case':'Корпус',
+    'lg.t0':'Смета · 8 позиций','lg.d0':'цены на 05.10.2026','lg.f0':'Итого по смете',
+    'lg.t1':'Закупка · чеки','lg.d1':'07.10.2026','lg.f1':'По чекам',
+    'lg.t2':'Сборка','lg.d2':'08.10.2026','lg.f2':'На месте 8 из 8',
+    'lg.t3':'Протокол теста','lg.d3':'09.10.2026','lg.f3':'Нагрузка',
+    'lg.t4':'Сдача','lg.d4':'12.10.2026','lg.f4':'Паспорт NV-0001 · акт подписан',
+    'lg.2':[['Габарит корпуса','455 × 470 мм'],['Кабели','за поддоном'],['BIOS','F12 · EXPO 6000'],['Windows 11 Pro','лицензия по чеку']],
+    'lg.3':[['Процессор, 8 ч','0 ошибок · 78 °C'],['Видеокарта, 1 ч','0 ошибок · 71 °C'],['Память, 4 прохода','0 ошибок'],['SSD, SMART','7 050 МБ/с · 100 %']],
+    'lg.4':[['Стол 1700 мм','+0.750'],['Монитор, кронштейн','верх +1.190'],['Свет, кабель-канал','установлены'],['Гарантия','12 мес. · одно окно']],
+    'dr.cable':'кабель-канал','dr.view':'Вид слева · боковая панель условно не показана','dr.scr':'ПАСПОРТ NV-0001','dr.done':'СДАНО',
+    'h.how':'Путь от заявки<br>до сданного места','h.cfg':'Конфигуратор:<br>ориентир за минуту','h.pp':'Паспорт сборки:<br>что вы получите','h.ideas':'Идеи: увидели —<br>соберём в Ташкенте','h.prices':'Цены и гарантия',
+    'c.task':'Задача','c.budget':'Бюджет на детали','c.mln':'млн сум','c.style':'Стиль','c.case':'Корпус','c.light':'Подсветка','c.size':'Размер',
+    'c.lightc':'Светлый','c.dark':'Тёмный','c.off':'Выкл','c.on':'Вкл, тёплая белая','c.compact':'Компактный','c.mid':'Средний','c.full':'Большой',
+    'c.card':'Карточка сборки','c.meta':'Цены на 05.10.2026, медиана трёх продавцов Ташкента','c.badge':'Пример · цены на дату · не оферта','c.cls':'Класс (оценка)',
+    'c.parts':'Детали — по цене чеков','c.fee':'Плата за работу','c.total':'Итого','c.tag':'ОРИЕНТИР','c.sum':'сум',
+    't.games':'Игры','t.3d':'3D и видео','t.code':'Программирование','t.office':'Учёба и офис','t.stream':'Стриминг',
+    'L.Процессор':'Процессор','L.Охлаждение':'Охлаждение','L.Материнская плата':'Материнская плата','L.Память':'Память','L.Накопитель':'Накопитель','L.Видеокарта':'Видеокарта','L.Блок питания':'Блок питания','L.Корпус':'Корпус','L.Вентиляторы':'Вентиляторы',
+    'tt.k':'ТЕСТ ПОД НАГРУЗКОЙ','tt.err':'ошибок: 0 · из 8 ч','ret':'возврат вам','motion':'Без анимации'
+  },
+  uz:{
+    'nav.config':'Konfigurator','nav.ideas':'Gʻoyalar','nav.how':'Qanday ishlaymiz','nav.prices':'Narxlar','nav.menu':'MENYU',
+    'cta.calc':'Setapni hisoblash','cta.how':'Qanday ishlaymiz','cta.tg':'Smetani Telegramda olish','cta.like':'Toshkentda shunga oʻxshashini yigʻish',
+    'hero.tag':'Yigʻma pasporti','hero.city':'Toshkent · 2026-yil oktyabrdan',
+    'hero.h1a':'Vazifangizga mos kompyuter va ish joyi.','hero.h1b':'Toshkentda yigʻamiz va oʻrnatamiz.',
+    'pr.1':'Xariddan oldin smeta','pr.2':'Topshirishdan oldin test','pr.3':'Natija uchun yagona darcha',
+    'hero.lead':'Tanlaymiz, sotib olamiz, yigʻamiz, sinaymiz va joyiga oʻrnatamiz. Qismlar — chekdagi narxda, tejalgan pul sizda qoladi. Ish haqi — shkala boʻyicha 10–15 %, smetada alohida qatorda.',
+    'hs.label':'Yigʻish bosqichi','hs.hint':'Aylantiring — 5 bosqichda yigʻish ↓','hero.note':'Sxema — konsept, aniq model emas','hero.noteS':'konsept',
+    'tb.item':'Mahsulot','tb.itemv':'Kompyuter va ish joyi','tb.code':'Belgi','tb.stage':'Bosqich','tb.sheet':'Varaq','tb.scale':'Masshtab','tb.sum':'Smeta 17 790 000 · chekda',
+    's.0':'Smeta','s.1':'Xarid','s.2':'Yigʻish','s.3':'Test','s.4':'Topshirish',
+    'd.0':'Ajratilgan koʻrinish: 8 ta pozitsiya, 05.10.2026 holatiga narxlar — uchta sotuvchi medianasi. Ish haqi — alohida qatorda.',
+    'd.1':'1–2 ish kunida oʻzimiz sotib olamiz. Cheklar, kafolat talonlari va seriya raqamlari — sizga hisobotda.',
+    'd.2':'Qismlar oʻz joyiga tushadi. Kabellar — orqa panel ortida. BIOS, xotira profili, chek boʻyicha litsenziyali Windows.',
+    'd.3':'8 soat yuklama ostida, xotira — tun boʻyi. Imzoli hisobot — yigʻma pasportiga.',
+    'd.4':'Olib kelamiz, stolga qoʻyamiz, monitor va yorugʻlikni ulaymiz. Kafolat 12 oy — yagona darcha.',
+    'p.mobo':'Ona plata','p.cpu':'Protsessor va kuler','p.ram':'Xotira 32 GB','p.ssd':'SSD 2 TB','p.gpu':'Videokarta','p.psu':'Quvvat bloki','p.fans':'Ventilyatorlar','p.case':'ATX korpus',
+    'st.0':'SMETA TASDIQLANDI','st.1':'XARID · CHEKLAR 8/8','st.2':'YIGʻILDI · 8/8 JOYIDA','st.3':'TEST 8 SOAT · 0 XATO','st.4':'TOPSHIRILDI · KAFOLAT 12 OY',
+    'ss.0':'SMETA','ss.1':'CHEKLAR 8/8','ss.2':'YIGʻILDI','ss.3':'TEST 8 SOAT','ss.4':'TOPSHIRILDI',
+    'm.0':'Ajratilgan koʻrinish: 8 ta pozitsiya, 05.10.2026 narxlari — uchta sotuvchi medianasi.',
+    'm.1':'1–2 ish kunida oʻzimiz sotib olamiz. Cheklar, talonlar va seriya raqamlari — sizga.',
+    'm.2':'Qismlar joyida, kabellar orqa panel ortida. BIOS, xotira profili, chekli Windows.',
+    'm.3':'8 soat yuklama ostida, xotira — tun boʻyi. Hisobot — yigʻma pasportiga.',
+    'm.4':'Olib kelamiz, stolga qoʻyamiz, monitor va chiroqni ulaymiz. Kafolat 12 oy.',
+    'q.mobo':'Plata','q.cpu':'CPU, kuler','q.ram':'RAM 32 GB','q.ssd':'SSD 2 TB','q.gpu':'Videokarta','q.psu':'Blok 750 W','q.fans':'Vent. ×3','q.case':'Korpus',
+    'lg.t0':'Smeta · 8 pozitsiya','lg.d0':'05.10.2026 narxlari','lg.f0':'Smeta boʻyicha jami',
+    'lg.t1':'Xarid · cheklar','lg.d1':'07.10.2026','lg.f1':'Cheklar boʻyicha',
+    'lg.t2':'Yigʻish','lg.d2':'08.10.2026','lg.f2':'8 tadan 8 tasi joyida',
+    'lg.t3':'Test hisoboti','lg.d3':'09.10.2026','lg.f3':'Yuklama',
+    'lg.t4':'Topshirish','lg.d4':'12.10.2026','lg.f4':'Pasport NV-0001 · dalolatnoma imzolandi',
+    'lg.2':[['Korpus oʻlchami','455 × 470 mm'],['Kabellar','orqa panel ortida'],['BIOS','F12 · EXPO 6000'],['Windows 11 Pro','chek boʻyicha litsenziya']],
+    'lg.3':[['Protsessor, 8 soat','0 xato · 78 °C'],['Videokarta, 1 soat','0 xato · 71 °C'],['Xotira, 4 oʻtish','0 xato'],['SSD, SMART','7 050 MB/s · 100 %']],
+    'lg.4':[['Stol 1700 mm','+0.750'],['Monitor, kronshteyn','yuqori +1.190'],['Chiroq, kabel kanali','oʻrnatildi'],['Kafolat','12 oy · yagona darcha']],
+    'dr.cable':'kabel kanali','dr.view':'Chapdan koʻrinish · yon panel shartli koʻrsatilmagan','dr.scr':'PASPORT NV-0001','dr.done':'TOPSHIRILDI',
+    'h.how':'Arizadan<br>tayyor ish joyigacha','h.cfg':'Konfigurator:<br>bir daqiqada moʻljal','h.pp':'Yigʻma pasporti:<br>siz nimani olasiz','h.ideas':'Gʻoyalar: koʻrdingiz —<br>Toshkentda yigʻamiz','h.prices':'Narxlar va kafolat',
+    'c.task':'Vazifa','c.budget':'Qismlar uchun byudjet','c.mln':'mln soʻm','c.style':'Uslub','c.case':'Korpus','c.light':'Yoritish','c.size':'Oʻlcham',
+    'c.lightc':'Oq','c.dark':'Qora','c.off':'Oʻchiq','c.on':'Yoqilgan, iliq oq','c.compact':'Ixcham','c.mid':'Oʻrta','c.full':'Katta',
+    'c.card':'Yigʻma kartasi','c.meta':'05.10.2026 narxlari, Toshkentdagi uchta sotuvchi medianasi','c.badge':'Namuna · sanadagi narx · oferta emas','c.cls':'Sinf (baho)',
+    'c.parts':'Qismlar — chekdagi narxda','c.fee':'Ish haqi','c.total':'Jami','c.tag':'MOʻLJAL','c.sum':'soʻm',
+    't.games':'Oʻyinlar','t.3d':'3D va video','t.code':'Dasturlash','t.office':'Oʻqish va ofis','t.stream':'Striming',
+    'L.Процессор':'Protsessor','L.Охлаждение':'Sovutish','L.Материнская плата':'Ona plata','L.Память':'Xotira','L.Накопитель':'Disk','L.Видеокарта':'Videokarta','L.Блок питания':'Quvvat bloki','L.Корпус':'Korpus','L.Вентиляторы':'Ventilyatorlar',
+    'tt.k':'YUKLAMA OSTIDA TEST','tt.err':'xatolar: 0 · 8 soatdan','ret':'sizga qaytarish','motion':'Animatsiyasiz'
+  }
+};
+var lang = 'ru', cfgReady = false;
+function t(k){ return (I18N[lang] && I18N[lang][k]) || I18N.ru[k] || k; }
+function applyLang(l){
+  lang = l; root.lang = l==='uz' ? 'uz-Latn' : 'ru';
+  $$('[data-i18n]').forEach(function(el){ el.textContent = t(el.getAttribute('data-i18n')); });
+  $$('[data-i18n-html]').forEach(function(el){ el.innerHTML = t(el.getAttribute('data-i18n-html')); });
+  $$('.lang button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.lang===l)); });
+  $('#uzNote').hidden = l !== 'uz';
+  store('nivel-lang', l);
+  setupStamps(scene); lastIdx = -1; renderAll();
+  if (cfgReady) renderCfg();
+  if (staticMode) buildStatic();
+}
+$$('.lang button').forEach(function(b){ b.addEventListener('click', function(){ applyLang(b.dataset.lang); }); });
+
+/* меню на телефоне */
+var mb = $('.menu-btn'), mn = $('#mnav');
+mb.addEventListener('click', function(){ var o = mn.classList.toggle('open'); mb.setAttribute('aria-expanded', String(o)); });
+$$('#mnav a').forEach(function(a){ a.addEventListener('click', function(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); }); });
+
+/* ---------------- сцена первого экрана ---------------- */
+var PARTS = {
+  mobo:{off:[310,-40], w:[0.04,0.62], a:[655,346]},
+  cpu: {off:[-20,-265], w:[0.22,0.80], a:[648,300]},
+  ram: {off:[70,-260], w:[0.36,0.95], a:[719,296]},
+  ssd: {off:[320,130], w:[1.00,1.50], a:[656,395]},
+  gpu: {off:[0,250],  w:[1.08,1.66], a:[595,437]},
+  psu: {off:[300,170], w:[1.20,1.80], a:[714,565]},
+  fans:{off:[-270,0], w:[1.32,1.92], a:[429,336]}
+};
+var STAMP_ROT = [-6, 4, -3, 5, -4];
+/* где ставится штамп: свободный угол листа; на телефоне штамп крупнее и короче */
+var STAMP_AT = [[245,690],[245,690],[245,690],[330,630],[330,630]];
+var STAMP_AT_M = [[255,680],[255,680],[440,70],[330,630],[330,630]];
+/* камера на телефоне: общий вид → наезд на корпус при сборке → общий вид со столом */
+var VB_FULL = [100,-70,1000,880], VB_CASE = [290,-10,620,790];
+var mqM = window.matchMedia ? window.matchMedia('(max-width:640px)') : {matches:false};
+function isMob(){ return !!mqM.matches; }
+function smooth(x){ return x*x*(3-2*x); }
+/* текст и размер штампов: на компьютере — слово и дата, на телефоне — одно слово крупно */
+function setupStamps(svg){
+  var mob = isMob();
+  for (var k=0;k<5;k++){
+    var g = $('[data-k="st'+k+'"]', svg); if (!g) continue;
+    var tm = $('.st-main', g), r1 = $('.sr1', g), r2 = $('.sr2', g);
+    tm.textContent = mob ? t('ss.'+k) : t('st.'+k);
+    tm.removeAttribute('textLength'); tm.removeAttribute('lengthAdjust');
+    var w = 280, hh = 84;
+    if (mob){
+      var len = 120; try{ len = tm.getComputedTextLength() || 120; }catch(e){}
+      w = Math.max(150, Math.round(len + 46)); hh = 66; tm.setAttribute('y', '10');
+    } else {
+      tm.setAttribute('y', '0');
+      try{ if (tm.getComputedTextLength() > 248){ tm.setAttribute('textLength','248'); tm.setAttribute('lengthAdjust','spacingAndGlyphs'); } }catch(e){}
+    }
+    r1.setAttribute('x', -w/2); r1.setAttribute('width', w); r1.setAttribute('y', -hh/2); r1.setAttribute('height', hh);
+    r2.setAttribute('x', -w/2+7); r2.setAttribute('width', w-14); r2.setAttribute('y', -hh/2+7); r2.setAttribute('height', hh-14);
+  }
+}
+var maps = new WeakMap();
+function kmap(svg){
+  var m = maps.get(svg); if (m) return m;
+  m = {}; $$('[data-k]', svg).forEach(function(el){ m[el.getAttribute('data-k')] = el; });
+  maps.set(svg, m); return m;
+}
+function op(el, v){ if (el) el.setAttribute('opacity', v.toFixed(3)); }
+function renderScene(svg, T, cam){
+  var m = kmap(svg), mob = isMob();
+  if (cam){
+    var vb = VB_FULL;
+    if (mob){
+      var a = smooth(clamp((T-1.80)/.18,0,1)), b = smooth(clamp((T-2.12)/.5,0,1));
+      vb = VB_FULL.map(function(v,i){ var z = v + (VB_CASE[i]-v)*a; return z + (VB_FULL[i]-z)*b; });
+    }
+    svg.setAttribute('viewBox', vb.map(function(v){ return v.toFixed(1); }).join(' '));
+  }
+  Object.keys(PARTS).forEach(function(k){
+    var p = PARTS[k], lp = clamp((T-p.w[0])/(p.w[1]-p.w[0]),0,1), e = ease(lp);
+    var dx = p.off[0]*(1-e), dy = p.off[1]*(1-e);
+    m[k].setAttribute('transform','translate('+dx.toFixed(2)+' '+dy.toFixed(2)+')');
+    var ln = m['p-'+k];
+    ln.setAttribute('x1',(p.a[0]+dx).toFixed(1)); ln.setAttribute('y1',(p.a[1]+dy).toFixed(1));
+    ln.setAttribute('x2',p.a[0]); ln.setAttribute('y2',p.a[1]);
+    op(ln, lp>=.97 ? 0 : .95*(1-clamp((lp-.75)/.22,0,1)));
+    op(m['l-'+k], 1-clamp(lp/.22,0,1));
+  });
+  op(m['l-case'], 1-clamp((T-1.5)/.3,0,1));
+  op(m.dims, clamp((T-1.7)/.25,0,1)*(1-clamp((T-2.1)/.2,0,1)));
+  op(m.cables, clamp((T-1.75)/.25,0,1));
+  op(m.base, 1-clamp((T-2.1)/.25,0,1));
+  var c = ease(clamp((T-2.12)/.8,0,1)), s = 1-0.41*c;
+  m['case'].setAttribute('transform','translate('+(524*c).toFixed(2)+' '+(3.02*c).toFixed(2)+') scale('+s.toFixed(4)+')');
+  var de = ease(clamp((T-2.35)/.45,0,1));
+  op(m.floor, de); op(m.desk, de);
+  m.desk.setAttribute('transform','translate(0 '+((1-de)*26).toFixed(1)+')');
+  m.led.setAttribute('fill', T>2.82 ? '#D9501A' : '#F8F7F3');
+  var tb = clamp((T-2.72)/.2,0,1)*(1-clamp((T-3.25)/.2,0,1));
+  op(m.test, tb);
+  var secs = Math.round(clamp((T-2.72)/.26,0,1)*8*3600);
+  var hh = Math.floor(secs/3600), mm = Math.floor(secs%3600/60), ss = secs%60;
+  m.timer.textContent = ('0'+hh).slice(-2)+':'+('0'+mm).slice(-2)+':'+('0'+ss).slice(-2);
+  var me = ease(clamp((T-3.08)/.5,0,1));
+  op(m.mon, me); m.mon.setAttribute('transform','translate(0 '+((1-me)*70).toFixed(1)+')');
+  op(m.kbd, clamp((T-3.3)/.3,0,1));
+  op(m.lamp, clamp((T-3.4)/.35,0,1));
+  op(m.light, clamp((T-3.7)/.28,0,1));
+  for (var k=0;k<5;k++){
+    var pr = clamp((T-(k-.12))/.12,0,1), fo = k<4 ? clamp((T-(k+.5))/.14,0,1) : 0;
+    var sc = 1.35-.35*eout(pr);
+    var g = m['st'+k];
+    op(g, pr*(1-fo));
+    var at = (mob ? STAMP_AT_M : STAMP_AT)[k];
+    g.setAttribute('transform','translate('+at[0]+' '+at[1]+') rotate('+STAMP_ROT[k]+') scale('+sc.toFixed(3)+')');
+  }
+}
+
+var hero = $('.hero'), scene = $('#scene');
+var hsNum = $('#hsNum'), hsTitle = $('#hsTitle'), hsDesc = $('#hsDesc'), hsCount = $('#hsCount');
+var bars = $$('.hs-bar b'), cells = $$('.tb .cell');
+var tbStage = $('#tbStage'), tbSheet = $('#tbSheet'), tbScale = $('#tbScale'), tbSum = $('#tbSum'), tbRet = $('#tbRet');
+var lastIdx = -1, curT = 0, staticMode = false;
+function stateIdx(T){ return Math.min(4, Math.floor(T+0.5)); }
+/* ведомость под чертежом на телефоне: 8 позиций с ценами, затем чеки, сборка, тест, сдача */
+var LEDGER = [['mobo',2100000],['cpu',2950000],['ram',1420000],['ssd',1760000],['gpu',6900000],['psu',1290000],['fans',390000],['case',980000]];
+var lgB = $('#lgB'), lgT = $('#lgT'), lgD = $('#lgD'), lgFk = $('#lgFk'), lgFv = $('#lgFv'), lgRows = [];
+function buildLedger(i){
+  lgT.textContent = t('lg.t'+i); lgD.textContent = t('lg.d'+i); lgFk.textContent = t('lg.f'+i);
+  if (i < 2){
+    lgB.className = 'lg-b';
+    lgB.innerHTML = LEDGER.map(function(p,k){ return '<li><span class="i">0'+(k+1)+'</span><span class="nm">'+t('q.'+p[0])+'</span><span class="pr">'+fmt(p[1])+'</span></li>'; }).join('');
+  } else {
+    lgB.className = 'lg-b one';
+    lgB.innerHTML = t('lg.'+i).map(function(r){ return '<li><span class="nm">'+r[0]+'</span><span class="pr">'+r[1]+'</span></li>'; }).join('');
+  }
+  lgRows = $$('li', lgB);
+}
+function renderLedger(T, i, changed){
+  if (changed) buildLedger(i);
+  if (i === 0){ lgFv.textContent = '17 790 000'; lgRows.forEach(function(li){ li.classList.remove('ok'); }); }
+  else if (i === 1){
+    var b = clamp((T-.5)/.5,0,1), n = Math.floor(b*8+.001);
+    lgRows.forEach(function(li,k){ li.classList.toggle('ok', k < n); });
+    var s = 0; for (var k=0;k<n;k++) s += LEDGER[k][1];
+    if (n === 8) lgFv.innerHTML = '17 650 000 <span class="ret">· '+t('ret')+' 140 000</span>';
+    else lgFv.textContent = n ? fmt(s) : '—';
+  }
+  else if (i === 2) lgFv.textContent = '455 × 470';
+  else if (i === 3) lgFv.textContent = (kmap(scene).timer.textContent)+' · CPU 78 °C';
+  else lgFv.textContent = '';
+}
+function renderUI(T){
+  var i = stateIdx(T), changed = i !== lastIdx, mob = isMob();
+  if (changed){
+    lastIdx = i;
+    hsNum.textContent = '0'+(i+1); hsTitle.textContent = t('s.'+i); hsDesc.textContent = t((mob ? 'm.' : 'd.')+i);
+    hsCount.textContent = '0'+(i+1)+' / 05';
+    tbStage.textContent = t('s.'+i); tbSheet.textContent = (i+1)+' / 5';
+  }
+  bars.forEach(function(b,k){ b.style.transform = 'scaleX('+clamp(T-k+1,0,1).toFixed(3)+')'; });
+  cells.forEach(function(c,k){ c.classList.toggle('on', T >= k-.12); });
+  tbScale.textContent = T < 2.5 ? '1:2' : '1:4';
+  var bought = clamp((T-.08)/.85,0,1);
+  tbSum.textContent = bought <= 0 ? '—' : fmt(Math.round(17650000*eout(bought)/1000)*1000);
+  tbRet.textContent = T >= .97 ? t('ret')+' 140 000' : '';
+  if (mob) renderLedger(T, i, changed || !lgRows.length);
+}
+function renderAll(){ renderScene(scene, curT, true); renderUI(curT); }
+if (mqM.addEventListener) mqM.addEventListener('change', function(){ setupStamps(scene); lgRows = []; lastIdx = -1; renderAll(); if (staticMode) buildStatic(); drawFee(); });
+
+function progressToT(p){
+  var raw = clamp(p,0,1)*4, i = Math.min(3, Math.floor(raw)), f = raw - i;
+  return i + ease(clamp((f-.16)/.68,0,1));
+}
+var forced = null;
+var ticking = false;
+function onScroll(){
+  if (ticking || staticMode) return; ticking = true;
+  requestAnimationFrame(function(){
+    ticking = false;
+    if (forced !== null){ curT = forced; renderAll(); return; }
+    var r = hero.getBoundingClientRect(), span = hero.offsetHeight - window.innerHeight;
+    curT = progressToT(span > 0 ? -r.top/span : 0);
+    renderAll();
+  });
+}
+window.addEventListener('scroll', onScroll, {passive:true});
+window.addEventListener('resize', onScroll);
+
+/* статичный режим: 5 кадров с подписями */
+function buildStatic(){
+  var box = $('#frames'); box.innerHTML = '';
+  for (var k=0;k<5;k++){
+    var fig = doc.createElement('figure'); fig.className = 'frame';
+    var cl = scene.cloneNode(true); cl.removeAttribute('id'); cl.setAttribute('aria-hidden','true'); cl.setAttribute('viewBox', VB_FULL.join(' '));
+    $$('[id]', cl).forEach(function(el){ el.removeAttribute('id'); });
+    fig.appendChild(cl);
+    var cap = doc.createElement('figcaption');
+    cap.innerHTML = '<b><span>0'+(k+1)+'</span>'+t('s.'+k)+'</b>'+t('d.'+k);
+    fig.appendChild(cap); box.appendChild(fig);
+    renderScene(cl, k);
+  }
+}
+function setStatic(on){
+  staticMode = on;
+  root.classList.toggle('is-static', on);
+  $('#motionBtn').setAttribute('aria-pressed', String(on));
+  if (on){ curT = 4; lastIdx = -1; renderAll(); buildStatic(); $$('.step').forEach(function(s){ s.classList.add('in'); }); }
+  else { $('#frames').innerHTML = ''; lastIdx = -1; onScroll(); }
+}
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+$('#motionBtn').addEventListener('click', function(){
+  var on = !staticMode; store('nivel-static', on ? '1' : '0'); setStatic(on);
+});
+
+/* ---------------- конфигуратор ---------------- */
+var CPU = {
+  games:[['AMD Ryzen 5 7500F',1790000,0],['AMD Ryzen 5 7600',2260000,1],['AMD Ryzen 5 9600X',2850000,1],['AMD Ryzen 7 7800X3D',5100000,2],['AMD Ryzen 7 9800X3D',6150000,3]],
+  '3d':[['AMD Ryzen 5 7600',2260000,1],['AMD Ryzen 7 7700',3380000,2],['AMD Ryzen 7 9700X',3990000,2],['AMD Ryzen 9 9900X',5250000,3],['AMD Ryzen 9 9950X',7690000,4]],
+  code:[['AMD Ryzen 5 7600',2260000,1],['AMD Ryzen 7 7700',3380000,2],['AMD Ryzen 7 9700X',3990000,2],['AMD Ryzen 9 9900X',5250000,3],['AMD Ryzen 9 9950X',7690000,4]],
+  office:[['AMD Ryzen 5 8500G, встроенная графика',1890000,0],['AMD Ryzen 5 8600G, встроенная графика',2450000,1],['AMD Ryzen 7 8700G, встроенная графика',3650000,2]],
+  stream:[['AMD Ryzen 5 7600',2260000,1],['AMD Ryzen 7 9700X',3990000,2],['AMD Ryzen 9 9900X',5250000,3],['AMD Ryzen 9 9950X',7690000,4]]
+};
+var GPU_ALL = [['GeForce RTX 3050, 6 ГБ',2450000,70,'nv'],['Arc B570, 10 ГБ',3050000,150,'x'],['GeForce RTX 5050, 8 ГБ',3790000,130,'nv'],['GeForce RTX 5060, 8 ГБ',5380000,145,'nv'],['GeForce RTX 5060 Ti, 16 ГБ',6900000,180,'nv'],['GeForce RTX 5070, 12 ГБ',9400000,250,'nv'],['Radeon RX 9070 XT, 16 ГБ',10200000,304,'x'],['GeForce RTX 5070 Ti, 16 ГБ',13600000,300,'nv'],['GeForce RTX 5080, 16 ГБ',18900000,360,'nv'],['GeForce RTX 5090, 32 ГБ',41500000,575,'nv']];
+var GPU = {
+  games: GPU_ALL,
+  '3d': GPU_ALL.filter(function(g){ return g[3]==='nv' && g[1]>=3790000; }),
+  code: GPU_ALL.filter(function(g){ return g[3]==='nv' && g[1]<=9400000; }),
+  office: [],
+  stream: GPU_ALL.filter(function(g){ return g[3]==='nv' && g[1]>=3790000; })
+};
+var MB = [['A620',1150000],['B650',1650000],['B650 с Wi-Fi',2100000],['B850 с Wi-Fi',2650000],['X870 с Wi-Fi',3900000],['X870E с Wi-Fi',5200000]];
+var RAM = [['DDR5 16 ГБ (2×8), 5600',780000],['DDR5 32 ГБ (2×16), 6000 CL30',1420000],['DDR5 64 ГБ (2×32), 6000 CL30',2790000],['DDR5 96 ГБ (2×48), 6000',4300000],['DDR5 128 ГБ (4×32), 5600',5600000]];
+var SSD = [['NVMe 500 ГБ, PCIe 4.0',560000],['NVMe 1 ТБ, PCIe 4.0',980000],['NVMe 2 ТБ, PCIe 4.0',1760000],['NVMe 2 ТБ, PCIe 5.0',2900000],['NVMe 4 ТБ, PCIe 4.0',3450000]];
+var PSU = [[550,'550 Вт, Bronze',720000],[650,'650 Вт, Gold',1050000],[750,'750 Вт, Gold, ATX 3.1',1290000],[850,'850 Вт, Gold, ATX 3.1',1620000],[1000,'1000 Вт, Gold, ATX 3.1',2250000],[1200,'1200 Вт, Platinum, ATX 3.1',3300000]];
+var COOL = [['Башенный, 1×120 мм',320000],['Башенный, 1×120 мм',320000],['Башенный, 2×120 мм',690000],['Жидкостный 240 мм, готовый',1150000],['Жидкостный 360 мм, готовый',1690000]];
+var CASE = {compact:['mATX, 36 л',690000,'mATX'], mid:['ATX, 48 л, сетчатый фронт',980000,'ATX'], full:['E-ATX, 64 л',1650000,'E-ATX']};
+var W = {
+  games:{gpu:.42,cpu:.15,ram:.08,ssd:.08,mb:.10},
+  '3d':{gpu:.32,cpu:.24,ram:.13,ssd:.09,mb:.10},
+  code:{gpu:.12,cpu:.26,ram:.15,ssd:.11,mb:.12},
+  office:{gpu:0,cpu:.28,ram:.14,ssd:.13,mb:.13},
+  stream:{gpu:.34,cpu:.22,ram:.10,ssd:.09,mb:.10}
+};
+var CLS = {
+  games:['1080p, средние настройки','1080p, высокие настройки','1440p, высокие настройки','4K, высокие настройки'],
+  '3d':['Монтаж Full HD','Монтаж 4K, простые 3D-сцены','Монтаж 4K, сложные 3D-сцены','Тяжёлые 3D-сцены, 8K-исходники'],
+  code:['IDE, браузер, видеосвязь','IDE, Docker, 2–3 монитора','Большие проекты, виртуальные машины','Локальные модели, много ВМ'],
+  office:['Учёба, офис, видеосвязь','Офис, 2 монитора, фото','Офис, фото, лёгкий монтаж','Офис, фото, лёгкий монтаж'],
+  stream:['Стрим 1080p60','Стрим 1080p60 и игра 1440p','Стрим и запись 1440p','Стрим 4K и монтаж']
+};
+var TASK_N = {games:'Игры','3d':'3D и видео',code:'Программирование',office:'Учёба и офис',stream:'Стриминг'};
+var cfg = {task:'games', budget:18, color:'light', light:'off', size:'mid'};
+function pickIdx(list, target){ var idx = 0; for (var i=0;i<list.length;i++){ if (list[i][1] <= target) idx = i; } return idx; }
+function build(){
+  var B = cfg.budget*1e6, w = W[cfg.task], cpuL = CPU[cfg.task], gpuL = GPU[cfg.task];
+  var minRam = (cfg.task==='3d'||cfg.task==='stream'||cfg.task==='code') ? 1 : 0;
+  var ix = {
+    cpu: pickIdx(cpuL, B*w.cpu),
+    gpu: gpuL.length ? pickIdx(gpuL, B*w.gpu) : -1,
+    ram: Math.max(minRam, pickIdx(RAM, B*w.ram)),
+    ssd: Math.max(1, pickIdx(SSD, B*w.ssd)),
+    mb:  pickIdx(MB, B*w.mb)
+  };
+  if (cfg.task==='office' && B < 8e6) ix.ssd = Math.max(0, pickIdx(SSD, B*w.ssd));
+  var mins = {cpu:0,gpu:0,ram:minRam,ssd:0,mb:0};
+  function compose(){
+    var cpu = cpuL[ix.cpu], gpu = ix.gpu>=0 ? gpuL[ix.gpu] : null;
+    var mbi = cfg.size==='full' ? Math.max(ix.mb,3) : ix.mb;
+    if (cpu[2]>=3 && mbi<2) mbi = 2;
+    var mb = MB[mbi], cs = CASE[cfg.size];
+    var cool = COOL[cfg.size==='compact' ? Math.min(cpu[2],3) : cpu[2]];
+    var watts = (gpu?gpu[2]:0) + [65,90,120,170,170][cpu[2]] + 90, psu = PSU[0];
+    for (var i=0;i<PSU.length;i++){ if (PSU[i][0] >= watts*1.6){ psu = PSU[i]; break; } psu = PSU[i]; }
+    var mbPrice = mb[1] + (cfg.size==='full' ? 700000 : 0);
+    var colorW = cfg.color==='light' ? 'белый' : 'чёрный';
+    var L = [
+      ['Процессор', cpu[0], cpu[1]],
+      ['Охлаждение', cool[0], cool[1]],
+      ['Материнская плата', 'AM5, '+mb[0]+', '+cs[2], mbPrice],
+      ['Память', RAM[ix.ram][0], RAM[ix.ram][1]],
+      ['Накопитель', SSD[ix.ssd][0], SSD[ix.ssd][1]]
+    ];
+    if (gpu) L.push(['Видеокарта', gpu[0], gpu[1]]);
+    L.push(['Блок питания', psu[1], psu[2]]);
+    L.push(['Корпус', cs[0]+', '+colorW, cs[1]]);
+    if (cfg.light==='on') L.push(['Вентиляторы', '120 мм ×3, подсветка тёплая белая', 540000]);
+    else if (!(cfg.size==='compact' && B < 10e6)) L.push(['Вентиляторы', '120 мм ×3, без подсветки', 390000]);
+    var S = L.reduce(function(a,l){ return a+l[2]; }, 0);
+    return {lines:L, sum:S, gpu:gpu};
+  }
+  var r = compose(), guard = 0, order = ['gpu','cpu','mb','ssd','ram'];
+  while (r.sum > B*1.02 && guard++ < 40){
+    var moved = false;
+    for (var o=0;o<order.length;o++){ var k = order[o]; if (ix[k] > mins[k]){ ix[k]--; moved = true; break; } }
+    if (!moved) break; r = compose();
+  }
+  guard = 0; var up = cfg.task==='office' ? ['cpu','ram','ssd','mb'] : ['gpu','cpu','ram','ssd','mb'];
+  var lists = {cpu:cpuL, gpu:gpuL, ram:RAM, ssd:SSD, mb:MB};
+  while (r.sum < B*0.9 && guard++ < 40){
+    var did = false;
+    for (var u=0;u<up.length;u++){
+      var key = up[u]; if (ix[key] < 0 || ix[key] >= lists[key].length-1) continue;
+      ix[key]++; var r2 = compose();
+      if (r2.sum <= B*1.02){ r = r2; did = true; break; } ix[key]--;
+    }
+    if (!did) break;
+  }
+  return r;
+}
+function fee(S){ if (S < 20e6) return {f:Math.round(S*.15), r:'15 %'}; var f = Math.round(S*.10); return f < 3e6 ? {f:3e6, r:'10 %, минимум 3 000 000'} : {f:f, r:'10 %'}; }
+function caseSvg(){
+  var dark = cfg.color==='dark', h = {compact:70, mid:86, full:100}[cfg.size], wd = {compact:56, mid:64, full:72}[cfg.size];
+  var x = (92-wd)/2, y = 104-h, body = dark ? '#1D1D1B' : '#F8F7F3', line = dark ? '#F1EFEA' : '#1D1D1B';
+  var fanF = cfg.light==='on' ? '#F3DCC4' : 'none', n = cfg.size==='compact' ? 2 : 3, fh = (h-20)/n, s = '';
+  s += '<rect x="'+x+'" y="'+y+'" width="'+wd+'" height="'+h+'" rx="3" fill="'+body+'" stroke="#1D1D1B" stroke-width="2"/>';
+  s += '<rect x="'+(x+4)+'" y="'+(y+6)+'" width="'+(wd-8)+'" height="'+(h-12)+'" fill="none" stroke="'+line+'" stroke-width="1" stroke-dasharray="3 2"/>';
+  for (var i=0;i<n;i++){ var cy = y+12+fh*i+fh/2; s += '<circle cx="'+(x+wd/2)+'" cy="'+cy.toFixed(1)+'" r="'+Math.min(fh/2-2,(wd-14)/2).toFixed(1)+'" fill="'+fanF+'" stroke="'+line+'" stroke-width="1.4"/>'; }
+  s += '<rect x="'+(x+6)+'" y="104" width="10" height="4" fill="#1D1D1B"/><rect x="'+(x+wd-16)+'" y="104" width="10" height="4" fill="#1D1D1B"/>';
+  s += '<text x="46" y="'+(y-4)+'" text-anchor="middle" style="font:500 9px var(--f-mono)" fill="#55534E">'+CASE[cfg.size][2]+'</text>';
+  return s;
+}
+function renderCfg(){
+  var r = build(), F = fee(r.sum), B = cfg.budget*1e6;
+  $('#budgetV').textContent = String(cfg.budget).replace('.', ',');
+  $('#estNo').innerHTML = '<span class="no">№</span>&nbsp;0510-'+String(Math.round(cfg.budget*10)).padStart(3,'0');
+  var tier = r.sum < 12e6 ? 0 : r.sum < 20e6 ? 1 : r.sum < 35e6 ? 2 : 3;
+  $('#estCls').textContent = t('t.'+cfg.task)+': '+CLS[cfg.task][tier];
+  $('#estLines').innerHTML = r.lines.map(function(l,i){
+    return '<li><span class="i">'+('0'+(i+1)).slice(-2)+'</span><span class="nm"><small>'+t('L.'+l[0])+'</small>'+l[1]+'</span><span class="pr">'+fmt(l[2])+'</span></li>';
+  }).join('');
+  var SUM = ' '+t('c.sum');
+  $('#estParts').textContent = fmt(r.sum)+SUM;
+  $('#estRate').textContent = F.r;
+  $('#estFee').textContent = fmt(F.f)+SUM;
+  $('#estTotal').textContent = fmt(r.sum+F.f)+SUM;
+  $('#estSplit').textContent = 'Плата: 30 % при смете — '+fmt(F.f*.3)+', 70 % при сдаче — '+fmt(F.f*.7)+'. Лимит закупки с резервом 3 % — '+fmt(Math.round(r.sum*1.03/1000)*1000)+' сум.';
+  var warn = $('#estWarn'), msg = '', info = false;
+  var mln = function(v){ return (v/1e6).toFixed(1).replace('.', ',')+' млн'; };
+  if (r.sum > B*1.03) msg = 'Под задачу «'+TASK_N[cfg.task]+'» минимальная сборка — около '+fmt(r.sum)+' сум, это выше бюджета на '+fmt(r.sum-B)+'. Можно взять задачу «Учёба и офис» или поднять бюджет.';
+  else if (r.sum < 6.7e6) msg = 'Полный цикл — от 6,7 млн сум. Сборки 4,5–6,7 млн — типовые, в свободные окна; ниже — платный «Подбор» без закупки.';
+  else if (r.sum > B){ info = true; msg = 'Сборка выше бюджета на '+fmt(r.sum-B)+' сум — это в пределах резерва 3 % на колебание цен. Если нужно строго в бюджет, мастер уберёт разницу при смете.'; }
+  else if (r.sum < B*0.9){ info = true; msg = 'Бюджет больше, чем нужно под задачу: подобрали '+mln(r.sum)+', остаток '+mln(B-r.sum)+' не тратим. Можно добавить монитор или сетап — посчитаем отдельно.'; }
+  warn.textContent = msg; warn.classList.toggle('show', !!msg); warn.classList.toggle('info', info);
+  $('#estCase').innerHTML = caseSvg();
+  $('#tgBtn').href = 'https://t.me/niveluzbot?start=cfg_'+cfg.task+'_'+Math.round(cfg.budget*10)+'_'+cfg.color+'_'+cfg.light+'_'+cfg.size;
+}
+$$('#taskChips .chip').forEach(function(b){ b.addEventListener('click', function(){
+  cfg.task = b.dataset.task; $$('#taskChips .chip').forEach(function(x){ x.setAttribute('aria-pressed', String(x===b)); }); renderCfg();
+}); });
+$('#budget').addEventListener('input', function(e){ cfg.budget = parseFloat(e.target.value); renderCfg(); });
+$$('.seg[data-opt]').forEach(function(seg){ $$('button', seg).forEach(function(b){ b.addEventListener('click', function(){
+  cfg[seg.dataset.opt] = b.dataset.v; $$('button', seg).forEach(function(x){ x.setAttribute('aria-pressed', String(x===b)); }); renderCfg();
+}); }); });
+
+/* ---------------- график шкалы платы ---------------- */
+var NS = 'http://www.w3.org/2000/svg';
+function feeAt(s){ return s < 20 ? s*.15 : Math.max(s*.10, 3); }
+/* шкала платы: на телефоне — своя сетка и крупнее шрифт, подписи не пересекают линию */
+var feeS = 25, feeGeo = null;
+function drawFee(){
+  var svg = $('#feeChart'); if (!svg) return;
+  var narrow = (svg.parentNode.clientWidth || 600) < 520;
+  var G = narrow ? {W:360, H:262, X0:34, X1:346, Y0:214, Y1:26, fs:12.5, fb:13.5, r:5}
+                 : {W:640, H:300, X0:56, X1:620, Y0:256, Y1:20, fs:12, fb:13, r:4};
+  feeGeo = G;
+  svg.setAttribute('viewBox', '0 0 '+G.W+' '+G.H);
+  var X0 = G.X0, X1 = G.X1, Y0 = G.Y0, Y1 = G.Y1;
+  var x = function(s){ return X0 + s/60*(X1-X0); }, y = function(f){ return Y0 - f/7*(Y0-Y1); };
+  var tx = function(px, py, s, extra){ return '<text x="'+px.toFixed(1)+'" y="'+py.toFixed(1)+'" '+(extra||'')+'>'+s+'</text>'; };
+  var h = '';
+  h += '<line x1="'+X0+'" y1="'+Y0+'" x2="'+X1+'" y2="'+Y0+'" stroke="#1D1D1B" stroke-width="1.5"/>';
+  h += '<line x1="'+X0+'" y1="'+Y0+'" x2="'+X0+'" y2="'+Y1+'" stroke="#1D1D1B" stroke-width="1.5"/>';
+  for (var s=0;s<=60;s+=10){ h += '<line x1="'+x(s)+'" y1="'+Y0+'" x2="'+x(s)+'" y2="'+(Y0+6)+'" stroke="#1D1D1B"/>'+tx(x(s), Y0+21, s, 'text-anchor="middle" font-size="'+G.fs+'" fill="#55534E"'); }
+  for (var f=0;f<=6;f+=(narrow?2:1)){ h += '<line x1="'+(X0-6)+'" y1="'+y(f)+'" x2="'+X0+'" y2="'+y(f)+'" stroke="#1D1D1B"/>'+tx(X0-9, y(f)+4, f, 'text-anchor="end" font-size="'+G.fs+'" fill="#55534E"'); }
+  h += tx(X1, Y0+41, 'смета, млн сум', 'text-anchor="end" font-size="'+G.fs+'" fill="#55534E"');
+  h += tx(X0-9, Y1-10, 'плата, млн сум', 'text-anchor="start" font-size="'+G.fs+'" fill="#55534E"');
+  h += '<line x1="'+x(20)+'" y1="'+Y0+'" x2="'+x(20)+'" y2="'+y(3)+'" stroke="#8A867E" stroke-dasharray="3 4"/><line x1="'+x(30)+'" y1="'+Y0+'" x2="'+x(30)+'" y2="'+y(3)+'" stroke="#8A867E" stroke-dasharray="3 4"/>';
+  h += '<path d="M'+x(0)+' '+y(0)+'L'+x(20)+' '+y(3)+'L'+x(30)+' '+y(3)+'L'+x(60)+' '+y(6)+'" fill="none" stroke="#1D1D1B" stroke-width="2.5" stroke-linejoin="round"/>';
+  /* подписи: «15 %» — над наклоном слева, «10 %» — под наклоном справа, минимум — под полкой между пунктирами */
+  h += tx(x(3), y(2.3), '15 %', 'font-size="'+G.fb+'" font-weight="600" fill="#1D1D1B"');
+  h += tx(x(narrow?44:47), y(narrow?4.4:4.7)+(narrow?24:22), '10 %', 'font-size="'+G.fb+'" font-weight="600" fill="#1D1D1B"');
+  if (narrow){
+    h += tx(x(25), y(3)+20, 'мин.', 'text-anchor="middle" font-size="'+G.fs+'" font-weight="600" fill="#1D1D1B"');
+    h += tx(x(25), y(3)+36, '3 млн', 'text-anchor="middle" font-size="'+G.fs+'" font-weight="600" fill="#1D1D1B"');
+  } else {
+    h += tx(x(25), y(3)+22, 'мин. 3 млн', 'text-anchor="middle" font-size="'+G.fs+'" font-weight="600" fill="#1D1D1B"');
+  }
+  [5,10,15,25,40,60].forEach(function(s){ h += '<circle cx="'+x(s)+'" cy="'+y(feeAt(s))+'" r="'+G.r+'" fill="#F8F7F3" stroke="#1D1D1B" stroke-width="2"/>'; });
+  h += '<g id="feeCur"><line id="fcL" stroke="#D9501A" stroke-width="1.5" stroke-dasharray="5 4"/><path id="fcT" d="M-8 0h16l-8 12Z" fill="#D9501A"/><circle id="fcC" r="6" fill="#D9501A" stroke="#F8F7F3" stroke-width="2"/></g>';
+  h += '<rect id="feeHit" x="'+X0+'" y="'+Y1+'" width="'+(X1-X0)+'" height="'+(Y0-Y1)+'" fill="transparent" style="cursor:crosshair"/>';
+  svg.innerHTML = h;
+  $('#feeHit').addEventListener('pointermove', function(e){
+    var r = svg.getBoundingClientRect(), vx = (e.clientX - r.left)/r.width*G.W;
+    var s = Math.round(((vx-X0)/(X1-X0)*60)*2)/2; setFee(s); $('#feeRange').value = clamp(s,4.5,60);
+  });
+  setFee(feeS);
+}
+function setFee(s){
+  var G = feeGeo; if (!G) return;
+  s = clamp(s, 4.5, 60); feeS = s; var fv = feeAt(s);
+  var cx = G.X0 + s/60*(G.X1-G.X0), cy = G.Y0 - fv/7*(G.Y0-G.Y1);
+  /* курсор — только над точкой, чтобы не резать подписи под линией */
+  $('#fcL').setAttribute('x1', cx); $('#fcL').setAttribute('x2', cx); $('#fcL').setAttribute('y1', G.Y1); $('#fcL').setAttribute('y2', cy-8);
+  $('#fcC').setAttribute('cx', cx); $('#fcC').setAttribute('cy', cy);
+  $('#fcT').setAttribute('transform','translate('+cx+' '+(G.Y1-14)+')');
+  $('#frS').textContent = s.toFixed(1).replace('.', ',')+' млн';
+  $('#frF').textContent = fv.toFixed(2).replace('.', ',')+' млн';
+  $('#frR').textContent = (fv/s*100).toFixed(fv/s*100 % 1 ? 1 : 0).replace('.', ',')+' % от сметы';
+}
+$('#feeRange').addEventListener('input', function(){ setFee(parseFloat(this.value)); });
+drawFee();
+window.addEventListener('resize', function(){ var sv = $('#feeChart'); if (feeGeo && ((sv.parentNode.clientWidth < 520) !== (feeGeo.W === 360))) drawFee(); });
+
+
+/* ---------------- график температуры (паспорт) ---------------- */
+(function tempChart(){
+  var svg = $('#tempChart'), X0 = 40, X1 = 548, Y0 = 160, Y1 = 12;
+  var x = function(h){ return X0 + h/8*(X1-X0); }, y = function(c){ return Y0 - (c-30)/70*(Y0-Y1); };
+  var pts = [], mx = 0, mxH = 0;
+  for (var i=0;i<=480;i+=2){
+    var hh = i/60, v = 36 + 40.5*(1-Math.exp(-hh*11)) + Math.sin(i*.37)*.8 + Math.sin(i*.113)*1.1 + Math.sin(i*.051+1)*.6;
+    if (v > mx){ mx = v; mxH = hh; } pts.push([hh, v]);
+  }
+  var scale = 78/mx; pts = pts.map(function(p){ return [p[0], p[1]>40 ? 36+(p[1]-36)*((78-36)/(mx-36)) : p[1]]; });
+  var d = pts.map(function(p,k){ return (k?'L':'M')+x(p[0]).toFixed(1)+' '+y(p[1]).toFixed(1); }).join('');
+  var h = '';
+  [40,60,80,100].forEach(function(c){ h += '<line x1="'+(X0-5)+'" y1="'+y(c)+'" x2="'+X0+'" y2="'+y(c)+'" stroke="#1D1D1B"/><text x="'+(X0-9)+'" y="'+(y(c)+4)+'" text-anchor="end" font-size="11" fill="#55534E" font-family="IBM Plex Mono, monospace">'+c+'</text>'; });
+  for (var hr=0;hr<=8;hr+=2){ h += '<line x1="'+x(hr)+'" y1="'+Y0+'" x2="'+x(hr)+'" y2="'+(Y0+5)+'" stroke="#1D1D1B"/><text x="'+x(hr)+'" y="'+(Y0+19)+'" text-anchor="middle" font-size="11" fill="#55534E" font-family="IBM Plex Mono, monospace">'+hr+' ч</text>'; }
+  h += '<line x1="'+X0+'" y1="'+Y0+'" x2="'+X1+'" y2="'+Y0+'" stroke="#1D1D1B" stroke-width="1.3"/><line x1="'+X0+'" y1="'+Y0+'" x2="'+X0+'" y2="'+Y1+'" stroke="#1D1D1B" stroke-width="1.3"/>';
+  h += '<line x1="'+X0+'" y1="'+y(95)+'" x2="'+X1+'" y2="'+y(95)+'" stroke="#1D1D1B" stroke-dasharray="6 4"/><text x="'+(X1)+'" y="'+(y(95)-6)+'" text-anchor="end" font-size="11" fill="#1D1D1B" font-family="IBM Plex Mono, monospace">предел 95 °C</text>';
+  h += '<path d="'+d+'" fill="none" stroke="#1D1D1B" stroke-width="2" stroke-linejoin="round"/>';
+  var mp = pts.reduce(function(a,p){ return p[1]>a[1]?p:a; }, pts[0]);
+  h += '<circle cx="'+x(mp[0])+'" cy="'+y(mp[1])+'" r="5" fill="#D9501A" stroke="#F8F7F3" stroke-width="2"/><text x="'+(x(mp[0]))+'" y="'+(y(mp[1])-12)+'" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1D1D1B" font-family="IBM Plex Mono, monospace">макс. 78 °C</text>';
+  svg.innerHTML = h;
+})();
+
+/* ---------------- идеи ---------------- */
+var IDEAS = [
+  {h:'@avtor_posta_1', t:'Светлый компактный стол', tags:['белый','компактный','1 монитор','тихий'], p:'16,8', s:{mon:1, pc:'right', light:true, dark:false, shelf:true}},
+  {h:'@avtor_posta_2', t:'Два монитора для разработки', tags:['2 монитора','кронштейн','программирование'], p:'27,4', s:{mon:2, pc:'under', light:true, dark:false, shelf:false}},
+  {h:'@avtor_posta_3', t:'Стрим-угол: свет и камера', tags:['стриминг','свет','микрофон'], p:'34,9', s:{mon:1, pc:'left', light:true, dark:true, cam:true}},
+  {h:'@avtor_posta_4', t:'Тёмный минимализм для 3D', tags:['тёмный','3D и видео','широкий монитор'], p:'42,1', s:{mon:'wide', pc:'right', light:false, dark:true, shelf:true}}
+];
+function ideaSvg(o){
+  var ink = '#1D1D1B', fill = o.dark ? '#1D1D1B' : '#F8F7F3', s = '<svg viewBox="0 0 400 300" aria-hidden="true">';
+  s += '<line x1="20" y1="262" x2="380" y2="262" stroke="'+ink+'" stroke-width="2"/>';
+  s += '<rect x="40" y="196" width="320" height="10" fill="'+(o.dark?ink:'#DCD7CC')+'" stroke="'+ink+'" stroke-width="2"/>';
+  s += '<rect x="52" y="206" width="8" height="56" fill="'+ink+'"/><rect x="340" y="206" width="8" height="56" fill="'+ink+'"/>';
+  if (o.shelf) s += '<rect x="250" y="70" width="110" height="6" fill="none" stroke="'+ink+'" stroke-width="2"/><rect x="262" y="52" width="14" height="18" fill="none" stroke="'+ink+'" stroke-width="1.5"/><path d="M292 70v-22h10v22M306 70v-16h8v16" fill="none" stroke="'+ink+'" stroke-width="1.5"/>';
+  if (o.mon === 2){ s += '<rect x="110" y="102" width="92" height="58" rx="3" fill="'+fill+'" stroke="'+ink+'" stroke-width="2.5"/><rect x="206" y="102" width="92" height="58" rx="3" fill="'+fill+'" stroke="'+ink+'" stroke-width="2.5"/><path d="M204 160v36M186 196h36" stroke="'+ink+'" stroke-width="3"/>'; }
+  else if (o.mon === 'wide'){ s += '<rect x="112" y="104" width="176" height="62" rx="3" fill="'+fill+'" stroke="'+ink+'" stroke-width="2.5"/><path d="M200 166v30M178 196h44" stroke="'+ink+'" stroke-width="3"/>'; }
+  else { s += '<rect x="140" y="104" width="120" height="70" rx="3" fill="'+fill+'" stroke="'+ink+'" stroke-width="2.5"/><path d="M200 174v22M182 196h36" stroke="'+ink+'" stroke-width="3"/>'; }
+  s += '<rect x="160" y="188" width="80" height="6" rx="2" fill="none" stroke="'+ink+'" stroke-width="1.5"/>';
+  if (o.pc === 'right') s += '<rect x="300" y="132" width="44" height="64" rx="2" fill="'+fill+'" stroke="'+ink+'" stroke-width="2"/><circle cx="322" cy="150" r="7" fill="none" stroke="'+(o.dark?'#F1EFEA':ink)+'" stroke-width="1.3"/><circle cx="322" cy="172" r="7" fill="none" stroke="'+(o.dark?'#F1EFEA':ink)+'" stroke-width="1.3"/>';
+  if (o.pc === 'left') s += '<rect x="56" y="132" width="44" height="64" rx="2" fill="'+fill+'" stroke="'+ink+'" stroke-width="2"/>';
+  if (o.pc === 'under') s += '<rect x="292" y="212" width="40" height="50" rx="2" fill="'+fill+'" stroke="'+ink+'" stroke-width="2"/>';
+  if (o.light) s += '<path d="M76 196V120l22-10" fill="none" stroke="'+ink+'" stroke-width="3" stroke-linecap="round"/><path d="M92 104l18 8-6 9-18-8z" fill="'+ink+'"/><path d="M98 120L138 196H74Z" fill="url(#ihatch)"/>';
+  if (o.cam) s += '<path d="M200 96v-14" stroke="'+ink+'" stroke-width="2"/><rect x="190" y="70" width="20" height="12" rx="2" fill="'+ink+'"/><path d="M330 196V80" stroke="'+ink+'" stroke-width="2"/><rect x="312" y="56" width="36" height="24" fill="#F8F7F3" stroke="'+ink+'" stroke-width="2"/>';
+  s += '<defs><pattern id="ihatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(38)"><line x1="0" y1="0" x2="0" y2="7" stroke="#1D1D1B" stroke-width="1" opacity=".35"/></pattern></defs>';
+  return s + '</svg>';
+}
+$('#ideasGrid').innerHTML = IDEAS.map(function(o){
+  return '<article class="idea"><div class="idea-top"><span class="ava" aria-hidden="true"></span><div><div class="who">'+o.h+'</div><div class="src">Instagram · заглушка встраивания</div></div></div>'+
+    '<div class="idea-prev">'+ideaSvg(o.s)+'<span class="lab">схема Nivel, не фото</span><button class="emb" type="button">Загрузить пост</button></div>'+
+    '<div class="idea-b"><h3>'+o.t+'</h3><div class="tags">'+o.tags.map(function(x){ return '<span>'+x+'</span>'; }).join('')+'</div>'+
+    '<p class="cr">Фото: '+o.h+', с разрешения автора</p>'+
+    '<div class="pr">Похожий в Ташкенте<br><b>≈ '+o.p+' млн сум</b> <span class="note">пример, цены на 05.10.2026</span></div>'+
+    '<a class="btn btn-line btn-sm" href="#config" data-i18n="cta.like">Собрать похожий в Ташкенте</a></div></article>';
+}).join('');
+$$('.emb').forEach(function(b){ b.addEventListener('click', function(){ b.textContent = 'В макете не загружается'; }); });
+
+/* штампы в «Пути» */
+if ('IntersectionObserver' in window && !reduce){
+  var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {threshold:.45});
+  $$('.step').forEach(function(s, i){ s.style.transitionDelay = (i*80)+'ms'; io.observe(s); });
+} else { $$('.step').forEach(function(s){ s.classList.add('in'); }); }
+
+/* ---------------- плавная прокрутка (только компьютер) ---------------- */
+function initLenis(){
+  if (staticMode || reduce || !window.Lenis || !matchMedia('(pointer:fine)').matches) return;
+  try{
+    var lenis = new window.Lenis({lerp:.11, smoothWheel:true});
+    function raf(ts){ lenis.raf(ts); requestAnimationFrame(raf); }
+    requestAnimationFrame(raf);
+    lenis.on('scroll', onScroll);
+    $$('a[href^="#"]').forEach(function(a){ a.addEventListener('click', function(e){
+      var id = a.getAttribute('href'); if (id.length < 2) return; var tg = $(id); if (!tg) return;
+      e.preventDefault(); lenis.scrollTo(tg, {offset: id==='#top'?0:-60});
+    }); });
+  }catch(e){}
+}
+
+/* ---------------- старт ---------------- */
+var st = store('nivel-lang'); if (st === 'uz') lang = 'uz';
+if (window.NIVEL_FORCE_T !== undefined) forced = window.NIVEL_FORCE_T;
+applyLang(lang);
+renderCfg(); cfgReady = true;
+if (reduce || store('nivel-static') === '1' || window.NIVEL_STATIC) setStatic(true); else onScroll();
+window.addEventListener('load', initLenis);
+if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(function(){ setupStamps(scene); renderAll(); if (staticMode) buildStatic(); });
+})();
+</script>
+</body>
+</html>
