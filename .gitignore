@@ -8,3 +8,10 @@ dist/
 .DS_Store
 __pycache__/
 *.pyc
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.data/
+next-env.d.ts
+.pnpm-store/

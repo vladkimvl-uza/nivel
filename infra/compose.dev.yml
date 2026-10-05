@@ -1,0 +1,49 @@
+# Local development cluster. Always run with the project name:
+#   docker compose -p nivel-dev --env-file .env.local -f infra/compose.dev.yml up -d
+name: nivel-dev
+
+x-pg-env: &pg-env
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run pnpm env:init}
+  NIVEL_MIGRATOR_PASSWORD: ${NIVEL_MIGRATOR_PASSWORD:?}
+  NIVEL_WEB_PASSWORD: ${NIVEL_WEB_PASSWORD:?}
+  NIVEL_ADMIN_PASSWORD: ${NIVEL_ADMIN_PASSWORD:?}
+  NIVEL_BOT_PASSWORD: ${NIVEL_BOT_PASSWORD:?}
+  NIVEL_WORKER_PASSWORD: ${NIVEL_WORKER_PASSWORD:?}
+  NIVEL_UMAMI_PASSWORD: ${NIVEL_UMAMI_PASSWORD:?}
+
+services:
+  postgres:
+    image: postgres:18.6-trixie
+    container_name: nivel-dev-pg
+    environment: *pg-env
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - nivel-dev-pgdata:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nivel"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  umami:
+    profiles: ["analytics"]
+    image: ghcr.io/umami-software/umami:3.4.0
+    container_name: nivel-dev-umami
+    environment:
+      DATABASE_URL: postgresql://nivel_umami:${NIVEL_UMAMI_PASSWORD:?}@postgres:5432/nivel_umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?}
+    ports:
+      - "127.0.0.1:3110:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 320m
+    restart: unless-stopped
+
+volumes:
+  nivel-dev-pgdata:
+    name: nivel-dev-pgdata

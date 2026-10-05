@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/config" },
+    { "path": "packages/domain" },
+    { "path": "packages/contracts" },
+    { "path": "packages/db" },
+    { "path": "packages/services" },
+    { "path": "packages/i18n" },
+    { "path": "packages/ui" },
+    { "path": "packages/pdf" },
+    { "path": "packages/ai" },
+    { "path": "packages/telegram" },
+    { "path": "packages/testing" }
+  ]
+}

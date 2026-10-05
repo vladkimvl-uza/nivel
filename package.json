@@ -1,0 +1,58 @@
+{
+  "name": "nivel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "download"
+    },
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.9.1",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=24.21"
+  },
+  "scripts": {
+    "env:init": "node tools/init-env.mjs",
+    "dev": "node tools/check-ports.mjs && pnpm -r --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r --filter \"./apps/*\" build",
+    "infra:dev:up": "docker compose -p nivel-dev --env-file .env.local -f infra/compose.dev.yml up -d --wait",
+    "infra:dev:down": "docker compose -p nivel-dev --env-file .env.local -f infra/compose.dev.yml down",
+    "infra:test:up": "docker compose -p nivel-test --env-file .env.local -f infra/compose.test.yml up -d --wait",
+    "infra:test:down": "docker compose -p nivel-test --env-file .env.local -f infra/compose.test.yml down",
+    "db:generate": "pnpm --filter @nivel/db run generate",
+    "db:migrate": "pnpm --filter @nivel/db run migrate",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc -b && pnpm -r --filter \"./apps/*\" run typecheck",
+    "test": "vitest run --project unit --project tools",
+    "test:int": "vitest run --project integration",
+    "e2e": "node tools/e2e.mjs",
+    "check:node": "node tools/check-node.mjs",
+    "check:deps": "node tools/check-deps.mjs",
+    "check:ownership": "node tools/check-ownership.mjs",
+    "check:antilist": "node tools/check-antilist.mjs",
+    "check:uz-text": "node tools/check-uz-text.mjs",
+    "check:messages": "node tools/check-messages.mjs",
+    "check:ports": "node tools/check-ports.mjs",
+    "check:bundle-budget": "node tools/check-bundle-budget.mjs",
+    "check:demo": "node tools/check-demo.mjs",
+    "gitleaks": "docker compose -p nivel-test --env-file .env.local -f infra/compose.test.yml --profile tools run --rm gitleaks",
+    "ci:local": "node tools/ci-local.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

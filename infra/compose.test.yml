@@ -1,0 +1,45 @@
+# Throwaway test cluster: data in tmpfs, fsync off. Always run with the project name:
+#   docker compose -p nivel-test --env-file .env.local -f infra/compose.test.yml up -d
+name: nivel-test
+
+services:
+  postgres:
+    image: postgres:18.6-trixie
+    container_name: nivel-test-pg
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run pnpm env:init}
+      NIVEL_MIGRATOR_PASSWORD: ${NIVEL_MIGRATOR_PASSWORD:?}
+      NIVEL_WEB_PASSWORD: ${NIVEL_WEB_PASSWORD:?}
+      NIVEL_ADMIN_PASSWORD: ${NIVEL_ADMIN_PASSWORD:?}
+      NIVEL_BOT_PASSWORD: ${NIVEL_BOT_PASSWORD:?}
+      NIVEL_WORKER_PASSWORD: ${NIVEL_WORKER_PASSWORD:?}
+      NIVEL_UMAMI_PASSWORD: ${NIVEL_UMAMI_PASSWORD:?}
+    ports:
+      - "127.0.0.1:54339:5432"
+    tmpfs:
+      - /var/lib/postgresql:size=256m
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nivel"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Secret scan without network (pnpm gitleaks, step of pnpm ci:local).
+  gitleaks:
+    profiles: ["tools"]
+    image: zricethezav/gitleaks:v8.30.1
+    network_mode: none
+    working_dir: /repo
+    environment:
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: "*"
+    volumes:
+      - ..:/repo:ro
+    command: ["git", "/repo", "--no-banner", "--redact", "--log-level", "warn"]
+    mem_limit: 512m

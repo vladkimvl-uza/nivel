@@ -1,0 +1,67 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Exact versions only (ARCHITECTURE 1.1). Package agents never bump a version themselves:
+# a request goes to the integrator, who edits this file and pnpm-lock.yaml.
+catalog:
+  # language, lint, tests
+  typescript: 6.0.3
+  "@biomejs/biome": 2.5.15
+  "@types/node": 24.19.1
+  vitest: 5.0.3
+  "@vitest/coverage-v8": 5.0.3
+  fast-check: 4.10.2
+  msw: 3.0.2
+  "@playwright/test": 1.63.0
+  # web and admin
+  next: 16.3.8
+  react: 19.3.0
+  react-dom: 19.3.0
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
+  next-intl: 4.14.9
+  use-intl: 4.14.9
+  tailwindcss: 4.3.3
+  "@tailwindcss/postcss": 4.3.3
+  # data
+  drizzle-orm: 0.45.3
+  drizzle-kit: 0.31.11
+  pg: 8.23.1
+  "@types/pg": 8.23.1
+  pg-boss: 12.36.0
+  zod: 4.6.5
+  # bot and mini app
+  grammy: 1.46.0
+  "@grammyjs/runner": 2.0.3
+  "@grammyjs/auto-retry": 2.0.2
+  "@tma.js/sdk-react": 3.0.23
+  jose: 6.2.12
+  # ai, documents, files
+  "@anthropic-ai/sdk": 0.131.0
+  "@react-pdf/renderer": 4.9.0
+  qrcode: 1.5.4
+  csv-parse: 7.0.3
+  exceljs: 4.4.0
+  sharp: 0.35.5
+  # auth, codes, limits, logs
+  "@node-rs/argon2": 2.2.1
+  "@oslojs/otp": 1.1.0
+  nanoid: 6.0.1
+  rate-limiter-flexible: 11.2.1
+  pino: 10.4.0
+  # motion and 3D (not wired before R2 / version 2)
+  gsap: 3.15.0
+  lenis: 1.3.26
+  three: 0.186.1
+  "@react-three/fiber": 9.8.1
+  "@react-three/drei": 10.7.9
+
+# Supply chain (ARCHITECTURE 1.3, 10.1 A03).
+# pnpm 11+ replaced onlyBuiltDependencies with allowBuilds (see docs/arch/ADR-003).
+allowBuilds:
+  sharp: true
+  "@node-rs/argon2": true
+minimumReleaseAge: 4320
+minimumReleaseAgeExclude:
+  - next
