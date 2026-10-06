@@ -202,7 +202,7 @@ pnpm ci:local                        # full local CI
 
 - Выпуск: R0, фаза 1. Владеет: `packages/i18n/**` (кроме чужих пространств имён), `messages/{uz,ru,meta}/common.json`, `tools/i18n-export.mjs`, `tools/i18n-import.mjs`, `tools/uz-new-latin.mjs`, `tools/check-uz-text.mjs`, `tools/check-messages.mjs`, `content.glossary` (сид 116 терминов).
 - Зависит от: WP-00, WP-02 (`normalizeUz`). Контракты: `getMessages(locale, ns)`, `createNodeTranslator(locale, ns)` для бота и PDF, `formatSum`, `formatDate`, `formatTime`.
-- Приёмка: одинаковые ключи uz/ru; апострофы; плейсхолдеры ICU совпадают; лимиты из `meta`; `formatSum(12500000, "uz")` → `12 500 000 soʻm`; выгрузка XLSX и обратная загрузка без потерь; переводчик получает файл к 13.10 (Р-25).
+- Приёмка: одинаковые ключи uz/ru; апострофы; плейсхолдеры ICU совпадают (числовой аргумент — по ADR-005); лимиты из `meta`; `formatSum(12500000, "uz")` → `12 500 000 soʻm`; выгрузка XLSX и обратная загрузка без потерь; переводчик получает файл к 13.10 (Р-25).
 - Тесты: vitest; круговой тест XLSX.
 
 ### WP-09. Дизайн-токены, темы, шрифты, примитивы

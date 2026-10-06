@@ -270,7 +270,8 @@ describe("EstimateRow and EstimateTable", () => {
     const t0 = performance.now();
     const html = render(h(EstimateTable, { caption: "Большая смета", labels }, rows));
     expect(html.match(/<tr class="nv-est__row/g)).toHaveLength(10_000);
-    expect(performance.now() - t0).toBeLessThan(5000);
+    // Guards against quadratic rendering; generous because CI shares the machine with other runs.
+    expect(performance.now() - t0).toBeLessThan(15_000);
   });
 });
 

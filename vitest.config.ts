@@ -16,6 +16,8 @@ export default defineConfig({
           include: ["packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.ts"],
           exclude: ["**/*.int.test.ts", "**/node_modules/**"],
           setupFiles: ["packages/testing/src/setup-unit.ts"],
+          // Several worktrees run tests at once on one machine: the 5 s default broke heavy tests under load.
+          testTimeout: 20_000,
         },
       },
       {

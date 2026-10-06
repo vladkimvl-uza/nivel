@@ -85,6 +85,7 @@
 
 - `packages/i18n/src/**`
 - `packages/i18n/messages/{uz,ru,meta}/common.json`
+- `packages/i18n/messages/{uz,ru,meta}/quote.json` (ключи предупреждений `computeQuote`; добавлено интегратором 06.10.2026)
 - `packages/db/seed/glossary/**`
 - `tools/{i18n-export,i18n-import,uz-new-latin,check-uz-text,check-messages}.mjs`
 - `tools/__tests__/{check-uz-text,check-messages}.test.mjs`

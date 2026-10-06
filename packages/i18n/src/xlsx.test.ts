@@ -152,7 +152,8 @@ describe("writeXlsx / readXlsx", () => {
     const out = readXlsx(writeXlsx([sheet("Big", rows)]));
     expect(out[0]?.rows).toHaveLength(10_000);
     expect(out[0]?.rows[9999]).toEqual(["common", "key.9999", "Matn 9999 oʻ", 9999]);
-    expect(Date.now() - started).toBeLessThan(5000);
+    // Guards against quadratic parsing; generous because CI shares the machine with other runs.
+    expect(Date.now() - started).toBeLessThan(15_000);
   });
 
   it("is deterministic (same bytes on every export)", () => {
