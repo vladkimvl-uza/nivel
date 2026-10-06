@@ -1,4 +1,3 @@
-import { createElement, type ReactElement } from "react";
 import { themeTokens } from "../themes/tokens.ts";
 import { DAY_FROM_HOUR, DAY_TO_HOUR, THEME_STORAGE_KEY } from "./select.ts";
 
@@ -23,13 +22,4 @@ export function themeInitScript(): string {
     `m.setAttribute("content",t==="night"?${JSON.stringify(night.themeColor)}:${JSON.stringify(day.themeColor)});`,
     "})();",
   ].join("");
-}
-
-/** `<script>` with the code above; pass the CSP nonce of the request when the page has one. */
-export function ThemeInitScript({ nonce }: { nonce?: string | undefined }): ReactElement {
-  return createElement("script", {
-    ...(nonce === undefined ? {} : { nonce }),
-    // The text is built from constants of this package only, nothing from the request.
-    dangerouslySetInnerHTML: { __html: themeInitScript() },
-  });
 }

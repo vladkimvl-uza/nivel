@@ -1,18 +1,16 @@
-// Design system "Night and day" (decision R-18): tokens, two themes, fonts, primitives. Owner: WP-09
+// Design system "Night and day" (decision R-18): tokens, two themes, fonts. Owner: WP-09
 // (docs/design/day-night/DESIGN_SYSTEM.md is the source of the values).
+//
+// This is the CORE entry: plain .ts files, no react, no JSX. It loads in plain Node (`node src/main.ts` of the
+// worker and bot, the PDF renderer takes brand colors and TTF names here) and in the browser alike.
+// React parts (primitives, ThemeProvider, ThemeToggle, ThemeInitScript) are the second entry, `./react.ts`
+// (package path `@nivel/ui/react`); a test loads this file in a clean Node and checks the split.
 //
 // Styles are CSS, imported once by the app: `src/styles/index.css` (themes, @font-face, base, primitives).
 // The theme is switched by `<html data-theme="day|night">`; components never know it.
 export { fontFaceCss, fontFaces, fontFile, fontLicenses, legacyFontFiles, requiredGlyphs } from "./fonts/catalog.ts";
 export { formatAmount, formatBp, MINUS, NBSP } from "./format/format.ts";
-export { Badge, type BadgeKind, badgeKinds, Tag } from "./primitives/Badge.tsx";
-export { Button, type ButtonProps, Mark } from "./primitives/Button.tsx";
-export { type EstimateLabels, EstimateRow, EstimateTable } from "./primitives/Estimate.tsx";
-export { Select, type SelectOption, type SelectProps, TextField, type TextFieldProps } from "./primitives/Field.tsx";
-export { Money } from "./primitives/Money.tsx";
-export { Paper } from "./primitives/Paper.tsx";
-export { INK_FILTER_ID, RoundStamp, Stamp, StampInkDefs } from "./primitives/Stamp.tsx";
-export { type SumKind, type SumLine, SumsTable } from "./primitives/SumsTable.tsx";
+export { type BadgeKind, badgeKinds } from "./primitives/kinds.ts";
 export { compositeOver, contrastRatio, parseColor, relativeLuminance } from "./themes/contrast.ts";
 export { sceneLight } from "./themes/scene-light.ts";
 export { buildThemesCss, cssVarName } from "./themes/to-css.ts";
@@ -27,7 +25,7 @@ export {
   type ThemeControllerDeps,
 } from "./theming/controller.ts";
 export { defaultTheme, isTheme, type Theme, themes } from "./theming/ids.ts";
-export { ThemeInitScript, themeInitScript } from "./theming/init-script.ts";
+export { themeInitScript } from "./theming/init-script.ts";
 export {
   DAY_FROM_HOUR,
   DAY_TO_HOUR,
@@ -39,6 +37,4 @@ export {
   themeByLocalTime,
   themeFromSearch,
 } from "./theming/select.ts";
-export { type ThemeContextValue, ThemeProvider, useTheme } from "./theming/ThemeProvider.tsx";
-export { ThemeToggle, type ThemeToggleLabels, ThemeToggleView } from "./theming/ThemeToggle.tsx";
 export { font, motion, radius, space } from "./tokens.ts";

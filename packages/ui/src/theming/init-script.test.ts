@@ -4,7 +4,8 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "../test-support/render.ts";
 import { themeTokens } from "../themes/tokens.ts";
-import { ThemeInitScript, themeInitScript } from "./init-script.ts";
+import { ThemeInitScript } from "./InitScript.ts";
+import { themeInitScript } from "./init-script.ts";
 import { resolveTheme } from "./select.ts";
 
 interface Page {

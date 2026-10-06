@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
 import { assertText, cx } from "./cx.ts";
+import { type BadgeKind, badgeKinds } from "./kinds.ts";
 
 /**
  * The marks of honesty (DESIGN_SYSTEM 3.6, 7.8): `demo` for demo data, `draft` for an unconfirmed document,
  * `visualization` for the 3D scene and drawings, `sample` for example documents.
  */
-export const badgeKinds = ["demo", "draft", "visualization", "sample"] as const;
-export type BadgeKind = (typeof badgeKinds)[number];
-
 /**
  * A plaque with a required kind and a required label. The words (uz/ru) come from the caller; there is no default,
  * so a mark cannot be left out or left untranslated, and an empty one is refused.
