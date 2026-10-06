@@ -1,0 +1,1594 @@
+// An in-memory imitation of the parts of Google Apps Script that the CRM uses: SpreadsheetApp (sheets, ranges, formats,
+// colours, widths, validations, rules, charts, protections, bandings, named ranges), Charts, Utilities, PropertiesService,
+// LockService, CacheService, ScriptApp, UrlFetchApp, MailApp, DriveApp, ContentService, HtmlService and Session.
+// It records what the script does, so tests and the preview can read the result. Formulas are stored, not evaluated.
+import crypto from "node:crypto";
+import vm from "node:vm";
+
+const MAX_ROWS = 1000;
+const MAX_COLS = 26;
+
+export function colToLetter(n) {
+  let s = "";
+  let x = n;
+  while (x > 0) {
+    const m = (x - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    x = Math.floor((x - 1) / 26);
+  }
+  return s;
+}
+
+export function letterToCol(s) {
+  let n = 0;
+  for (const ch of s.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n;
+}
+
+/** Parses an A1 reference ("B2", "B2:D9", "A:A", "A6:A", "3:5") against the size of the sheet. */
+export function parseA1(a1, maxRows, maxCols) {
+  const clean = a1.replace(/\$/g, "");
+  const parts = clean.split(":");
+  const one = (p, isEnd, other) => {
+    const m = /^([A-Za-z]*)(\d*)$/.exec(p);
+    if (!m) throw new Error(`Bad A1 reference: ${a1}`);
+    return { col: m[1] ? letterToCol(m[1]) : 0, row: m[2] ? Number(m[2]) : 0, isEnd, other };
+  };
+  const a = one(parts[0]);
+  const b = parts[1] ? one(parts[1]) : { ...a };
+  const r1 = a.row || 1;
+  const c1 = a.col || 1;
+  const r2 = b.row || (parts[1] ? maxRows : r1);
+  const c2 = b.col || (parts[1] ? maxCols : c1);
+  return { row: r1, col: c1, numRows: r2 - r1 + 1, numCols: c2 - c1 + 1 };
+}
+
+const key = (r, c) => `${r},${c}`;
+
+class DataValidationBuilder {
+  constructor() {
+    this._p = { allowInvalid: true, dropdown: true };
+  }
+  requireValueInList(list, dropdown = true) {
+    this._p.type = "list";
+    this._p.list = list;
+    this._p.dropdown = dropdown;
+    return this;
+  }
+  requireValueInRange(range, dropdown = true) {
+    this._p.type = "range";
+    this._p.range = range.getA1Notation ? range.getA1Notation() : String(range);
+    this._p.rangeSheet = range.getSheet ? range.getSheet().getName() : "";
+    this._p.dropdown = dropdown;
+    return this;
+  }
+  requireCheckbox() {
+    this._p.type = "checkbox";
+    return this;
+  }
+  requireNumberGreaterThanOrEqualTo(n) {
+    this._p.type = "number>=";
+    this._p.n = n;
+    return this;
+  }
+  requireNumberGreaterThan(n) {
+    this._p.type = "number>";
+    this._p.n = n;
+    return this;
+  }
+  requireNumberBetween(a, b) {
+    this._p.type = "numberBetween";
+    this._p.n = [a, b];
+    return this;
+  }
+  requireDate() {
+    this._p.type = "date";
+    return this;
+  }
+  requireDateOnOrAfter(d) {
+    this._p.type = "date>=";
+    this._p.n = d;
+    return this;
+  }
+  requireFormulaSatisfied(f) {
+    this._p.type = "formula";
+    this._p.formula = f;
+    return this;
+  }
+  requireTextMatchesPattern() {
+    throw new Error("not in Apps Script");
+  }
+  setAllowInvalid(b) {
+    this._p.allowInvalid = b;
+    return this;
+  }
+  setHelpText(t) {
+    this._p.help = t;
+    return this;
+  }
+  build() {
+    return { ...this._p, getCriteriaType: () => this._p.type, getAllowInvalid: () => this._p.allowInvalid };
+  }
+}
+
+class CfBuilder {
+  constructor() {
+    this._p = { ranges: [] };
+  }
+  whenFormulaSatisfied(f) {
+    this._p.formula = f;
+    return this;
+  }
+  whenTextEqualTo(t) {
+    this._p.formula = `text=${t}`;
+    return this;
+  }
+  setRanges(r) {
+    this._p.ranges = r;
+    return this;
+  }
+  setBackground(c) {
+    this._p.background = c;
+    return this;
+  }
+  setFontColor(c) {
+    this._p.fontColor = c;
+    return this;
+  }
+  setBold(b) {
+    this._p.bold = b;
+    return this;
+  }
+  setItalic(b) {
+    this._p.italic = b;
+    return this;
+  }
+  setStrikethrough(b) {
+    this._p.strike = b;
+    return this;
+  }
+  build() {
+    const p = this._p;
+    return {
+      ...p,
+      getRanges: () => p.ranges,
+      getBooleanCondition: () => ({ getCriteriaType: () => "CUSTOM_FORMULA", getCriteriaValues: () => [p.formula] }),
+    };
+  }
+}
+
+class TextStyleBuilder {
+  constructor() {
+    this._p = {};
+  }
+  setForegroundColor(c) {
+    this._p.color = c;
+    return this;
+  }
+  setFontSize(n) {
+    this._p.size = n;
+    return this;
+  }
+  setBold(b) {
+    this._p.bold = b;
+    return this;
+  }
+  setFontFamily(f) {
+    this._p.family = f;
+    return this;
+  }
+  build() {
+    return { ...this._p };
+  }
+}
+
+class RichTextBuilder {
+  constructor() {
+    this._p = { runs: [], text: "" };
+  }
+  setText(t) {
+    this._p.text = t;
+    return this;
+  }
+  setTextStyle(a, b, style) {
+    this._p.runs.push({ start: a, end: b, style });
+    return this;
+  }
+  build() {
+    const p = this._p;
+    return { getText: () => p.text, runs: p.runs, isRich: true };
+  }
+}
+
+class Range {
+  constructor(sheet, row, col, numRows, numCols) {
+    this.sheet = sheet;
+    this.row = row;
+    this.col = col;
+    this.numRows = numRows;
+    this.numCols = numCols;
+  }
+  getSheet() {
+    return this.sheet;
+  }
+  getCell(r, c) {
+    return new Range(this.sheet, this.row + r - 1, this.col + c - 1, 1, 1);
+  }
+  getRow() {
+    return this.row;
+  }
+  getColumn() {
+    return this.col;
+  }
+  getLastRow() {
+    return this.row + this.numRows - 1;
+  }
+  getLastColumn() {
+    return this.col + this.numCols - 1;
+  }
+  getNumRows() {
+    return this.numRows;
+  }
+  getNumColumns() {
+    return this.numCols;
+  }
+  getA1Notation() {
+    const a = colToLetter(this.col) + this.row;
+    if (this.numRows === 1 && this.numCols === 1) return a;
+    return `${a}:${colToLetter(this.getLastColumn())}${this.getLastRow()}`;
+  }
+  _each(fn) {
+    for (let r = 0; r < this.numRows; r++) for (let c = 0; c < this.numCols; c++) fn(this.row + r, this.col + c, r, c);
+  }
+  _cell(r, c) {
+    return this.sheet._cell(r, c);
+  }
+  _set(prop, value) {
+    this._each((r, c) => {
+      this._cell(r, c)[prop] = value;
+    });
+    return this;
+  }
+  _setMatrix(prop, matrix) {
+    if (!Array.isArray(matrix) || matrix.length !== this.numRows) {
+      throw new Error(
+        `${prop}: expected ${this.numRows} rows, got ${Array.isArray(matrix) ? matrix.length : typeof matrix}`,
+      );
+    }
+    this._each((r, c, i, j) => {
+      if (!Array.isArray(matrix[i]) || matrix[i].length !== this.numCols) {
+        throw new Error(`${prop}: expected ${this.numCols} columns in row ${i}`);
+      }
+      this._cell(r, c)[prop] = matrix[i][j];
+    });
+    return this;
+  }
+  getValues() {
+    const out = [];
+    for (let r = 0; r < this.numRows; r++) {
+      const row = [];
+      for (let c = 0; c < this.numCols; c++) {
+        const cell = this.sheet.cells.get(key(this.row + r, this.col + c));
+        row.push(cell && cell.v !== undefined ? cell.v : "");
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  getValue() {
+    return this.getValues()[0][0];
+  }
+  getDisplayValues() {
+    return this.getValues().map((r) =>
+      r.map((v) => (Object.prototype.toString.call(v) === "[object Date]" ? v.toISOString() : String(v))),
+    );
+  }
+  getFormulas() {
+    const out = [];
+    for (let r = 0; r < this.numRows; r++) {
+      const row = [];
+      for (let c = 0; c < this.numCols; c++) {
+        const cell = this.sheet.cells.get(key(this.row + r, this.col + c));
+        row.push(cell?.f ? cell.f : "");
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  getFormula() {
+    return this.getFormulas()[0][0];
+  }
+  setValues(matrix) {
+    if (!Array.isArray(matrix) || matrix.length !== this.numRows) {
+      throw new Error(
+        `setValues: expected ${this.numRows} rows, got ${Array.isArray(matrix) ? matrix.length : typeof matrix} in ${this.getA1Notation()}`,
+      );
+    }
+    this._each((r, c, i, j) => {
+      const row = matrix[i];
+      if (!Array.isArray(row) || row.length !== this.numCols) {
+        throw new Error(`setValues: expected ${this.numCols} columns in row ${i} of ${this.getA1Notation()}`);
+      }
+      const v = row[j];
+      const cell = this._cell(r, c);
+      if (typeof v === "string" && v.startsWith("=")) {
+        cell.f = v;
+        cell.v = "";
+      } else {
+        cell.v = v === null ? "" : v;
+        delete cell.f;
+      }
+      delete cell.rich;
+    });
+    this.sheet.owner._touch(this.sheet, this);
+    return this;
+  }
+  setValue(v) {
+    this._each((r, c) => {
+      const cell = this._cell(r, c);
+      if (typeof v === "string" && v.startsWith("=")) {
+        cell.f = v;
+        cell.v = "";
+      } else {
+        cell.v = v === null ? "" : v;
+        delete cell.f;
+      }
+      delete cell.rich;
+    });
+    this.sheet.owner._touch(this.sheet, this);
+    return this;
+  }
+  setFormula(f) {
+    this._each((r, c) => {
+      const cell = this._cell(r, c);
+      cell.f = f;
+      cell.v = "";
+    });
+    return this;
+  }
+  setFormulas(m) {
+    return this.setValues(m);
+  }
+  setRichTextValue(rt) {
+    this._each((r, c) => {
+      const cell = this._cell(r, c);
+      cell.rich = rt;
+      cell.v = rt.getText();
+    });
+    return this;
+  }
+  clear() {
+    this._each((r, c) => this.sheet.cells.delete(key(r, c)));
+    return this;
+  }
+  clearContent() {
+    this._each((r, c) => {
+      const cell = this.sheet.cells.get(key(r, c));
+      if (cell) {
+        delete cell.v;
+        delete cell.f;
+        delete cell.rich;
+      }
+    });
+    return this;
+  }
+  clearFormat() {
+    this._each((r, c) => {
+      const cell = this.sheet.cells.get(key(r, c));
+      if (cell) {
+        for (const k of ["nf", "bg", "fc", "ff", "fs", "fw", "fi", "fl", "ha", "va", "wrap", "borders"]) delete cell[k];
+      }
+    });
+    return this;
+  }
+  clearDataValidations() {
+    this._each((r, c) => {
+      const cell = this.sheet.cells.get(key(r, c));
+      if (cell) delete cell.dv;
+    });
+    return this;
+  }
+  clearNote() {
+    return this._set("note", undefined);
+  }
+  setNumberFormat(f) {
+    return this._set("nf", f);
+  }
+  setNumberFormats(m) {
+    return this._setMatrix("nf", m);
+  }
+  setBackground(c) {
+    return this._set("bg", c);
+  }
+  setBackgrounds(m) {
+    return this._setMatrix("bg", m);
+  }
+  setFontColor(c) {
+    return this._set("fc", c);
+  }
+  setFontColors(m) {
+    return this._setMatrix("fc", m);
+  }
+  setFontFamily(f) {
+    return this._set("ff", f);
+  }
+  setFontSize(n) {
+    return this._set("fs", n);
+  }
+  setFontWeight(w) {
+    return this._set("fw", w);
+  }
+  setFontWeights(m) {
+    return this._setMatrix("fw", m);
+  }
+  setFontStyle(s) {
+    return this._set("fi", s);
+  }
+  setFontLine(l) {
+    return this._set("fl", l);
+  }
+  setHorizontalAlignment(a) {
+    return this._set("ha", a);
+  }
+  setVerticalAlignment(a) {
+    return this._set("va", a);
+  }
+  setWrap(b) {
+    return this._set("wrap", b);
+  }
+  setWrapStrategy(s) {
+    return this._set("wrap", s !== "CLIP" && s !== "OVERFLOW");
+  }
+  setNote(n) {
+    return this._set("note", n);
+  }
+  setDataValidation(rule) {
+    return this._set("dv", rule);
+  }
+  setDataValidations(m) {
+    return this._setMatrix("dv", m);
+  }
+  insertCheckboxes() {
+    this._each((r, c) => {
+      const cell = this._cell(r, c);
+      cell.dv = { type: "checkbox" };
+      if (cell.v === undefined || cell.v === "") cell.v = false;
+    });
+    return this;
+  }
+  setBorder(top, left, bottom, right, vertical, horizontal, color, style) {
+    const b = { top, left, bottom, right, vertical, horizontal, color, style };
+    this._each((r, c, i, j) => {
+      const cell = this._cell(r, c);
+      cell.borders = cell.borders || {};
+      const edges = [];
+      if (top && i === 0) edges.push("top");
+      if (bottom && i === this.numRows - 1) edges.push("bottom");
+      if (left && j === 0) edges.push("left");
+      if (right && j === this.numCols - 1) edges.push("right");
+      if (horizontal && i > 0) edges.push("top");
+      if (horizontal && i < this.numRows - 1) edges.push("bottom");
+      if (vertical && j > 0) edges.push("left");
+      if (vertical && j < this.numCols - 1) edges.push("right");
+      if (top === false && i === 0) delete cell.borders.top;
+      if (bottom === false && i === this.numRows - 1) delete cell.borders.bottom;
+      for (const e of edges) cell.borders[e] = { color: b.color, style: b.style };
+      if (top === null || bottom === null || left === null || right === null) {
+        // null leaves the edge as it is
+      }
+    });
+    return this;
+  }
+  merge() {
+    const m = { row: this.row, col: this.col, numRows: this.numRows, numCols: this.numCols };
+    if (
+      !this.sheet.merges.some(
+        (x) => x.row === m.row && x.col === m.col && x.numRows === m.numRows && x.numCols === m.numCols,
+      )
+    ) {
+      this.sheet.merges.push(m);
+    }
+    return this;
+  }
+  mergeAcross() {
+    for (let r = 0; r < this.numRows; r++)
+      this.sheet.merges.push({ row: this.row + r, col: this.col, numRows: 1, numCols: this.numCols });
+    return this;
+  }
+  breakApart() {
+    this.sheet.merges = this.sheet.merges.filter((m) => !(m.row === this.row && m.col === this.col));
+    return this;
+  }
+  protect() {
+    const p = {
+      range: this,
+      description: "",
+      warningOnly: false,
+      type: "RANGE",
+      setDescription(d) {
+        p.description = d;
+        return p;
+      },
+      setWarningOnly(b) {
+        p.warningOnly = b;
+        return p;
+      },
+      remove() {
+        p.sheet.protections = p.sheet.protections.filter((x) => x !== p);
+      },
+      getRange() {
+        return p.range;
+      },
+      getDescription() {
+        return p.description;
+      },
+      isWarningOnly() {
+        return p.warningOnly;
+      },
+      getProtectionType() {
+        return "RANGE";
+      },
+      sheet: this.sheet,
+    };
+    this.sheet.protections.push(p);
+    return p;
+  }
+  applyRowBanding(theme, showHeader, showFooter) {
+    const sheet = this.sheet;
+    const b = {
+      range: this,
+      theme,
+      showHeader,
+      showFooter,
+      first: null,
+      second: null,
+      header: null,
+      setFirstRowColor(c) {
+        b.first = c;
+        return b;
+      },
+      setSecondRowColor(c) {
+        b.second = c;
+        return b;
+      },
+      setHeaderRowColor(c) {
+        b.header = c;
+        return b;
+      },
+      setFooterRowColor() {
+        return b;
+      },
+      getRange() {
+        return b.range;
+      },
+      remove() {
+        sheet.bandings = sheet.bandings.filter((x) => x !== b);
+      },
+    };
+    sheet.bandings.push(b);
+    return b;
+  }
+  createFilter() {
+    this.sheet.filter = { range: this, remove: () => (this.sheet.filter = null), getRange: () => this };
+    return this.sheet.filter;
+  }
+  shiftColumnGroupDepth(d) {
+    for (let c = this.col; c < this.col + this.numCols; c++) {
+      this.sheet.colGroups.set(c, (this.sheet.colGroups.get(c) || 0) + d);
+    }
+    return this;
+  }
+  collapseGroups() {
+    for (let c = this.col; c < this.col + this.numCols; c++) this.sheet.collapsedCols.add(c);
+    return this;
+  }
+  activate() {
+    this.sheet.owner.activeSheet = this.sheet;
+    return this;
+  }
+  getRichTextValue() {
+    const cell = this.sheet.cells.get(key(this.row, this.col));
+    return cell ? cell.rich || null : null;
+  }
+  setTextStyle(ts) {
+    this._each((r, c) => {
+      const cell = this._cell(r, c);
+      if (ts.color) cell.fc = ts.color;
+      if (ts.size) cell.fs = ts.size;
+      if (ts.bold !== undefined) cell.fw = ts.bold ? "bold" : "normal";
+      if (ts.family) cell.ff = ts.family;
+    });
+    return this;
+  }
+  copyTo() {
+    return this;
+  }
+  sort() {
+    return this;
+  }
+  createTextFinder(text) {
+    const self = this;
+    const state = { entire: false };
+    const f = {
+      matchEntireCell(b) {
+        state.entire = b;
+        return f;
+      },
+      matchCase() {
+        return f;
+      },
+      findNext() {
+        let hit = null;
+        self._each((r, c) => {
+          if (hit) return;
+          const cell = self.sheet.cells.get(key(r, c));
+          const v = cell ? String(cell.v ?? "") : "";
+          if (state.entire ? v === text : v.includes(text)) hit = new Range(self.sheet, r, c, 1, 1);
+        });
+        return hit;
+      },
+    };
+    return f;
+  }
+}
+
+class Sheet {
+  constructor(owner, id, name) {
+    this.owner = owner;
+    this.id = id;
+    this.name = name;
+    this.cells = new Map();
+    this.maxRows = MAX_ROWS;
+    this.maxCols = MAX_COLS;
+    this.colW = new Map();
+    this.rowH = new Map();
+    this.hiddenCols = new Set();
+    this.hiddenRows = new Set();
+    this.frozenRows = 0;
+    this.frozenCols = 0;
+    this.hiddenGrid = false;
+    this.tabColor = null;
+    this.hidden = false;
+    this.merges = [];
+    this.cf = [];
+    this.protections = [];
+    this.charts = [];
+    this.images = [];
+    this.bandings = [];
+    this.filter = null;
+    this.colGroups = new Map();
+    this.collapsedCols = new Set();
+    this.sheetProtection = null;
+    this.filterViews = [];
+  }
+  _cell(r, c) {
+    if (r < 1 || c < 1) throw new Error(`Bad cell ${r},${c}`);
+    if (r > this.maxRows || c > this.maxCols) {
+      throw new Error(
+        `Range outside the grid of ${this.name}: row ${r}, column ${c} (grid ${this.maxRows}x${this.maxCols})`,
+      );
+    }
+    const k = key(r, c);
+    let cell = this.cells.get(k);
+    if (!cell) {
+      cell = {};
+      this.cells.set(k, cell);
+    }
+    return cell;
+  }
+  getName() {
+    return this.name;
+  }
+  setName(n) {
+    this.name = n;
+    return this;
+  }
+  getSheetId() {
+    return this.id;
+  }
+  getIndex() {
+    return this.owner.sheets.indexOf(this) + 1;
+  }
+  getParent() {
+    return this.owner;
+  }
+  getRange(a, b, c, d) {
+    if (typeof a === "string") {
+      const p = parseA1(a, this.maxRows, this.maxCols);
+      return new Range(this, p.row, p.col, p.numRows, p.numCols);
+    }
+    return new Range(this, a, b, c || 1, d || 1);
+  }
+  getDataRange() {
+    return new Range(this, 1, 1, Math.max(1, this.getLastRow()), Math.max(1, this.getLastColumn()));
+  }
+  getLastRow() {
+    let m = 0;
+    for (const [k, cell] of this.cells) {
+      if ((cell.v !== undefined && cell.v !== "") || cell.f) m = Math.max(m, Number(k.split(",")[0]));
+    }
+    return m;
+  }
+  getLastColumn() {
+    let m = 0;
+    for (const [k, cell] of this.cells) {
+      if ((cell.v !== undefined && cell.v !== "") || cell.f) m = Math.max(m, Number(k.split(",")[1]));
+    }
+    return m;
+  }
+  getMaxRows() {
+    return this.maxRows;
+  }
+  getMaxColumns() {
+    return this.maxCols;
+  }
+  insertRowsAfter(_after, n) {
+    this.maxRows += n;
+    return this;
+  }
+  insertColumnsAfter(_after, n) {
+    this.maxCols += n;
+    return this;
+  }
+  insertColumns(_at, n) {
+    this.maxCols += n;
+    return this;
+  }
+  deleteRows(_from, n) {
+    this.maxRows = Math.max(1, this.maxRows - n);
+    for (const k of [...this.cells.keys()]) if (Number(k.split(",")[0]) > this.maxRows) this.cells.delete(k);
+    return this;
+  }
+  deleteColumns(_from, n) {
+    this.maxCols = Math.max(1, this.maxCols - n);
+    for (const k of [...this.cells.keys()]) if (Number(k.split(",")[1]) > this.maxCols) this.cells.delete(k);
+    return this;
+  }
+  deleteRow(r) {
+    return this.deleteRows(r, 1);
+  }
+  appendRow(values) {
+    const r = this.getLastRow() + 1;
+    if (r > this.maxRows) this.maxRows = r;
+    this.getRange(r, 1, 1, values.length).setValues([values]);
+    return this;
+  }
+  setColumnWidth(c, w) {
+    this.colW.set(c, w);
+    return this;
+  }
+  setColumnWidths(c, n, w) {
+    for (let i = 0; i < n; i++) this.colW.set(c + i, w);
+    return this;
+  }
+  setRowHeight(r, h) {
+    this.rowH.set(r, h);
+    return this;
+  }
+  setRowHeights(r, n, h) {
+    for (let i = 0; i < n; i++) this.rowH.set(r + i, h);
+    return this;
+  }
+  setRowHeightsForced(r, n, h) {
+    return this.setRowHeights(r, n, h);
+  }
+  setFrozenRows(n) {
+    this.frozenRows = n;
+    return this;
+  }
+  setFrozenColumns(n) {
+    this.frozenCols = n;
+    return this;
+  }
+  getFrozenRows() {
+    return this.frozenRows;
+  }
+  getFrozenColumns() {
+    return this.frozenCols;
+  }
+  setHiddenGridlines(b) {
+    this.hiddenGrid = b;
+    return this;
+  }
+  setTabColor(c) {
+    this.tabColor = c;
+    return this;
+  }
+  getTabColor() {
+    return this.tabColor;
+  }
+  hideSheet() {
+    this.hidden = true;
+    return this;
+  }
+  showSheet() {
+    this.hidden = false;
+    return this;
+  }
+  isSheetHidden() {
+    return this.hidden;
+  }
+  hideColumns(c, n = 1) {
+    for (let i = 0; i < n; i++) this.hiddenCols.add(c + i);
+    return this;
+  }
+  showColumns(c, n = 1) {
+    for (let i = 0; i < n; i++) this.hiddenCols.delete(c + i);
+    return this;
+  }
+  hideRows(r, n = 1) {
+    for (let i = 0; i < n; i++) this.hiddenRows.add(r + i);
+    return this;
+  }
+  isColumnHiddenByUser(c) {
+    return this.hiddenCols.has(c);
+  }
+  getConditionalFormatRules() {
+    return [...this.cf];
+  }
+  setConditionalFormatRules(rules) {
+    this.cf = [...rules];
+    return this;
+  }
+  getProtections(type) {
+    if (type === "SHEET") return this.sheetProtection ? [this.sheetProtection] : [];
+    return [...this.protections];
+  }
+  protect() {
+    const p = {
+      type: "SHEET",
+      warningOnly: false,
+      description: "",
+      unprotected: [],
+      setDescription(d) {
+        p.description = d;
+        return p;
+      },
+      setWarningOnly(b) {
+        p.warningOnly = b;
+        return p;
+      },
+      setUnprotectedRanges(r) {
+        p.unprotected = r;
+        return p;
+      },
+      remove: () => {
+        this.sheetProtection = null;
+      },
+      getProtectionType: () => "SHEET",
+      isWarningOnly() {
+        return p.warningOnly;
+      },
+    };
+    this.sheetProtection = p;
+    return p;
+  }
+  getBandings() {
+    return [...this.bandings];
+  }
+  getCharts() {
+    return [...this.charts];
+  }
+  newChart() {
+    return new ChartBuilder(this);
+  }
+  insertChart(chart) {
+    chart.sheet = this;
+    this.charts.push(chart);
+    return this;
+  }
+  removeChart(chart) {
+    this.charts = this.charts.filter((c) => c !== chart);
+    return this;
+  }
+  updateChart(_chart) {
+    return this;
+  }
+  getFilter() {
+    return this.filter;
+  }
+  insertImage(blob, col, row, offX = 0, offY = 0) {
+    const img = {
+      blob,
+      col,
+      row,
+      offX,
+      offY,
+      width: 0,
+      height: 0,
+      setWidth(w) {
+        img.width = w;
+        return img;
+      },
+      setHeight(h) {
+        img.height = h;
+        return img;
+      },
+      remove: () => {
+        this.images = this.images.filter((x) => x !== img);
+      },
+      setAltTextTitle(t) {
+        img.title = t;
+        return img;
+      },
+      setAltTextDescription(t) {
+        img.description = t;
+        return img;
+      },
+    };
+    this.images.push(img);
+    return img;
+  }
+  getImages() {
+    return [...this.images];
+  }
+  setColumnGroupControlPosition() {
+    return this;
+  }
+  collapseAllColumnGroups() {
+    for (const c of this.colGroups.keys()) this.collapsedCols.add(c);
+    return this;
+  }
+  activate() {
+    this.owner.activeSheet = this;
+    return this;
+  }
+  clear() {
+    this.cells.clear();
+    this.merges = [];
+    this.cf = [];
+    return this;
+  }
+  clearConditionalFormatRules() {
+    this.cf = [];
+    return this;
+  }
+  createTextFinder(text) {
+    return this.getDataRange().createTextFinder(text);
+  }
+  setActiveSelection() {
+    return this;
+  }
+  autoResizeColumn() {
+    return this;
+  }
+}
+
+class ChartBuilder {
+  constructor(sheet) {
+    this.sheet = sheet;
+    this.spec = { ranges: [], options: {}, type: null, position: null };
+  }
+  setChartType(t) {
+    this.spec.type = t;
+    return this;
+  }
+  addRange(r) {
+    this.spec.ranges.push(r.getA1Notation());
+    return this;
+  }
+  setPosition(row, col, offX, offY) {
+    this.spec.position = { row, col, offX, offY };
+    return this;
+  }
+  setOption(k, v) {
+    this.spec.options[k] = v;
+    return this;
+  }
+  setNumHeaders(n) {
+    this.spec.numHeaders = n;
+    return this;
+  }
+  setTransposeRowsAndColumns(b) {
+    this.spec.transpose = b;
+    return this;
+  }
+  setMergeStrategy(m) {
+    this.spec.merge = m;
+    return this;
+  }
+  asBarChart() {
+    this.spec.type = "BAR";
+    return this;
+  }
+  build() {
+    const spec = this.spec;
+    return {
+      spec,
+      sheet: this.sheet,
+      getOptions: () => ({ get: (k) => spec.options[k] }),
+      getRanges: () => spec.ranges,
+    };
+  }
+}
+
+class Spreadsheet {
+  constructor(env, name = "Nivel CRM") {
+    this.env = env;
+    this.name = name;
+    this.sheets = [];
+    this.nextId = 100;
+    this.named = new Map();
+    this.tz = "GMT";
+    this.locale = "en_US";
+    this.themeColors = {};
+    this.themeFont = null;
+    this.activeSheet = null;
+    this.toasts = [];
+    this.id = "mock-spreadsheet-id";
+    this.touches = [];
+    this.onTouch = null;
+    this.insertSheet("Sheet1");
+  }
+  _touch(sheet, range) {
+    if (this.onTouch) this.onTouch(sheet, range);
+  }
+  getId() {
+    return this.id;
+  }
+  getName() {
+    return this.name;
+  }
+  getUrl() {
+    return `https://docs.google.com/spreadsheets/d/${this.id}/edit`;
+  }
+  getSheets() {
+    return [...this.sheets];
+  }
+  getSheetByName(n) {
+    return this.sheets.find((s) => s.name === n) || null;
+  }
+  insertSheet(name) {
+    if (name && this.getSheetByName(name)) throw new Error(`A sheet with the name "${name}" already exists`);
+    const s = new Sheet(this, this.nextId++, name || `Sheet${this.nextId}`);
+    this.sheets.push(s);
+    if (!this.activeSheet) this.activeSheet = s;
+    return s;
+  }
+  deleteSheet(s) {
+    if (this.sheets.length === 1) throw new Error("Cannot delete the only sheet");
+    this.sheets = this.sheets.filter((x) => x !== s);
+    if (this.activeSheet === s) this.activeSheet = this.sheets[0];
+  }
+  setActiveSheet(s) {
+    this.activeSheet = s;
+    return s;
+  }
+  getActiveSheet() {
+    return this.activeSheet;
+  }
+  moveActiveSheet(pos) {
+    const s = this.activeSheet;
+    this.sheets = this.sheets.filter((x) => x !== s);
+    this.sheets.splice(pos - 1, 0, s);
+  }
+  setSpreadsheetTimeZone(z) {
+    this.tz = z;
+  }
+  getSpreadsheetTimeZone() {
+    return this.tz;
+  }
+  setSpreadsheetLocale(l) {
+    this.locale = l;
+  }
+  getSpreadsheetLocale() {
+    return this.locale;
+  }
+  getNamedRanges() {
+    return [...this.named.entries()].map(([name, range]) => ({
+      getName: () => name,
+      getRange: () => range,
+      remove: () => this.named.delete(name),
+    }));
+  }
+  setNamedRange(name, range) {
+    this.named.set(name, range);
+  }
+  removeNamedRange(name) {
+    this.named.delete(name);
+  }
+  getRangeByName(name) {
+    return this.named.get(name) || null;
+  }
+  toast(msg, title, sec) {
+    this.toasts.push({ msg, title, sec });
+  }
+  getSpreadsheetTheme() {
+    const self = this;
+    return {
+      setFontFamily(f) {
+        self.themeFont = f;
+        return this;
+      },
+      getFontFamily: () => self.themeFont,
+      setConcreteColor(type, color) {
+        self.themeColors[type] = color;
+        return this;
+      },
+      getConcreteColor: (type) => ({ asRgbColor: () => ({ asHexString: () => self.themeColors[type] }) }),
+    };
+  }
+  setRecalculationInterval() {}
+  rename(n) {
+    this.name = n;
+  }
+  getBlob() {
+    return { getBytes: () => [] };
+  }
+  getDeveloperMetadata() {
+    return [];
+  }
+}
+
+class Env {
+  constructor(opts = {}) {
+    this.now = opts.now || new Date("2026-10-06T12:00:00+05:00");
+    this.ss = new Spreadsheet(this);
+    this.scriptProps = new Map(Object.entries(opts.scriptProps || {}));
+    this.docProps = new Map();
+    this.userProps = new Map();
+    this.cache = new Map();
+    this.triggers = [];
+    this.fetches = [];
+    this.fetchHandler = opts.fetchHandler || null;
+    this.mails = [];
+    this.alerts = [];
+    this.prompts = [];
+    this.alertAnswers = [];
+    this.promptAnswers = [];
+    this.userEmail = opts.userEmail || "owner@example.com";
+    this.locked = false;
+    this.lockHeldElsewhere = false;
+    this.uuidCounter = 0;
+    this.folders = new Map();
+    this.files = [];
+    this.logs = [];
+    this.sidebars = [];
+    this.menus = [];
+    this.dialogs = [];
+    this.webAppUrl = "https://script.google.com/macros/s/MOCK/exec";
+  }
+}
+
+const _hex = (buf) => Buffer.from(buf).toString("hex");
+
+function formatDate(date, tz, pattern) {
+  const offsetMin = tz === "Asia/Tashkent" ? 300 : tz === "GMT" || tz === "UTC" ? 0 : 0;
+  const d = new Date(date.getTime() + offsetMin * 60000);
+  const p = (n, w = 2) => String(n).padStart(w, "0");
+  const map = {
+    yyyy: p(d.getUTCFullYear(), 4),
+    MM: p(d.getUTCMonth() + 1),
+    dd: p(d.getUTCDate()),
+    HH: p(d.getUTCHours()),
+    mm: p(d.getUTCMinutes()),
+    ss: p(d.getUTCSeconds()),
+    SSS: p(d.getUTCMilliseconds(), 3),
+    XXX: offsetMin === 300 ? "+05:00" : "Z",
+    u: String(d.getUTCDay() === 0 ? 7 : d.getUTCDay()),
+  };
+  // Literal text in single quotes is kept as it is.
+  return pattern.replace(/'([^']*)'|yyyy|MM|dd|HH|mm|ss|SSS|XXX|u/g, (m, lit) => (lit !== undefined ? lit : map[m]));
+}
+
+/** Builds the global objects of Apps Script around one environment. */
+export function createGas(opts = {}) {
+  const env = new Env(opts);
+  const enumOf = (names) => Object.fromEntries(names.map((n) => [n, n]));
+
+  const SpreadsheetApp = {
+    getActive: () => env.ss,
+    getActiveSpreadsheet: () => env.ss,
+    openById: (id) => {
+      if (id !== env.ss.id) throw new Error(`No access to ${id}`);
+      return env.ss;
+    },
+    getUi: () => ({
+      createMenu: (title) => {
+        const menu = { title, items: [], subs: [] };
+        const api = {
+          addItem(label, fn) {
+            menu.items.push({ label, fn });
+            return api;
+          },
+          addSeparator() {
+            menu.items.push({ separator: true });
+            return api;
+          },
+          addSubMenu(sub) {
+            menu.items.push({ sub: sub._menu });
+            return api;
+          },
+          addToUi() {
+            env.menus.push(menu);
+          },
+          _menu: menu,
+        };
+        return api;
+      },
+      alert: (title, text, buttons) => {
+        env.alerts.push({ title, text, buttons });
+        return env.alertAnswers.length ? env.alertAnswers.shift() : "YES";
+      },
+      prompt: (title, text) => {
+        env.prompts.push({ title, text });
+        const a = env.promptAnswers.length ? env.promptAnswers.shift() : "";
+        return {
+          getSelectedButton: () => (a === null ? "CANCEL" : "OK"),
+          getResponseText: () => (a === null ? "" : a),
+        };
+      },
+      showSidebar: (html) => env.sidebars.push(html),
+      showModalDialog: (html, title) => env.dialogs.push({ html, title }),
+      ButtonSet: enumOf(["OK", "OK_CANCEL", "YES_NO", "YES_NO_CANCEL"]),
+      Button: enumOf(["OK", "CANCEL", "YES", "NO", "CLOSE"]),
+    }),
+    newDataValidation: () => new DataValidationBuilder(),
+    newConditionalFormatRule: () => new CfBuilder(),
+    newRichTextValue: () => new RichTextBuilder(),
+    newTextStyle: () => new TextStyleBuilder(),
+    BorderStyle: enumOf(["SOLID", "SOLID_MEDIUM", "SOLID_THICK", "DASHED", "DOTTED", "DOUBLE"]),
+    BandingTheme: enumOf([
+      "LIGHT_GREY",
+      "CYAN",
+      "GREEN",
+      "YELLOW",
+      "ORANGE",
+      "BLUE",
+      "TEAL",
+      "GREY",
+      "BROWN",
+      "LIGHT_GREEN",
+      "INDIGO",
+      "PINK",
+    ]),
+    ProtectionType: enumOf(["RANGE", "SHEET"]),
+    ThemeColorType: enumOf([
+      "TEXT",
+      "BACKGROUND",
+      "ACCENT1",
+      "ACCENT2",
+      "ACCENT3",
+      "ACCENT4",
+      "ACCENT5",
+      "ACCENT6",
+      "HYPERLINK",
+    ]),
+    WrapStrategy: enumOf(["WRAP", "OVERFLOW", "CLIP"]),
+    GroupControlTogglePosition: enumOf(["BEFORE", "AFTER"]),
+    Dimension: enumOf(["ROWS", "COLUMNS"]),
+    DataValidationCriteria: enumOf(["CHECKBOX", "VALUE_IN_LIST", "VALUE_IN_RANGE"]),
+  };
+
+  const Charts = {
+    ChartType: enumOf(["COLUMN", "BAR", "LINE", "AREA", "COMBO", "STEPPED_AREA", "SCATTER", "PIE", "TABLE"]),
+    ChartMergeStrategy: enumOf(["MERGE_ROWS", "MERGE_COLUMNS"]),
+    Position: enumOf(["TOP", "BOTTOM", "LEFT", "RIGHT", "NONE"]),
+  };
+
+  const propsApi = (map) => ({
+    getProperty: (k) => (map.has(k) ? map.get(k) : null),
+    setProperty(k, v) {
+      map.set(k, String(v));
+      return this;
+    },
+    setProperties(o, del) {
+      if (del) map.clear();
+      for (const [k, v] of Object.entries(o)) map.set(k, String(v));
+      return this;
+    },
+    deleteProperty(k) {
+      map.delete(k);
+      return this;
+    },
+    getProperties: () => Object.fromEntries(map),
+    getKeys: () => [...map.keys()],
+  });
+  const PropertiesService = {
+    getScriptProperties: () => propsApi(env.scriptProps),
+    getDocumentProperties: () => propsApi(env.docProps),
+    getUserProperties: () => propsApi(env.userProps),
+  };
+
+  const LockService = {
+    _make: () => ({
+      waitLock(_ms) {
+        if (env.lockHeldElsewhere) throw new Error("Lock timeout: another process holds the lock");
+        if (env.locked) throw new Error("Lock is already held by this execution");
+        env.locked = true;
+      },
+      tryLock(_ms) {
+        if (env.lockHeldElsewhere || env.locked) return false;
+        env.locked = true;
+        return true;
+      },
+      releaseLock() {
+        env.locked = false;
+      },
+      hasLock: () => env.locked,
+    }),
+    getDocumentLock() {
+      return this._make();
+    },
+    getScriptLock() {
+      return this._make();
+    },
+    getUserLock() {
+      return this._make();
+    },
+  };
+
+  const CacheService = {
+    getScriptCache: () => ({
+      get: (k) => (env.cache.has(k) ? env.cache.get(k) : null),
+      put: (k, v) => env.cache.set(k, String(v)),
+      remove: (k) => env.cache.delete(k),
+    }),
+    getDocumentCache: () => CacheService.getScriptCache(),
+  };
+
+  const triggerBuilder = (kind) => {
+    const t = { kind, handler: "", id: `trg-${env.triggers.length + 1}`, params: {} };
+    const api = {
+      forSpreadsheet() {
+        t.source = "spreadsheet";
+        return api;
+      },
+      onEdit() {
+        t.event = "ON_EDIT";
+        return api;
+      },
+      onOpen() {
+        t.event = "ON_OPEN";
+        return api;
+      },
+      onChange() {
+        t.event = "ON_CHANGE";
+        return api;
+      },
+      timeBased() {
+        t.event = "CLOCK";
+        return api;
+      },
+      everyHours(n) {
+        t.params.everyHours = n;
+        return api;
+      },
+      everyDays(n) {
+        t.params.everyDays = n;
+        return api;
+      },
+      everyWeeks(n) {
+        t.params.everyWeeks = n;
+        return api;
+      },
+      onWeekDay(d) {
+        t.params.weekDay = d;
+        return api;
+      },
+      onMonthDay(d) {
+        t.params.monthDay = d;
+        return api;
+      },
+      atHour(h) {
+        t.params.atHour = h;
+        return api;
+      },
+      nearMinute(m) {
+        t.params.nearMinute = m;
+        return api;
+      },
+      inTimezone(z) {
+        t.params.tz = z;
+        return api;
+      },
+      after(ms) {
+        t.params.after = ms;
+        return api;
+      },
+      create() {
+        env.triggers.push(t);
+        return {
+          getHandlerFunction: () => t.handler,
+          getUniqueId: () => t.id,
+          getEventType: () => t.event,
+        };
+      },
+    };
+    api.handler = t;
+    return api;
+  };
+  const ScriptApp = {
+    newTrigger: (fn) => {
+      const b = triggerBuilder("new");
+      b.handler.handler = fn;
+      return b;
+    },
+    getProjectTriggers: () =>
+      env.triggers.map((t) => ({
+        getHandlerFunction: () => t.handler,
+        getUniqueId: () => t.id,
+        getEventType: () => t.event,
+        _spec: t,
+      })),
+    deleteTrigger: (tr) => {
+      env.triggers = env.triggers.filter((t) => t.id !== tr.getUniqueId());
+    },
+    getService: () => ({ getUrl: () => env.webAppUrl }),
+    WeekDay: enumOf(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
+    EventType: enumOf(["ON_EDIT", "ON_OPEN", "CLOCK", "ON_CHANGE"]),
+  };
+
+  const Utilities = {
+    formatDate: (d, tz, pattern) => formatDate(d, tz, pattern),
+    computeHmacSha256Signature: (value, key) => {
+      const k = typeof key === "string" ? Buffer.from(key, "utf8") : Buffer.from(key);
+      const v = typeof value === "string" ? Buffer.from(value, "utf8") : Buffer.from(value);
+      return [...crypto.createHmac("sha256", k).update(v).digest()].map((b) => (b > 127 ? b - 256 : b));
+    },
+    computeDigest: (_alg, value) => {
+      const v = typeof value === "string" ? Buffer.from(value, "utf8") : Buffer.from(value);
+      return [...crypto.createHash("sha256").update(v).digest()].map((b) => (b > 127 ? b - 256 : b));
+    },
+    DigestAlgorithm: enumOf(["SHA_256", "MD5"]),
+    MacAlgorithm: enumOf(["HMAC_SHA_256"]),
+    base64Encode: (b) => (typeof b === "string" ? Buffer.from(b, "utf8") : Buffer.from(b)).toString("base64"),
+    base64Decode: (s) => [...Buffer.from(s, "base64")].map((b) => (b > 127 ? b - 256 : b)),
+    newBlob: (data, type, name) => ({
+      data,
+      type,
+      name,
+      getBytes: () => data,
+      getName: () => name,
+      getContentType: () => type,
+    }),
+    getUuid: () => crypto.randomUUID(),
+    sleep: () => {},
+    parseDate: (s) => new Date(s),
+    Charset: enumOf(["UTF_8"]),
+  };
+
+  const UrlFetchApp = {
+    fetch: (url, options = {}) => {
+      env.fetches.push({ url, options });
+      const res = env.fetchHandler ? env.fetchHandler(url, options) : { code: 200, body: '{"ok":true}' };
+      return {
+        getResponseCode: () => res.code,
+        getContentText: () => res.body,
+      };
+    },
+  };
+
+  const MailApp = {
+    sendEmail: (to, subject, body) => {
+      env.mails.push(typeof to === "object" ? to : { to, subject, body });
+    },
+    getRemainingDailyQuota: () => 100,
+  };
+
+  const DriveApp = {
+    getFileById: (_id) => ({
+      getName: () => "Nivel CRM",
+      makeCopy: (name, folder) => {
+        const f = {
+          name,
+          folder,
+          trashed: false,
+          created: new Date(env.now),
+          setTrashed: (b) => (f.trashed = b),
+          getName: () => name,
+          getDateCreated: () => f.created,
+        };
+        env.files.push(f);
+        if (folder?._files) folder._files.push(f);
+        return f;
+      },
+    }),
+    getFoldersByName: (name) => {
+      const f = env.folders.get(name);
+      let used = false;
+      return {
+        hasNext: () => !!f && !used,
+        next: () => {
+          used = true;
+          return f;
+        },
+      };
+    },
+    createFolder: (name) => {
+      const f = {
+        name,
+        _files: [],
+        getFiles: () => {
+          let i = 0;
+          const list = f._files.filter((x) => !x.trashed);
+          return { hasNext: () => i < list.length, next: () => list[i++] };
+        },
+        getId: () => `folder-${name}`,
+      };
+      env.folders.set(name, f);
+      return f;
+    },
+  };
+
+  const ContentService = {
+    MimeType: enumOf(["JSON", "TEXT"]),
+    createTextOutput: (text) => {
+      const out = {
+        text,
+        mime: "TEXT",
+        setMimeType: (m) => {
+          out.mime = m;
+          return out;
+        },
+        getContent: () => out.text,
+      };
+      return out;
+    },
+  };
+
+  const HtmlService = {
+    createHtmlOutput: (html) => {
+      const out = {
+        html,
+        title: "",
+        width: 0,
+        setTitle: (t) => {
+          out.title = t;
+          return out;
+        },
+        setWidth: (w) => {
+          out.width = w;
+          return out;
+        },
+        setHeight: () => out,
+        getContent: () => out.html,
+      };
+      return out;
+    },
+  };
+
+  const Session = {
+    getActiveUser: () => ({ getEmail: () => env.userEmail }),
+    getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }),
+    getScriptTimeZone: () => "Asia/Tashkent",
+  };
+
+  const Logger = { log: (...a) => env.logs.push(a.join(" ")) };
+
+  // Date is the real one, but `new Date()` without arguments follows env.now so that tests control the clock.
+  return {
+    env,
+    globals: {
+      SpreadsheetApp,
+      Charts,
+      PropertiesService,
+      LockService,
+      CacheService,
+      ScriptApp,
+      Utilities,
+      UrlFetchApp,
+      MailApp,
+      DriveApp,
+      ContentService,
+      HtmlService,
+      Session,
+      Logger,
+    },
+  };
+}
+
+/** Runs a function with `new Date()` and `Date.now()` of the given context pinned to env.now. */
+export function pinClock(ctx, env) {
+  const RealDate = vm.runInContext("Date", ctx);
+  function PinnedDate(...args) {
+    if (!new.target) return new RealDate(env.now.getTime()).toString();
+    if (args.length === 0) return new RealDate(env.now.getTime());
+    return new RealDate(...args);
+  }
+  PinnedDate.prototype = RealDate.prototype;
+  PinnedDate.now = () => env.now.getTime();
+  PinnedDate.UTC = RealDate.UTC;
+  PinnedDate.parse = RealDate.parse;
+  ctx.Date = PinnedDate;
+}
