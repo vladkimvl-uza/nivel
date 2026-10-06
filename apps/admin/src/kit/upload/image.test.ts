@@ -111,6 +111,59 @@ describe("sanitizeImage: JPEG", () => {
     expect(r.removed).toEqual(expect.arrayContaining(["exif", "xmp", "iptc", "comment", "mpf"]));
   });
 
+  it("cuts everything after the end of the picture (a Motion Photo video, a second JPEG with its own EXIF)", async () => {
+    const second = Buffer.from([0xff, 0xd8, ...segment(0xe1, exifPayload(1)), 0xff, 0xd9]);
+    const video = Buffer.from([...u16(0), ...ascii("ftypmp42SECRET-VIDEO-TAIL-41.2995N")]);
+    const original = Buffer.concat([jpegWith(JFIF), second, video]);
+    const r = await sanitizeImage(original);
+    if (!r.ok) throw new Error(r.error);
+    const text = r.data.toString("latin1");
+    expect(text).not.toContain("SECRET-GPS");
+    expect(text).not.toContain("SECRET-VIDEO-TAIL");
+    expect(r.data.subarray(-2)).toEqual(Buffer.from([0xff, 0xd9]));
+    expect(r.removed).toContain("trailer");
+    expect(r.data.indexOf(Buffer.from([0xff, 0xd8]), 2)).toBe(-1);
+  });
+
+  it("does not take the bytes FF D9 inside a table of a later scan for the end of the picture", async () => {
+    // A progressive-style file: scan, a quantisation table that holds FF D9 as two values, a second scan, EOI, junk.
+    const scan = [0xff, 0xda, 0, 8, 1, 1, 0, 0, 63, 0, 0x12, 0x34, 0xff, 0x00, 0x56];
+    const table = segment(0xdb, [0, 0xff, 0xd9, 3, 4]);
+    const comment = segment(0xfe, ascii("SECRET-COMMENT-BETWEEN-SCANS"));
+    const head = jpegWith(JFIF).subarray(0, -2);
+    const original = Buffer.concat([
+      head,
+      Buffer.from([...scan, ...table, ...comment, ...scan, 0xff, 0xd9]),
+      Buffer.from("SECRET-AFTER-EOI"),
+    ]);
+    const r = await sanitizeImage(original);
+    if (!r.ok) throw new Error(r.error);
+    const text = r.data.toString("latin1");
+    expect(text).not.toContain("SECRET-AFTER-EOI");
+    expect(text).not.toContain("SECRET-COMMENT-BETWEEN-SCANS");
+    expect(r.data.includes(Buffer.from(table))).toBe(true);
+    expect(r.data.subarray(-2)).toEqual(Buffer.from([0xff, 0xd9]));
+    expect(r.data.length).toBeGreaterThan(head.length + scan.length * 2 + table.length);
+  });
+
+  it("closes a picture that is followed by a second one without an end marker of its own", async () => {
+    const first = jpegWith(JFIF).subarray(0, -2);
+    const second = Buffer.from([0xff, 0xd8, ...segment(0xe1, exifPayload(1)), 0xff, 0xd9]);
+    const r = await sanitizeImage(Buffer.concat([first, second]));
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.toString("latin1")).not.toContain("SECRET-GPS");
+    expect(r.data.subarray(-2)).toEqual(Buffer.from([0xff, 0xd9]));
+    expect(r.removed).toContain("trailer");
+  });
+
+  it("keeps a file that has no end marker as it is (a cut-off file is not made up)", async () => {
+    const cut = jpegWith(JFIF).subarray(0, -2);
+    const r = await sanitizeImage(cut);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.removed).not.toContain("trailer");
+    expect(r.data.subarray(-4)).toEqual(cut.subarray(-4));
+  });
+
   it("keeps the orientation of a rotated phone photo and nothing else of the EXIF", async () => {
     const original = jpegWith(JFIF, segment(0xe1, exifPayload(6)));
     expect(readJpegOrientation(original)).toBe(6);

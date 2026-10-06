@@ -39,7 +39,7 @@ interface Segment {
   payload: Buffer;
 }
 
-function readSegments(buf: Buffer): { segments: Segment[]; scan: Buffer } | null {
+function readSegments(buf: Buffer): { segments: Segment[]; scanStart: number } | null {
   const segments: Segment[] = [];
   let pos = 2;
   while (pos < buf.length) {
@@ -48,7 +48,7 @@ function readSegments(buf: Buffer): { segments: Segment[]; scan: Buffer } | null
     const marker = buf[pos + 1];
     if (marker === undefined) return null;
     if (marker === 0xd9) return null; // the image ended before any scan
-    if (marker === 0xda) return { segments, scan: buf.subarray(pos) };
+    if (marker === 0xda) return { segments, scanStart: pos };
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
       segments.push({ marker, bytes: buf.subarray(pos, pos + 2), payload: Buffer.alloc(0) });
       pos += 2;
@@ -65,6 +65,65 @@ function readSegments(buf: Buffer): { segments: Segment[]; scan: Buffer } | null
     pos += 2 + length;
   }
   return null;
+}
+
+/**
+ * The picture data from the first scan to the end-of-image marker. Entropy-coded data never holds FF followed by
+ * anything but 00 or RSTn, so the first real marker after a scan is read as such; the tables between scans are kept
+ * (they may hold the bytes FF D9), comments and APPn between scans are dropped. Whatever follows the end-of-image
+ * marker (the video of a Motion Photo, a second JPEG with its own EXIF, a gain map) is cut off. A file with no end
+ * marker is kept to its last byte.
+ */
+function readScanData(buf: Buffer, start: number): { data: Buffer; trailer: boolean; dropped: boolean } {
+  const out: Buffer[] = [];
+  let dropped = false;
+  let pos = start;
+  let chunkStart = start;
+  const flush = (end: number) => {
+    if (end > chunkStart) out.push(buf.subarray(chunkStart, end));
+  };
+  while (pos < buf.length) {
+    if (buf[pos] !== 0xff) {
+      pos += 1;
+      continue;
+    }
+    // Skip fill bytes: FF FF ... FF xx.
+    let m = pos + 1;
+    while (buf[m] === 0xff) m += 1;
+    const marker = buf[m];
+    if (marker === undefined) break;
+    if (marker === 0x00 || (marker >= 0xd0 && marker <= 0xd7)) {
+      pos = m + 1;
+      continue;
+    }
+    if (marker === 0xd9) {
+      flush(m + 1);
+      return { data: Buffer.concat(out), trailer: m + 1 < buf.length, dropped };
+    }
+    if (marker === 0xd8) {
+      // A second image starts before the first one ended: keep the first, close it, drop the rest.
+      flush(pos);
+      out.push(Buffer.from([0xff, 0xd9]));
+      return { data: Buffer.concat(out), trailer: true, dropped };
+    }
+    if (marker === 0x01) {
+      pos = m + 1;
+      continue;
+    }
+    if (m + 3 >= buf.length) break;
+    const length = buf.readUInt16BE(m + 1);
+    if (length < 2 || m + 1 + length > buf.length) break;
+    const end = m + 1 + length;
+    const isMetadata = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
+    if (isMetadata) {
+      flush(pos);
+      chunkStart = end;
+      dropped = true;
+    }
+    pos = end;
+  }
+  flush(buf.length);
+  return { data: Buffer.concat(out), trailer: false, dropped };
 }
 
 const startsWith = (payload: Buffer, text: string) => payload.subarray(0, text.length).toString("latin1") === text;
@@ -169,7 +228,10 @@ function cleanJpeg(input: Buffer): SanitizeResult {
   }
 
   if (orientation !== null && orientation > 1) kept.splice(afterJfif, 0, orientationOnlyExif(orientation));
-  const data = Buffer.concat([Buffer.from([0xff, 0xd8]), ...kept, parsed.scan]);
+  const scan = readScanData(input, parsed.scanStart);
+  if (scan.trailer) removed.add("trailer");
+  if (scan.dropped) removed.add("app");
+  const data = Buffer.concat([Buffer.from([0xff, 0xd8]), ...kept, scan.data]);
   return { ok: true, data, mime: "image/jpeg", ext: "jpg", removed: [...removed] };
 }
 
