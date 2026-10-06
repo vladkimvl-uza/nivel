@@ -104,4 +104,31 @@ describe("taxRiskReserve: 1 % of purchases until the tax authority answers", () 
     expect(() => taxRiskReserve(S(-1), true)).toThrow(RangeError);
     expect(() => taxRiskReserve(0.5 as unknown as Sum, true)).toThrow(RangeError);
   });
+  it("rejects a non-boolean flag: a lost field must not silently switch the reserve off", () => {
+    for (const bad of [undefined, null, 0, 1, "", "true"]) {
+      expect(() => taxRiskReserve(S(27_000_000), bad as unknown as boolean)).toThrow(RangeError);
+    }
+  });
+});
+
+describe("warrantyReserveContribution: a broken fund state is an error, never a guessed amount", () => {
+  it("rejects a missing or non-object state", () => {
+    for (const bad of [undefined, null, 5, "x"]) {
+      expect(() => warrantyReserveContribution(S(1_000_000), bad as unknown as WarrantyReserveState)).toThrow(
+        RangeError,
+      );
+    }
+  });
+  it("rejects a state with a lost or invalid field", () => {
+    const ok = state();
+    for (const key of ["balance", "closedOrders", "lossesLast12mBp"] as const) {
+      // A negative balance is data (an overdrawn fund), the other two are counts and cannot be negative.
+      const bads =
+        key === "balance" ? [undefined, null, Number.NaN, 0.5, "1"] : [undefined, null, Number.NaN, -1, 0.5, "1"];
+      for (const bad of bads) {
+        const broken = { ...ok, [key]: bad } as unknown as WarrantyReserveState;
+        expect(() => warrantyReserveContribution(S(1_000_000), broken), `${key}=${String(bad)}`).toThrow(RangeError);
+      }
+    }
+  });
 });

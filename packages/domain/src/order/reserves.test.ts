@@ -135,6 +135,42 @@ describe("reserve rules as decided (DECISIONS R-7, R-12) seen through the order"
     );
   });
 
+  it("a lost or non-boolean taxRiskActive or a broken warranty state fails loudly on both events", () => {
+    const withReserves = (status: "delivering" | "report_sent", reserves: unknown): OrderSnapshot => {
+      const o = order(status === "delivering" ? { status } : { status, report: { accepted: true } });
+      return { ...o, reserves } as OrderSnapshot;
+    };
+    const ok = { warranty: state(0, 0), taxRiskActive: true };
+    const broken: unknown[] = [
+      { warranty: ok.warranty },
+      { ...ok, taxRiskActive: null },
+      { ...ok, taxRiskActive: undefined },
+      { ...ok, taxRiskActive: 0 },
+      { ...ok, taxRiskActive: "" },
+      { taxRiskActive: true },
+      { ...ok, warranty: undefined },
+      { ...ok, warranty: null },
+    ];
+    // The warranty state matters only to HANDOVER; the settlement reads taxRiskActive alone.
+    const brokenWarranty: unknown[] = [
+      { ...ok, warranty: { balance: 0 } },
+      { ...ok, warranty: { ...ok.warranty, closedOrders: "1" } },
+    ];
+    for (const r of [...broken, ...brokenWarranty]) {
+      expect(
+        () => transition(withReserves("delivering", r), EVENTS.HANDOVER, "owner", NOW, CAL, SETTINGS),
+        `HANDOVER ${JSON.stringify(r)}`,
+      ).toThrow(RangeError);
+    }
+    for (const r of broken) {
+      const label = JSON.stringify(r);
+      expect(
+        () => transition(withReserves("report_sent", r), EVENTS.REMAINDER_SETTLED, "owner", NOW, CAL, SETTINGS),
+        `REMAINDER_SETTLED ${label}`,
+      ).toThrow(RangeError);
+    }
+  });
+
   it("does not touch the snapshot", () => {
     const o = order({ status: "delivering", reserves: { warranty: { balance: sum(10_000_000), closedOrders: 30 } } });
     const before = JSON.stringify(o);

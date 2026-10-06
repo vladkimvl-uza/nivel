@@ -70,8 +70,12 @@ function podborCreditUntil(delivered: Date, days: number): Date {
 }
 /** Reserve inputs of the snapshot; a snapshot without them is a caller bug, never a reason to guess an amount. */
 function reserveInputs(o: OrderSnapshot): OrderSnapshot["reserves"] {
-  if (o.reserves == null) throw new RangeError("transition: the snapshot has no reserves (fund state, taxRiskActive)");
-  return o.reserves;
+  const r = o.reserves;
+  // Both inputs are checked on either event: a lost taxRiskActive must not switch the tax reserve off after a JSON round trip.
+  if (r == null || typeof r.taxRiskActive !== "boolean" || r.warranty == null || typeof r.warranty !== "object") {
+    throw new RangeError("transition: the snapshot has no valid reserves (fund state, taxRiskActive)");
+  }
+  return r;
 }
 /** A ledger entry of a fund; nothing to record when the contribution is zero. */
 const ledger = (fund: Extract<Effect, { kind: "ledger" }>["fund"], amount: Sum): Effect[] =>

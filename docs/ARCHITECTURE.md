@@ -622,7 +622,8 @@ export interface ThresholdStatus { year: number; limit: Sum; volume: Sum; commit
 /** Registration year: floor(annualLimit / daysInYear × days). */
 export declare function thresholdForYear(year: number, s: ThresholdSettings): Sum;
 export declare function thresholdStatus(entries: readonly DealEntry[], committed: Sum, year: number, s: ThresholdSettings): ThresholdStatus;
-export declare function warrantyReserveContribution(componentsSum: Sum, st: { balance: Sum; closedOrders: number; lossesLast12mBp: Bp }): Sum;
+export interface WarrantyReserveState { balance: Sum; closedOrders: number; lossesLast12mBp: Bp }
+export declare function warrantyReserveContribution(componentsSum: Sum, st: WarrantyReserveState): Sum;
 export declare function taxRiskReserve(receiptsTotal: Sum, active: boolean): Sum;
 ```
 
@@ -1075,7 +1076,7 @@ const msg = await stream.finalMessage();
 | `orders.reminders` | каждые 5 мин | заявка без ответа 15 мин (в часы ответа); неоплаченная смета 24 ч; отчёт 24/48 ч; `REPORT_DEEMED_ACCEPTED` по сроку; возврат остатка 5 р. д.; ЭСФ 10 дней; снятие поста «Идей» 48 ч |
 | `warranty.sla` | каждые 15 мин | сроки гарантийных случаев |
 | `warranty.vendor_expiry` | 09:00 | гарантия продавца кончается через 30 дней |
-| `aftercare` | 10:00 | звонки через 7 и 30 дней, профилактика через 6–12 месяцев, срок зачёта «Подбора» |
+| `aftercare` | 10:00 | звонки через 7 и 30 дней, профилактика через 6–12 месяцев; срок зачёта «Подбора» читается из `orders.podbor_credit_until`, отдельной задачи нет (ADR-007) |
 | `threshold.check` | 06:00 и после платежа или чека | `thresholdStatus`, оповещения, снимок раз в сутки |
 | `pdf.render` | по событию | документы uz/ru → `ops.files` |
 | `ideas.embed.check` | понедельник 08:00 (R1) | доступность постов через oEmbed |
@@ -1253,6 +1254,7 @@ const msg = await stream.finalMessage();
 | Node на машине | Оставить 25.9 глобально, проект на 24.21 через pnpm; поставить 24 глобально | Оставить 25.9; проект сам скачивает 24.21 |
 | Пакетный менеджер | pnpm 12.9.1; npm workspaces | pnpm |
 | Округление платы | Вниз до сума; до 1 000 сум | Вниз до сума (ставка не выходит за шкалу) |
+| Округление резервов (гарантийного и налогового) | Вверх; вниз | Вверх: резерв — защитный фонд, недобор хуже лишней сотни сумов (решение интегратора 06.10.2026, ADR-007 п. 4) |
 | Порог резерва 5 % | Доля памяти и SSD ≥ 25 %; ≥ 30 % | 25 %, пересмотр после 10 смет |
 | Срок смешанной сметы | 24 ч; по строкам | 24 ч, если есть хоть одна не мебельная строка |
 | Удержание при отказе после тестов | 85 %; 100 % | 85 % до заключения юриста |
