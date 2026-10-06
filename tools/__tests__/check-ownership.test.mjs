@@ -104,7 +104,11 @@ describe("OWNERSHIP.md: registry of translation namespaces", () => {
 
   it("does not turn into a list of owners: its bullets are not read as globs of a work package", () => {
     const { owners } = parseOwnership(text);
-    expect([...owners.keys()].every((k) => /^WP-\d{2}$/.test(k))).toBe(true);
+    // WP-00 keeps "**": the section's bullets (catalog.ts, messages/...) were not added to any owner.
+    expect(owners.get("WP-00")?.include).toEqual(["**"]);
+    for (const [wp, { include }] of owners) {
+      expect(include.some((g) => g.includes("catalog.ts") || g.includes("NIVEL_STRICT")), wp).toBe(false);
+    }
     // The namespace files are still owned by the packages that are named in OWNERSHIP.md.
     expect(owners.get("WP-12")?.include).toContain("packages/i18n/messages/{uz,ru,meta}/pdf.json");
   });
