@@ -1,0 +1,930 @@
+[
+  {
+    "no": 1,
+    "group": "pc",
+    "termRu": "компьютер, ПК",
+    "termUz": "kompyuter",
+    "termUzNewLatin": null,
+    "note": "«shaxsiy kompyuter» → şaxsiy"
+  },
+  {
+    "no": 2,
+    "group": "pc",
+    "termRu": "системный блок",
+    "termUz": "tizim bloki",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 3,
+    "group": "pc",
+    "termRu": "комплектующие",
+    "termUz": "butlovchi qismlar",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 4,
+    "group": "pc",
+    "termRu": "процессор",
+    "termUz": "protsessor",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 5,
+    "group": "pc",
+    "termRu": "ядро процессора",
+    "termUz": "protsessor yadrosi",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 6,
+    "group": "pc",
+    "termRu": "видеокарта",
+    "termUz": "videokarta",
+    "termUzNewLatin": null,
+    "note": "uz.wikipedia"
+  },
+  {
+    "no": 7,
+    "group": "pc",
+    "termRu": "графический процессор",
+    "termUz": "grafik protsessor (GPU)",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 8,
+    "group": "pc",
+    "termRu": "видеопамять",
+    "termUz": "videoxotira",
+    "termUzNewLatin": null,
+    "note": "uz.wikipedia"
+  },
+  {
+    "no": 9,
+    "group": "pc",
+    "termRu": "оперативная память",
+    "termUz": "operativ xotira",
+    "termUzNewLatin": null,
+    "note": "вариант «tezkor xotira» (uz.wikipedia); в интерфейсе — только «operativ xotira»"
+  },
+  {
+    "no": 10,
+    "group": "pc",
+    "termRu": "материнская плата",
+    "termUz": "ona plata",
+    "termUzNewLatin": null,
+    "note": "uz.wikipedia"
+  },
+  {
+    "no": 11,
+    "group": "pc",
+    "termRu": "чипсет",
+    "termUz": "chipset",
+    "termUzNewLatin": "çipset",
+    "note": "заимствование; замена ch — проверить по тексту закона"
+  },
+  {
+    "no": 12,
+    "group": "pc",
+    "termRu": "сокет",
+    "termUz": "protsessor uyasi (soket)",
+    "termUzNewLatin": null,
+    "note": "проверить"
+  },
+  {
+    "no": 13,
+    "group": "pc",
+    "termRu": "разъём",
+    "termUz": "ulagich",
+    "termUzNewLatin": "ulagiç",
+    "note": "uz.wikipedia: «SATA ulagichi»"
+  },
+  {
+    "no": 14,
+    "group": "pc",
+    "termRu": "накопитель",
+    "termUz": "maʼlumot saqlash qurilmasi",
+    "termUzNewLatin": "maʼlumot saqlaş qurilmasi",
+    "note": "в кнопках — «disk»"
+  },
+  {
+    "no": 15,
+    "group": "pc",
+    "termRu": "SSD-накопитель",
+    "termUz": "SSD disk",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 16,
+    "group": "pc",
+    "termRu": "жёсткий диск",
+    "termUz": "qattiq disk (HDD)",
+    "termUzNewLatin": null,
+    "note": "uz.wikipedia"
+  },
+  {
+    "no": 17,
+    "group": "pc",
+    "termRu": "блок питания",
+    "termUz": "quvvat bloki",
+    "termUzNewLatin": null,
+    "note": "вариант «quvvat manbai» (uz.wikipedia); выбрать один"
+  },
+  {
+    "no": 18,
+    "group": "pc",
+    "termRu": "корпус",
+    "termUz": "korpus",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 19,
+    "group": "pc",
+    "termRu": "система охлаждения",
+    "termUz": "sovutish tizimi",
+    "termUzNewLatin": "sovutiş tizimi",
+    "note": "uz.wikipedia"
+  },
+  {
+    "no": 20,
+    "group": "pc",
+    "termRu": "кулер",
+    "termUz": "kuler",
+    "termUzNewLatin": null,
+    "note": "uz.wikipedia"
+  },
+  {
+    "no": 21,
+    "group": "pc",
+    "termRu": "вентилятор",
+    "termUz": "ventilyator",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 22,
+    "group": "pc",
+    "termRu": "радиатор",
+    "termUz": "radiator",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 23,
+    "group": "pc",
+    "termRu": "жидкостное охлаждение",
+    "termUz": "suyuqlikli sovutish",
+    "termUzNewLatin": "suyuqlikli sovutiş",
+    "note": "проверить"
+  },
+  {
+    "no": 24,
+    "group": "pc",
+    "termRu": "термопаста",
+    "termUz": "termopasta",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 25,
+    "group": "pc",
+    "termRu": "сетевая карта",
+    "termUz": "tarmoq kartasi",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 26,
+    "group": "pc",
+    "termRu": "операционная система",
+    "termUz": "operatsion tizim",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 27,
+    "group": "pc",
+    "termRu": "драйвер",
+    "termUz": "drayver",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 28,
+    "group": "pc",
+    "termRu": "обновление BIOS",
+    "termUz": "BIOSni yangilash",
+    "termUzNewLatin": "BIOSni yangilaş",
+    "note": null
+  },
+  {
+    "no": 29,
+    "group": "pc",
+    "termRu": "серийный номер",
+    "termUz": "seriya raqami",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 30,
+    "group": "pc",
+    "termRu": "производитель",
+    "termUz": "ishlab chiqaruvchi",
+    "termUzNewLatin": "işlab çiqaruvçi",
+    "note": null
+  },
+  {
+    "no": 31,
+    "group": "specs",
+    "termRu": "частота",
+    "termUz": "chastota",
+    "termUzNewLatin": "çastota",
+    "note": null
+  },
+  {
+    "no": 32,
+    "group": "specs",
+    "termRu": "частота обновления (Гц)",
+    "termUz": "yangilanish chastotasi",
+    "termUzNewLatin": "yangilaniş çastotasi",
+    "note": null
+  },
+  {
+    "no": 33,
+    "group": "specs",
+    "termRu": "разрешение экрана",
+    "termUz": "ekran ruxsati",
+    "termUzNewLatin": null,
+    "note": "проверить: «ruxsat» или «aniqlik»"
+  },
+  {
+    "no": 34,
+    "group": "specs",
+    "termRu": "кадры в секунду",
+    "termUz": "soniyasiga kadrlar (FPS)",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 35,
+    "group": "specs",
+    "termRu": "время отклика",
+    "termUz": "javob vaqti",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 36,
+    "group": "specs",
+    "termRu": "мощность",
+    "termUz": "quvvat",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 37,
+    "group": "specs",
+    "termRu": "энергопотребление",
+    "termUz": "energiya isteʼmoli",
+    "termUzNewLatin": null,
+    "note": "ʼ — U+02BC"
+  },
+  {
+    "no": 38,
+    "group": "specs",
+    "termRu": "температура",
+    "termUz": "harorat",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 39,
+    "group": "specs",
+    "termRu": "шум",
+    "termUz": "shovqin",
+    "termUzNewLatin": "şovqin",
+    "note": null
+  },
+  {
+    "no": 40,
+    "group": "specs",
+    "termRu": "производительность",
+    "termUz": "unumdorlik",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 41,
+    "group": "specs",
+    "termRu": "совместимость",
+    "termUz": "moslik",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 42,
+    "group": "specs",
+    "termRu": "объём памяти",
+    "termUz": "xotira hajmi",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 43,
+    "group": "specs",
+    "termRu": "скорость чтения и записи",
+    "termUz": "oʻqish va yozish tezligi",
+    "termUzNewLatin": "öqiş va yoziş tezligi",
+    "note": null
+  },
+  {
+    "no": 44,
+    "group": "specs",
+    "termRu": "нагрузочный тест",
+    "termUz": "yuklama testi",
+    "termUzNewLatin": null,
+    "note": "проверить"
+  },
+  {
+    "no": 45,
+    "group": "specs",
+    "termRu": "протокол тестов",
+    "termUz": "test bayonnomasi",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 46,
+    "group": "specs",
+    "termRu": "разгон",
+    "termUz": "tezlashtirish (overklok)",
+    "termUzNewLatin": "tezlaştiriş",
+    "note": null
+  },
+  {
+    "no": 47,
+    "group": "specs",
+    "termRu": "подсветка RGB",
+    "termUz": "RGB yoritish",
+    "termUzNewLatin": "RGB yoritiş",
+    "note": null
+  },
+  {
+    "no": 48,
+    "group": "peripherals",
+    "termRu": "монитор",
+    "termUz": "monitor",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 49,
+    "group": "peripherals",
+    "termRu": "диагональ",
+    "termUz": "diagonal",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 50,
+    "group": "peripherals",
+    "termRu": "матрица",
+    "termUz": "matritsa",
+    "termUzNewLatin": null,
+    "note": "IPS, VA, OLED не переводятся"
+  },
+  {
+    "no": 51,
+    "group": "peripherals",
+    "termRu": "кронштейн для монитора",
+    "termUz": "monitor kronshteyni",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 52,
+    "group": "peripherals",
+    "termRu": "клавиатура",
+    "termUz": "klaviatura",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 53,
+    "group": "peripherals",
+    "termRu": "механическая клавиатура",
+    "termUz": "mexanik klaviatura",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 54,
+    "group": "peripherals",
+    "termRu": "мышь",
+    "termUz": "sichqoncha",
+    "termUzNewLatin": "siçqonça",
+    "note": null
+  },
+  {
+    "no": 55,
+    "group": "peripherals",
+    "termRu": "коврик для мыши",
+    "termUz": "sichqoncha gilamchasi",
+    "termUzNewLatin": "siçqonça gilamçasi",
+    "note": "проверить"
+  },
+  {
+    "no": 56,
+    "group": "peripherals",
+    "termRu": "наушники",
+    "termUz": "quloqchin",
+    "termUzNewLatin": "quloqçin",
+    "note": null
+  },
+  {
+    "no": 57,
+    "group": "peripherals",
+    "termRu": "гарнитура",
+    "termUz": "garnitura",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 58,
+    "group": "peripherals",
+    "termRu": "микрофон",
+    "termUz": "mikrofon",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 59,
+    "group": "peripherals",
+    "termRu": "веб-камера",
+    "termUz": "veb-kamera",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 60,
+    "group": "peripherals",
+    "termRu": "колонки",
+    "termUz": "karnaylar",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 61,
+    "group": "peripherals",
+    "termRu": "аудиоинтерфейс",
+    "termUz": "audiointerfeys",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 62,
+    "group": "peripherals",
+    "termRu": "геймпад",
+    "termUz": "geympad",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 63,
+    "group": "peripherals",
+    "termRu": "ИБП",
+    "termUz": "uzluksiz quvvat manbai (UPS)",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 64,
+    "group": "peripherals",
+    "termRu": "сетевой фильтр",
+    "termUz": "tarmoq filtri",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 65,
+    "group": "peripherals",
+    "termRu": "периферия",
+    "termUz": "periferiya qurilmalari",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 66,
+    "group": "workplace",
+    "termRu": "рабочее место",
+    "termUz": "ish joyi",
+    "termUzNewLatin": "iş joyi",
+    "note": null
+  },
+  {
+    "no": 67,
+    "group": "workplace",
+    "termRu": "сетап",
+    "termUz": "setap",
+    "termUzNewLatin": null,
+    "note": "при первом упоминании: «setap — ish joyini toʻliq jihozlash» → «iş joyini töliq jihozlaş»"
+  },
+  {
+    "no": 68,
+    "group": "workplace",
+    "termRu": "стол",
+    "termUz": "stol",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 69,
+    "group": "workplace",
+    "termRu": "стол с регулировкой высоты",
+    "termUz": "balandligi sozlanadigan stol",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 70,
+    "group": "workplace",
+    "termRu": "кресло",
+    "termUz": "kreslo",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 71,
+    "group": "workplace",
+    "termRu": "игровое кресло",
+    "termUz": "geymer kreslosi",
+    "termUzNewLatin": null,
+    "note": "проверить"
+  },
+  {
+    "no": 72,
+    "group": "workplace",
+    "termRu": "подлокотник",
+    "termUz": "qoʻl tayanchi",
+    "termUzNewLatin": "qöl tayançi",
+    "note": "проверить"
+  },
+  {
+    "no": 73,
+    "group": "workplace",
+    "termRu": "поясничная опора",
+    "termUz": "bel tayanchi",
+    "termUzNewLatin": "bel tayançi",
+    "note": null
+  },
+  {
+    "no": 74,
+    "group": "workplace",
+    "termRu": "эргономика",
+    "termUz": "ergonomika",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 75,
+    "group": "workplace",
+    "termRu": "полка",
+    "termUz": "javon",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 76,
+    "group": "workplace",
+    "termRu": "подставка",
+    "termUz": "taglik",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 77,
+    "group": "workplace",
+    "termRu": "декор",
+    "termUz": "bezak",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 78,
+    "group": "workplace",
+    "termRu": "освещение",
+    "termUz": "yoritish",
+    "termUzNewLatin": "yoritiş",
+    "note": null
+  },
+  {
+    "no": 79,
+    "group": "workplace",
+    "termRu": "настольная лампа",
+    "termUz": "stol chiroqi",
+    "termUzNewLatin": "stol çiroqi",
+    "note": null
+  },
+  {
+    "no": 80,
+    "group": "workplace",
+    "termRu": "светодиодная лента",
+    "termUz": "LED tasma",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 81,
+    "group": "workplace",
+    "termRu": "цветовая температура",
+    "termUz": "rang harorati",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 82,
+    "group": "workplace",
+    "termRu": "акустическая панель",
+    "termUz": "akustik panel",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 83,
+    "group": "workplace",
+    "termRu": "шумоизоляция",
+    "termUz": "shovqin izolyatsiyasi",
+    "termUzNewLatin": "şovqin izolyatsiyasi",
+    "note": null
+  },
+  {
+    "no": 84,
+    "group": "workplace",
+    "termRu": "кабель",
+    "termUz": "kabel",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 85,
+    "group": "workplace",
+    "termRu": "кабель-менеджмент",
+    "termUz": "kabellarni tartiblash",
+    "termUzNewLatin": "kabellarni tartiblaş",
+    "note": null
+  },
+  {
+    "no": 86,
+    "group": "workplace",
+    "termRu": "кабельный канал",
+    "termUz": "kabel kanali",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 87,
+    "group": "workplace",
+    "termRu": "стяжка для кабелей",
+    "termUz": "kabel bogʻichi",
+    "termUzNewLatin": "kabel boğiçi",
+    "note": "проверить"
+  },
+  {
+    "no": 88,
+    "group": "service",
+    "termRu": "подбор",
+    "termUz": "tanlash",
+    "termUzNewLatin": "tanlaş",
+    "note": null
+  },
+  {
+    "no": 89,
+    "group": "service",
+    "termRu": "сборка (работа)",
+    "termUz": "yigʻish",
+    "termUzNewLatin": "yiğiş",
+    "note": null
+  },
+  {
+    "no": 90,
+    "group": "service",
+    "termRu": "собранный ПК",
+    "termUz": "yigʻilgan kompyuter",
+    "termUzNewLatin": "yiğilgan kompyuter",
+    "note": null
+  },
+  {
+    "no": 91,
+    "group": "service",
+    "termRu": "конфигуратор",
+    "termUz": "konfigurator",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 92,
+    "group": "service",
+    "termRu": "заявка",
+    "termUz": "ariza",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 93,
+    "group": "service",
+    "termRu": "смета",
+    "termUz": "smeta",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 94,
+    "group": "service",
+    "termRu": "закупка",
+    "termUz": "xarid",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 95,
+    "group": "service",
+    "termRu": "доставка",
+    "termUz": "yetkazib berish",
+    "termUzNewLatin": "yetkazib beriş",
+    "note": null
+  },
+  {
+    "no": 96,
+    "group": "service",
+    "termRu": "установка и монтаж",
+    "termUz": "oʻrnatish",
+    "termUzNewLatin": "örnatiş",
+    "note": null
+  },
+  {
+    "no": 97,
+    "group": "service",
+    "termRu": "сдача и приёмка",
+    "termUz": "topshirish va qabul qilish",
+    "termUzNewLatin": "topşiriş va qabul qiliş",
+    "note": null
+  },
+  {
+    "no": 98,
+    "group": "service",
+    "termRu": "паспорт сборки",
+    "termUz": "kompyuter pasporti",
+    "termUzNewLatin": null,
+    "note": "название документа утверждает владелец"
+  },
+  {
+    "no": 99,
+    "group": "service",
+    "termRu": "гарантия",
+    "termUz": "kafolat",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 100,
+    "group": "service",
+    "termRu": "гарантийный случай",
+    "termUz": "kafolat holati",
+    "termUzNewLatin": null,
+    "note": "проверить"
+  },
+  {
+    "no": 101,
+    "group": "service",
+    "termRu": "гарантийный талон",
+    "termUz": "kafolat taloni",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 102,
+    "group": "service",
+    "termRu": "ИИ-консультант",
+    "termUz": "sunʼiy intellekt maslahatchisi",
+    "termUzNewLatin": "sunʼiy intellekt maslahatçisi",
+    "note": "ʼ — U+02BC"
+  },
+  {
+    "no": 103,
+    "group": "service",
+    "termRu": "визуализация",
+    "termUz": "vizualizatsiya",
+    "termUzNewLatin": null,
+    "note": "пометка на ИИ-кадрах"
+  },
+  {
+    "no": 104,
+    "group": "service",
+    "termRu": "концепт",
+    "termUz": "konsept",
+    "termUzNewLatin": null,
+    "note": "пометка на 3D-концептах"
+  },
+  {
+    "no": 105,
+    "group": "money",
+    "termRu": "плата за услугу",
+    "termUz": "xizmat haqi",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 106,
+    "group": "money",
+    "termRu": "предоплата",
+    "termUz": "oldindan toʻlov",
+    "termUzNewLatin": "oldindan tölov",
+    "note": null
+  },
+  {
+    "no": 107,
+    "group": "money",
+    "termRu": "фискальный чек",
+    "termUz": "fiskal chek",
+    "termUzNewLatin": "fiskal çek",
+    "note": null
+  },
+  {
+    "no": 108,
+    "group": "money",
+    "termRu": "по цене чеков",
+    "termUz": "chekdagi narxda",
+    "termUzNewLatin": "çekdagi narxda",
+    "note": null
+  },
+  {
+    "no": 109,
+    "group": "money",
+    "termRu": "возврат денег",
+    "termUz": "pulni qaytarish",
+    "termUzNewLatin": "pulni qaytariş",
+    "note": null
+  },
+  {
+    "no": 110,
+    "group": "money",
+    "termRu": "отказ от договора",
+    "termUz": "shartnomadan voz kechish",
+    "termUzNewLatin": "şartnomadan voz keçiş",
+    "note": null
+  },
+  {
+    "no": 111,
+    "group": "money",
+    "termRu": "публичная оферта",
+    "termUz": "ommaviy oferta",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 112,
+    "group": "money",
+    "termRu": "договор комиссии",
+    "termUz": "komissiya shartnomasi",
+    "termUzNewLatin": "komissiya şartnomasi",
+    "note": null
+  },
+  {
+    "no": 113,
+    "group": "money",
+    "termRu": "бытовой подряд",
+    "termUz": "maishiy pudrat",
+    "termUzNewLatin": null,
+    "note": "термин ГК — сверить юристу"
+  },
+  {
+    "no": 114,
+    "group": "money",
+    "termRu": "акт",
+    "termUz": "dalolatnoma",
+    "termUzNewLatin": null,
+    "note": null
+  },
+  {
+    "no": 115,
+    "group": "money",
+    "termRu": "персональные данные",
+    "termUz": "shaxsga doir maʼlumotlar",
+    "termUzNewLatin": "şaxsga doir maʼlumotlar",
+    "note": "как в названии закона ЗРУ-547"
+  },
+  {
+    "no": 116,
+    "group": "money",
+    "termRu": "индивидуальный предприниматель",
+    "termUz": "yakka tartibdagi tadbirkor (YaTT)",
+    "termUzNewLatin": null,
+    "note": null
+  }
+]

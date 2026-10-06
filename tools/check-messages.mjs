@@ -1,56 +1,14 @@
 // Message catalogs: same keys in uz and ru, a meta entry per key, same ICU placeholders, length limits from meta,
-// no "$" or "USD" (ARCHITECTURE 5.2). Owner after WP-00 — WP-08.
+// no "$" or "USD" (ARCHITECTURE 5.2). Owner — WP-08; the rules live in packages/i18n/src/messages-check.ts.
+// Usage: node tools/check-messages.mjs [--root dir]
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { parseArgs } from "node:util";
+import { placeholders } from "../packages/i18n/src/icu.ts";
+import { checkNamespace } from "../packages/i18n/src/messages-check.ts";
 import { isMain, ROOT } from "./lib/env.mjs";
 
-function flatten(obj, prefix = "") {
-  return Object.entries(obj).flatMap(([k, v]) =>
-    v && typeof v === "object" ? flatten(v, `${prefix}${k}.`) : [[`${prefix}${k}`, String(v)]],
-  );
-}
-
-/** Top-level ICU argument names: "{count, plural, ...}" → count, "{name}" → name. */
-export function placeholders(message) {
-  const names = new Set();
-  let depth = 0;
-  for (let i = 0; i < message.length; i++) {
-    const c = message[i];
-    if (c === "{") {
-      if (depth === 0) {
-        const m = /^\{\s*([A-Za-z_][\w]*)/.exec(message.slice(i));
-        if (m) names.add(m[1]);
-      }
-      depth++;
-    } else if (c === "}") depth = Math.max(0, depth - 1);
-  }
-  return [...names].sort();
-}
-
-export function checkNamespace(ns, uz, ru, meta) {
-  const out = [];
-  const u = new Map(flatten(uz));
-  const r = new Map(flatten(ru));
-  for (const k of u.keys()) if (!r.has(k)) out.push(`${ns}: key "${k}" missing in ru`);
-  for (const k of r.keys()) if (!u.has(k)) out.push(`${ns}: key "${k}" missing in uz`);
-  for (const [k, uzText] of u) {
-    const ruText = r.get(k);
-    const m = meta?.[k];
-    if (!m) out.push(`${ns}: key "${k}" has no meta entry (context, maxLen, status)`);
-    if (ruText !== undefined && placeholders(uzText).join() !== placeholders(ruText).join()) {
-      out.push(`${ns}: key "${k}" placeholders differ: uz {${placeholders(uzText)}} vs ru {${placeholders(ruText)}}`);
-    }
-    for (const [lang, text] of [
-      ["uz", uzText],
-      ["ru", ruText],
-    ]) {
-      if (text === undefined) continue;
-      if (m?.maxLen && text.length > m.maxLen) out.push(`${ns}: ${lang} "${k}" is ${text.length} > maxLen ${m.maxLen}`);
-      if (/\$|\bUSD\b/.test(text)) out.push(`${ns}: ${lang} "${k}" mentions dollars; prices are in sums only`);
-    }
-  }
-  return out;
-}
+export { checkNamespace, placeholders };
 
 export function checkMessages(root = ROOT) {
   const base = join(root, "packages", "i18n", "messages");
@@ -60,20 +18,39 @@ export function checkMessages(root = ROOT) {
       existsSync(join(base, l)) ? readdirSync(join(base, l)).filter((f) => f.endsWith(".json")) : [],
     ),
   );
-  const read = (l, f) => (existsSync(join(base, l, f)) ? JSON.parse(readFileSync(join(base, l, f), "utf8")) : null);
-  return [...namespaces].flatMap((f) => {
+  const problems = [];
+  for (const f of [...namespaces].sort()) {
     const ns = f.replace(/\.json$/, "");
-    const uz = read("uz", f);
-    const ru = read("ru", f);
-    const meta = read("meta", f);
-    if (!uz || !ru) return [`${ns}: file missing in ${uz ? "ru" : "uz"}`];
-    if (!meta) return [`${ns}: meta/${f} is missing`];
-    return checkNamespace(ns, uz, ru, meta);
-  });
+    const read = (l) => {
+      const path = join(base, l, f);
+      if (!existsSync(path)) return { missing: true };
+      try {
+        return { data: JSON.parse(readFileSync(path, "utf8")) };
+      } catch (e) {
+        problems.push(`${ns}: ${l}/${f} is not valid JSON: ${e.message}`);
+        return { broken: true };
+      }
+    };
+    const uz = read("uz");
+    const ru = read("ru");
+    const meta = read("meta");
+    if (uz.broken || ru.broken || meta.broken) continue;
+    if (uz.missing || ru.missing) {
+      problems.push(`${ns}: file missing in ${uz.missing ? "uz" : "ru"}`);
+      continue;
+    }
+    if (meta.missing) {
+      problems.push(`${ns}: meta/${f} is missing`);
+      continue;
+    }
+    problems.push(...checkNamespace(ns, uz.data, ru.data, meta.data));
+  }
+  return problems;
 }
 
 if (isMain(import.meta.url)) {
-  const problems = checkMessages();
+  const { values } = parseArgs({ options: { root: { type: "string" } } });
+  const problems = checkMessages(values.root ? resolve(values.root) : ROOT);
   if (problems.length > 0) {
     console.error(`check-messages: ${problems.length} problem(s):\n  - ${problems.join("\n  - ")}`);
     process.exit(1);
