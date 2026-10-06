@@ -41,27 +41,6 @@ describe("effects of SEND_ESTIMATE", () => {
     expect(effects[0]).toEqual({ kind: "render_pdf", doc: "quote", watermarkDraft: true });
   });
 
-  it("without validUntil the shorter 24 h shelf life of components applies", () => {
-    const effects = effectsOf(
-      { status: "estimate_draft", quote: { validUntil: undefined } },
-      EVENTS.SEND_ESTIMATE,
-      "owner",
-    );
-    expect(effects.at(-1)).toEqual({ kind: "schedule", job: "estimate_expiry", at: at(NOW.getTime() + 24 * HOUR) });
-  });
-
-  it("the shelf life comes from the settings", () => {
-    const settings = { ...SETTINGS, shelfLifeHours: { components: 12, furniture: 72 } };
-    const effects = effectsOf(
-      { status: "estimate_draft", quote: { validUntil: undefined } },
-      EVENTS.SEND_ESTIMATE,
-      "owner",
-      NOW,
-      settings,
-    );
-    expect(effects.at(-1)).toMatchObject({ job: "estimate_expiry", at: at(NOW.getTime() + 12 * HOUR) });
-  });
-
   it("a 72 h validUntil (furniture, light, decor) is scheduled as is", () => {
     const validUntil = at(NOW.getTime() + 72 * HOUR);
     const effects = effectsOf({ status: "estimate_draft", quote: { validUntil } }, EVENTS.SEND_ESTIMATE, "owner");

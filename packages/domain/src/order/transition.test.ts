@@ -342,6 +342,62 @@ const GUARDS: GuardCase[] = [
     error: "estimate_expired",
   },
   {
+    name: "SEND_ESTIMATE: no validUntil (the expiry job would have no term)",
+    status: "estimate_draft",
+    event: EVENTS.SEND_ESTIMATE,
+    actor: "owner",
+    patch: { quote: { validUntil: undefined } },
+    error: "invalid_transition",
+  },
+  {
+    name: "SEND_ESTIMATE: validUntil is an Invalid Date",
+    status: "estimate_draft",
+    event: EVENTS.SEND_ESTIMATE,
+    actor: "owner",
+    patch: { quote: { validUntil: new Date(Number.NaN) } },
+    error: "invalid_transition",
+  },
+  {
+    name: "ACCEPT: no validUntil counts as expired (fail closed)",
+    status: "estimate_sent",
+    event: EVENTS.ACCEPT,
+    actor: "customer",
+    patch: { quote: { validUntil: undefined } },
+    error: "estimate_expired",
+  },
+  {
+    name: "ACCEPT: validUntil is an Invalid Date counts as expired (fail closed)",
+    status: "estimate_sent",
+    event: EVENTS.ACCEPT,
+    actor: "customer",
+    patch: { quote: { validUntil: new Date(Number.NaN) } },
+    error: "estimate_expired",
+  },
+  {
+    name: "START_PURCHASE: purchaseNotBefore is an Invalid Date",
+    status: "accepted",
+    event: EVENTS.START_PURCHASE,
+    actor: "owner",
+    patch: { flags: { feePrepaid: true, fundsReceived: true }, purchaseNotBefore: new Date(Number.NaN) },
+    error: "purchase_too_early",
+  },
+  {
+    name: "FUNDS_RECEIVED: receivedAt is an Invalid Date",
+    status: "accepted",
+    event: { type: "FUNDS_RECEIVED", paymentIds: ["p2"], receivedAt: new Date(Number.NaN) },
+    actor: "owner",
+    patch: { money: { fundsReceived: sum(10_300_000) } },
+    error: "payments_incomplete",
+  },
+  {
+    name: "FUNDS_RECEIVED: receivedAt is not a Date (an ISO string after a JSON round trip)",
+    status: "accepted",
+    event: { type: "FUNDS_RECEIVED", paymentIds: ["p2"], receivedAt: "2026-10-06T11:00:00+05:00" as unknown as Date },
+    actor: "owner",
+    patch: { money: { fundsReceived: sum(10_300_000) } },
+    error: "payments_incomplete",
+  },
+  {
     name: "SEND_ESTIMATE: manual check is reported before compatibility and eligibility",
     status: "estimate_draft",
     event: EVENTS.SEND_ESTIMATE,
@@ -378,14 +434,6 @@ const GUARDS: GuardCase[] = [
     event: EVENTS.EXPIRE,
     actor: "system",
     patch: {},
-    error: "invalid_transition",
-  },
-  {
-    name: "EXPIRE: no validUntil",
-    status: "estimate_sent",
-    event: EVENTS.EXPIRE,
-    actor: "system",
-    patch: { quote: { validUntil: undefined } },
     error: "invalid_transition",
   },
   {
@@ -1072,7 +1120,6 @@ describe("boundaries that must pass", () => {
       "free window estimate",
       { quote: { eligibility: { mode: "free_window_only" as const, minEstimate: sum(4_500_000) } } },
     ],
-    ["no validUntil yet (not confirmed)", { quote: { validUntil: undefined } }],
     ["validUntil in one millisecond", { quote: { validUntil: new Date(NOW.getTime() + 1) } }],
     ["stub offers (Р-25: the stub is allowed in an estimate)", { offer: { uz: "stub" as const, ru: "stub" as const } }],
   ])("SEND_ESTIMATE with %s", (_name, patch) => {
@@ -1105,8 +1152,14 @@ describe("boundaries that must pass", () => {
     expect(run({ status: "estimate_sent", quote: { validUntil: NOW } }, EVENTS.ACCEPT, "customer").ok).toBe(true);
   });
 
-  it("ACCEPT without validUntil is valid", () => {
-    expect(run({ status: "estimate_sent", quote: { validUntil: undefined } }, EVENTS.ACCEPT, "customer").ok).toBe(true);
+  it("EXPIRE without validUntil lets the stuck estimate expire", () => {
+    const r = run({ status: "estimate_sent", quote: { validUntil: undefined } }, EVENTS.EXPIRE, "system");
+    expect(r).toMatchObject({ ok: true, next: "estimate_expired" });
+  });
+
+  it("EXPIRE with an Invalid Date validUntil lets the stuck estimate expire", () => {
+    const r = run({ status: "estimate_sent", quote: { validUntil: new Date(Number.NaN) } }, EVENTS.EXPIRE, "system");
+    expect(r).toMatchObject({ ok: true, next: "estimate_expired" });
   });
 
   it("ACCEPT in development mode works with stub offers", () => {
