@@ -60,7 +60,8 @@ describe("entries of @nivel/ui", () => {
       `const ui = await import(${JSON.stringify(url)});` +
         "console.log(JSON.stringify({" +
         "def: ui.defaultTheme, themes: ui.themes, ink: typeof ui.brand, fonts: ui.fontFaces.length," +
-        "ttf: ui.fontFile(ui.fontFaces[0], 'ttf'), amount: ui.formatAmount(1234567), scene: typeof ui.sceneLight }));",
+        "ttf: ui.fontFile(ui.fontFaces[0], 'ttf'), amount: ui.formatAmount(1234567), scene: typeof ui.sceneLight," +
+        "logo: ui.logoSvg({ kind: 'lockup' }).slice(0, 4) }));",
     );
     expect(run.stderr).toBe("");
     expect(run.status).toBe(0);
@@ -69,6 +70,7 @@ describe("entries of @nivel/ui", () => {
     expect(out.fonts).toBeGreaterThanOrEqual(9);
     expect(String(out.ttf)).toMatch(/\.ttf$/);
     expect(String(out.amount)).toContain("567");
+    expect(out.logo).toBe("<svg"); // the logo as a string for the worker, the bot and the PDF renderer
   });
 
   it("the core entry reaches no .tsx file and no react", () => {
