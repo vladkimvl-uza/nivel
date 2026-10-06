@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createSharpSanitizer, readJpegOrientation, type SharpFactory, sanitizeImage } from "./image.ts";
+import {
+  createSharpSanitizer,
+  readJpegOrientation,
+  type SharpFactory,
+  type SharpPipeline,
+  sanitizeImage,
+} from "./image.ts";
 
 const u16 = (n: number) => [(n >> 8) & 255, n & 255];
 const segment = (marker: number, payload: number[]) => [0xff, marker, ...u16(payload.length + 2), ...payload];
@@ -290,41 +296,174 @@ describe("sanitizeImage: what is not accepted", () => {
     expect(await sanitizeImage(Buffer.from("MZ\x90\x00 an executable"))).toMatchObject({ ok: false });
   });
 
-  it("hands a format it cannot read (HEIC) to the sharp-based sanitizer when one is installed", async () => {
+  it("hands a HEIF file (the brand in `ftyp`) to the sharp-based sanitizer when one is installed", async () => {
     const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.alloc(16)]);
     expect(await sanitizeImage(heic)).toMatchObject({ ok: false, error: "Нужен снимок в формате JPEG, PNG или WebP." });
     const calls: Buffer[] = [];
-    const sharp: SharpFactory = (input) => {
-      calls.push(input);
-      return {
-        rotate: () => ({
-          toBuffer: async () => ({ data: Buffer.from("clean-jpeg"), info: { format: "jpeg" } }),
-        }),
-      };
-    };
-    const r = await sanitizeImage(heic, { fallback: createSharpSanitizer(sharp) });
+    const r = await sanitizeImage(heic, { fallback: createSharpSanitizer(fakeSharp({ calls })) });
     expect(r).toMatchObject({ ok: true, mime: "image/jpeg", ext: "jpg" });
     expect(calls).toHaveLength(1);
   });
+
+  it("sends a JPEG that carries a turn through sharp, so that the file keeps no tag at all", async () => {
+    const calls: Buffer[] = [];
+    const fallback = createSharpSanitizer(fakeSharp({ calls }));
+    const turned = jpegWith(JFIF, segment(0xe1, exifPayload(6)));
+    const r = await sanitizeImage(turned, { fallback });
+    expect(r).toMatchObject({ ok: true, data: Buffer.from("clean-jpeg") });
+    expect(r.ok && r.removed).toEqual(expect.arrayContaining(["exif", "reencoded"]));
+    // An upright one stays on the lossless path and does not wake sharp.
+    const upright = await sanitizeImage(jpegWith(JFIF, segment(0xe1, exifPayload(1))), { fallback });
+    expect(upright.ok && upright.data.equals(Buffer.from("clean-jpeg"))).toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("keeps the lossless result of a turned JPEG when sharp fails", async () => {
+    const fallback = createSharpSanitizer(fakeSharp({ fail: true }));
+    const r = await sanitizeImage(jpegWith(JFIF, segment(0xe1, exifPayload(6))), { fallback });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.toString("latin1")).not.toContain("SECRET-GPS");
+    expect(readJpegOrientation(r.data)).toBe(6);
+  });
 });
 
+/** A stand-in for sharp that records what it was given and says what the pipeline was asked to do. */
+function fakeSharp(opts: { calls?: Buffer[]; fail?: boolean; format?: string; steps?: string[] }): SharpFactory {
+  return (input) => {
+    opts.calls?.push(input);
+    const step = (name: string) => {
+      opts.steps?.push(name);
+      return pipeline;
+    };
+    const pipeline: SharpPipeline = {
+      rotate: () => step("rotate"),
+      flatten: () => step("flatten"),
+      jpeg: () => step("jpeg"),
+      toBuffer: async () => {
+        if (opts.fail) throw new Error("Input buffer contains unsupported image format");
+        return { data: Buffer.from("clean-jpeg"), info: { format: opts.format ?? "jpeg" } };
+      },
+    };
+    return pipeline;
+  };
+}
+
 describe("createSharpSanitizer", () => {
-  it("re-encodes with the turn applied and no metadata; a failure of sharp is a refusal, not a crash", async () => {
-    const ok = createSharpSanitizer(() => ({
-      rotate: () => ({ toBuffer: async () => ({ data: Buffer.from("png-bytes"), info: { format: "png" } }) }),
-    }));
-    expect(await ok(Buffer.from("x"))).toMatchObject({ ok: true, mime: "image/png", ext: "png" });
-    const broken = createSharpSanitizer(() => ({
-      rotate: () => ({
-        toBuffer: async () => {
-          throw new Error("Input buffer contains unsupported image format");
-        },
-      }),
-    }));
-    expect(await broken(Buffer.from("x"))).toEqual({ ok: false, error: "Файл не удалось прочитать как снимок." });
-    const odd = createSharpSanitizer(() => ({
-      rotate: () => ({ toBuffer: async () => ({ data: Buffer.from("x"), info: { format: "svg" } }) }),
-    }));
-    expect(await odd(Buffer.from("x"))).toMatchObject({ ok: false });
+  const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.alloc(16)]);
+  const avif = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypavif"), Buffer.alloc(16)]);
+
+  it("turns, flattens and writes a JPEG in this order, whatever the format of the input was", async () => {
+    const steps: string[] = [];
+    expect(await createSharpSanitizer(fakeSharp({ steps }))(heic)).toMatchObject({
+      ok: true,
+      mime: "image/jpeg",
+      ext: "jpg",
+      removed: ["reencoded"],
+    });
+    expect(steps).toEqual(["rotate", "flatten", "jpeg"]);
+  });
+
+  it("refuses a failure of sharp, a result that is not a JPEG, and files of other kinds, without crashing", async () => {
+    expect(await createSharpSanitizer(fakeSharp({ fail: true }))(avif)).toEqual({
+      ok: false,
+      error: "Файл не удалось прочитать как снимок.",
+    });
+    const hevc = await createSharpSanitizer(fakeSharp({ fail: true }))(heic);
+    expect(hevc.ok ? "" : hevc.error).toContain("JPEG");
+    expect(await createSharpSanitizer(fakeSharp({ format: "heif" }))(heic)).toMatchObject({ ok: false });
+    for (const other of ["GIF89a....", "<svg/>", "II*\0....", "%PDF-1.7"]) {
+      expect(await createSharpSanitizer(fakeSharp({}))(Buffer.from(other, "latin1"))).toEqual({
+        ok: false,
+        error: "Нужен снимок в формате JPEG, PNG или WebP.",
+      });
+    }
+  });
+});
+
+describe("sanitizeImage: files built to hurt (broken structure, millions of tiny parts)", () => {
+  const SECRET = "SECRET-GPS-41.2995N";
+
+  it("does not keep a metadata tail behind a segment with a broken length (zero)", async () => {
+    const hostile = Buffer.from([
+      0xff,
+      0xd8,
+      ...JFIF,
+      ...TINY_BODY,
+      0xff,
+      0xe1,
+      0,
+      0,
+      ...exifPayload(1),
+      ...ascii(SECRET),
+    ]);
+    const r = await sanitizeImage(hostile);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.toString("latin1")).not.toContain(SECRET);
+    expect(r.data.toString("latin1")).not.toContain("Exif");
+    expect(r.data.subarray(-2)).toEqual(Buffer.from([0xff, 0xd9]));
+    expect(r.removed).toContain("trailer");
+  });
+
+  it("does not keep a metadata tail behind a segment whose length runs past the end of the file", async () => {
+    const hostile = Buffer.from([
+      0xff,
+      0xd8,
+      ...JFIF,
+      ...TINY_BODY,
+      0xff,
+      0xe1,
+      0xff,
+      0xff,
+      ...exifPayload(1),
+      ...ascii(SECRET),
+    ]);
+    const r = await sanitizeImage(hostile);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.toString("latin1")).not.toContain(SECRET);
+    expect(r.data.subarray(-2)).toEqual(Buffer.from([0xff, 0xd9]));
+  });
+
+  it("does not keep a marker that is cut off at the very end", async () => {
+    const hostile = Buffer.from([0xff, 0xd8, ...JFIF, ...TINY_BODY, 0xff, 0xe1, 0x00]);
+    const r = await sanitizeImage(hostile);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.toString("latin1")).not.toContain("\xff\xe1");
+  });
+
+  it("refuses a JPEG with hundreds of segments before the picture (a real one has a few dozen)", async () => {
+    const comments = Array.from({ length: 300 }, () => segment(0xfe, [0x41]));
+    expect(await sanitizeImage(jpegWith(JFIF, ...comments))).toEqual({ ok: false, error: "Файл повреждён." });
+  });
+
+  it("refuses a JPEG that cuts thousands of metadata segments out of its scan data", async () => {
+    const piece = [0x00, 0xff, 0xfe, 0x00, 0x02];
+    const many = Buffer.from(Array.from({ length: 6000 }, () => piece).flat());
+    const hostile = Buffer.concat([Buffer.from([0xff, 0xd8, ...JFIF]), TINY_BODY, many, Buffer.from([0xff, 0xd9])]);
+    expect(await sanitizeImage(hostile)).toEqual({ ok: false, error: "Файл повреждён." });
+  });
+
+  it("refuses a PNG and a WebP made of tens of thousands of empty chunks", async () => {
+    const crc = Buffer.alloc(4);
+    const pngChunk = (type: string, data: Buffer) => {
+      const len = Buffer.alloc(4);
+      len.writeUInt32BE(data.length);
+      return Buffer.concat([len, Buffer.from(type, "latin1"), data, crc]);
+    };
+    const ihdr = pngChunk("IHDR", Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0]));
+    const idat = pngChunk("IDAT", Buffer.alloc(0));
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      ihdr,
+      ...Array.from({ length: 30_000 }, () => idat),
+      pngChunk("IEND", Buffer.alloc(0)),
+    ]);
+    expect(await sanitizeImage(png)).toEqual({ ok: false, error: "Файл повреждён." });
+
+    const wchunk = Buffer.concat([Buffer.from("JUNK", "latin1"), Buffer.alloc(4)]);
+    const inner = Buffer.concat([Buffer.from("WEBP", "latin1"), ...Array.from({ length: 30_000 }, () => wchunk)]);
+    const head = Buffer.alloc(8);
+    head.write("RIFF", 0, "latin1");
+    head.writeUInt32LE(inner.length, 4);
+    expect(await sanitizeImage(Buffer.concat([head, inner]))).toEqual({ ok: false, error: "Файл повреждён." });
   });
 });

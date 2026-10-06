@@ -11,6 +11,32 @@ import { type FallbackSanitizer, sanitizeImage } from "./image.ts";
 
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
+/**
+ * Cleaning a picture holds the whole file and a working copy in memory (and sharp, more), and the admin container has
+ * 384 MB. Two cleanings run at once, a few wait, and the rest are turned away with a plain message.
+ */
+export const MAX_PARALLEL_CLEANINGS = 2;
+export const MAX_WAITING_CLEANINGS = 8;
+const BUSY = "Сервер занят обработкой других снимков. Повторите через минуту.";
+
+const cleaning = { active: 0, waiting: [] as Array<() => void> };
+
+/** The slot is taken, or null when the queue is full. The function that gives the slot back is returned. */
+async function takeCleaningSlot(): Promise<(() => void) | null> {
+  if (cleaning.active >= MAX_PARALLEL_CLEANINGS) {
+    if (cleaning.waiting.length >= MAX_WAITING_CLEANINGS) return null;
+    await new Promise<void>((resolve) => cleaning.waiting.push(resolve));
+  } else {
+    cleaning.active += 1;
+  }
+  return () => {
+    // The slot goes straight to the next in the queue (the count of the active stays), or is freed.
+    const next = cleaning.waiting.shift();
+    if (next) next();
+    else cleaning.active -= 1;
+  };
+}
+
 type RetentionClass = "lead_12m" | "order_warranty_plus_3y" | "tax_5y" | "ai_90d" | "media";
 
 /** What a file is for decides how long it is kept (ARCHITECTURE 10.2) and whether it may show a person's data. */
@@ -73,7 +99,7 @@ export interface UploadDeps {
   files: FileSink;
   registry: FileRegistry;
   audit: AuditSink;
-  /** sharp, once the integrator wires it: reads HEIC and anything else the plain cleaner does not. */
+  /** sharp: reads what the plain cleaner does not (HEIF/AVIF) and re-encodes it without metadata. */
   fallback?: FallbackSanitizer;
 }
 
@@ -99,7 +125,14 @@ export async function saveUpload(
   if (!kind) return { ok: false, error: "Неизвестный вид файла." };
   if (input.bytes.length > MAX_UPLOAD_BYTES) return { ok: false, error: "Файл больше 12 МБ." };
 
-  const clean = await sanitizeImage(input.bytes, deps.fallback ? { fallback: deps.fallback } : {});
+  const release = await takeCleaningSlot();
+  if (!release) return { ok: false, error: BUSY };
+  let clean: Awaited<ReturnType<typeof sanitizeImage>>;
+  try {
+    clean = await sanitizeImage(input.bytes, deps.fallback ? { fallback: deps.fallback } : {});
+  } finally {
+    release();
+  }
   if (!clean.ok) return clean;
 
   const sha256 = createHash("sha256").update(clean.data).digest("hex");

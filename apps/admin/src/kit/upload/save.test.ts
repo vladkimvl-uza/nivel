@@ -6,7 +6,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AuditSink } from "../../auth/audit.ts";
 import type { SessionUser } from "../../auth/service.ts";
 import type { AuditEntry } from "../../auth/store.ts";
-import { createFsFileSink, type FileRegistry, MAX_UPLOAD_BYTES, saveUpload, UPLOAD_KINDS } from "./save.ts";
+import {
+  createFsFileSink,
+  type FileRegistry,
+  MAX_PARALLEL_CLEANINGS,
+  MAX_UPLOAD_BYTES,
+  MAX_WAITING_CLEANINGS,
+  saveUpload,
+  UPLOAD_KINDS,
+} from "./save.ts";
 
 const owner: SessionUser = {
   id: "o1",
@@ -175,5 +183,52 @@ describe("file sink", () => {
     ]) {
       await expect(sink.put(bad, Buffer.from("x")), bad).rejects.toThrow(/storage key/);
     }
+  });
+});
+
+describe("saveUpload: the work on a picture is limited, so that a flood of big files cannot starve the admin", () => {
+  it("runs at most two cleanings at once, queues a few more and turns the rest away", async () => {
+    const { deps } = setup();
+    let active = 0;
+    let peak = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fallback = async (input: Buffer) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await gate;
+      active -= 1;
+      return { ok: true as const, data: Buffer.from(input), mime: "image/jpeg", ext: "jpg", removed: [] };
+    };
+    const heic = (n: number) =>
+      Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.from([n])]);
+    const all = Array.from({ length: 12 }, (_, i) =>
+      saveUpload({ ...deps, fallback }, { actor: assistant, bytes: heic(i), kind: "receipt" }),
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(active).toBe(MAX_PARALLEL_CLEANINGS);
+    release();
+    const results = await Promise.all(all);
+    expect(peak).toBe(MAX_PARALLEL_CLEANINGS);
+    const busy = results.filter((r) => !r.ok && r.error.includes("занят"));
+    expect(busy).toHaveLength(12 - MAX_PARALLEL_CLEANINGS - MAX_WAITING_CLEANINGS);
+    expect(results.filter((r) => r.ok)).toHaveLength(MAX_PARALLEL_CLEANINGS + MAX_WAITING_CLEANINGS);
+  });
+
+  it("lets the next one in after an earlier one failed", async () => {
+    const { deps } = setup();
+    const boom = async () => {
+      throw new Error("sharp fell over");
+    };
+    const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic")]);
+    for (let i = 0; i < 5; i += 1) {
+      await expect(
+        saveUpload({ ...deps, fallback: boom }, { actor: assistant, bytes: heic, kind: "receipt" }),
+      ).rejects.toThrow("sharp fell over");
+    }
+    const ok = await saveUpload(deps, { actor: assistant, bytes: photo(), kind: "receipt" });
+    expect(ok.ok).toBe(true);
   });
 });

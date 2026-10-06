@@ -9,6 +9,7 @@ import { createCatalogResource } from "../kit/catalog/resource.ts";
 import { createPgCatalogStore } from "../kit/catalog/store.pg.ts";
 import { createHttpRevalidator, createSettingsService, type SettingsService } from "../kit/settings/service.ts";
 import { createPgRevalidateRetry, createPgSettingsStore } from "../kit/settings/store.pg.ts";
+import { createLazySharpSanitizer, type SharpFactory } from "../kit/upload/image.ts";
 import { createPgFileRegistry } from "../kit/upload/registry.pg.ts";
 import { createFsFileSink, type UploadDeps } from "../kit/upload/save.ts";
 import { type AuditSink, createPgAuditSink } from "./audit.ts";
@@ -30,6 +31,18 @@ export interface Runtime {
 }
 
 const KEY = Symbol.for("nivel.admin.runtime");
+
+/**
+ * sharp reads the HEIF family and turns and re-encodes phone photos (kit/upload/image.ts). It is a native module kept
+ * out of the bundle (`serverExternalPackages`), loaded on the first picture that needs it. Two threads and no cache: the
+ * container has 384 MB and cleaning is limited to two pictures at once.
+ */
+async function loadSharp(): Promise<SharpFactory> {
+  const sharp = (await import("sharp")).default;
+  sharp.cache(false);
+  sharp.concurrency(2);
+  return sharp;
+}
 
 export function getRuntime(): Runtime {
   const holder = globalThis as unknown as Record<symbol, Runtime | undefined>;
@@ -60,6 +73,7 @@ export function getRuntime(): Runtime {
       files: createFsFileSink(env.FILES_DIR ?? join(process.cwd(), ".data", "files")),
       registry: createPgFileRegistry(db),
       audit,
+      fallback: createLazySharpSanitizer(loadSharp),
     },
     hashIp: (ip) => createHmac("sha256", dataKey).update(`ip:${ip}`).digest("hex").slice(0, 32),
   };
