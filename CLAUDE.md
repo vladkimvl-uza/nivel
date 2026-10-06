@@ -9,7 +9,7 @@
 - Запрещено: `docker system prune`, `docker volume prune`, `docker compose down` без `-p nivel-*`, `docker rm`/`stop` чужих контейнеров, правка `.wslconfig` и настроек Docker Desktop.
 - Свои контейнеры: `nivel-dev-pg` (127.0.0.1:54329, том `nivel-dev-pgdata`), `nivel-test-pg` (127.0.0.1:54339, tmpfs); `mem_limit: 512m` у каждого.
 - Процессы завершать только по PID своего процесса (`taskkill /PID <pid> /T`, `Stop-Process -Id`), сначала проверив его командную строку. Запрещено завершать по имени: `taskkill /IM`, `Stop-Process -Name`, `pkill`, `killall`. 06.10.2026 так были убиты все python.exe на машине, включая чужие.
-- `nivel-test-pg` общий для всех worktree: `pnpm ci:local` и `pnpm infra:test:*` запускать по одному. Если контейнер пересоздан посреди прогона («Connection terminated unexpectedly»), прогон повторить, а не чинить код.
+- `nivel-test-pg` и `nivel-dev-pg` общие для всех worktree. `pnpm infra:*:up` контейнер не пересоздаёт (`--no-recreate`): путь к `infra/postgres/init` у каждой копии свой, и без флага `up` из другой копии убивал чужой прогон. После правки `infra/compose.*.yml` или `infra/postgres/init/**` нужно выполнить `pnpm infra:test:down`, затем `up` — только интегратору и только когда нет других прогонов.
 
 ## Браузер
 
