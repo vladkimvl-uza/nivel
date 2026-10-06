@@ -326,6 +326,12 @@ describe("functions", () => {
     "sales.apply_transition(uuid,jsonb,text,text,text,jsonb,jsonb)": ROLES,
     "ai.purge_expired(timestamp with time zone)": ["nivel_admin", "nivel_worker"],
     "ops.next_number(text,integer)": ["nivel_web", "nivel_admin", "nivel_bot"],
+    // WP-00: what the bot, the site and the worker need and may not do on the tables themselves.
+    "sales.expect_payment(uuid,text,bigint,text,boolean)": ["nivel_worker", "nivel_bot"],
+    "sales.sign_act(uuid,text,jsonb)": ["nivel_bot"],
+    "sales.warranty_fund_state(timestamp with time zone)": ROLES,
+    "sales.purge_expired_leads(timestamp with time zone)": ["nivel_admin", "nivel_worker"],
+    "ops.purge_expired_files(timestamp with time zone)": ["nivel_admin", "nivel_worker"],
     "ops.consent_granted(uuid,text)": ROLES,
     // A trigger function: it runs with the trigger, nobody calls it.
     "ops.guard_consent()": [],

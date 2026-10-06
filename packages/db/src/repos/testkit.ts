@@ -297,3 +297,47 @@ export function openDb(role: Role = "ADMIN"): Db {
   if (!url) throw new Error(`DATABASE_URL_${role} is not set (integration project only)`);
   return createDb(url, { max: 4 });
 }
+
+/** The current quote of the order is marked as sent by hand (what the owner does before SEND_ESTIMATE); run as migrator or admin. */
+export async function sendQuote(client: pg.Client, quoteId: string): Promise<void> {
+  const owner = await insertAdminUser(client, { role: "owner" });
+  await client.query(
+    `update sales.quotes set status = 'sent', sent_at = now(), manually_checked_by = $2, manually_checked_at = now()
+      where id = $1`,
+    [quoteId, owner.id],
+  );
+}
+
+/** An unsigned act of the order. */
+export async function insertAct(
+  client: pg.Client,
+  orderId: string,
+  kind: "material_acceptance" | "customer_parts" | "handover" = "material_acceptance",
+): Promise<string> {
+  const row = await one<{ id: string }>(
+    client,
+    "insert into sales.acts (order_id, kind, lines) values ($1, $2, '[]'::jsonb) returning id",
+    [orderId, kind],
+  );
+  return row.id;
+}
+
+export interface FileFixture {
+  retention: "lead_12m" | "order_warranty_plus_3y" | "tax_5y" | "ai_90d" | "media";
+  /** SQL interval of the age, e.g. "13 months"; the row is written with created_at = now() - age. */
+  age: string;
+  kind?: string;
+}
+
+/** A registered file of the given class and age; returns its id and its storage key. Run as migrator or admin. */
+export async function insertFile(client: pg.Client, f: FileFixture): Promise<{ id: string; storageKey: string }> {
+  const n = uniq();
+  const storageKey = `test/${f.retention}/${n}-${Math.random().toString(36).slice(2, 8)}`;
+  const row = await one<{ id: string }>(
+    client,
+    `insert into ops.files (sha256, mime, bytes, storage_key, kind, retention_class, created_at)
+     values (repeat('a', 64), 'application/pdf', 10, $1, $2, $3, now() - $4::interval) returning id`,
+    [storageKey, f.kind ?? "quote_pdf", f.retention, f.age],
+  );
+  return { id: row.id, storageKey };
+}

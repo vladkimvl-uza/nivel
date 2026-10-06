@@ -13,7 +13,7 @@ import {
   settings,
   thresholdSnapshots,
 } from "../schema/ops.ts";
-import { DbRuleError, expectUpdated } from "./errors.ts";
+import { DbRuleError, expectUpdated, guarded } from "./errors.ts";
 import type { Executor, Tx } from "./executor.ts";
 import { MS_PER_MINUTE } from "./time.ts";
 
@@ -247,6 +247,19 @@ export async function registerFile(db: Executor, input: FileInsert): Promise<str
 export async function getFile(db: Executor, id: string) {
   const [row] = await db.select().from(files).where(eq(files.id, id));
   return row ?? null;
+}
+
+/**
+ * Deletes the rows of the files whose retention class has run out (ops.purge_expired_files) and answers their storage
+ * keys: the caller removes the bytes from the disk. For the admin panel and the worker. A file whose bytes could not be
+ * removed stays on the disk without a row: the keys are the only record, so the caller logs a failure by key.
+ */
+export async function purgeExpiredFiles(db: Executor, now?: Date): Promise<string[]> {
+  const at = now === undefined ? null : now.toISOString();
+  const { rows } = await guarded(() =>
+    db.execute<{ storage_key: string }>(sql`select storage_key from ops.purge_expired_files(${at}::timestamptz)`),
+  );
+  return rows.map((r) => r.storage_key).sort();
 }
 
 // ---- public numbers ---------------------------------------------------------------------------------------------

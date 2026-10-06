@@ -27,6 +27,11 @@ export type DbRuleCode =
   | "invalid_event"
   | "invalid_actor"
   | "text_hash_mismatch"
+  | "invalid_payment"
+  | "invalid_evidence"
+  | "evidence_mismatch"
+  | "act_already_signed"
+  | "act_not_found"
   | "check_violation"
   | "unique_violation"
   | "foreign_key_violation"
@@ -57,6 +62,11 @@ const KEYED: ReadonlySet<string> = new Set<DbRuleCode>([
   "invalid_event",
   "invalid_actor",
   "text_hash_mismatch",
+  "invalid_payment",
+  "invalid_evidence",
+  "evidence_mismatch",
+  "act_already_signed",
+  "act_not_found",
 ]);
 
 export class DbRuleError extends Error {

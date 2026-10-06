@@ -21,6 +21,11 @@ describe("toRuleError", () => {
     ["append_only: ops.audit_log forbids UPDATE", "append_only"],
     ["immutable: a sent quote keeps its totals", "immutable"],
     ["text_hash_mismatch: text_sha256 of offer version v1 does not match its text", "text_hash_mismatch"],
+    ["invalid_payment: fee_advance is not paid by bank_transfer_ip", "invalid_payment"],
+    ["invalid_evidence: the press needs the id of the message", "invalid_evidence"],
+    ["evidence_mismatch: the press is not the press of the customer", "evidence_mismatch"],
+    ["act_already_signed: the act was signed at 2026-10-06", "act_already_signed"],
+    ["act_not_found: 0190a1b2", "act_not_found"],
   ])("maps %s", (message, code) => {
     const e = toRuleError(pg("23514", message));
     expect(e).toBeInstanceOf(DbRuleError);
