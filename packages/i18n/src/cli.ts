@@ -1,12 +1,12 @@
 // Command-line logic of tools/i18n-export.mjs, tools/i18n-import.mjs and tools/uz-new-latin.mjs. Plain functions that
 // return the exit code (0 ok, 1 problems found, 2 wrong usage), so that tests run them in-process.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
 import { formatDate } from "./format.ts";
 import { flattenMessages, type MessageTree } from "./messages-check.ts";
 import { toNewLatinMessages } from "./new-latin.ts";
-import { buildExportSheets, importTranslations, readCatalog, readGlossary } from "./translator-flow.ts";
+import { buildExportSheets, importTranslations, readCatalog, readGlossary, readJsonFile } from "./translator-flow.ts";
 import { writeXlsx } from "./xlsx.ts";
 
 export interface CliIo {
@@ -130,6 +130,13 @@ export function runImport(argv: readonly string[], io: CliIo, deps: ImportDeps =
   return 0;
 }
 
+/** True when `child` is `parent` or lies under it. Windows paths ignore letter case, so they are compared in lower case. */
+function isInside(parent: string, child: string): boolean {
+  const fold = (p: string) => (process.platform === "win32" ? p.toLowerCase() : p);
+  const rel = relative(fold(parent), fold(child));
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
 function readExceptions(path: string): string[] {
   const data: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (!Array.isArray(data) || data.some((w) => typeof w !== "string"))
@@ -149,7 +156,7 @@ export function runNewLatin(argv: readonly string[], io: CliIo): number {
   const root = resolve(parsed.values.root ?? process.cwd());
   const messages = join(root, "packages", "i18n", "messages");
   const out = parsed.values.out ? resolve(parsed.values.out) : null;
-  if (out && (out === messages || out.startsWith(messages + sep))) {
+  if (out && isInside(messages, out)) {
     io.error(`uz-new-latin: refusing to write inside the messages folder (${messages}); choose another --out`);
     return 2;
   }
@@ -169,7 +176,13 @@ export function runNewLatin(argv: readonly string[], io: CliIo): number {
   let total = 0;
   let changed = 0;
   for (const f of files) {
-    const before = JSON.parse(readFileSync(join(dir, f), "utf8")) as MessageTree;
+    let before: MessageTree;
+    try {
+      before = readJsonFile(join(dir, f)) as MessageTree;
+    } catch (e) {
+      io.error(`uz-new-latin: ${(e as Error).message}`);
+      return 2;
+    }
     const after = toNewLatinMessages(before, { exceptions });
     const a = flattenMessages(before);
     const b = new Map(flattenMessages(after));

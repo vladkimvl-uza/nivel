@@ -1,11 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runExport, runImport, runNewLatin } from "./cli.ts";
-import { botFixture, makeRoot, readJson, siteFixture } from "./flow-fixtures.ts";
+import { botFixture, makeRoot, readJson, siteFixture, tempDir } from "./flow-fixtures.ts";
 import { readXlsx, writeXlsx } from "./xlsx.ts";
 
 const O = "ʻ";
@@ -17,7 +16,7 @@ function io() {
 }
 
 const newRoot = () => makeRoot({ site: siteFixture, bot: botFixture });
-const tmp = () => mkdtempSync(join(tmpdir(), "nivel-cli-"));
+const tmp = () => tempDir("nivel-cli-");
 
 describe("runExport", () => {
   it("writes the workbook to --out and reports the counts", () => {
@@ -43,6 +42,15 @@ describe("runExport", () => {
     const out = join(tmp(), "bot.xlsx");
     expect(runExport(["--root", root, "--out", out, "--ns", "bot"], io())).toBe(0);
     expect(readXlsx(readFileSync(out))[0]?.rows).toHaveLength(2);
+  });
+
+  it("names the broken message file in the error", () => {
+    const root = newRoot();
+    writeFileSync(join(root, "packages", "i18n", "messages", "ru", "bot.json"), "{ nope");
+    const o = io();
+    expect(runExport(["--root", root, "--out", join(tmp(), "t.xlsx")], o)).toBe(2);
+    expect(o.err.join("
+")).toMatch(/bot.json/);
   });
 
   it("exits 2 with usage for an unknown option or namespace", () => {
@@ -172,6 +180,34 @@ describe("runNewLatin", () => {
     const o = io();
     expect(runNewLatin(["--root", root, "--out", join(root, "packages", "i18n", "messages", "uz")], o)).toBe(2);
     expect(o.err.join("\n")).toContain("inside the messages folder");
+  });
+
+  it("refuses the messages folder given with a different letter case on Windows", () => {
+    const root = makeRoot({ x: { uz: { a: "a" }, ru: { a: "A" }, meta: {} } });
+    const shouted = join(root, "packages", "I18N", "Messages", "UZ").replace(/^./, (c) => c.toLowerCase());
+    const o = io();
+    const code = runNewLatin(["--root", root, "--out", shouted], o);
+    if (process.platform === "win32") {
+      expect(code).toBe(2);
+      expect(o.err.join("\n")).toContain("inside the messages folder");
+    } else {
+      expect(code).toBe(0); // paths are case-sensitive elsewhere: this is a different folder
+    }
+  });
+
+  it("refuses a sibling folder whose name only starts like the messages folder", () => {
+    const root = makeRoot({ x: { uz: { a: "a" }, ru: { a: "A" }, meta: {} } });
+    const o = io();
+    const sibling = join(root, "packages", "i18n", "messages-copy");
+    expect(runNewLatin(["--root", root, "--out", sibling], o)).toBe(0);
+  });
+
+  it("names the broken file and exits 2 instead of crashing on invalid JSON", () => {
+    const root = makeRoot({ x: { uz: { a: "a" }, ru: { a: "A" }, meta: {} } });
+    writeFileSync(join(root, "packages", "i18n", "messages", "uz", "x.json"), "{ not json");
+    const o = io();
+    expect(runNewLatin(["--root", root], o)).toBe(2);
+    expect(o.err.join("\n")).toMatch(/x.json/);
   });
 
   it("reads an extra exception list from a JSON file", () => {

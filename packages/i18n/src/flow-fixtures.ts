@@ -1,7 +1,8 @@
 // Test helpers shared by flow and CLI tests: a throw-away repository root with message files and the real glossary seed.
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { afterEach } from "vitest";
 
 export interface FixtureNamespace {
   uz: unknown;
@@ -39,8 +40,21 @@ export const botFixture: FixtureNamespace = {
   meta: { start: { context: "Button /start", maxLen: 10, status: "draft" } },
 };
 
+const created: string[] = [];
+
+/** A temporary folder that is removed after the test that asked for it. */
+export function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  created.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 export function makeRoot(namespaces: Record<string, FixtureNamespace>, { glossary = true } = {}): string {
-  const root = mkdtempSync(join(tmpdir(), "nivel-i18n-"));
+  const root = tempDir("nivel-i18n-");
   for (const [ns, files] of Object.entries(namespaces)) {
     for (const kind of ["uz", "ru", "meta"] as const) {
       const path = join(root, "packages", "i18n", "messages", kind, `${ns}.json`);

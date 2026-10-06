@@ -38,8 +38,17 @@ const messagePath = (root: string, kind: "uz" | "ru" | "meta", ns: string) =>
 const glossaryPath = (root: string) => join(root, "packages", "db", "seed", "glossary", "glossary.json");
 const relPath = (kind: "uz" | "ru" | "meta", ns: string) => `packages/i18n/messages/${kind}/${ns}.json`;
 
+/** Reads a JSON file; a broken file is reported with its path, not with a bare parser message. */
+export function readJsonFile(path: string): unknown {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (e) {
+    throw new Error(`${path}: ${(e as Error).message}`, { cause: e });
+  }
+}
+
 function readJsonOr<T>(path: string, fallback: T): T {
-  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as T) : fallback;
+  return existsSync(path) ? (readJsonFile(path) as T) : fallback;
 }
 
 /** Reads message files; `only` limits (and validates) the namespaces. */
@@ -67,7 +76,7 @@ export function readCatalog(root: string, only?: readonly string[]): Catalog {
 /** The glossary seed of the repository, or null when the file is not there. */
 export function readGlossary(root: string): GlossaryTerm[] | null {
   const path = glossaryPath(root);
-  return existsSync(path) ? parseGlossary(JSON.parse(readFileSync(path, "utf8"))) : null;
+  return existsSync(path) ? parseGlossary(readJsonFile(path)) : null;
 }
 
 function lookup(tree: MessageTree, key: string): string | undefined {
