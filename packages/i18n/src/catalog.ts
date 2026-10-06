@@ -1,17 +1,20 @@
 // The message catalog of the app: static JSON imports, so that bundlers (Next.js) and Node (bot, PDF) read the same files.
-// A new namespace file messages/{uz,ru,meta}/<ns>.json is added to the lists below in the same change (repo-messages.test.ts
-// fails when a file on disk is not registered).
+// A package writes its namespace files messages/{uz,ru,meta}/<ns>.json; the integrator adds the registration to the lists
+// below when the branch is merged (docs/arch/OWNERSHIP.md). repo-messages.test.ts warns about a file on disk that is not
+// registered, and fails with NIVEL_STRICT_NAMESPACES=1, which is the check before the merge.
 
 import ruCommon from "../messages/ru/common.json" with { type: "json" };
+import ruQuote from "../messages/ru/quote.json" with { type: "json" };
 import uzCommon from "../messages/uz/common.json" with { type: "json" };
+import uzQuote from "../messages/uz/quote.json" with { type: "json" };
 import type { AppLocale } from "./locales.ts";
 import type { MessageTree } from "./messages-check.ts";
 
 export type Messages = MessageTree;
 
 const catalog = {
-  uz: { common: uzCommon },
-  ru: { common: ruCommon },
+  uz: { common: uzCommon, quote: uzQuote },
+  ru: { common: ruCommon, quote: ruQuote },
 } satisfies Record<AppLocale, Record<string, MessageTree>>;
 
 export type Namespace = keyof (typeof catalog)["uz"];

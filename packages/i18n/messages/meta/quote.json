@@ -1,0 +1,17 @@
+{
+  "quote.empty": {
+    "context": "warning under the estimate: no line adds to the cost (the estimate is empty, or has only the customer's own items or zero sums) (computeQuote: quote.empty)",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "quote.reserve_high": {
+    "context": "warning under the estimate: memory and SSD are a large share of the purchase, so the price-growth reserve is raised; no numbers in the text, the rates are owner settings and the reserve line of the estimate shows the rate (computeQuote: quote.reserve_high, parameter shareBp is not shown)",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "quote.free_window_unavailable": {
+    "context": "warning under the estimate in the range of the free-window segment: there is no free window (free = unoccupied slot in the owner's workload, not free of charge) for a full cycle, only the paid selection service (podbor) is available (computeQuote: quote.free_window_unavailable)",
+    "maxLen": 160,
+    "status": "draft"
+  }
+}

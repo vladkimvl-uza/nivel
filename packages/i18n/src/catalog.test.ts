@@ -107,8 +107,39 @@ describe("Uzbek text API re-exported from the domain (ARCHITECTURE 4.12)", () =>
     expect(typeof api.uzSearchKey).toBe("function");
   });
 
-  it.todo(
-    "after the WP-02 merge: normalizeUz from @nivel/i18n turns apostrophes after o/g into U+02BB and other apostrophes between letters into U+02BC",
-  );
-  it.todo(`after the WP-02 merge: uzSearchKey("o'yin") equals uzSearchKey("oʻyin") (catalog search)`);
+  it("is the implementation of @nivel/domain, not a copy", async () => {
+    const api = await import("./index.ts");
+    const domain = await import("@nivel/domain/text");
+    expect(api.normalizeUz).toBe(domain.normalizeUz);
+    expect(api.uzSearchKey).toBe(domain.uzSearchKey);
+  });
+
+  it("normalizeUz turns apostrophes after o/g into U+02BB and other apostrophes between letters into U+02BC", async () => {
+    const { normalizeUz } = await import("./index.ts");
+    expect(normalizeUz("o'zbek g'isht")).toBe("oʻzbek gʻisht");
+    expect(normalizeUz("ma'lumot san'at")).toBe("maʼlumot sanʼat");
+    expect(normalizeUz("O’zbekiston")).toBe("Oʻzbekiston");
+    expect(normalizeUz("tog'")).toBe("togʻ"); // at the end of a word, too
+    expect(normalizeUz("Salom")).toBe("Salom"); // text without apostrophes is untouched
+  });
+
+  it("normalizeUz does not rewrite a sign that is already correct, and leaves Cyrillic alone", async () => {
+    const { normalizeUz } = await import("./index.ts");
+    const done = "oʻzbek maʼlumot";
+    expect(normalizeUz(done)).toBe(done);
+    expect(normalizeUz(normalizeUz("o'zbek"))).toBe("oʻzbek");
+    expect(normalizeUz("д'Артаньян")).toBe("д'Артаньян");
+  });
+
+  it("normalizeUz rejects a value that is not a string", async () => {
+    const { normalizeUz } = await import("./index.ts");
+    expect(() => normalizeUz(undefined as never)).toThrow(TypeError);
+  });
+
+  it('uzSearchKey makes "o\'yin" and "oʻyin" the same key (catalog search)', async () => {
+    const { uzSearchKey } = await import("./index.ts");
+    expect(uzSearchKey("o'yin")).toBe(uzSearchKey("oʻyin"));
+    expect(uzSearchKey("O‘YIN")).toBe(uzSearchKey("oʻyin"));
+    expect(uzSearchKey("  Ma'lumot   BAZASI ")).toBe(uzSearchKey("maʼlumot bazasi"));
+  });
 });

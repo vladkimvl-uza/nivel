@@ -1,5 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { normalizeUz } from "@nivel/domain/text";
 import { describe, expect, it } from "vitest";
 import { botFixture, makeRoot, readJson, readText, siteFixture } from "./flow-fixtures.ts";
 import { parseGlossary } from "./glossary.ts";
@@ -73,6 +74,19 @@ describe("export", () => {
   it("builds Translations, a translator guide and the glossary, in this order", () => {
     const sheets = buildExportSheets(catalog, glossary);
     expect(sheets.map((s) => s.name)).toEqual([TRANSLATIONS_SHEET, "Памятка", "Glossary"]);
+  });
+
+  it("explains in the guide that a number may be written as {count} ta for a Russian plural, and which types stay strict", () => {
+    const guide =
+      buildExportSheets(catalog, glossary)[1]
+        ?.rows.map((r) => String(r[0]))
+        .join(" ") ?? "";
+    expect(guide).toContain("{count} ta");
+    expect(guide).toContain("{count, number}");
+    expect(guide).toContain("selectordinal");
+    expect(guide).not.toContain("импорт считает разными");
+    expect(guide).toContain("только если в русском тексте это число"); // a plain Russian {name} stays strict
+    expect(guide).toMatch(/date.*time.*select|дата.*время.*select/s);
   });
 
   it("writes the header and one row per key: namespace, key, context, limit, ru, uz, status, screenshot", () => {
@@ -401,10 +415,50 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
     ]);
   });
 
+  it("rejects a number or plural for a plain Russian {name}: the name is a string and would print NaN", () => {
+    for (const bad of ["Hi {name, number}", "{name, plural, other {#}}"]) {
+      const { report } = run((wb) => wb.set("site", "hello", "uz", bad));
+      const differs = report.errors.filter((e) => e.includes("placeholders differ"));
+      expect(differs, bad).toHaveLength(1);
+      expect(differs[0], bad).toContain("placeholders differ from ru: ru {name:argument}");
+    }
+  });
+
+  it("rejects an unknown argument type such as {count, numeric}", () => {
+    const { report } = run((wb) => wb.set("site", "hero.count", "uz", "{count, numeric} ta mahsulot"));
+    expect(report.errors).toHaveLength(1);
+    expect(report.errors[0]).toContain("numeric");
+  });
+
   it("shows the types when only the type of a placeholder differs", () => {
-    const { report } = run((wb) => wb.set("site", "hello", "uz", "Hi {name, number}"));
+    const { report } = run((wb) => wb.set("site", "hello", "uz", "Hi {name, date}"));
     expect(report.errors).toEqual([
-      "row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {name:number}",
+      "row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {name:date}",
+    ]);
+  });
+
+  it("accepts a plain number for a Russian plural: {count} ta ... is the natural Uzbek", () => {
+    const root = newRoot();
+    const wb = open(exportTranslations(root));
+    wb.set("site", "hero.count", "uz", "{count} ta mahsulot");
+    const report = importTranslations(root, wb.save());
+    expect(report.errors).toEqual([]);
+    expect(report.changes.map((c) => `${c.namespace}:${c.key}`)).toEqual(["site:hero.count"]);
+    expect((readJson(root, "uz", "site") as { hero: { count: string } }).hero.count).toBe("{count} ta mahsulot");
+  });
+
+  it("accepts {count, number} and selectordinal for a Russian plural, and rejects a renamed or date-typed one", () => {
+    for (const ok of ["{count, number} ta mahsulot", "{count, selectordinal, other {#-chi}}"]) {
+      const { report } = run((wb) => wb.set("site", "hero.count", "uz", ok));
+      expect(report.errors, ok).toEqual([]);
+    }
+    const renamed = run((wb) => wb.set("site", "hero.count", "uz", "{soni} ta mahsulot"));
+    expect(renamed.report.errors).toEqual([
+      "row 4: site:hero.count placeholders differ from ru: ru {count:plural}, uz {soni:argument}",
+    ]);
+    const date = run((wb) => wb.set("site", "hero.count", "uz", "{count, date} ta"));
+    expect(date.report.errors).toEqual([
+      "row 4: site:hero.count placeholders differ from ru: ru {count:plural}, uz {count:date}",
     ]);
   });
 
@@ -497,8 +551,8 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
   });
 });
 
-describe("import: normalization hook (normalizeUz comes from WP-02)", () => {
-  // Stand-in with the contract of ARCHITECTURE 4.12; the real function is tested after the WP-02 merge.
+describe("import: normalization hook", () => {
+  // Stand-in with the contract of ARCHITECTURE 4.12 for the hook tests; the real normalizeUz (WP-02) is used in the last two tests.
   const fake = (s: string) => s.replace(/([oOgG])['‘’`ʼ]/g, `$1${O}`).replace(/(?<=\p{L})['’]/gu, T);
 
   it("fixes apostrophes in changed rows before the checks and reports it", () => {
@@ -523,9 +577,24 @@ describe("import: normalization hook (normalizeUz comes from WP-02)", () => {
     expect(calls).toBe(0);
   });
 
-  it.todo(
-    "after the WP-02 merge: the import runs the real normalizeUz from @nivel/domain (oʻ, gʻ to U+02BB, other apostrophes to U+02BC)",
-  );
+  it("runs the real normalizeUz from @nivel/domain (oʻ, gʻ to U+02BB, other apostrophes to U+02BC)", () => {
+    const root = newRoot();
+    const wb = open(exportTranslations(root));
+    wb.set("site", "hello", "uz", "g'oya, ma'no {name}");
+    const report = importTranslations(root, wb.save(), { normalize: normalizeUz });
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toEqual(["row 5: site:hello uz apostrophes normalized"]);
+    expect((readJson(root, "uz", "site") as { hello: string }).hello).toBe(`g${O}oya, ma${T}no {name}`);
+  });
+
+  it("the real normalizeUz leaves a correct new text as typed: no warning, one change", () => {
+    const root = newRoot();
+    const wb = open(exportTranslations(root));
+    wb.set("site", "hello", "uz", `g${O}oya, ma${T}no {name}`);
+    const report = importTranslations(root, wb.save(), { normalize: normalizeUz });
+    expect(report.warnings).toEqual([]);
+    expect(report.changes).toHaveLength(1);
+  });
 });
 
 describe("import: broken input files", () => {

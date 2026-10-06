@@ -1,6 +1,14 @@
 import { createTranslator } from "use-intl/core";
 import { describe, expect, it } from "vitest";
-import { checkIcuSyntax, placeholderSignature, placeholders, sampleValues } from "./icu.ts";
+import {
+  checkIcuSyntax,
+  compatibleSignature,
+  numericNames,
+  placeholderSignature,
+  placeholders,
+  placeholdersCompatible,
+  sampleValues,
+} from "./icu.ts";
 
 describe("placeholders", () => {
   it("returns sorted argument names", () => {
@@ -48,6 +56,79 @@ describe("placeholderSignature", () => {
     const uz = "{count, plural, one {# ta} other {# ta}}";
     const ru = "{count, plural, one {# шт.} few {# шт.} many {# шт.} other {# шт.}}";
     expect(placeholderSignature(uz)).toEqual(placeholderSignature(ru));
+  });
+});
+
+describe("numericNames, compatibleSignature and placeholdersCompatible(uz, ru)", () => {
+  const ruPlural = "{count, plural, one {# товар} few {# товара} many {# товаров} other {# товара}}";
+
+  it("numericNames lists the names the Russian text declares as number, plural or selectordinal", () => {
+    expect(numericNames("{count} {n, number} {m, plural, other {#}} {o, selectordinal, other {#}}")).toEqual([
+      "m",
+      "n",
+      "o",
+    ]);
+    expect(numericNames("Привет, {name}! {d, date} {g, select, other {x}}")).toEqual([]);
+    expect(numericNames("{n} шт., {n, plural, other {#}}")).toEqual(["n"]);
+  });
+
+  it("compatibleSignature puts the numeric names' number-like types into one class and keeps the rest apart", () => {
+    const numeric = new Set(["count"]);
+    expect(compatibleSignature("{count}", numeric)).toEqual(["count:#numeric"]);
+    expect(compatibleSignature("{count, number}", numeric)).toEqual(["count:#numeric"]);
+    expect(compatibleSignature(ruPlural, numeric)).toEqual(["count:#numeric"]);
+    expect(compatibleSignature("{count, selectordinal, other {#-chi}}", numeric)).toEqual(["count:#numeric"]);
+    expect(compatibleSignature("{count, date}", numeric)).toEqual(["count:date"]);
+    expect(compatibleSignature("{d, date, short} {t, time} {g, select, a {x} other {y}} {n}", new Set())).toEqual([
+      "d:date",
+      "g:select",
+      "n:argument",
+      "t:time",
+    ]);
+  });
+
+  it("accepts the natural Uzbek '{count} ta ...' for a Russian plural (Uzbek does not decline the noun after a number)", () => {
+    expect(placeholdersCompatible("{count} ta mahsulot", ruPlural)).toBe(true);
+    expect(placeholdersCompatible("{count, number} ta mahsulot", ruPlural)).toBe(true);
+    expect(placeholdersCompatible("{count, plural, one {# ta} other {# ta}}", ruPlural)).toBe(true);
+    expect(placeholdersCompatible("{count, selectordinal, other {#-chi}}", ruPlural)).toBe(true);
+    expect(placeholdersCompatible("{count} ta", "{count, number} шт.")).toBe(true);
+  });
+
+  it("is directed: a plain Russian {x} may be a string, so uz may not make it a number, plural or selectordinal", () => {
+    expect(placeholdersCompatible("Salom, {name, number}!", "Привет, {name}!")).toBe(false);
+    expect(placeholdersCompatible("{n, plural, other {#}}", "{n} шт.")).toBe(false);
+    expect(placeholdersCompatible("{n, selectordinal, other {#}}", "{n} шт.")).toBe(false);
+    expect(placeholdersCompatible("{n, number}", "{n}")).toBe(false);
+    expect(placeholdersCompatible("Salom, {name}!", "Привет, {name}!")).toBe(true);
+  });
+
+  it("stays strict for the other types", () => {
+    expect(placeholdersCompatible("{count} ta", "{count, date}")).toBe(false);
+    expect(placeholdersCompatible("{count, date}", ruPlural)).toBe(false);
+    expect(placeholdersCompatible("{d, date}", "{d}")).toBe(false);
+    expect(placeholdersCompatible("{d, time}", "{d, date}")).toBe(false);
+    expect(placeholdersCompatible("{g, select, other {x}}", "{g}")).toBe(false);
+    expect(placeholdersCompatible("{d, date}", "{d, date}")).toBe(true);
+  });
+
+  it("stays strict for names: a different, missing or extra argument is not compatible", () => {
+    expect(placeholdersCompatible("{soni} ta", ruPlural)).toBe(false);
+    expect(placeholdersCompatible("ta mahsulot", ruPlural)).toBe(false);
+    expect(placeholdersCompatible("{count} {extra}", "{count, plural, other {#}}")).toBe(false);
+  });
+
+  it("treats a name used both as a plain argument and as a plural like one numeric argument", () => {
+    expect(placeholdersCompatible("{n} ta, {n, plural, other {#}}", "{n, plural, one {#} other {#}}")).toBe(true);
+  });
+
+  it("returns false for an argument that is used as a number in one message and as a date in the other part", () => {
+    expect(placeholdersCompatible("{n} {n, date}", "{n, plural, other {#}}")).toBe(false);
+  });
+
+  it("does not take an invalid type word for a number: {n, numeric} is a syntax error and incompatible", () => {
+    expect(checkIcuSyntax("{n, numeric}")).toContain("numeric");
+    expect(placeholdersCompatible("{n, numeric}", "{n, plural, other {#}}")).toBe(false);
   });
 });
 
