@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // Reads the set of code points a font maps, from a TTF/OTF (sfnt) or a WOFF2 file. Test support: there is no font
 // parser among the dependencies, and `cmap` is the one table that WOFF2 stores untransformed.
 import { brotliDecompressSync } from "node:zlib";
