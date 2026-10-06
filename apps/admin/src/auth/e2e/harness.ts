@@ -6,7 +6,7 @@
 // as a person would.
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -53,6 +53,58 @@ function required(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`${name} is not set (pnpm env:init)`);
   return v;
+}
+
+/**
+ * The test cluster of the machine lives in 256 MB of memory shared by every worktree: eight workers with a database
+ * of ten megabytes each filled it once and the server went down. At most `SLOTS` harnesses exist at a time; a worker
+ * that has no slot waits for one. A lock is a folder with the PID of its owner, taken over when the owner is gone.
+ */
+const SLOTS = 2;
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // signal 0 only asks whether the process exists
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function tryLock(dir: string): (() => void) | null {
+  try {
+    mkdirSync(dir);
+  } catch {
+    try {
+      if (!alive(Number(readFileSync(join(dir, "pid"), "utf8")))) rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // the owner is just writing its PID, or the folder is gone: the next round decides
+    }
+    return null;
+  }
+  writeFileSync(join(dir, "pid"), String(process.pid));
+  let released = false;
+  return () => {
+    // Once: a second call must not remove the lock of whoever took the place meanwhile.
+    if (released) return;
+    released = true;
+    rmSync(dir, { recursive: true, force: true });
+  };
+}
+
+async function acquire(names: string[], timeoutMs: number): Promise<() => void> {
+  const root = join(tmpdir(), `nivel-admin-e2e-locks-${process.env.NIVEL_SLOT ?? "0"}`);
+  mkdirSync(root, { recursive: true });
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    for (const name of names) {
+      const release = tryLock(join(root, name));
+      if (release) return release;
+    }
+    if (Date.now() > deadline)
+      throw new Error(`no free place for the admin e2e (${names.join(", ")}) in ${timeoutMs} ms`);
+    await new Promise((r) => setTimeout(r, 400));
+  }
 }
 
 /**
@@ -162,15 +214,34 @@ const SEED_SETTINGS: Record<string, unknown> = {
 };
 
 export async function startAdminHarness(parallelIndex: number): Promise<AdminHarness> {
+  await ensureStatic();
+  const releaseSlot = await acquire(
+    Array.from({ length: SLOTS }, (_, i) => `slot-${i}`),
+    15 * 60_000,
+  );
+  try {
+    return await boot(parallelIndex, releaseSlot);
+  } catch (error) {
+    releaseSlot();
+    throw error;
+  }
+}
+
+async function boot(parallelIndex: number, releaseSlot: () => void): Promise<AdminHarness> {
   const dataKey = required("DATA_ENC_KEY");
   const hmacKey = required("REVALIDATE_HMAC_KEY");
   const slot = Number(process.env.NIVEL_SLOT ?? "0");
   const portBase = 3100 + 100 * slot;
   const adminPort = portBase + 10 + 2 * parallelIndex;
   const sitePort = portBase + 11 + 2 * parallelIndex;
-  await ensureStatic();
 
-  await prepareTemplate();
+  // The template is built once, by whoever comes first; the others find it ready.
+  const releaseTemplate = await acquire(["template"], 5 * 60_000);
+  try {
+    await prepareTemplate();
+  } finally {
+    releaseTemplate();
+  }
   const database: WorkerDatabase = await createWorkerDatabase(`adm${parallelIndex}`, process.env, {});
   const db: Db = createDb(database.urls.ADMIN, { max: 3 });
   for (const [key, value] of Object.entries(SEED_SETTINGS)) {
@@ -255,13 +326,18 @@ export async function startAdminHarness(parallelIndex: number): Promise<AdminHar
       await db.$client.end().catch(() => {});
       await database.drop().catch(() => {});
       rmSync(filesDir, { recursive: true, force: true });
+      releaseSlot();
     },
   };
 
   try {
     await waitForHealth(baseURL, child, () => output);
+    // The first request to each kind of page loads its code: do it before the tests start counting seconds.
+    for (const path of ["/sign-in", "/forbidden", "/catalog", "/catalog/template?category=gpu", "/journal"]) {
+      await fetch(`${baseURL}${path}`, { redirect: "manual" }).catch(() => {});
+    }
   } catch (error) {
-    await harness.stop();
+    await harness.stop(); // also gives the place back
     throw error;
   }
   return harness;
