@@ -158,22 +158,38 @@ describe("PSU_WATTAGE boundaries (block 28, 3.4)", () => {
     expect(psu(withPsu(650, ti, { maxPowerW: 65 }))).toEqual(["compat.psu_below_recommended"]);
     expect(psu(withPsu(750, ti, { maxPowerW: 65 }))).toEqual([]);
   });
-  it("the headroom warning applies only above the recommendation, at 3000 bp exactly it passes", () => {
-    // peak 410 W, recommended 550 W; headroom of 550 W is 2545 bp, of 586 W is 3003 bp, of 585 W is 2991 bp
+  it("the headroom is counted over the peak: 3000 bp exactly passes, one watt less warns", () => {
+    // peak 410 W; the recommendation is dropped to the 100 W step so that the headroom rule is the one that decides:
+    // 533 W is 3000 bp over the peak (123 / 410), 532 W is 2975 bp
     const base = { maxPowerW: 150 };
     const gpu = { tgpW: 200, vendorRecommendedPsuW: 0 };
-    expect(psu(withPsu(585, gpu, base))).toEqual(["compat.psu_low_headroom"]);
-    expect(psu(withPsu(586, gpu, base))).toEqual([]);
+    const loose = { psuMultiplier: 1, psuSeriesW: [] };
+    const at = (watts: number) => keys(of(withPsu(watts, gpu, base), "PSU_WATTAGE", [], loose));
+    expect(at(533)).toEqual([]);
+    expect(at(532)).toEqual(["compat.psu_low_headroom"]);
+  });
+  it("params of the headroom warning are in whole percent over the peak", () => {
+    const gpu = { tgpW: 200, vendorRecommendedPsuW: 0 };
+    const found = of(withPsu(500, gpu, { maxPowerW: 150 }), "PSU_WATTAGE", [], { psuMultiplier: 1, psuSeriesW: [] });
+    expect(found.map((i) => [i.messageKey, i.params])).toEqual([
+      ["compat.psu_low_headroom", { headroomPct: 21, minPct: 30, peakW: 410 }],
+    ]);
+  });
+  it("a PSU of the recommended wattage gets no headroom warning (peak 410 W, PSU 550 W is 3414 bp over the peak)", () => {
+    const gpu = { tgpW: 200, vendorRecommendedPsuW: 0 };
+    const r = run(withPsu(550, gpu, { maxPowerW: 150 }));
+    expect(r.power).toMatchObject({ peakW: 410, recommendedPsuW: 550, selectedPsuW: 550, headroomBp: 3414 });
+    expect(psu(withPsu(550, gpu, { maxPowerW: 150 }))).toEqual([]);
   });
   it("takes the headroom threshold from the settings", () => {
-    const parts = withPsu(650);
+    const parts = withPsu(550); // peak 293 W: 8771 bp over the peak
     expect(psu(parts)).toEqual([]);
     const strict = of(parts, "PSU_WATTAGE", [], { psuHeadroomWarnBp: 9000 });
     expect(keys(strict)).toEqual(["compat.psu_low_headroom"]);
   });
   it("exposes the estimate in the result", () => {
-    const r = run(withPsu(650));
-    expect(r.power).toEqual({ peakW: 293, recommendedPsuW: 550, selectedPsuW: 650, headroomBp: 5492 });
+    const r = run(withPsu(550));
+    expect(r.power).toEqual({ peakW: 293, recommendedPsuW: 550, selectedPsuW: 550, headroomBp: 8771 });
   });
   it("is not checked for a build without a CPU or a card", () => {
     const r = run(pcBuild({ drop: ["cpu", "gpu"] }));
@@ -202,11 +218,12 @@ describe("PSU_WATTAGE boundaries (block 28, 3.4)", () => {
     expect(r.issues.filter((i) => i.ruleId === "PSU_WATTAGE")).toEqual([]);
     expect(r.verdict).toBe("ok");
   });
-  it("a PSU of exactly the recommended wattage can still warn about headroom (contract quirk, pinned)", () => {
+  it("the PSU of the recommended wattage does not get the headroom warning (the recommendation is the headroom)", () => {
     const gpu = { tgpW: 200, vendorRecommendedPsuW: 0 };
     const r = run(withPsu(550, gpu, { maxPowerW: 150 }));
     expect(r.power).toMatchObject({ peakW: 410, recommendedPsuW: 550 });
-    expect(psu(withPsu(550, gpu, { maxPowerW: 150 }))).toEqual(["compat.psu_low_headroom"]);
+    expect(r.issues.filter((i) => i.ruleId === "PSU_WATTAGE")).toEqual([]);
+    expect(r.verdict).toBe("ok");
   });
   it("still blocks on a lower bound when some inputs are unknown, and lists the unknowns", () => {
     const r = run(pcBuild({ psu: { watts: 100 }, gpu: { tgpW: null } }));

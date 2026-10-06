@@ -145,8 +145,8 @@ const PAIRS: Pair[] = [
   },
   {
     row: "Мощность блока питания",
-    name: "headroom under 30 % (estimate)",
-    parts: pcBuild({ cpu: { maxPowerW: 150 }, gpu: { tgpW: 200, vendorRecommendedPsuW: 0 }, psu: { watts: 550 } }),
+    name: "headroom over the peak under 30 % (estimate: 410 W peak, 500 W PSU is 21 %)",
+    parts: pcBuild({ cpu: { maxPowerW: 150 }, gpu: { tgpW: 200, vendorRecommendedPsuW: 0 }, psu: { watts: 500 } }),
     rules: ["PSU_WATTAGE"],
     level: "проверьте",
   },
@@ -271,14 +271,14 @@ describe("block 28, 3.4: PSU power estimate", () => {
     ]);
   });
 
-  it("the interface example: 420 W estimate, 750 W PSU, headroom 44 %", () => {
+  it("the interface example: 420 W estimate, 750 W PSU, headroom over the peak 78 %", () => {
     const b = build(
       makeProduct("cpu", "cpu", { maxPowerW: 100 }),
       makeProduct("gpu", "gpu", { tgpW: 270 }),
       makeProduct("psu", "psu", { watts: 750 }),
     );
     const est = estimatePower(b.lines, b.catalog, DEFAULT_COMPAT_SETTINGS);
-    expect([est.peakW, est.selectedPsuW, Math.floor((est.headroomBp ?? 0) / 100)]).toEqual([420, 750, 44]);
+    expect([est.peakW, est.selectedPsuW, Math.floor((est.headroomBp ?? 0) / 100)]).toEqual([420, 750, 78]);
   });
 });
 

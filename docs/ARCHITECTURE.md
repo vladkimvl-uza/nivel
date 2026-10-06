@@ -432,7 +432,8 @@ export interface CompatIssue {
   params: Record<string, string | number>;              // { gpuMm: 340, caseMm: 330 }
   fix?: { category: CategoryCode; filter: Record<string, string | number | boolean> };
 }
-export interface PowerEstimate { peakW: number; recommendedPsuW: number; selectedPsuW?: number; headroomBp?: Bp }
+export interface PowerEstimate { peakW: number; recommendedPsuW: number; selectedPsuW?: number;
+  headroomBp?: Bp }            // запас над пиком: (selectedPsuW − peakW) / peakW, ≤ 10 000 (ADR-007, п. 7)
 export interface CompatResult {
   verdict: "ok" | "warn" | "block" | "incomplete";
   issues: CompatIssue[]; power: PowerEstimate; checkedRules: RuleId[];
@@ -475,7 +476,7 @@ export declare function estimatePower(lines: BuildLine[], catalog: CatalogLookup
 | `COOLER_CASE_HEIGHT` | высота кулера ≤ максимума корпуса | block; запас < 5 мм — warn |
 | `COOLER_TDP` | рассеиваемая мощность < максимальной мощности процессора | warn |
 | `AIO_RADIATOR_MOUNT` / `AIO_RADIATOR_THICKNESS` | есть место нужного размера / толщина с вентиляторами | block / warn |
-| `PSU_WATTAGE` | БП ниже пика — block; ниже `max(ряд(пик × 1,3), рекомендация карты)` или запас < 30 % — warn; пик = maxPower CPU + TGP + 50 + 5 × вентиляторы + 15 при СЖО (блок 28, 3.4) | block / warn |
+| `PSU_WATTAGE` | БП ниже пика — block; ниже `max(ряд(пик × 1,3), рекомендация карты)` или запас над пиком < 30 % — warn (запас = (БП − пик) / пик); пик = maxPower CPU + TGP + 50 + 5 × вентиляторы + 15 при СЖО (блок 28, 3.4) | block / warn |
 | `PSU_GPU_CONNECTORS` | разъёмы БП покрывают карту; 12V-2x6 — родной кабель или переходник из комплекта карты (с переходником — warn) | block / warn |
 | `PSU_CASE_FORMFACTOR` / `PSU_CASE_LENGTH` | форм-фактор / длина БП | block / warn |
 | `M2_SLOTS` / `M2_LENGTH` | NVMe больше слотов / длина накопителя против слота | block |

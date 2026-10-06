@@ -533,11 +533,14 @@ export const PC_SCENARIOS: Record<
         fix: { category: "psu", filter: { wattsMin: 650 } },
       },
       {
-        name: "headroom under 30 % although the PSU covers the recommendation",
-        parts: pcBuild({ cpu: { maxPowerW: 150 }, gpu: { tgpW: 200, vendorRecommendedPsuW: 0 }, psu: { watts: 550 } }),
+        // At the default settings the recommendation (peak x 1.3) is itself a 30 % headroom, so the headroom warning
+        // can only be provoked when the owner lowers the multiplier or raises the threshold.
+        name: "headroom over the peak under 30 % with a lowered multiplier",
+        parts: pcBuild({ cpu: { maxPowerW: 150 }, gpu: { tgpW: 200, vendorRecommendedPsuW: 0 }, psu: { watts: 500 } }),
+        settings: { psuMultiplier: 1, psuSeriesW: [] },
         key: "compat.psu_low_headroom",
         severity: "warn",
-        params: { headroomPct: 25, minPct: 30, peakW: 410 },
+        params: { headroomPct: 21, minPct: 30, peakW: 410 },
         products: ["psu"],
       },
     ],
