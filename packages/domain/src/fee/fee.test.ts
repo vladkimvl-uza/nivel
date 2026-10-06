@@ -6,6 +6,7 @@ import {
   computeQuote,
   DEFAULT_FEE_SETTINGS,
   type FeeSettings,
+  MAX_BUDGET_SUM,
   partsBudgetFromTotal,
   podborFee,
   type QuoteContext,
@@ -474,20 +475,52 @@ describe("partsBudgetFromTotal: client budget -> parts", () => {
     expect(() => partsBudgetFromTotal(S(-1), D, bp(300))).toThrow(RangeError);
   });
 
+  it("rejects a budget above the domain limit instead of searching forever (unsafe-integer midpoint regression)", () => {
+    expect(MAX_BUDGET_SUM).toBe(1_000_000_000_000);
+    for (const reserve of [bp(0), bp(300), bp(500)]) {
+      expect(() => partsBudgetFromTotal(S(Number.MAX_SAFE_INTEGER), D, reserve)).toThrow(RangeError);
+      expect(() => partsBudgetFromTotal(S(5_200_000_000_000_000), D, reserve)).toThrow(RangeError);
+      expect(() => partsBudgetFromTotal(S(MAX_BUDGET_SUM + 1), D, reserve)).toThrow(RangeError);
+    }
+  });
+
+  it("terminates and stays exact at the domain limit", () => {
+    for (const reserve of [bp(0), bp(300), bp(500)]) {
+      const parts = partsBudgetFromTotal(S(MAX_BUDGET_SUM), D, reserve);
+      expect(quoteCost(parts, reserve)).toBeLessThanOrEqual(MAX_BUDGET_SUM);
+      expect(quoteCost(parts + 1, reserve)).toBeGreaterThan(MAX_BUDGET_SUM);
+    }
+  });
+
+  /** Independent cost of a PC-scale base: parts + fee + rounded-up reserve (zero parts cost nothing). */
+  function quoteCost(p: number, reserve: Bp): number {
+    if (p === 0) return 0;
+    const fee = computeFee([pcLine(p)], D, { complexBuild: false }).total;
+    const res = Math.ceil((p * reserve) / (10_000 * D.reserveRoundStep)) * D.reserveRoundStep;
+    return p + fee + res;
+  }
+
   it("property: the largest parts whose quote does not exceed the budget", () => {
     forAll(
       (g) => {
         const budget = S(g.int(0, 200_000_000));
         const reserve: Bp = g.pick([bp(300), bp(500), bp(0)]);
         const parts = partsBudgetFromTotal(budget, D, reserve);
-        const cost = (p: number) => {
-          if (p === 0) return 0;
-          const fee = computeFee([pcLine(p)], D, { complexBuild: false }).total;
-          const res = Math.ceil((p * reserve) / (10_000 * D.reserveRoundStep)) * D.reserveRoundStep;
-          return p + fee + res;
-        };
-        expect(cost(parts)).toBeLessThanOrEqual(budget);
-        expect(cost(parts + 1)).toBeGreaterThan(budget);
+        expect(quoteCost(parts, reserve)).toBeLessThanOrEqual(budget);
+        expect(quoteCost(parts + 1, reserve)).toBeGreaterThan(budget);
+      },
+      { runs: 300 },
+    );
+  });
+
+  it("property: the same holds over the whole allowed range up to the domain limit", () => {
+    forAll(
+      (g) => {
+        const budget = S(g.pick([g.int(0, 1_000_000_000), g.int(1_000_000_000, 1_000_000_000_000)]));
+        const reserve: Bp = g.pick([bp(300), bp(500), bp(0)]);
+        const parts = partsBudgetFromTotal(budget, D, reserve);
+        expect(quoteCost(parts, reserve)).toBeLessThanOrEqual(budget);
+        expect(quoteCost(parts + 1, reserve)).toBeGreaterThan(budget);
       },
       { runs: 300 },
     );

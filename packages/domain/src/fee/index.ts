@@ -170,20 +170,28 @@ export function podborFee(fee: FeeBreakdown, s: FeeSettings): Sum {
 }
 
 /**
+ * Upper limit of a client budget the inversion accepts: 1 000 000 000 000 sums (one trillion).
+ * Far above any real order, far below 2^53, so the search arithmetic stays exact. Input schemas must apply the same limit.
+ */
+export const MAX_BUDGET_SUM = 1_000_000_000_000;
+
+/**
  * Client budget -> parts: the largest base whose total (parts + PC-scale fee + reserve) fits the budget.
  * Exact search over the monotone cost, so both branches of the scale (15 % and 10 % with the minimum) are covered
  * and the consistent one is taken; the result always re-quotes within the budget.
+ * Throws RangeError for a negative budget and for a budget above MAX_BUDGET_SUM.
  */
 export function partsBudgetFromTotal(total: Sum, s: FeeSettings, reserveBp: Bp): Sum {
   if (sum(total) < 0) throw new RangeError("Budget must not be negative");
-  const cost = (parts: number): number => {
+  if (total > MAX_BUDGET_SUM) throw new RangeError(`Budget must not exceed ${MAX_BUDGET_SUM} sums`);
+  const cost = (parts: number): Sum => {
     const p = sum(parts);
-    return p + pcScaleFee(p, s) + reserveSumFor(p, reserveBp, s);
+    return addSums(p, pcScaleFee(p, s), reserveSumFor(p, reserveBp, s));
   };
   let lo = 0; // cost(0) = 0 <= total
   let hi: number = total; // cost(p) >= p, so p <= total
   while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
+    const mid = lo + Math.ceil((hi - lo) / 2); // hi - lo is exact: no precision loss in the midpoint
     if (cost(mid) <= total) lo = mid;
     else hi = mid - 1;
   }
