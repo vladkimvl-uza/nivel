@@ -107,7 +107,10 @@ describe("OWNERSHIP.md: registry of translation namespaces", () => {
     // WP-00 keeps "**": the section's bullets (catalog.ts, messages/...) were not added to any owner.
     expect(owners.get("WP-00")?.include).toEqual(["**"]);
     for (const [wp, { include }] of owners) {
-      expect(include.some((g) => g.includes("catalog.ts") || g.includes("NIVEL_STRICT")), wp).toBe(false);
+      expect(
+        include.some((g) => g.includes("catalog.ts") || g.includes("NIVEL_STRICT")),
+        wp,
+      ).toBe(false);
     }
     // The namespace files are still owned by the packages that are named in OWNERSHIP.md.
     expect(owners.get("WP-12")?.include).toContain("packages/i18n/messages/{uz,ru,meta}/pdf.json");
