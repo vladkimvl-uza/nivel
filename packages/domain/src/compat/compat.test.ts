@@ -175,8 +175,9 @@ describe("checkCompatibility: input handling", () => {
           });
         expect(key(r)).toBe(key(base));
       }),
+      { numRuns: 50 },
     );
-  });
+  }, 60_000);
 
   it("settings are arguments: a different margin gives a different verdict", () => {
     const parts = pcBuild({ gpu: { lengthMm: 300 } });

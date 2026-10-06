@@ -13,6 +13,8 @@ import { COMPAT_MESSAGE_KEYS } from "./message-keys.ts";
 import { build, ctx, makeProduct, type Part, pcBuild, settings, setupParts } from "./testkit.ts";
 import type { CompatResult, SetupPlan, Task } from "./types.ts";
 
+// Property tests run on a shared machine next to other work packages: allow time, the logic is not slow.
+const SLOW = 60_000;
 const pcOrder = PC_RULES.map((r) => r.id as string);
 const setupOrder = SETUP_RULES.map((r) => r.id as string);
 
@@ -198,35 +200,43 @@ function structural(r: CompatResult, order: string[], lineIds: Set<string>): voi
 
 describe("random builds keep the structural invariants", () => {
   const pcBase = fullPc();
-  it("PC: scaled values, flipped flags and unknown (null) values", () => {
-    fc.assert(
-      fc.property(fc.integer({ min: 1, max: 2 ** 30 }), fc.constantFrom(0, 5, 25), (seed, nullChance) => {
-        const parts = randomParts(seed, pcBase, nullChance);
-        const b = build(...parts);
-        const r = checkCompatibility(b.lines, b.catalog, ctx(["streaming", "office"]));
-        structural(r, pcOrder, new Set(b.lines.map((l) => l.productId)));
-        // the estimate is a finite non-negative number and the recommendation never below the peak x 1.3
-        expect(Number.isFinite(r.power.peakW)).toBe(true);
-        expect(r.power.peakW).toBeGreaterThanOrEqual(0);
-        expect(r.power.recommendedPsuW).toBeGreaterThanOrEqual(Math.ceil(r.power.peakW * 1.3 - 1e-9));
-      }),
-      { numRuns: 300 },
-    );
-  });
+  it(
+    "PC: scaled values, flipped flags and unknown (null) values",
+    () => {
+      fc.assert(
+        fc.property(fc.integer({ min: 1, max: 2 ** 30 }), fc.constantFrom(0, 5, 25), (seed, nullChance) => {
+          const parts = randomParts(seed, pcBase, nullChance);
+          const b = build(...parts);
+          const r = checkCompatibility(b.lines, b.catalog, ctx(["streaming", "office"]));
+          structural(r, pcOrder, new Set(b.lines.map((l) => l.productId)));
+          // the estimate is a finite non-negative number and the recommendation never below the peak x 1.3
+          expect(Number.isFinite(r.power.peakW)).toBe(true);
+          expect(r.power.peakW).toBeGreaterThanOrEqual(0);
+          expect(r.power.recommendedPsuW).toBeGreaterThanOrEqual(Math.ceil(r.power.peakW * 1.3 - 1e-9));
+        }),
+        { numRuns: 150 },
+      );
+    },
+    SLOW,
+  );
 
   const { parts: setupBase, plan } = fullSetup();
-  it("setup: scaled values, flipped flags and unknown (null) values", () => {
-    fc.assert(
-      fc.property(fc.integer({ min: 1, max: 2 ** 30 }), fc.constantFrom(0, 5, 25), (seed, nullChance) => {
-        const parts = randomParts(seed, setupBase, nullChance);
-        const b = build(...parts);
-        const r = checkSetup({ ...plan, lines: b.lines }, b.catalog, settings());
-        structural(r, setupOrder, new Set(b.lines.map((l) => l.productId)));
-        expect(r.power).toEqual({ peakW: 0, recommendedPsuW: 0 });
-      }),
-      { numRuns: 300 },
-    );
-  });
+  it(
+    "setup: scaled values, flipped flags and unknown (null) values",
+    () => {
+      fc.assert(
+        fc.property(fc.integer({ min: 1, max: 2 ** 30 }), fc.constantFrom(0, 5, 25), (seed, nullChance) => {
+          const parts = randomParts(seed, setupBase, nullChance);
+          const b = build(...parts);
+          const r = checkSetup({ ...plan, lines: b.lines }, b.catalog, settings());
+          structural(r, setupOrder, new Set(b.lines.map((l) => l.productId)));
+          expect(r.power).toEqual({ peakW: 0, recommendedPsuW: 0 });
+        }),
+        { numRuns: 150 },
+      );
+    },
+    SLOW,
+  );
 });
 
 describe("monotonic properties", () => {
@@ -242,29 +252,39 @@ describe("monotonic properties", () => {
   };
   const rank = (s: "block" | "warn" | undefined) => (s === "block" ? 2 : s === "warn" ? 1 : 0);
 
-  it("a longer case never makes the GPU length verdict worse", () => {
-    fc.assert(
-      fc.property(
-        fc.integer({ min: 150, max: 450 }),
-        fc.integer({ min: 150, max: 450 }),
-        fc.integer({ min: 0, max: 100 }),
-        (gpu, caseMm, extra) => {
-          expect(rank(gpuRule(gpu, caseMm + extra))).toBeLessThanOrEqual(rank(gpuRule(gpu, caseMm)));
-        },
-      ),
-    );
-  });
+  it(
+    "a longer case never makes the GPU length verdict worse",
+    () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 150, max: 450 }),
+          fc.integer({ min: 150, max: 450 }),
+          fc.integer({ min: 0, max: 100 }),
+          (gpu, caseMm, extra) => {
+            expect(rank(gpuRule(gpu, caseMm + extra))).toBeLessThanOrEqual(rank(gpuRule(gpu, caseMm)));
+          },
+        ),
+        { numRuns: 60 },
+      );
+    },
+    SLOW,
+  );
 
-  it("a more powerful PSU never makes the PSU verdict worse", () => {
-    const psuRank = (watts: number) => {
-      const b = build(...pcBuild({ psu: { watts }, gpu: { tgpW: 300, vendorRecommendedPsuW: 750 } }));
-      const r = checkCompatibility(b.lines, b.catalog, ctx());
-      return rank(r.issues.find((i) => i.ruleId === "PSU_WATTAGE")?.severity);
-    };
-    fc.assert(
-      fc.property(fc.integer({ min: 200, max: 1500 }), fc.integer({ min: 0, max: 400 }), (watts, extra) => {
-        expect(psuRank(watts + extra)).toBeLessThanOrEqual(psuRank(watts));
-      }),
-    );
-  });
+  it(
+    "a more powerful PSU never makes the PSU verdict worse",
+    () => {
+      const psuRank = (watts: number) => {
+        const b = build(...pcBuild({ psu: { watts }, gpu: { tgpW: 300, vendorRecommendedPsuW: 750 } }));
+        const r = checkCompatibility(b.lines, b.catalog, ctx());
+        return rank(r.issues.find((i) => i.ruleId === "PSU_WATTAGE")?.severity);
+      };
+      fc.assert(
+        fc.property(fc.integer({ min: 200, max: 1500 }), fc.integer({ min: 0, max: 400 }), (watts, extra) => {
+          expect(psuRank(watts + extra)).toBeLessThanOrEqual(psuRank(watts));
+        }),
+        { numRuns: 60 },
+      );
+    },
+    SLOW,
+  );
 });

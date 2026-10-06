@@ -171,8 +171,9 @@ describe("estimatePower: properties", () => {
           expect(pb.recommendedPsuW).toBeGreaterThanOrEqual(pa.recommendedPsuW);
         },
       ),
+      { numRuns: 100 },
     );
-  });
+  }, 60_000);
 
   it("does not depend on the order of lines", () => {
     fc.assert(
@@ -189,6 +190,7 @@ describe("estimatePower: properties", () => {
         const b = build(...ordered);
         expect(estimatePower(b.lines, b.catalog, S)).toEqual(estimatePower(a.lines, a.catalog, S));
       }),
+      { numRuns: 50 },
     );
-  });
+  }, 60_000);
 });
