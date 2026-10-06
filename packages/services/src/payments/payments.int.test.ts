@@ -305,6 +305,30 @@ describe("payments.confirm", () => {
     expect([row.payer_is_customer, row.third_party_statement_file_id]).toEqual([false, statement]);
   });
 
+  it("checks the file of the statement whenever it is named, also when the customer pays himself", async () => {
+    const o = await acceptedOrder(w);
+    const id = await expectAdvance(o);
+    for (const [thirdPartyStatementFileId, code] of [
+      ["not-a-uuid", "uuid_invalid"],
+      [7, "uuid_invalid"],
+      ["0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "file_unknown"],
+    ] as const) {
+      await expect(
+        confirm(
+          {
+            paymentId: id,
+            fiscalReceiptNo: "FR-9",
+            payerIsCustomer: true,
+            thirdPartyStatementFileId: thirdPartyStatementFileId as never,
+          },
+          owner(),
+          w.admin,
+        ),
+      ).rejects.toMatchObject({ name: "ValidationError", issues: [{ path: "thirdPartyStatementFileId", code }] });
+    }
+    expect((await paymentRow(id)).status).toBe("expected");
+  });
+
   it("is for the owner in the admin role only: the assistant does not confirm money", async () => {
     const o = await acceptedOrder(w);
     const id = await expectAdvance(o);

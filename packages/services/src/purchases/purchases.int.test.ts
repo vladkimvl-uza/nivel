@@ -208,6 +208,24 @@ describe("purchases.record", () => {
     ).rejects.toMatchObject({ issues: [{ path: "receiptFileIds", code: "file_unknown" }] });
   });
 
+  it("refuses a product that is not an id or not in the catalog with a validation error, not with an error of the database", async () => {
+    const o = await purchasingOrder(w);
+    w.clock.set(new Date("2026-10-13T10:00:00+05:00"));
+    for (const productId of ["x", 5, "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"]) {
+      await expect(
+        record(await input(o, "cpu", { productId: productId as never }), owner(), w.admin),
+      ).rejects.toMatchObject({ name: "ValidationError", issues: [{ path: "productId" }] });
+    }
+    await expect(
+      record(await input(o, "cpu", { productId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" }), owner(), w.admin),
+    ).rejects.toMatchObject({ issues: [{ path: "productId", code: "product_unknown" }] });
+    await expect(
+      record(await input(o, "cpu", { productId: w.products.cpu.id }), owner(), w.admin),
+    ).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
   it("refuses sums and quantities that are not whole and positive, and serial numbers beyond the quantity", async () => {
     const o = await purchasingOrder(w);
     for (const amountSum of [0, -1, 1.5, Number.NaN]) {

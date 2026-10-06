@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "./errors.ts";
-import { asDate, assertInstant, assertText, assertUuid, assertWholeSum, isCalendarDate, isUuid } from "./validate.ts";
+import {
+  asDate,
+  assertInstant,
+  assertTasks,
+  assertText,
+  assertUuid,
+  assertWholeSum,
+  isCalendarDate,
+  isUuid,
+} from "./validate.ts";
 
 const uuid = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
 
@@ -69,5 +78,25 @@ describe("validate", () => {
     expect(asDate("2026-10-13 05:00:00+00")).toEqual(d);
     expect(asDate("2026-10-13 10:00:00.5+05")).toEqual(new Date("2026-10-13T05:00:00.500Z"));
     expect(() => asDate("yesterday")).toThrow(/not a date/);
+  });
+
+  it("takes one or two different known tasks and nothing else", () => {
+    expect(assertTasks(["gaming"])).toEqual(["gaming"]);
+    expect(assertTasks([])).toEqual([]);
+    expect(assertTasks(["office", "design3d"])).toEqual(["office", "design3d"]);
+    for (const bad of [
+      undefined,
+      null,
+      5,
+      "gaming",
+      {},
+      ["x"],
+      ["gaming", "gaming"],
+      ["gaming", "office", "streaming"],
+      [1],
+      [null],
+    ]) {
+      expect(() => assertTasks(bad)).toThrow(ValidationError);
+    }
   });
 });

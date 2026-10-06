@@ -207,14 +207,15 @@ export async function confirm(
       throw ValidationError.of("fiscalReceiptNo", code, `${payment.kind} cannot be confirmed: ${check.errorKey}`);
     }
     const payerIsCustomer = input.payerIsCustomer ?? payment.payerIsCustomer;
-    if (!payerIsCustomer) {
-      if (input.thirdPartyStatementFileId === undefined) {
-        throw ValidationError.of(
-          "thirdPartyStatementFileId",
-          "statement_required",
-          "the money of a person who is not the customer is taken only with the written statement of that person",
-        );
-      }
+    if (!payerIsCustomer && input.thirdPartyStatementFileId === undefined) {
+      throw ValidationError.of(
+        "thirdPartyStatementFileId",
+        "statement_required",
+        "the money of a person who is not the customer is taken only with the written statement of that person",
+      );
+    }
+    // Whenever a file is named it must be a registered one: the foreign key would answer with an error of the database.
+    if (input.thirdPartyStatementFileId !== undefined) {
       const fileId = assertUuid(input.thirdPartyStatementFileId, "thirdPartyStatementFileId");
       if (!(await ops.getFile(tx, fileId))) {
         throw ValidationError.of(

@@ -125,6 +125,14 @@ export async function record(
         );
       }
     }
+    if (input.productId !== undefined) {
+      const productId = assertUuid(input.productId, "productId");
+      const product = await tx.query.products.findFirst({
+        columns: { id: true },
+        where: (t, { eq }) => eq(t.id, productId),
+      });
+      if (!product) throw ValidationError.of("productId", "product_unknown", "the product is not in the catalog");
+    }
     const vendor = await tx.query.vendors.findFirst({
       columns: { id: true },
       where: (t, { eq }) => eq(t.id, input.vendorId),
