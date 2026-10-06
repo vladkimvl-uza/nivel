@@ -17,8 +17,8 @@ export interface ThemeControllerDeps {
   search?: string | undefined;
   /** Updates `<meta name="theme-color">`. */
   setThemeColor?: ((color: string) => void) | undefined;
-  /** Tells the non-React world (the 3D scene) that the theme changed. */
-  emit?: ((theme: Theme) => void) | undefined;
+  /** Tells the non-React world (the 3D scene) that the theme changed; `animate` is false when the colors do not fade. */
+  emit?: ((theme: Theme, animate: boolean) => void) | undefined;
   reducedMotion?: (() => boolean) | undefined;
   schedule?: ((fn: () => void, ms: number) => unknown) | undefined;
   cancel?: ((handle: unknown) => void) | undefined;
@@ -74,12 +74,13 @@ export function createThemeController(deps: ThemeControllerDeps): ThemeControlle
   const set = (theme: Theme, { persist = true, animate = true }: SetThemeOptions = {}): void => {
     if (!isTheme(theme)) throw new TypeError(`unknown theme: ${String(theme)}`);
     const changed = get() !== theme || root.getAttribute("data-theme") === null;
-    if (animate && changed && !deps.reducedMotion?.()) startShift();
+    const fade = animate && changed && !deps.reducedMotion?.();
+    if (fade) startShift();
     root.setAttribute("data-theme", theme);
     deps.setThemeColor?.(themeTokens[theme].themeColor);
     if (persist) storeTheme(deps.storage, theme);
     if (changed) {
-      deps.emit?.(theme);
+      deps.emit?.(theme, animate && !deps.reducedMotion?.());
       for (const listener of listeners) listener();
     }
   };

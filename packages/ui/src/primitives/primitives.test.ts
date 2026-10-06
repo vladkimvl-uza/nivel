@@ -157,6 +157,25 @@ describe("Select", () => {
     expect(html).toContain('<option value="" disabled="" selected="">Выберите</option>');
   });
 
+  it("shows the placeholder by itself when neither value nor defaultValue is given (no silent first option)", () => {
+    const html = render(h(Select, { id: "k", label: "K", options, placeholder: "Выберите" }));
+    expect(html).toContain('<option value="" disabled="" selected="">Выберите</option>');
+    expect(html).not.toMatch(/<option value="a"[^>]*selected/);
+  });
+
+  it("keeps the caller's choice: a given defaultValue or value is not overridden by the placeholder", () => {
+    const first = options[0]?.value ?? "";
+    const withDefault = render(
+      h(Select, { id: "k", label: "K", options, placeholder: "Выберите", defaultValue: first }),
+    );
+    expect(withDefault).toContain(`<option value="${first}" selected="">`);
+    expect(withDefault).not.toContain('<option value="" disabled="" selected="">');
+    const controlled = render(
+      h(Select, { id: "k", label: "K", options, placeholder: "Выберите", value: first, onChange: () => undefined }),
+    );
+    expect(controlled).toContain(`<option value="${first}" selected="">`);
+  });
+
   it("shares the hint and error semantics of TextField", () => {
     const html = render(h(Select, { id: "k", label: "K", options, error: "Нужно выбрать" }));
     expect(tag(html, "select")).toContain('aria-invalid="true"');

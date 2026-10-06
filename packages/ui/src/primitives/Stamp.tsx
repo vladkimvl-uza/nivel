@@ -24,7 +24,8 @@ export function StampInkDefs() {
 /**
  * Neutral stamp: a word and, below it, a date or a number. It has no business meaning of its own: what it confirms
  * is the caller's business ("Утверждено 05.10.2026 · 15:02", "Сдано 12.10.2026 · NV-0001"). A stamp with a date
- * belongs inside an example document that is marked as one.
+ * belongs inside an example document that is marked as one. `rect` and `RoundStamp` are drawn for paper
+ * (`Paper`) only; `small` also works on the page (it takes the accent ink there).
  */
 export function Stamp({
   word,
@@ -35,13 +36,13 @@ export function Stamp({
   className,
 }: {
   word: string;
-  meta?: string;
+  meta?: string | undefined;
   /** `rect` is the double frame; `small` is for the steps of "How we work". */
-  variant?: "rect" | "small";
-  tilt?: "left" | "right";
+  variant?: "rect" | "small" | undefined;
+  tilt?: "left" | "right" | undefined;
   /** Hide from screen readers when the same words are written next to the stamp. */
-  decorative?: boolean;
-  className?: string;
+  decorative?: boolean | undefined;
+  className?: string | undefined;
 }) {
   assertText(word, "word", "Stamp");
   const hidden = decorative ? true : undefined;
@@ -79,7 +80,7 @@ export function RoundStamp({
   date: string;
   /** Accessible name of the whole stamp. */
   label: string;
-  className?: string;
+  className?: string | undefined;
 }) {
   assertText(id, "id", "RoundStamp");
   assertText(label, "label", "RoundStamp");

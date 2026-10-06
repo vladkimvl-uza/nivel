@@ -36,14 +36,14 @@ function setup(over: Partial<ThemeControllerDeps> = {}) {
   const storage = memoryStorage();
   const timers: { fn: () => void; ms: number; id: number; live: boolean }[] = [];
   const colors: string[] = [];
-  const emitted: string[] = [];
+  const emitted: { theme: string; animate: boolean }[] = [];
   const deps: ThemeControllerDeps = {
     root,
     storage,
     now: () => at(12),
     search: "",
     setThemeColor: (c) => colors.push(c),
-    emit: (t) => emitted.push(t),
+    emit: (theme, animate) => emitted.push({ theme, animate }),
     reducedMotion: () => false,
     schedule: (fn, ms) => {
       timers.push({ fn, ms, id: timers.length, live: true });
@@ -130,7 +130,7 @@ describe("set: switching by the attribute only", () => {
     expect(s.root.getAttribute("data-theme")).toBe("night");
     expect(s.storage.data["nv-theme"]).toBe("night");
     expect(s.colors).toEqual(["#121110"]);
-    expect(s.emitted).toEqual(["night"]);
+    expect(s.emitted).toEqual([{ theme: "night", animate: true }]);
     expect(seen).toEqual(["night"]);
     expect(s.controller.get()).toBe("night");
   });

@@ -391,9 +391,14 @@
   display: inline-block;
   padding: 4px 7px 3px;
   border: 2px solid currentColor;
-  color: var(--stamp);
+  color: var(--accent-ink);
   text-align: center;
   filter: url(#ink);
+}
+
+/* the ink of paper is for paper; on the page (the steps sit on --surface) the stamp takes --accent-ink (4.5:1 and more) */
+.nv-paper .nv-sstamp {
+  color: var(--stamp);
 }
 
 .nv-sstamp b {

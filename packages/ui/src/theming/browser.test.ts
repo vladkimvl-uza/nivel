@@ -34,6 +34,7 @@ function fakeWindow(
         classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
       },
       head: { appendChild: (m: FakeMeta) => metas.push(m) },
+      dispatchEvent: (e: Event) => events.push({ type: e.type, detail: (e as CustomEvent).detail }),
       querySelector: () => metas[0] ?? null,
       createElement: () => meta(),
     },
@@ -43,7 +44,6 @@ function fakeWindow(
     },
     location: { search: over.search ?? "" },
     matchMedia: over.matchMedia === "missing" ? undefined : () => ({ matches: over.matchMedia === true }),
-    dispatchEvent: (e: Event) => events.push({ type: e.type, detail: (e as CustomEvent).detail }),
     setTimeout: (fn: () => void) => timers.push(fn),
     clearTimeout: vi.fn(),
   };
@@ -51,6 +51,20 @@ function fakeWindow(
 }
 
 describe("createBrowserThemeController", () => {
+  it("tells the scene whether the change is animated: not for an automatic change or reduced motion", () => {
+    const f = fakeWindow({ matchMedia: true });
+    const c = createBrowserThemeController(f.win);
+    c.set("night");
+    c.set("day", { animate: false });
+    expect(f.events.map((e) => e.detail)).toEqual([
+      { theme: "night", animate: false },
+      { theme: "day", animate: false },
+    ]);
+    const g = fakeWindow();
+    createBrowserThemeController(g.win).set("night", { animate: false });
+    expect(g.events.map((e) => e.detail)).toEqual([{ theme: "night", animate: false }]);
+  });
+
   it("applies the theme to the page, adds the theme-color meta once, saves the choice and fires nv-theme", () => {
     const f = fakeWindow();
     const c = createBrowserThemeController(f.win);
@@ -62,9 +76,10 @@ describe("createBrowserThemeController", () => {
     expect(f.metas).toHaveLength(1);
     expect(f.metas[0]?.attrs.content).toBe("#F1EFEA");
     expect(f.store["nv-theme"]).toBe("day");
+    // On `document`, with `{ theme, animate }`: the contract of DESIGN_SYSTEM 7.4 (the scene of WP-21 listens to it).
     expect(f.events).toEqual([
-      { type: THEME_EVENT, detail: "night" },
-      { type: THEME_EVENT, detail: "day" },
+      { type: THEME_EVENT, detail: { theme: "night", animate: true } },
+      { type: THEME_EVENT, detail: { theme: "day", animate: true } },
     ]);
     expect(THEME_EVENT).toBe("nv-theme");
   });

@@ -50,14 +50,14 @@ export function EstimateRow({
   kind = "item",
 }: {
   /** A number gets two digits (`3` -> `03`); a string is shown as is. */
-  index?: number | string;
+  index?: number | string | undefined;
   name: ReactNode;
   note?: ReactNode;
   amount: number;
   /** Usually in the column header instead. */
-  unit?: string;
+  unit?: string | undefined;
   /** A refund to the customer is shown in the refund color with a minus. */
-  kind?: "item" | "refund";
+  kind?: "item" | "refund" | undefined;
 }) {
   const i = typeof index === "number" ? String(index).padStart(2, "0") : index;
   return (
@@ -68,7 +68,7 @@ export function EstimateRow({
         {note ? <small>{note}</small> : null}
       </td>
       <td className="nv-est__amount">
-        <Money amount={amount} {...(unit === undefined ? {} : { unit })} />
+        <Money amount={amount} unit={unit} />
       </td>
     </tr>
   );

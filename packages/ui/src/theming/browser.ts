@@ -2,7 +2,10 @@ import { createThemeController, type ThemeController } from "./controller.ts";
 import { defaultTheme } from "./ids.ts";
 import type { StorageLike } from "./select.ts";
 
-/** Event on `window` after every change of the theme; `detail` is the theme id. For the 3D scene and analytics. */
+/**
+ * Event on `document` after every change of the theme, `detail` is `{ theme, animate }` (DESIGN_SYSTEM 7.4; the scene
+ * of WP-21 listens to it). The theme of the first paint is not announced: read `data-theme` of `<html>` at start.
+ */
 export const THEME_EVENT = "nv-theme";
 
 /** `localStorage` is a getter that can throw (blocked cookies); the answer is then "no storage". */
@@ -47,7 +50,7 @@ export function createBrowserThemeController(
     storage: storageOf(win),
     search: win.location.search,
     setThemeColor: (color) => setMetaThemeColor(doc, color),
-    emit: (theme) => win.dispatchEvent(new CustomEvent(THEME_EVENT, { detail: theme })),
+    emit: (theme, animate) => doc.dispatchEvent(new CustomEvent(THEME_EVENT, { detail: { theme, animate } })),
     reducedMotion: () => win.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
     schedule: (fn, ms) => win.setTimeout(fn, ms),
     cancel: (handle) => win.clearTimeout(handle as number),

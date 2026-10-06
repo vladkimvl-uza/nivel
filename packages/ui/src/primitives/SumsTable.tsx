@@ -10,7 +10,7 @@ export interface SumLine {
   label: ReactNode;
   /** Whole sums; a refund is negative. The amounts are computed on the server, never here. */
   amount: number;
-  kind?: SumKind;
+  kind?: SumKind | undefined;
 }
 
 /**

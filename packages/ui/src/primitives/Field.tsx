@@ -44,7 +44,7 @@ function check({ id, label }: FieldBase, component: string): void {
 }
 
 export type TextFieldProps = FieldBase &
-  Omit<ComponentPropsWithoutRef<"input">, keyof FieldBase | "className"> & { className?: string };
+  Omit<ComponentPropsWithoutRef<"input">, keyof FieldBase | "className"> & { className?: string | undefined };
 
 /** Text input with its label, hint and error tied together for assistive technology. */
 export function TextField(props: TextFieldProps) {
@@ -67,21 +67,24 @@ export function TextField(props: TextFieldProps) {
 export interface SelectOption {
   value: string;
   label: string;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
 }
 
 export type SelectProps = FieldBase &
   Omit<ComponentPropsWithoutRef<"select">, keyof FieldBase | "className" | "children"> & {
     options: readonly SelectOption[];
-    /** An empty first option that is shown until the visitor chooses; use `defaultValue=""` to select it. */
-    placeholder?: string;
-    className?: string;
+    /** An empty first option shown until the visitor chooses (selected when no `value` or `defaultValue` is given). */
+    placeholder?: string | undefined;
+    className?: string | undefined;
   };
 
 /** Native select (works on every phone) with the same label, hint and error semantics as `TextField`. */
 export function Select(props: SelectProps) {
   check(props, "Select");
   const { id, label, hint, error, className, options, placeholder, ...select } = props;
+  // The placeholder is chosen until the visitor chooses: without it the browser would select the first real option
+  // and a `required` select would pass unnoticed. A given `value` or `defaultValue` is never overridden.
+  const startsEmpty = placeholder !== undefined && select.value === undefined && select.defaultValue === undefined;
   return (
     <Shell base={{ id, label, hint, error }} className={className}>
       <span className="nv-select">
@@ -90,6 +93,7 @@ export function Select(props: SelectProps) {
           id={id}
           aria-describedby={describedBy(id, hint, error)}
           aria-invalid={error ? true : undefined}
+          {...(startsEmpty ? { defaultValue: "" } : {})}
           {...select}
         >
           {placeholder !== undefined && (

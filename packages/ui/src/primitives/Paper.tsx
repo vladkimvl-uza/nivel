@@ -12,10 +12,10 @@ export function Paper({
   children,
 }: {
   /** A slight slant on wide screens, like a sheet laid on a desk. */
-  tilt?: "left" | "right";
+  tilt?: "left" | "right" | undefined;
   /** The sample plaque, which sits over the top edge: `<Badge kind="sample" label=... />`. */
   badge?: ReactNode;
-  className?: string;
+  className?: string | undefined;
   children?: ReactNode;
 }) {
   return (

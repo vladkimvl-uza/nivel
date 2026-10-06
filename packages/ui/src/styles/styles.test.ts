@@ -210,6 +210,13 @@ describe("documents", () => {
     expect(Object.fromEntries(r?.decls ?? []).color).toBe("var(--stamp)");
   });
 
+  it("paint the small stamp with --accent-ink on the page and with --stamp only on paper (steps sit on --surface)", () => {
+    const base = rules.find((x) => x.selector.trim() === ".nv-sstamp");
+    expect(Object.fromEntries(base?.decls ?? []).color).toBe("var(--accent-ink)");
+    const onPaper = rules.find((x) => /\.nv-paper \.nv-sstamp/.test(x.selector));
+    expect(Object.fromEntries(onPaper?.decls ?? []).color).toBe("var(--stamp)");
+  });
+
   it("show the lamp spot only through the --lamp-opacity role", () => {
     const r = rules.find((x) => /\.nv-lamp::before/.test(x.selector));
     const d = Object.fromEntries(r?.decls ?? []);

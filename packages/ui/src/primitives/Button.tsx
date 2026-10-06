@@ -8,11 +8,11 @@ export function Mark() {
 
 interface ButtonBase {
   /** Solid by default (asphalt by day, paper at night); ghost has a frame. */
-  variant?: "primary" | "ghost";
-  size?: "md" | "sm";
+  variant?: "primary" | "ghost" | undefined;
+  size?: "md" | "sm" | undefined;
   /** The triangle before the label, for the main call to action. */
-  mark?: boolean;
-  className?: string;
+  mark?: boolean | undefined;
+  className?: string | undefined;
   children?: ReactNode;
 }
 
@@ -25,25 +25,32 @@ export type ButtonProps = AsButton | AsLink;
  * hover changes only background and frame, with no lift, shadow or gradient (DESIGN_SYSTEM 3.1).
  */
 export function Button(props: ButtonProps) {
-  const { variant = "primary", size = "md", mark = false, className, children, ...rest } = props;
-  const classes = cx("nv-btn", variant === "ghost" && "nv-btn--ghost", size === "sm" && "nv-btn--sm", className);
-  const content = (
-    <>
-      {mark && <Mark />}
-      {children}
-    </>
-  );
+  // `props` is narrowed by `href` first, then taken apart in each branch: no cast is needed.
   if (props.href !== undefined) {
+    const { variant, size, mark, className, children, ...anchor } = props;
     return (
-      <a className={classes} {...(rest as ComponentPropsWithoutRef<"a">)}>
-        {content}
+      <a className={classesOf(variant, size, className)} {...anchor}>
+        <Content mark={mark}>{children}</Content>
       </a>
     );
   }
-  const { type = "button", ...buttonRest } = rest as ComponentPropsWithoutRef<"button">;
+  const { variant, size, mark, className, children, type = "button", ...button } = props;
   return (
-    <button type={type} className={classes} {...buttonRest}>
-      {content}
+    <button type={type} className={classesOf(variant, size, className)} {...button}>
+      <Content mark={mark}>{children}</Content>
     </button>
+  );
+}
+
+function classesOf(variant: ButtonBase["variant"], size: ButtonBase["size"], className: string | undefined): string {
+  return cx("nv-btn", variant === "ghost" && "nv-btn--ghost", size === "sm" && "nv-btn--sm", className);
+}
+
+function Content({ mark, children }: { mark: boolean | undefined; children: ReactNode }) {
+  return (
+    <>
+      {mark === true && <Mark />}
+      {children}
+    </>
   );
 }

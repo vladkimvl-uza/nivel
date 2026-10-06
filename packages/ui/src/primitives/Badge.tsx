@@ -10,7 +10,7 @@ import { type BadgeKind, badgeKinds } from "./kinds.ts";
  * A plaque with a required kind and a required label. The words (uz/ru) come from the caller; there is no default,
  * so a mark cannot be left out or left untranslated, and an empty one is refused.
  */
-export function Badge({ kind, label, className }: { kind: BadgeKind; label: string; className?: string }) {
+export function Badge({ kind, label, className }: { kind: BadgeKind; label: string; className?: string | undefined }) {
   if (!(badgeKinds as readonly string[]).includes(kind)) throw new Error(`Badge: unknown kind ${JSON.stringify(kind)}`);
   assertText(label, "label", "Badge");
   return (
