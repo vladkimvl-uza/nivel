@@ -49,8 +49,7 @@ describe("runExport", () => {
     writeFileSync(join(root, "packages", "i18n", "messages", "ru", "bot.json"), "{ nope");
     const o = io();
     expect(runExport(["--root", root, "--out", join(tmp(), "t.xlsx")], o)).toBe(2);
-    expect(o.err.join("
-")).toMatch(/bot.json/);
+    expect(o.err.join("\n")).toMatch(/bot\.json/);
   });
 
   it("exits 2 with usage for an unknown option or namespace", () => {
