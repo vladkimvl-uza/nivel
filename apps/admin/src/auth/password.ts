@@ -110,7 +110,7 @@ export function checkPasswordPolicy(password: string, ctx: { email?: string }): 
   return problems;
 }
 
-const PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // gitleaks:allow the alphabet of generated passwords
 
 /** A generated first password for a new account: 20 characters, about 114 bits; shown once, changed at the first use. */
 export function randomPassword(length = 20): string {

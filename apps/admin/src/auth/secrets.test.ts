@@ -14,7 +14,7 @@ import {
 const key = parseDataKey(randomBytes(32).toString("base64"));
 
 describe("sealed TOTP bundle (AES-256-GCM)", () => {
-  const bundle: TotpBundle = { v: 1, secret: "GEZDGNBVGY3TQOJQ", recovery: [sha256Hex("a"), sha256Hex("b")] };
+  const bundle: TotpBundle = { v: 1, secret: "GEZDGNBVGY3TQOJQ", recovery: [sha256Hex("a"), sha256Hex("b")] }; // gitleaks:allow a made-up test key
 
   it("round trips", () => {
     const sealed = sealSecret(bundle, key, "user-1");
