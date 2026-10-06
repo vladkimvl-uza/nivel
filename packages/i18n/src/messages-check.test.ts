@@ -73,6 +73,19 @@ describe("checkNamespace", () => {
     expect(checkNamespace("s", { a: "{count} ta" }, { a: "{count} шт." }, { a: meta() })).toEqual([]);
   });
 
+  it("does not let a plain Russian {name} (a string) become a number or a plural in uz", () => {
+    const ru = { a: "Здравствуйте, {name}!", b: "{sum} в смете" };
+    const uz = { a: "Salom, {name, number}!", b: "{sum, plural, other {#}} smetada" };
+    const errors = checkNamespace("s", uz, ru, { a: meta(), b: meta() }).join("\n");
+    expect(errors).toContain("placeholders differ: uz {name:number} vs ru {name:argument}");
+    expect(errors).toContain("placeholders differ: uz {sum:plural} vs ru {sum:argument}");
+  });
+
+  it("rejects an unknown argument type instead of reading it as a number", () => {
+    const ru = { a: "{count, plural, one {# товар} other {# товара}}" };
+    expect(checkNamespace("s", { a: "{count, numeric} ta" }, ru, { a: meta() }).join("\n")).toContain("numeric");
+  });
+
   it("still rejects a renamed number or a number turned into another type", () => {
     const ru = { a: "{count, plural, one {# товар} other {# товара}}" };
     expect(checkNamespace("s", { a: "{soni} ta" }, ru, { a: meta() }).join("\n")).toContain("placeholders differ");

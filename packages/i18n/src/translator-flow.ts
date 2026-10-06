@@ -111,7 +111,7 @@ const GUIDE_LINES = [
   "",
   "1. Править нужно только колонку uz (перевод) и, когда текст проверен носителем, колонку status. Остальные колонки справочные: правки в них при импорте игнорируются.",
   "2. Колонка ru — исходный русский текст, колонка context — где и как показывается текст, колонка maxLen — предельная длина в знаках. Длиннее нельзя: импорт откажет.",
-  "3. Части в фигурных скобках — часть программы: {name}, {count, plural, one {...} other {...}}. Имена и ключевые слова внутри скобок (name, count, plural, one, other) не переводятся и не меняются; слова внутри ветвей {...} переводятся. Тип части тоже должен совпадать с русским, с одним послаблением для чисел: вместо русского {count, plural, ...} можно писать «{count} ta ...», {count, number} или {count, selectordinal, ...} — узбекское существительное после числа не склоняется. Даты ({d, date}), время ({t, time}) и выбор ({g, select, ...}) должны совпадать строго: они требуют от программы других значений (в сообщении об ошибке тип стоит после двоеточия).",
+  "3. Части в фигурных скобках — часть программы: {name}, {count, plural, one {...} other {...}}. Имена и ключевые слова внутри скобок (name, count, plural, one, other) не переводятся и не меняются; слова внутри ветвей {...} переводятся. Тип части тоже должен совпадать с русским, с одним послаблением для чисел: только если в русском тексте это число — {count, plural, ...} или {count, number}, — вместо него можно писать «{count} ta ...», {count, number} или {count, selectordinal, ...} (узбекское существительное после числа не склоняется). Обычную русскую часть без типа ({name}, {sum}) менять на число нельзя: в ней может быть имя или готовая сумма. Даты ({d, date}), время ({t, time}) и выбор ({g, select, ...}) должны совпадать строго: они требуют от программы других значений (в сообщении об ошибке тип стоит после двоеточия).",
   "4. Знаки узбекского: oʻ и gʻ пишутся со знаком ʻ (U+02BB); тутук и прочие апострофы между буквами — ʼ (U+02BC). Обычный апостроф ' (U+0027) и ’ (U+2019) внутри слов импорт не примет.",
   "5. Цены только в сумах: «12 500 000 soʻm». Знак доллара и USD недопустимы.",
   "6. Термины — по листу Glossary; обращение к клиенту — Siz. Варианты вне глоссария (например, «tezkor xotira» вместо «operativ xotira») импорт отклонит.",
@@ -234,7 +234,6 @@ interface RowInfo {
   key: string;
   /** "namespace:key" */
   id: string;
-  data: NamespaceData;
   ruRepo: string | undefined;
   uzRepo: string | undefined;
   meta: MetaEntry | undefined;
@@ -338,7 +337,7 @@ function checkUzText(plan: Plan, row: RowInfo, text: string, glossary: readonly 
   if (/\p{Script=Cyrillic}/u.test(text)) plan.warnings.push(`${where} uz contains Cyrillic letters`);
 }
 
-/** Checks the uz cell of a row; returns the new text, or null when the text is not changed (or has errors). */
+/** Checks the uz cell of a row; returns the new text, or null when the text is not changed. Errors go to the plan; the caller checks them. */
 function checkUzCell(
   plan: Plan,
   row: RowInfo,
@@ -423,18 +422,21 @@ interface RowLedger {
   valid: Set<string>;
 }
 
+/** What every row of one import is read against. */
+interface RowScope {
+  catalog: Catalog;
+  columns: Columns;
+  only: ReadonlySet<string> | null;
+  ledger: RowLedger;
+  glossary: readonly GlossaryTerm[] | null;
+  options: ImportOptions;
+}
+
 /** Resolves namespace and key of a row against the catalog; null (with an error) when the row cannot be imported. */
-function resolveRow(
-  plan: Plan,
-  catalog: Catalog,
-  C: Columns,
-  row: readonly XlsxCell[],
-  n: number,
-  only: ReadonlySet<string> | null,
-  ledger: RowLedger,
-): RowInfo | null {
-  const ns = String(row[C.ns] ?? "").trim();
-  const key = String(row[C.key] ?? "").trim();
+function resolveRow(plan: Plan, scope: RowScope, cells: readonly XlsxCell[], n: number): RowInfo | null {
+  const { catalog, columns: C, only, ledger } = scope;
+  const ns = String(cells[C.ns] ?? "").trim();
+  const key = String(cells[C.key] ?? "").trim();
   if (ns === "" || key === "") {
     plan.errors.push(`row ${n}: namespace and key are required`);
     return null;
@@ -461,30 +463,24 @@ function resolveRow(
     return null;
   }
   ledger.valid.add(id);
-  return { n, ns, key, id, data, ruRepo, uzRepo, meta: data.meta[key] };
+  return { n, ns, key, id, ruRepo, uzRepo, meta: data.meta[key] };
 }
 
 /** Checks one data row and, when it is clean and changed, records the change. */
-function planRow(
-  plan: Plan,
-  info: RowInfo,
-  C: Columns,
-  row: readonly XlsxCell[],
-  glossary: readonly GlossaryTerm[] | null,
-  options: ImportOptions,
-): void {
+function planRow(plan: Plan, scope: RowScope, row: RowInfo, cells: readonly XlsxCell[]): void {
+  const { columns: C, glossary, options } = scope;
   const errorsBefore = plan.errors.length;
-  const { meta } = info;
-  warnReadOnly(plan, info, "ru", C.ru, info.ruRepo ?? "", row[C.ru]);
-  warnReadOnly(plan, info, "context", C.context, meta?.context ?? "", row[C.context]);
-  warnReadOnly(plan, info, "maxLen", C.maxLen, meta?.maxLen ?? null, row[C.maxLen]);
-  warnReadOnly(plan, info, "screenshot", C.screenshot, meta?.screenshot ?? null, row[C.screenshot]);
+  const { meta } = row;
+  warnReadOnly(plan, row, "ru", C.ru, row.ruRepo ?? "", cells[C.ru]);
+  warnReadOnly(plan, row, "context", C.context, meta?.context ?? "", cells[C.context]);
+  warnReadOnly(plan, row, "maxLen", C.maxLen, meta?.maxLen ?? null, cells[C.maxLen]);
+  warnReadOnly(plan, row, "screenshot", C.screenshot, meta?.screenshot ?? null, cells[C.screenshot]);
 
-  const uzAfter = checkUzCell(plan, info, row[C.uz], glossary, options);
+  const uzAfter = checkUzCell(plan, row, cells[C.uz], glossary, options);
   const statusBefore = meta?.status ?? "draft";
-  const statusAfter = resolveStatus(plan, info, statusBefore, row[C.status], C.status);
+  const statusAfter = resolveStatus(plan, row, statusBefore, cells[C.status], C.status);
   if (plan.errors.length > errorsBefore) return;
-  applyRowChange(plan, info, uzAfter, statusBefore, statusAfter);
+  applyRowChange(plan, row, uzAfter, statusBefore, statusAfter);
 }
 
 /** Checks the rows of the Translations sheet against the catalog and prepares the new catalog. Writes nothing. */
@@ -509,18 +505,18 @@ function planImportRaw(
     plan.errors.push(`sheet "${TRANSLATIONS_SHEET}" not found`);
     return plan;
   }
-  const C = findColumns(sheet, plan);
-  if (!C) return plan;
+  const columns = findColumns(sheet, plan);
+  if (!columns) return plan;
 
   const only = options.namespaces ? new Set(options.namespaces) : null;
-  const ledger: RowLedger = { seen: new Map(), valid: new Set() };
+  const scope: RowScope = { catalog, columns, only, ledger: { seen: new Map(), valid: new Set() }, glossary, options };
   for (let i = 1; i < sheet.rows.length; i++) {
-    const row = sheet.rows[i] as XlsxCell[];
-    if (row.every(blank)) continue;
-    const info = resolveRow(plan, catalog, C, row, i + 1, only, ledger);
-    if (info) planRow(plan, info, C, row, glossary, options);
+    const cells = sheet.rows[i] as XlsxCell[];
+    if (cells.every(blank)) continue;
+    const row = resolveRow(plan, scope, cells, i + 1);
+    if (row) planRow(plan, scope, row, cells);
   }
-  plan.missing = countRepoKeys(catalog, only) - ledger.valid.size;
+  plan.missing = countRepoKeys(catalog, only) - scope.ledger.valid.size;
   return plan;
 }
 

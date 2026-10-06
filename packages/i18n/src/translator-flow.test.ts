@@ -85,6 +85,7 @@ describe("export", () => {
     expect(guide).toContain("{count, number}");
     expect(guide).toContain("selectordinal");
     expect(guide).not.toContain("импорт считает разными");
+    expect(guide).toContain("только если в русском тексте это число"); // a plain Russian {name} stays strict
     expect(guide).toMatch(/date.*time.*select|дата.*время.*select/s);
   });
 
@@ -414,6 +415,21 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
     ]);
   });
 
+  it("rejects a number or plural for a plain Russian {name}: the name is a string and would print NaN", () => {
+    for (const bad of ["Hi {name, number}", "{name, plural, other {#}}"]) {
+      const { report } = run((wb) => wb.set("site", "hello", "uz", bad));
+      const differs = report.errors.filter((e) => e.includes("placeholders differ"));
+      expect(differs, bad).toHaveLength(1);
+      expect(differs[0], bad).toContain("placeholders differ from ru: ru {name:argument}");
+    }
+  });
+
+  it("rejects an unknown argument type such as {count, numeric}", () => {
+    const { report } = run((wb) => wb.set("site", "hero.count", "uz", "{count, numeric} ta mahsulot"));
+    expect(report.errors).toHaveLength(1);
+    expect(report.errors[0]).toContain("numeric");
+  });
+
   it("shows the types when only the type of a placeholder differs", () => {
     const { report } = run((wb) => wb.set("site", "hello", "uz", "Hi {name, date}"));
     expect(report.errors).toEqual([
@@ -571,7 +587,7 @@ describe("import: normalization hook", () => {
     expect((readJson(root, "uz", "site") as { hello: string }).hello).toBe(`g${O}oya, ma${T}no {name}`);
   });
 
-  it("the real normalizeUz leaves a correct text unchanged: no warning, no change", () => {
+  it("the real normalizeUz leaves a correct new text as typed: no warning, one change", () => {
     const root = newRoot();
     const wb = open(exportTranslations(root));
     wb.set("site", "hello", "uz", `g${O}oya, ma${T}no {name}`);

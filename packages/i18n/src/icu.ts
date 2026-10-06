@@ -18,6 +18,8 @@ const NAME = /[^\s{},#<>']+/y;
 /** Argument names as the real parser (formatjs) reads them: no dots, dashes or colons. */
 const ARG_NAME = /[A-Za-z0-9_]+/y;
 const STRUCTURED = new Set(["plural", "select", "selectordinal"]);
+/** Argument types the real parser (formatjs) knows; any other word is an INVALID_ARGUMENT_TYPE error. */
+const KNOWN_TYPES = new Set(["number", "date", "time", "plural", "select", "selectordinal"]);
 const TAG = /<(\/?)([A-Za-z][\w-]*)\s*(\/?)>/y;
 
 class Parser {
@@ -116,6 +118,7 @@ class Parser {
     this.pos++;
     this.skipSpace();
     const type = this.word("argument type");
+    if (!KNOWN_TYPES.has(type)) throw new IcuSyntaxError(`unknown argument type "${type}" of "${name}"`);
     this.args.push({ name, type });
     this.skipSpace();
     if (this.src[this.pos] === "}") {
@@ -190,26 +193,47 @@ export function placeholderSignature(message: string): string[] {
   return [...new Set(run(message).args.map((a) => `${a.name}:${a.type}`))].sort();
 }
 
-/**
- * Types of one numeric argument that the uz and ru texts may swap: Uzbek does not decline the noun after a number, so
- * "{count} ta mahsulot" is the natural translation of a Russian {count, plural, ...}.
- */
-const NUMBER_LIKE = new Set(["argument", "number", "plural", "selectordinal"]);
-
-/**
- * Like placeholderSignature, but {n}, {n, number}, {n, plural, ...} and {n, selectordinal, ...} all read "n:numeric".
- * date, time and select stay strict: they need other values from the code.
- */
-export function compatibleSignature(message: string): string[] {
-  return [...new Set(run(message).args.map((a) => `${a.name}:${NUMBER_LIKE.has(a.type) ? "numeric" : a.type}`))].sort();
-}
-
-/** True when two messages (uz and ru) ask the code for the same arguments, numeric types being interchangeable. */
-export function placeholdersCompatible(a: string, b: string): boolean {
-  return compatibleSignature(a).join() === compatibleSignature(b).join();
-}
-
+/** Types of an argument that count something: the code passes a number for them. */
 const NUMERIC = new Set(["number", "plural", "selectordinal"]);
+/**
+ * Types of one numeric argument that uz may swap: Uzbek does not decline the noun after a number, so "{count} ta mahsulot"
+ * is the natural translation of a Russian {count, plural, ...}.
+ */
+const NUMBER_LIKE = new Set(["argument", ...NUMERIC]);
+/** Class label of the numeric types. "#" cannot occur in a type word, so no real type can be mistaken for it. */
+const NUMERIC_CLASS = "#numeric";
+
+/** Names the message declares as number, plural or selectordinal: the code passes numbers for them. */
+export function numericNames(message: string): string[] {
+  return [
+    ...new Set(
+      run(message)
+        .args.filter((a) => NUMERIC.has(a.type))
+        .map((a) => a.name),
+    ),
+  ].sort();
+}
+
+/**
+ * Like placeholderSignature, but for the names in `numeric` the types {n}, {n, number}, {n, plural, ...} and
+ * {n, selectordinal, ...} all read "n:#numeric". date, time, select and the names outside `numeric` stay strict.
+ */
+export function compatibleSignature(message: string, numeric: ReadonlySet<string>): string[] {
+  const label = (a: IcuArgument) =>
+    `${a.name}:${numeric.has(a.name) && NUMBER_LIKE.has(a.type) ? NUMERIC_CLASS : a.type}`;
+  return [...new Set(run(message).args.map(label))].sort();
+}
+
+/**
+ * True when the Uzbek text asks the code for the same arguments as the Russian source. The relaxation is directed: a name
+ * that Russian declares as a number (number, plural, selectordinal) may be written in uz as {n}, {n, number}, plural or
+ * selectordinal. A plain Russian {x} may carry a string (a name, a ready-formatted sum), so uz must keep it plain.
+ */
+export function placeholdersCompatible(uz: string, ru: string): boolean {
+  const numeric = new Set(numericNames(ru));
+  return compatibleSignature(uz, numeric).join() === compatibleSignature(ru, numeric).join();
+}
+
 const DATED = new Set(["date", "time"]);
 
 /**
