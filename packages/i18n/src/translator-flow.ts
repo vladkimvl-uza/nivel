@@ -214,6 +214,279 @@ function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
 
+/** Positions of the columns of the Translations sheet; -1 for an optional column that is not in the file. */
+interface Columns {
+  ns: number;
+  key: number;
+  ru: number;
+  uz: number;
+  context: number;
+  maxLen: number;
+  status: number;
+  screenshot: number;
+}
+
+/** One data row of the sheet, resolved against the catalog. */
+interface RowInfo {
+  /** Row number as the translator sees it (1-based, header is row 1). */
+  n: number;
+  ns: string;
+  key: string;
+  /** "namespace:key" */
+  id: string;
+  data: NamespaceData;
+  ruRepo: string | undefined;
+  uzRepo: string | undefined;
+  meta: MetaEntry | undefined;
+}
+
+/** Finds the columns by header name; a missing required column is an error and gives null. */
+function findColumns(sheet: XlsxSheet, plan: Plan): Columns | null {
+  const header = (sheet.rows[0] ?? []).map((c) => (typeof c === "string" ? c.trim() : ""));
+  const col = (name: string) => header.indexOf(name);
+  for (const required of ["namespace", "key", "ru", "uz"]) {
+    if (col(required) < 0) plan.errors.push(`${TRANSLATIONS_SHEET}: missing column "${required}"`);
+  }
+  if (plan.errors.length > 0) return null;
+  return {
+    ns: col("namespace"),
+    key: col("key"),
+    ru: col("ru"),
+    uz: col("uz"),
+    context: col("context"),
+    maxLen: col("maxLen"),
+    status: col("status"),
+    screenshot: col("screenshot"),
+  };
+}
+
+/** Number of distinct keys of the (selected) namespaces of the repository. */
+function countRepoKeys(catalog: Catalog, only: ReadonlySet<string> | null): number {
+  let total = 0;
+  for (const [ns, data] of Object.entries(catalog)) {
+    if (only && !only.has(ns)) continue;
+    total += new Set([...flattenMessages(data.ru).map(([k]) => k), ...flattenMessages(data.uz).map(([k]) => k)]).size;
+  }
+  return total;
+}
+
+/** Read-only columns: a difference from the repository is ignored with a warning. */
+function warnReadOnly(
+  plan: Plan,
+  row: RowInfo,
+  name: string,
+  column: number,
+  repo: string | number | null,
+  cell: XlsxCell | undefined,
+): void {
+  if (column < 0) return;
+  const a = typeof cell === "string" ? nl(cell) : (cell ?? null);
+  const b = typeof repo === "string" ? nl(repo) : repo;
+  const same = a === b || ((a === null || a === "") && (b === null || b === ""));
+  if (!same) {
+    plan.warnings.push(
+      `row ${row.n}: ${row.id} ${name} differs from the repository; the ${name} column is read-only and was ignored`,
+    );
+  }
+}
+
+/** The uz text as it will be checked: trimmed and, if asked, with fixed apostrophes (only for a changed cell). */
+function tidyUzText(plan: Plan, row: RowInfo, text: string, options: ImportOptions): string {
+  if (text === (row.uzRepo ?? "")) return text;
+  let tidy = text;
+  const trimmed = tidy.trim();
+  if (trimmed !== tidy) {
+    plan.warnings.push(`row ${row.n}: ${row.id} uz had leading or trailing spaces; trimmed`);
+    tidy = trimmed;
+  }
+  if (options.normalize) {
+    const fixed = options.normalize(tidy);
+    if (fixed !== tidy) {
+      plan.warnings.push(`row ${row.n}: ${row.id} uz apostrophes normalized`);
+      tidy = fixed;
+    }
+  }
+  return tidy;
+}
+
+/** The error for ICU arguments that differ from the Russian source, or null (no check when ru itself is not valid ICU). */
+function placeholderError(where: string, text: string, ruRepo: string | undefined): string | null {
+  if (ruRepo === undefined || checkIcuSyntax(ruRepo) !== null) return null;
+  if (placeholdersCompatible(text, ruRepo)) return null;
+  return `${where} placeholders differ from ru: ru {${placeholderSignature(ruRepo).join(", ")}}, uz {${placeholderSignature(text).join(", ")}}`;
+}
+
+/** All checks of a changed uz text: apostrophes, ICU, limit, dollars, glossary, Cyrillic. */
+function checkUzText(plan: Plan, row: RowInfo, text: string, glossary: readonly GlossaryTerm[] | null): void {
+  const where = `row ${row.n}: ${row.id}`;
+  plan.errors.push(...checkUzString(where, text));
+  const icu = checkIcuSyntax(text);
+  if (icu) plan.errors.push(`${where} uz is not valid ICU: ${icu}`);
+  else {
+    const mismatch = placeholderError(where, text, row.ruRepo);
+    if (mismatch) plan.errors.push(mismatch);
+  }
+  const maxLen = row.meta?.maxLen;
+  if (typeof maxLen === "number" && text.length > maxLen)
+    plan.errors.push(`${where} uz is ${text.length} > maxLen ${maxLen}`);
+  if (/\$|\bUSD\b/.test(text)) plan.errors.push(`${where} uz mentions dollars; prices are in sums only`);
+  if (glossary) {
+    const g = glossaryProblems(row.ruRepo ?? "", text, glossary);
+    plan.errors.push(...g.errors.map((e) => `${where} ${e}`));
+    plan.warnings.push(...g.warnings.map((w) => `${where} ${w}`));
+  }
+  if (/\p{Script=Cyrillic}/u.test(text)) plan.warnings.push(`${where} uz contains Cyrillic letters`);
+}
+
+/** Checks the uz cell of a row; returns the new text, or null when the text is not changed (or has errors). */
+function checkUzCell(
+  plan: Plan,
+  row: RowInfo,
+  raw: XlsxCell | undefined,
+  glossary: readonly GlossaryTerm[] | null,
+  options: ImportOptions,
+): string | null {
+  if (blank(raw)) {
+    if (row.uzRepo !== undefined && row.uzRepo !== "") plan.errors.push(`row ${row.n}: ${row.id} uz is empty`);
+    return null;
+  }
+  if (typeof raw !== "string") {
+    plan.errors.push(`row ${row.n}: ${row.id} uz must be text`);
+    return null;
+  }
+  const text = tidyUzText(plan, row, nl(raw), options);
+  if (text === (row.uzRepo ?? "")) return null;
+  checkUzText(plan, row, text, glossary);
+  return text;
+}
+
+/** The status of a row after the import: the cell if it is valid and the key has a meta entry. */
+function resolveStatus(
+  plan: Plan,
+  row: RowInfo,
+  statusBefore: string,
+  cell: XlsxCell | undefined,
+  column: number,
+): string {
+  if (column < 0 || blank(cell)) return statusBefore;
+  const s = String(cell).trim().toLowerCase();
+  if (!(STATUSES as readonly string[]).includes(s)) {
+    plan.errors.push(`row ${row.n}: ${row.id} status "${String(cell).trim()}" must be draft or reviewed`);
+    return statusBefore;
+  }
+  if (!row.meta) {
+    if (s !== statusBefore) plan.warnings.push(`row ${row.n}: ${row.id} has no meta entry; status ignored`);
+    return statusBefore;
+  }
+  return s;
+}
+
+/** Writes a checked change of one row into the next catalog and the change list. */
+function applyRowChange(
+  plan: Plan,
+  row: RowInfo,
+  uzAfter: string | null,
+  statusBefore: string,
+  statusAfter: string,
+): void {
+  const uzChanged = uzAfter !== null;
+  const statusChanged = statusAfter !== statusBefore;
+  if (!uzChanged && !statusChanged) {
+    plan.unchanged++;
+    return;
+  }
+  const nextData = plan.next[row.ns] as NamespaceData;
+  if (uzChanged && !setPath(nextData.uz, row.key, uzAfter)) {
+    plan.errors.push(`row ${row.n}: ${row.id} cannot be placed: a text already sits on its path in uz`);
+    return;
+  }
+  if (uzChanged) plan.touchedUz.add(row.ns);
+  if (statusChanged) {
+    (nextData.meta[row.key] as MetaEntry).status = statusAfter as MetaEntry["status"];
+    plan.touchedMeta.add(row.ns);
+  }
+  plan.changes.push({
+    namespace: row.ns,
+    key: row.key,
+    uzChanged,
+    statusChanged,
+    uzBefore: row.uzRepo ?? null,
+    uzAfter: uzAfter ?? row.uzRepo ?? "",
+    statusBefore,
+    statusAfter,
+  });
+}
+
+/** Rows seen so far: duplicates are an error, valid ones are not "missing". */
+interface RowLedger {
+  seen: Map<string, number>;
+  valid: Set<string>;
+}
+
+/** Resolves namespace and key of a row against the catalog; null (with an error) when the row cannot be imported. */
+function resolveRow(
+  plan: Plan,
+  catalog: Catalog,
+  C: Columns,
+  row: readonly XlsxCell[],
+  n: number,
+  only: ReadonlySet<string> | null,
+  ledger: RowLedger,
+): RowInfo | null {
+  const ns = String(row[C.ns] ?? "").trim();
+  const key = String(row[C.key] ?? "").trim();
+  if (ns === "" || key === "") {
+    plan.errors.push(`row ${n}: namespace and key are required`);
+    return null;
+  }
+  if (only && !only.has(ns)) return null;
+  const data = Object.hasOwn(catalog, ns) ? catalog[ns] : undefined;
+  if (!data) {
+    plan.errors.push(`row ${n}: unknown namespace "${ns}"`);
+    return null;
+  }
+  const id = `${ns}:${key}`;
+  const first = ledger.seen.get(id);
+  if (first !== undefined) {
+    plan.errors.push(`row ${n}: duplicate row for ${id} (first seen in row ${first})`);
+    return null;
+  }
+  ledger.seen.set(id, n);
+  const ruRepo = lookup(data.ru, key);
+  const uzRepo = lookup(data.uz, key);
+  if (ruRepo === undefined && uzRepo === undefined) {
+    plan.errors.push(
+      `row ${n}: key "${key}" does not exist in namespace "${ns}" (new keys are added in code, not in the file)`,
+    );
+    return null;
+  }
+  ledger.valid.add(id);
+  return { n, ns, key, id, data, ruRepo, uzRepo, meta: data.meta[key] };
+}
+
+/** Checks one data row and, when it is clean and changed, records the change. */
+function planRow(
+  plan: Plan,
+  info: RowInfo,
+  C: Columns,
+  row: readonly XlsxCell[],
+  glossary: readonly GlossaryTerm[] | null,
+  options: ImportOptions,
+): void {
+  const errorsBefore = plan.errors.length;
+  const { meta } = info;
+  warnReadOnly(plan, info, "ru", C.ru, info.ruRepo ?? "", row[C.ru]);
+  warnReadOnly(plan, info, "context", C.context, meta?.context ?? "", row[C.context]);
+  warnReadOnly(plan, info, "maxLen", C.maxLen, meta?.maxLen ?? null, row[C.maxLen]);
+  warnReadOnly(plan, info, "screenshot", C.screenshot, meta?.screenshot ?? null, row[C.screenshot]);
+
+  const uzAfter = checkUzCell(plan, info, row[C.uz], glossary, options);
+  const statusBefore = meta?.status ?? "draft";
+  const statusAfter = resolveStatus(plan, info, statusBefore, row[C.status], C.status);
+  if (plan.errors.length > errorsBefore) return;
+  applyRowChange(plan, info, uzAfter, statusBefore, statusAfter);
+}
+
 /** Checks the rows of the Translations sheet against the catalog and prepares the new catalog. Writes nothing. */
 function planImportRaw(
   catalog: Catalog,
@@ -236,173 +509,18 @@ function planImportRaw(
     plan.errors.push(`sheet "${TRANSLATIONS_SHEET}" not found`);
     return plan;
   }
-  const header = (sheet.rows[0] ?? []).map((c) => (typeof c === "string" ? c.trim() : ""));
-  const col = (name: string) => header.indexOf(name);
-  for (const required of ["namespace", "key", "ru", "uz"]) {
-    if (col(required) < 0) plan.errors.push(`${TRANSLATIONS_SHEET}: missing column "${required}"`);
-  }
-  if (plan.errors.length > 0) return plan;
-  const C = {
-    ns: col("namespace"),
-    key: col("key"),
-    ru: col("ru"),
-    uz: col("uz"),
-    context: col("context"),
-    maxLen: col("maxLen"),
-    status: col("status"),
-    screenshot: col("screenshot"),
-  };
+  const C = findColumns(sheet, plan);
+  if (!C) return plan;
 
   const only = options.namespaces ? new Set(options.namespaces) : null;
-  const seen = new Map<string, number>();
-  const valid = new Set<string>();
-  let total = 0;
-  for (const [ns, data] of Object.entries(catalog)) {
-    if (only && !only.has(ns)) continue;
-    total += new Set([...flattenMessages(data.ru).map(([k]) => k), ...flattenMessages(data.uz).map(([k]) => k)]).size;
-  }
-
+  const ledger: RowLedger = { seen: new Map(), valid: new Set() };
   for (let i = 1; i < sheet.rows.length; i++) {
     const row = sheet.rows[i] as XlsxCell[];
     if (row.every(blank)) continue;
-    const n = i + 1;
-    const ns = String(row[C.ns] ?? "").trim();
-    const key = String(row[C.key] ?? "").trim();
-    if (ns === "" || key === "") {
-      plan.errors.push(`row ${n}: namespace and key are required`);
-      continue;
-    }
-    if (only && !only.has(ns)) continue;
-    const data = Object.hasOwn(catalog, ns) ? catalog[ns] : undefined;
-    if (!data) {
-      plan.errors.push(`row ${n}: unknown namespace "${ns}"`);
-      continue;
-    }
-    const id = `${ns}:${key}`;
-    const first = seen.get(id);
-    if (first !== undefined) {
-      plan.errors.push(`row ${n}: duplicate row for ${id} (first seen in row ${first})`);
-      continue;
-    }
-    seen.set(id, n);
-    const ruRepo = lookup(data.ru, key);
-    const uzRepo = lookup(data.uz, key);
-    if (ruRepo === undefined && uzRepo === undefined) {
-      plan.errors.push(
-        `row ${n}: key "${key}" does not exist in namespace "${ns}" (new keys are added in code, not in the file)`,
-      );
-      continue;
-    }
-    valid.add(id);
-    const meta = data.meta[key];
-    const errorsBefore = plan.errors.length;
-
-    // Read-only columns: differences are ignored with a warning.
-    const readOnly = (name: string, column: number, repo: string | number | null, cell: XlsxCell | undefined) => {
-      if (column < 0) return;
-      const a = typeof cell === "string" ? nl(cell) : (cell ?? null);
-      const b = typeof repo === "string" ? nl(repo) : repo;
-      const same = a === b || ((a === null || a === "") && (b === null || b === ""));
-      if (!same)
-        plan.warnings.push(
-          `row ${n}: ${id} ${name} differs from the repository; the ${name} column is read-only and was ignored`,
-        );
-    };
-    readOnly("ru", C.ru, ruRepo ?? "", row[C.ru]);
-    readOnly("context", C.context, meta?.context ?? "", row[C.context]);
-    readOnly("maxLen", C.maxLen, meta?.maxLen ?? null, row[C.maxLen]);
-    readOnly("screenshot", C.screenshot, meta?.screenshot ?? null, row[C.screenshot]);
-
-    // Uzbek text.
-    let uzAfter: string | null = null;
-    const raw = row[C.uz];
-    if (blank(raw)) {
-      if (uzRepo !== undefined && uzRepo !== "") plan.errors.push(`row ${n}: ${id} uz is empty`);
-    } else if (typeof raw !== "string") {
-      plan.errors.push(`row ${n}: ${id} uz must be text`);
-    } else {
-      let text = nl(raw);
-      if (text !== (uzRepo ?? "")) {
-        const trimmed = text.trim();
-        if (trimmed !== text) {
-          plan.warnings.push(`row ${n}: ${id} uz had leading or trailing spaces; trimmed`);
-          text = trimmed;
-        }
-        if (options.normalize) {
-          const fixed = options.normalize(text);
-          if (fixed !== text) {
-            plan.warnings.push(`row ${n}: ${id} uz apostrophes normalized`);
-            text = fixed;
-          }
-        }
-      }
-      if (text !== (uzRepo ?? "")) {
-        const where = `row ${n}: ${id}`;
-        plan.errors.push(...checkUzString(where, text));
-        const icu = checkIcuSyntax(text);
-        if (icu) plan.errors.push(`${where} uz is not valid ICU: ${icu}`);
-        else if (ruRepo !== undefined && checkIcuSyntax(ruRepo) === null) {
-          if (!placeholdersCompatible(text, ruRepo)) {
-            plan.errors.push(
-              `${where} placeholders differ from ru: ru {${placeholderSignature(ruRepo).join(", ")}}, uz {${placeholderSignature(text).join(", ")}}`,
-            );
-          }
-        }
-        if (typeof meta?.maxLen === "number" && text.length > meta.maxLen) {
-          plan.errors.push(`${where} uz is ${text.length} > maxLen ${meta.maxLen}`);
-        }
-        if (/\$|\bUSD\b/.test(text)) plan.errors.push(`${where} uz mentions dollars; prices are in sums only`);
-        if (glossary) {
-          const g = glossaryProblems(ruRepo ?? "", text, glossary);
-          plan.errors.push(...g.errors.map((e) => `${where} ${e}`));
-          plan.warnings.push(...g.warnings.map((w) => `${where} ${w}`));
-        }
-        if (/\p{Script=Cyrillic}/u.test(text)) plan.warnings.push(`${where} uz contains Cyrillic letters`);
-        uzAfter = text;
-      }
-    }
-
-    // Status.
-    const statusBefore = meta?.status ?? "draft";
-    let statusAfter: string = statusBefore;
-    if (C.status >= 0 && !blank(row[C.status])) {
-      const s = String(row[C.status]).trim().toLowerCase();
-      if (!(STATUSES as readonly string[]).includes(s))
-        plan.errors.push(`row ${n}: ${id} status "${String(row[C.status]).trim()}" must be draft or reviewed`);
-      else if (!meta) {
-        if (s !== statusBefore) plan.warnings.push(`row ${n}: ${id} has no meta entry; status ignored`);
-      } else statusAfter = s;
-    }
-
-    const uzChanged = uzAfter !== null;
-    const statusChanged = statusAfter !== statusBefore;
-    if (plan.errors.length > errorsBefore) continue;
-    if (!uzChanged && !statusChanged) {
-      plan.unchanged++;
-      continue;
-    }
-    const nextData = plan.next[ns] as NamespaceData;
-    if (uzChanged && !setPath(nextData.uz, key, uzAfter as string)) {
-      plan.errors.push(`row ${n}: ${id} cannot be placed: a text already sits on its path in uz`);
-      continue;
-    }
-    if (uzChanged) plan.touchedUz.add(ns);
-    if (statusChanged) {
-      (nextData.meta[key] as MetaEntry).status = statusAfter as MetaEntry["status"];
-      plan.touchedMeta.add(ns);
-    }
-    plan.changes.push({
-      namespace: ns,
-      key,
-      uzChanged,
-      statusChanged,
-      uzBefore: uzRepo ?? null,
-      uzAfter: uzAfter ?? uzRepo ?? "",
-      statusBefore,
-      statusAfter,
-    });
+    const info = resolveRow(plan, catalog, C, row, i + 1, only, ledger);
+    if (info) planRow(plan, info, C, row, glossary, options);
   }
-  plan.missing = total - valid.size;
+  plan.missing = countRepoKeys(catalog, only) - ledger.valid.size;
   return plan;
 }
 
