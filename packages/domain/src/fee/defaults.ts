@@ -2,7 +2,8 @@ import { bp, sum } from "../money/index.ts";
 import type { FeeSettings } from "./types.ts";
 
 function deepFreeze<T>(value: T): T {
-  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+  // Always descend: the children of an already (shallow) frozen object may still be mutable. Settings have no cycles.
+  if (value !== null && typeof value === "object") {
     Object.freeze(value);
     for (const v of Object.values(value)) deepFreeze(v);
   }
