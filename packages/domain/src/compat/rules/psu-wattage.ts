@@ -7,10 +7,10 @@ import type { CompatIssue } from "../types.ts";
  * PSU rating against the estimated peak (block 28, 3.4).
  * - rating below the peak: block;
  * - below the recommended wattage (peak x 1.3 rounded up to the series, or the card vendor figure): warn;
- * - otherwise, headroom over the peak, (rating - peak) / peak, under `psuHeadroomWarnBp` (30 %): warn.
- * The recommendation (peak x 1.3 rounded up to the series) is itself a 30 % headroom over the peak, so with the default
- * settings a PSU that passes the recommendation never gets the headroom warning; the warning matters when the owner
- * lowers `psuMultiplier` or raises `psuHeadroomWarnBp` (ADR-007, item 7).
+ * - otherwise, `compat.psu_low_headroom` (warn) when the headroom over the peak, (rating - peak) / peak, is below the
+ *   threshold `psuHeadroomWarnBp` (30 % by default); with the default settings the recommendation itself gives a
+ *   headroom of at least the threshold, so the warning fires only if the owner changes the multiplier or the
+ *   threshold (ADR-007, item 7).
  * Unknown inputs make the estimate a lower bound: the findings stay valid, and the missing values are reported too,
  * also when there is no PSU yet (then there is nothing to compare, only the gaps).
  */

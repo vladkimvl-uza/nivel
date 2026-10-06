@@ -120,7 +120,7 @@
     "status": "draft"
   },
   "compat.psu_low_headroom": {
-    "context": "PSU_WATTAGE, warn: the headroom of the power supply over the estimated peak, (rating - peak) / peak, in whole percent, is below the owner's threshold minPct; with default settings only reachable if the owner lowers the multiplier",
+    "context": "PSU_WATTAGE, warn: the headroom of the power supply over the estimated peak, (rating - peak) / peak, shown in whole percent, is below the threshold psuHeadroomWarnBp (minPct); with the default settings the recommendation itself gives a headroom of at least the threshold, so the warning fires only if the owner changes the multiplier or the threshold",
     "maxLen": 180,
     "status": "draft"
   },
