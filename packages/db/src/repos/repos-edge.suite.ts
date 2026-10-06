@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Db } from "../client.ts";
 import { addConversationUsage, addDailyUsage } from "./ai.ts";
 import { subscribe } from "./bot.ts";
@@ -193,5 +193,32 @@ describe("the relay claims rows inside a transaction", () => {
     });
     expect(batches.mine.map((r) => r.id)).toEqual([a.id]);
     expect(batches.theirs).toEqual([]);
+  });
+
+  // send_after is stamped by the clock of the database (default now()). Comparing it with the clock of the caller made
+  // a row enqueued a millisecond ago "not yet due" whenever the caller's clock was a hair behind or rounded down to
+  // the millisecond: a flake of every test that claims at once, and a skipped poll for the relay.
+  it("judges a row due by the clock of the database, not by the clock of the caller", async () => {
+    await db.$client.query("delete from ops.outbox");
+    const a = await enqueueOutbox(db, { kind: "job", payload: { n: 2 } });
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.now() - 3_600_000) }); // the caller is an hour behind
+    try {
+      const batch = await db.transaction((tx) => claimOutbox(tx, 5));
+      expect(batch.map((r) => r.id)).toEqual([a.id]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still lets the caller name the moment: a row due later is claimed when `now` is later", async () => {
+    await db.$client.query("delete from ops.outbox");
+    const later = await enqueueOutbox(db, {
+      kind: "job",
+      payload: { n: 3 },
+      sendAfter: new Date(Date.now() + 3_600_000),
+    });
+    expect(await db.transaction((tx) => claimOutbox(tx, 5))).toEqual([]);
+    const batch = await db.transaction((tx) => claimOutbox(tx, 5, new Date(Date.now() + 7_200_000)));
+    expect(batch.map((r) => r.id)).toEqual([later.id]);
   });
 });

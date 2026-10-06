@@ -133,12 +133,17 @@ export async function enqueueOutbox(db: Executor, input: OutboxInput): Promise<{
   return { id: existing.id, duplicate: true };
 }
 
-/** The next batch for the relay. Needs a transaction: the rows stay locked (SKIP LOCKED) until it ends. */
-export async function claimOutbox(db: Tx, limit: number, now: Date = new Date()): Promise<OutboxRow[]> {
+/**
+ * The next batch for the relay. Needs a transaction: the rows stay locked (SKIP LOCKED) until it ends.
+ * send_after is stamped by the clock of the database (default now()), so a row is due by that clock too; comparing it
+ * with the clock of the caller skipped a row enqueued a millisecond ago. A caller that names `now` (a catch-up run,
+ * a test) gets exactly that moment.
+ */
+export async function claimOutbox(db: Tx, limit: number, now?: Date): Promise<OutboxRow[]> {
   return db
     .select()
     .from(outbox)
-    .where(and(eq(outbox.status, "pending"), lte(outbox.sendAfter, now)))
+    .where(and(eq(outbox.status, "pending"), lte(outbox.sendAfter, now ?? sql`clock_timestamp()`)))
     .orderBy(desc(outbox.priority), asc(outbox.sendAfter), asc(outbox.createdAt))
     .limit(limit)
     .for("update", { skipLocked: true });
