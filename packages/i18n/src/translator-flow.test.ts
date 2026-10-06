@@ -167,7 +167,7 @@ describe("round trip without losses (acceptance: export and import back)", () =>
     expect(readText(root, "uz", "bot")).toBe(before.bot);
   });
 
-  it("survives a pass through a spreadsheet program that re-saves the workbook", () => {
+  it("survives a re-save of the workbook (read and written again by this module, not by a real spreadsheet program)", () => {
     const root = newRoot();
     const resaved = open(exportTranslations(root)).save();
     expect(importTranslations(root, resaved).changes).toEqual([]);
@@ -320,6 +320,51 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
     const report = importTranslations(root, wb.save(), opts);
     return { report, root, uzBefore };
   }
+
+  it.each(["constructor.name", "__proto__.constructor.name", "toString.name", "hasOwnProperty", "__proto__"])(
+    "treats the inherited property %s as a key that does not exist",
+    (key) => {
+      const { report, root, uzBefore } = run((wb) => {
+        wb.sheet.rows.push(["site", key, "", 10, "x", "Changed", "draft", null]);
+      });
+      expect(report.ok).toBe(false);
+      expect(report.errors).toEqual([
+        `row 6: key "${key}" does not exist in namespace "site" (new keys are added in code, not in the file)`,
+      ]);
+      expect(readText(root, "uz", "site")).toBe(uzBefore);
+    },
+  );
+
+  it.each(["constructor", "__proto__", "toString"])(
+    "treats the inherited property %s as an unknown namespace",
+    (ns) => {
+      const { report } = run((wb) => {
+        wb.sheet.rows.push([ns, "a", "", 10, "x", "y", "draft", null]);
+      });
+      expect(report.errors).toEqual([`row 6: unknown namespace "${ns}"`]);
+    },
+  );
+
+  it("does not echo control characters of a cell into the messages (terminal escape sequences)", () => {
+    const esc = String.fromCharCode(27);
+    const bel = String.fromCharCode(7);
+    const { report } = run((wb) => {
+      wb.sheet.rows.push(["site", `hero.nope${esc}[2J${esc}]0;owned${bel}`, "", 10, "x", "y", "draft", null]);
+      wb.sheet.rows.push(["site", "hello", "", 10, "x", "Salom, {name}!", `bad${esc}[31mstatus`, null]);
+    });
+    expect(report.errors.length).toBeGreaterThanOrEqual(2);
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: the point of this check is that none are left
+    for (const line of [...report.errors, ...report.warnings]) expect(line).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    expect(report.errors.join("\n")).toContain("hero.nope");
+  });
+
+  it("keeps messages short when a cell holds thousands of characters", () => {
+    const { report } = run((wb) => {
+      wb.sheet.rows.push(["site", "k".repeat(20_000), "", 10, "x", "y", "draft", null]);
+    });
+    expect(report.errors).toHaveLength(1);
+    expect((report.errors[0] as string).length).toBeLessThan(600);
+  });
 
   it("rejects a key that does not exist and an unknown namespace", () => {
     const { report } = run((wb) => {

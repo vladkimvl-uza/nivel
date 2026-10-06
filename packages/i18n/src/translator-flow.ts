@@ -83,7 +83,8 @@ function lookup(tree: MessageTree, key: string): string | undefined {
   let node: string | MessageTree | undefined = tree;
   for (const part of key.split(".")) {
     if (node === undefined || typeof node === "string") return undefined;
-    node = node[part];
+    // Own properties only: a key from the file such as "constructor.name" must not walk up the prototype chain.
+    node = Object.hasOwn(node, part) ? node[part] : undefined;
   }
   return typeof node === "string" ? node : undefined;
 }
@@ -92,8 +93,9 @@ function lookup(tree: MessageTree, key: string): string | undefined {
 function setPath(tree: MessageTree, key: string, value: string): boolean {
   const parts = key.split(".");
   let node = tree;
+  if (parts.includes("__proto__")) return false;
   for (const part of parts.slice(0, -1)) {
-    const next = node[part];
+    const next = Object.hasOwn(node, part) ? node[part] : undefined;
     if (next === undefined) node = node[part] = {};
     else if (typeof next === "string") return false;
     else node = next;
@@ -213,7 +215,7 @@ function clone<T>(v: T): T {
 }
 
 /** Checks the rows of the Translations sheet against the catalog and prepares the new catalog. Writes nothing. */
-export function planImport(
+function planImportRaw(
   catalog: Catalog,
   sheets: readonly XlsxSheet[],
   glossary: readonly GlossaryTerm[] | null,
@@ -271,7 +273,7 @@ export function planImport(
       continue;
     }
     if (only && !only.has(ns)) continue;
-    const data = catalog[ns];
+    const data = Object.hasOwn(catalog, ns) ? catalog[ns] : undefined;
     if (!data) {
       plan.errors.push(`row ${n}: unknown namespace "${ns}"`);
       continue;
@@ -401,6 +403,30 @@ export function planImport(
     });
   }
   plan.missing = total - valid.size;
+  return plan;
+}
+
+const MAX_MESSAGE_CHARS = 400;
+
+/**
+ * A message that quotes a cell of the file goes to a terminal. Control characters (escape sequences that redraw the screen
+ * or set the window title) are replaced and very long values are cut.
+ */
+function printable(line: string): string {
+  const clean = line.replace(/\p{Cc}/gu, "�");
+  return clean.length > MAX_MESSAGE_CHARS ? `${clean.slice(0, MAX_MESSAGE_CHARS)}…` : clean;
+}
+
+/** Checks a workbook against the catalog and plans the changes; nothing is written here. */
+export function planImport(
+  catalog: Catalog,
+  sheets: readonly XlsxSheet[],
+  glossary: readonly GlossaryTerm[] | null,
+  options: ImportOptions = {},
+): Plan {
+  const plan = planImportRaw(catalog, sheets, glossary, options);
+  plan.errors = plan.errors.map(printable);
+  plan.warnings = plan.warnings.map(printable);
   return plan;
 }
 
