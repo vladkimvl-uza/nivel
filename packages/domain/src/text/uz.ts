@@ -9,8 +9,9 @@ const MARKS = "'‘’`´ʻʼ";
 
 // One pass, so that a freshly written U+02BB is never rewritten as tutuq:
 //  1. o, O, g, G followed by a mark: always oʻ / gʻ, also at the end of a word (togʻ, bogʻ);
-//  2. any other mark with a Latin letter on both sides: tutuq. Cyrillic text (д'Артаньян) is never touched.
-const SIGNS = new RegExp(String.raw`([oOgG])[${MARKS}]|(?<=\p{Script=Latin})[${MARKS}](?=\p{Script=Latin})`, "gu");
+//  2. any other Latin letter, a mark and a Latin letter after it: tutuq. Cyrillic text (д'Артаньян) is never touched.
+// No lookbehind on purpose: this module also runs in the browser, and Safari before 16.4 rejects lookbehind.
+const SIGNS = new RegExp(String.raw`([oOgG])[${MARKS}]|(\p{Script=Latin})[${MARKS}](?=\p{Script=Latin})`, "gu");
 const ANY_MARK = new RegExp(`[${MARKS}]`, "gu");
 
 function assertString(input: unknown, fn: string): asserts input is string {
@@ -20,7 +21,9 @@ function assertString(input: unknown, fn: string): asserts input is string {
 /** oʻ, gʻ: ' ‘ ’ ` ʼ after o/O/g/G → U+02BB; other apostrophes between letters → U+02BC. */
 export function normalizeUz(input: string): string {
   assertString(input, "normalizeUz");
-  return input.replace(SIGNS, (_m, og?: string) => (og === undefined ? TUTUQ : `${og}${OKINA}`));
+  return input.replace(SIGNS, (_m, og?: string, letter?: string) =>
+    og === undefined ? `${letter}${TUTUQ}` : `${og}${OKINA}`,
+  );
 }
 
 /**

@@ -989,6 +989,14 @@ const GUARDS: GuardCase[] = [
     error: "invalid_transition",
   },
   {
+    name: "CANCEL: a point named like an Object.prototype key",
+    status: "accepted",
+    event: { ...EVENTS.CANCEL, point: "constructor" } as unknown as OrderEvent,
+    actor: "owner",
+    patch: {},
+    error: "invalid_transition",
+  },
+  {
     name: "CANCEL: no settlement",
     status: "accepted",
     event: { ...EVENTS.CANCEL, point: "after_accept_before_purchase", settlement: undefined } as unknown as OrderEvent,

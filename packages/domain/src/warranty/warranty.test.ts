@@ -72,6 +72,15 @@ describe("warrantyTransition: every other pair is invalid_transition", () => {
     });
   });
 
+  it("prototype keys and missing events are not events or statuses", () => {
+    const invalid = { ok: false, error: "invalid_transition" };
+    expect(warrantyTransition("opened", { type: "constructor" } as unknown as WarrantyEvent)).toEqual(invalid);
+    expect(warrantyTransition("opened", { type: "toString" } as unknown as WarrantyEvent)).toEqual(invalid);
+    expect(warrantyTransition("constructor" as WarrantyStatus, EVENTS.CLOSE as WarrantyEvent)).toEqual(invalid);
+    expect(warrantyTransition("opened", null as unknown as WarrantyEvent)).toEqual(invalid);
+    expect(warrantyTransition("opened", undefined as unknown as WarrantyEvent)).toEqual(invalid);
+  });
+
   it("unknown event types and statuses are invalid_transition", () => {
     expect(warrantyTransition("opened", { type: "NOPE" } as unknown as WarrantyEvent)).toEqual({
       ok: false,

@@ -13,28 +13,27 @@ export type * from "./types.ts";
 const DAY_MS = 86_400_000;
 const CLIENT_FAULTS: readonly ClientFault[] = ["impact", "liquid", "overclocking", "third_party_replacement"];
 
-/** The automaton as data (ARCHITECTURE 4.10): status -> event type -> next status. */
-const TRANSITIONS: Readonly<Record<WarrantyStatus, Readonly<Partial<Record<WarrantyEvent["type"], WarrantyStatus>>>>> =
-  {
-    opened: { START_DIAGNOSIS: "diagnosing" },
-    diagnosing: {
-      ISSUE_LOANER: "loaner_issued",
-      SEND_TO_SUPPLIER: "at_supplier",
-      RESOLVE: "resolved",
-      REJECT: "rejected",
-    },
-    loaner_issued: { SEND_TO_SUPPLIER: "at_supplier", RESOLVE: "resolved", REJECT: "rejected" },
-    at_supplier: { RESOLVE: "resolved", REJECT: "rejected" },
-    resolved: { CLOSE: "closed" },
-    rejected: { CLOSE: "closed" },
-    closed: {},
-  };
+/** The automaton as data (ARCHITECTURE 4.10): "status|event type" -> next status. A Map: no prototype keys. */
+const TRANSITIONS = new Map<string, WarrantyStatus>([
+  ["opened|START_DIAGNOSIS", "diagnosing"],
+  ["diagnosing|ISSUE_LOANER", "loaner_issued"],
+  ["diagnosing|SEND_TO_SUPPLIER", "at_supplier"],
+  ["diagnosing|RESOLVE", "resolved"],
+  ["diagnosing|REJECT", "rejected"],
+  ["loaner_issued|SEND_TO_SUPPLIER", "at_supplier"],
+  ["loaner_issued|RESOLVE", "resolved"],
+  ["loaner_issued|REJECT", "rejected"],
+  ["at_supplier|RESOLVE", "resolved"],
+  ["at_supplier|REJECT", "rejected"],
+  ["resolved|CLOSE", "closed"],
+  ["rejected|CLOSE", "closed"],
+]);
 
 const isBlank = (v: unknown): boolean => typeof v !== "string" || v.trim() === "";
 
 /** Refusal only with a causal link to the client (impact, liquid, overclocking, third-party replacement) and evidence. */
 export function warrantyTransition(status: WarrantyStatus, e: WarrantyEvent): WarrantyTransitionResult {
-  const next = Object.hasOwn(TRANSITIONS, status) ? TRANSITIONS[status][e.type] : undefined;
+  const next = TRANSITIONS.get(`${status}|${e?.type}`);
   if (next === undefined) return { ok: false, error: "invalid_transition" };
   if (e.type === "REJECT" && (!CLIENT_FAULTS.includes(e.clientFault) || isBlank(e.evidence))) {
     return { ok: false, error: "fault_evidence_missing" };

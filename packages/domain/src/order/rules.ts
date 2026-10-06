@@ -70,6 +70,7 @@ const CANCEL_POINTS: Readonly<Record<CancelPoint, readonly OrderStatus[]>> = {
   during_assembly: ["assembling", "testing"],
   after_tests_before_handover: ["ready", "delivering"],
 };
+const POINT_STATUSES = new Map<string, readonly OrderStatus[]>(Object.entries(CANCEL_POINTS));
 const CANCELLABLE: readonly OrderStatus[] = Object.values(CANCEL_POINTS).flat();
 
 export const RULES: readonly Rule[] = [
@@ -367,7 +368,7 @@ export const RULES: readonly Rule[] = [
     guard: ({ o, e }) => {
       if (e.settlement === undefined || blank(e.reason)) return "invalid_transition";
       // The settlement was calculated for a point; a point that does not fit the status means wrong money.
-      return CANCEL_POINTS[e.point]?.includes(o.status) ? undefined : "invalid_transition";
+      return POINT_STATUSES.get(e.point)?.includes(o.status) ? undefined : "invalid_transition";
     },
     effects: ({ e }) => [
       ...expectPayment("fee_refund", e.settlement.feeToRefund),
