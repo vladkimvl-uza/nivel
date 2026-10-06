@@ -318,7 +318,7 @@ DECLARE
     'current_quote_id', 'offer_version_uz_id', 'offer_version_ru_id', 'accepted_at', 'report_due_at',
     'objection_until', 'refund_due_at', 'handed_over_at', 'warranty_until', 'podbor_credit_until',
     'cancel', 'documented_losses_sum'];
-  -- Fields this actor may write together with this event (see below).
+  -- Fields this actor may write together with this event (see below); empty for the system and the assistant.
   v_actor_keys text[];
   v_event_actors text[];
   v_net numeric;
@@ -349,10 +349,11 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
   -- The bot lives in the group of the owner and acts for the owner and the assistant. Whoever holds its credentials
-  -- could name any actor, so the id it names must be the Telegram id of an active account of that role. The id is
-  -- text and telegram_user_id is a bigint: the column is cast to text and the two texts are compared. The id is never
-  -- cast to a number, so '+123', ' 123', '0123' and '123.0' are not the account 123, and a text that is no number is
-  -- a plain refusal, not a cast error.
+  -- could name any actor, so the id it names must be the Telegram id of an active account of that role. A Telegram id
+  -- belongs to at most one account (the unique index admin_users_telegram_user_id_key), so there is one row to judge.
+  -- The id is text and telegram_user_id is a bigint: the column is cast to text and the two texts are compared. The
+  -- id is never cast to a number, so '+123', ' 123', '0123' and '123.0' are not the account 123, and a text that is
+  -- no number is a plain refusal, not a cast error.
   IF session_user = 'nivel_bot' AND p_actor_kind IN ('owner', 'assistant') AND NOT EXISTS (
        SELECT 1 FROM ops.admin_users a
         WHERE a.telegram_user_id::text = p_actor_id AND a.role = p_actor_kind AND a.active) THEN
@@ -361,16 +362,16 @@ BEGIN
   END IF;
   -- Fields an actor may write together with an event: a whitelist of the pair (actor, event), not of the actor
   -- alone. The owner writes any of them; the customer only what its event owns (the acceptance time and the offer
-  -- versions with ACCEPT, the handover time and the warranty with HANDOVER); the system the deadlines it sets; the
-  -- assistant none. The money fields (flags that open purchases, the deadlines of refunds, the documented losses of
-  -- the closing check) belong to the owner only.
+  -- versions with ACCEPT, the handover time and the warranty with HANDOVER); the system and the assistant none: the
+  -- events of the system (EXPIRE, REPORT_DEEMED_ACCEPTED, CLOSE) write no order field in table 4.9, the deadlines are
+  -- set by the owner's events. The money fields (flags that open purchases, the deadlines of refunds, the documented
+  -- losses of the closing check) belong to the owner only.
   v_actor_keys := CASE
     WHEN p_actor_kind = 'owner' THEN v_allowed
     WHEN p_actor_kind = 'customer' AND v_type = 'ACCEPT'
       THEN ARRAY['accepted_at', 'offer_version_uz_id', 'offer_version_ru_id']
     WHEN p_actor_kind = 'customer' AND v_type = 'HANDOVER'
       THEN ARRAY['handed_over_at', 'warranty_until']
-    WHEN p_actor_kind = 'system' THEN ARRAY['report_due_at', 'objection_until', 'refund_due_at']
     ELSE ARRAY[]::text[]
   END;
   FOR v_key IN SELECT jsonb_object_keys(coalesce(p_changes, '{}'::jsonb)) LOOP

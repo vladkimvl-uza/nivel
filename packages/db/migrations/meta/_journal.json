@@ -29,6 +29,13 @@
       "when": 1791264806092,
       "tag": "20261006053326_wp06_sql",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791278615634,
+      "tag": "20261006092335_wp06_admin_telegram_unique",
+      "breakpoints": true
     }
   ]
 }

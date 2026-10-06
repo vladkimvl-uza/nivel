@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "admin_users_telegram_user_id_key" ON "ops"."admin_users" USING btree ("telegram_user_id") WHERE "ops"."admin_users"."telegram_user_id" is not null;
