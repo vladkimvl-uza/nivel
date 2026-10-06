@@ -194,7 +194,7 @@ describe("effects of settlement, assembly and handover", () => {
     money: { ...FUNDS, refunded: sum(1_300_000) },
   };
 
-  it("REMAINDER_SETTLED moves 1 % of the receipts to the tax risk reserve (rounded down)", () => {
+  it("REMAINDER_SETTLED moves 1 % of the receipts to the tax risk reserve (rounded up, as in WP-01)", () => {
     expect(effectsOf(settled, EVENTS.REMAINDER_SETTLED, "owner")).toEqual([
       { kind: "ledger", fund: "tax_risk", amount: 90_000 },
     ]);
@@ -203,7 +203,7 @@ describe("effects of settlement, assembly and handover", () => {
       money: { fundsReceived: sum(1_234_599), receiptsTotal: sum(1_234_599), refunded: sum(0) },
     };
     expect(effectsOf(odd, { type: "REMAINDER_SETTLED" }, "owner")).toEqual([
-      { kind: "ledger", fund: "tax_risk", amount: 12_345 },
+      { kind: "ledger", fund: "tax_risk", amount: 12_346 },
     ]);
   });
 
@@ -249,20 +249,28 @@ describe("effects of settlement, assembly and handover", () => {
   });
 
   it.each([
-    [0, 150_000],
     [5_000_000, 150_000],
     [7_500_000, 150_000],
-    [7_500_001, 150_000],
+    [7_500_001, 150_001],
     [7_550_000, 151_000],
     [100_000_000, 2_000_000],
-    [12_345_678, 246_913],
-  ])("HANDOVER warranty reserve for receipts %s is %s (2 %%, at least 150 000, rounded down)", (receipts, expected) => {
+    [12_345_678, 246_914],
+  ])("HANDOVER warranty reserve for receipts %s is %s (2 %%, at least 150 000, rounded up)", (receipts, expected) => {
     const effects = effectsOf(
       { status: "delivering", money: { fundsReceived: sum(receipts), receiptsTotal: sum(receipts) } },
       EVENTS.HANDOVER,
       "customer",
     );
     expect(effects).toContainEqual({ kind: "ledger", fund: "warranty", amount: expected });
+  });
+
+  it("HANDOVER of an order without receipts has nothing to reserve", () => {
+    const effects = effectsOf(
+      { status: "delivering", money: { fundsReceived: sum(0), receiptsTotal: sum(0) } },
+      EVENTS.HANDOVER,
+      "owner",
+    );
+    expect(effects.some((e) => e.kind === "ledger")).toBe(false);
   });
 
   it("HANDOVER on a leap day keeps the last day of the shorter month", () => {

@@ -3,6 +3,7 @@ import { createWorkCalendar } from "../calendar/index.ts";
 import type { CancelPoint, CancelSettlement } from "../cancel/types.ts";
 import type { FeeSettings } from "../fee/types.ts";
 import type { Bp, Sum } from "../money/types.ts";
+import type { WarrantyReserveState } from "../threshold/types.ts";
 import type { Actor, OfferStatus, OrderEvent, OrderSnapshot, OrderStatus } from "./types.ts";
 
 export const sum = (n: number): Sum => n as Sum;
@@ -61,6 +62,7 @@ export interface OrderPatch {
   purchaseNotBefore?: Date | null;
   offer?: Partial<Record<"uz" | "ru", OfferStatus>>;
   appMode?: OrderSnapshot["appMode"];
+  reserves?: { warranty?: Partial<WarrantyReserveState>; taxRiskActive?: boolean };
 }
 
 export const DEFAULT_QUOTE: NonNullable<OrderSnapshot["quote"]> = {
@@ -108,6 +110,11 @@ export function order(patch: OrderPatch = {}): OrderSnapshot {
     grandTotal: patch.grandTotal ?? sum(13_300_000),
     offer: { uz: "published", ru: "published", ...patch.offer },
     appMode: patch.appMode ?? "production",
+    // The first months of the business: an empty fund, no closed orders, the tax reserve running.
+    reserves: {
+      warranty: { balance: sum(0), closedOrders: 0, lossesLast12mBp: bp(0), ...patch.reserves?.warranty },
+      taxRiskActive: patch.reserves?.taxRiskActive ?? true,
+    },
   };
   if (quote) base.quote = quote;
   if (report) base.report = report;

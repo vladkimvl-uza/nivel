@@ -3,6 +3,7 @@ import type { CancelPoint, CancelSettlement } from "../cancel/types.ts";
 import type { CompatResult } from "../compat/types.ts";
 import type { Eligibility, FeeSettings } from "../fee/types.ts";
 import type { IsoDate, Sum } from "../money/types.ts";
+import type { WarrantyReserveState } from "../threshold/types.ts";
 
 export type OrderStatus =
   | "estimate_draft"
@@ -80,6 +81,12 @@ export interface OrderSnapshot {
   purchaseNotBefore?: Date;
   offer: { uz: OfferStatus; ru: OfferStatus };
   appMode: "development" | "staging" | "production";
+  /**
+   * Inputs of the reserve rules of WP-01 (ledger effects of REMAINDER_SETTLED and HANDOVER): the state of the
+   * warranty fund (balance, closed orders, losses of 12 months) and whether the tax-risk reserve still runs
+   * (until the tax authority answers in writing, R-7).
+   */
+  reserves: { warranty: WarrantyReserveState; taxRiskActive: boolean };
 }
 export type Effect =
   | { kind: "notify"; to: "customer" | "owner_topic"; templateKey: string; params?: Record<string, string | number> }

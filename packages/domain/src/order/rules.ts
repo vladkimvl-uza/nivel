@@ -6,7 +6,7 @@ import { addMonthsTashkent, DAY_MS } from "../calendar/tashkent.ts";
 import type { CancelPoint } from "../cancel/types.ts";
 import type { FeeSettings } from "../fee/types.ts";
 import type { Sum } from "../money/types.ts";
-import { receiptsReserve, warrantyReserve } from "./reserves.ts";
+import { taxRiskReserve, warrantyReserveContribution } from "../reserve/index.ts";
 import type { Actor, Effect, GuardError, OrderEvent, OrderSnapshot, OrderStatus, WorkCalendar } from "./types.ts";
 
 type EventType = OrderEvent["type"];
@@ -68,6 +68,14 @@ function podborCreditUntil(delivered: Date, days: number): Date {
   }
   return until;
 }
+/** Reserve inputs of the snapshot; a snapshot without them is a caller bug, never a reason to guess an amount. */
+function reserveInputs(o: OrderSnapshot): OrderSnapshot["reserves"] {
+  if (o.reserves == null) throw new RangeError("transition: the snapshot has no reserves (fund state, taxRiskActive)");
+  return o.reserves;
+}
+/** A ledger entry of a fund; nothing to record when the contribution is zero. */
+const ledger = (fund: Extract<Effect, { kind: "ledger" }>["fund"], amount: Sum): Effect[] =>
+  amount > 0 ? [{ kind: "ledger", fund, amount }] : [];
 const notify = (to: "customer" | "owner_topic", templateKey: string): Effect => ({ kind: "notify", to, templateKey });
 const expectPayment = (
   paymentKind: Extract<Effect, { kind: "expect_payment" }>["paymentKind"],
@@ -304,10 +312,8 @@ export const RULES: readonly Rule[] = [
       // Funds received = receipts + refunded: the remainder has gone back (or there was none).
       return reconciled(o) ? undefined : "not_reconciled";
     },
-    effects: ({ o }) => {
-      const amount = receiptsReserve(o.money.receiptsTotal);
-      return amount > 0 ? [{ kind: "ledger", fund: "tax_risk", amount }] : [];
-    },
+    // The amounts come from the functions of WP-01 (reserve/index.ts), the single source of the reserve rules.
+    effects: ({ o }) => ledger("tax_risk", taxRiskReserve(o.money.receiptsTotal, reserveInputs(o).taxRiskActive)),
   }),
   rule({
     from: ["settled"],
@@ -357,7 +363,8 @@ export const RULES: readonly Rule[] = [
         ...AFTERCARE_DAYS.map(
           (days): Effect => ({ kind: "schedule", job: "aftercare", at: after(now, days * DAY_MS) }),
         ),
-        { kind: "ledger", fund: "warranty", amount: warrantyReserve(o.money.receiptsTotal) },
+        // The receipts of the order stand in for the components sum until the snapshot carries it.
+        ...ledger("warranty", warrantyReserveContribution(o.money.receiptsTotal, reserveInputs(o).warranty)),
         notify("customer", "order.handed_over"),
       ];
     },
