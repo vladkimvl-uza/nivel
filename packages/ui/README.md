@@ -11,7 +11,7 @@
 
 - Стили: один раз в CSS приложения `@import "@nivel/ui/styles.css"` (или относительным путём к `src/styles/index.css`). Это темы, `@font-face`, база, примитивы. Компоненты пишут `var(--ink)`, `var(--bg)`, а не цвета.
 - Корень страницы: `<html lang={…} data-theme={defaultTheme}>`. Сервер рисует `"night"`, скрипта и `suppressHydrationWarning` не нужно: атрибут не меняется. Страница без атрибута тоже ночная (`:root` и `[data-theme="night"]` — одно правило).
-- Атрибут `data-theme` оставлен намеренно: вторую тему можно вернуть, не трогая компоненты (член в `themes`, набор в `themeTokens`, правило в `themes.css`).
+- Атрибут `data-theme` оставлен намеренно: вторую тему можно вернуть, не трогая компоненты (член в `themes`, набор в `themeTokens`; правило в `themes.css` генератор допишет сам после `build-css.mjs`).
 - `<meta name="theme-color">` — значение `themeTokens.night.themeColor`.
 - Слой документов: `Paper`, `EstimateTable`/`EstimateRow`, `SumsTable`, `Stamp`/`RoundStamp` (один раз на странице `StampInkDefs`), `Tag`, `Badge` (`demo`, `draft`, `visualization`, `sample`). Документы лежат на «бумаге» `.nv-paper` внутри ночной страницы. Штампы `rect` и `RoundStamp` рассчитаны только на бумагу; малый штамп (`variant="small"`) вне бумаги берёт `--accent-ink`, на бумаге `--stamp`.
 - Вспомогательные классы: `.nv-lamp` (тёплое пятно лампы за блоком, всегда включено), `.nv-stamp--press` (оттиск штампа за 450 мс, при «уменьшить движение» отключён), `.nv-sr` (текст только для чтения с экрана).

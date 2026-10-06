@@ -26,6 +26,9 @@ function sources(): Map<string, string> {
   return out;
 }
 
+/** Day wording that must not come back to the README; `\b` does not work after Cyrillic, so look around by letters. */
+const DAY_WORDS = /Ночь и день|две темы|(?<!\p{L})день(?!\p{L})/iu;
+
 describe("night only: the package has no way to switch themes", () => {
   const files = sources();
 
@@ -66,6 +69,11 @@ describe("night only: the package has no way to switch themes", () => {
     const render = files.get("src/test-support/render.ts") ?? "";
     expect(render).toMatch(/from "react-dom\/server"/);
     expect(render).not.toMatch(/createRequire|apps\/web/);
+  });
+
+  it('catches the word "день" in Cyrillic text (\b in JS knows only ASCII)', () => {
+    for (const text of ["в день и ночь", "день", "Днём и день.", "Ночь и день"]) expect(text).toMatch(DAY_WORDS);
+    expect(`ночь, ведь «дневной» не нужен`).not.toMatch(DAY_WORDS);
   });
 
   it("has a README about night only, without the integrator requests that are already done", () => {

@@ -2,7 +2,7 @@
 // build step. A test fails when it is stale; regenerate with `node packages/ui/scripts/build-css.mjs`.
 
 import { font, motion, radius, space } from "../tokens.ts";
-import { defaultTheme } from "./ids.ts";
+import { defaultTheme, type Theme, themes } from "./ids.ts";
 import { brand, type ThemeTokens, themeTokens } from "./tokens.ts";
 
 /** `bg2` -> `--bg-2`, `docInk2` -> `--doc-ink-2`, `accentInk` -> `--accent-ink` (the names of the prototype). */
@@ -20,6 +20,11 @@ function modeDecls(t: ThemeTokens): [string, string][] {
   return Object.entries(t)
     .filter(([role]) => role !== "themeColor")
     .map(([role, value]) => [cssVarName(role), value]);
+}
+
+function themeSelector(theme: Theme): string {
+  const byAttribute = `[data-theme="${theme}"]`;
+  return theme === defaultTheme ? `:root,\n${byAttribute}` : byAttribute;
 }
 
 export function buildThemesCss(): string {
@@ -49,7 +54,7 @@ export function buildThemesCss(): string {
     block(":root", core),
     "/* In IBM Plex Mono the sign U+02BB looks like an acute accent: Uzbek uses Noto Sans Mono. */",
     block('html[lang="uz-Latn"]', [["--mono", font.monoUz]]),
-    "/* Night is the only theme and the default: a page without the attribute is night. */",
-    block(`:root,\n[data-theme="${defaultTheme}"]`, modeDecls(themeTokens[defaultTheme])),
+    "/* One rule per theme; the default theme also answers to :root, so a page without the attribute is night. */",
+    ...themes.map((theme) => block(themeSelector(theme), modeDecls(themeTokens[theme]))),
   ].join("\n");
 }

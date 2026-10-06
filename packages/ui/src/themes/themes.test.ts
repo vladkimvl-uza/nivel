@@ -51,6 +51,12 @@ describe("theme ids (owner decision of 06.10.2026: night only)", () => {
   it("keeps the data-theme contract: the token map is keyed by theme, so a second theme can come back", () => {
     expect(Object.keys(themeTokens)).toEqual([...themes]);
   });
+
+  it("has one themes.css rule per theme, so a theme added to the list cannot silently fall back to night", () => {
+    const css = buildThemesCss();
+    for (const theme of themes) expect(css).toContain(`[data-theme="${theme}"]`);
+    expect(css.match(/\[data-theme="/g)?.length).toBe(themes.length);
+  });
 });
 
 describe("tokens", () => {

@@ -27,7 +27,7 @@ html[lang="uz-Latn"] {
   --mono: "Noto Sans Mono", ui-monospace, Consolas, monospace;
 }
 
-/* Night is the only theme and the default: a page without the attribute is night. */
+/* One rule per theme; the default theme also answers to :root, so a page without the attribute is night. */
 :root,
 [data-theme="night"] {
   --bg: #121110;
