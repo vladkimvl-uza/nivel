@@ -1,4 +1,6 @@
 import type { BuildLine, CategoryCode, FeeGroup } from "@nivel/domain/catalog";
+import { PAYMENT_KINDS, PAYMENT_METHODS } from "@nivel/domain/money";
+import type { Actor, OrderStatus } from "@nivel/domain/order";
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -51,23 +53,13 @@ export const ORDER_STATUSES = [
   "podbor_delivered",
   "cancelling",
   "cancelled",
-] as const;
+] as const satisfies readonly OrderStatus[];
 export type OrderStatusCode = (typeof ORDER_STATUSES)[number];
 export const ORDER_KINDS = ["pc", "setup", "podbor", "upgrade"] as const;
-export const ACTOR_KINDS = ["system", "customer", "owner", "assistant"] as const;
+export const ACTOR_KINDS = ["system", "customer", "owner", "assistant"] as const satisfies readonly Actor[];
 export const QUOTE_STATUSES = ["draft", "sent", "accepted", "expired", "superseded"] as const;
-export const PAYMENT_KINDS = [
-  "fee_advance",
-  "fee_final",
-  "fee_extra",
-  "podbor_fee",
-  "purchase_funds",
-  "purchase_topup",
-  "remainder_refund",
-  "fee_refund",
-  "funds_refund",
-] as const;
-export const PAYMENT_METHODS = ["xolis_qr", "merchant_card", "bank_transfer_ip", "bank_transfer_out"] as const;
+// The lists of the payment pairs are the contract of packages/domain; the CHECKs below are generated from them.
+export { PAYMENT_KINDS, PAYMENT_METHODS };
 export const PAYMENT_STATUSES = ["expected", "confirmed", "void"] as const;
 export const WARRANTY_STATUSES = [
   "opened",

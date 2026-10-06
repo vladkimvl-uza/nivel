@@ -1,3 +1,4 @@
+import { DEFAULT_FEE_SETTINGS } from "@nivel/domain/fee";
 import { describe, expect, it } from "vitest";
 
 // Pure checks of the seed data (no database): the shape of the 32 base builds of block 28 and the plausibility of the
@@ -376,6 +377,10 @@ describe("guards", () => {
 });
 
 describe("money settings of the seed", () => {
+  it("are the default fee settings of packages/domain (the seed is a copy that cannot drift)", () => {
+    expect(seed.FEE_SETTINGS).toEqual(DEFAULT_FEE_SETTINGS);
+  });
+
   it("repeat the default money rules of the owner (ARCHITECTURE 4.6, DECISIONS R-8)", () => {
     expect(seed.FEE_SETTINGS).toMatchObject({
       pcLowRateBp: 1500,

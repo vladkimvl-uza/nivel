@@ -1,5 +1,5 @@
 {
-  "$comment": "WP-06: money rules the database enforces as the second line of defence (ARCHITECTURE 3.4). Run against the real database by packages/db/src/money-cases.int.test.ts. When WP-01 lands packages/testing/fixtures/money-cases.json, the integrator wires its shared cases into the same runner.",
+  "$comment": "WP-06: money rules the database enforces as the second line of defence (ARCHITECTURE 3.4). Run against the real database by packages/db/src/repos/money-cases.suite.ts; the shared packages/testing/fixtures/money-cases.json of WP-01 runs next to it in shared-money-cases.suite.ts.",
   "paymentPairs": [
     {
       "name": "advance by Xolis QR with a receipt",
