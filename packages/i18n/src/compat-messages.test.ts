@@ -3,13 +3,13 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DETAILED_CATEGORIES, type DetailedCategory, type SpecMap } from "@nivel/domain/catalog";
-import { COMPAT_MESSAGE_KEYS, fieldNameKey } from "@nivel/domain/compat";
+import { COMPAT_MESSAGE_KEYS, type CompatIssue, fieldNameKey, fieldNameKeyOf } from "@nivel/domain/compat";
 import { describe, expect, it } from "vitest";
 import { glossaryProblems, parseGlossary } from "./glossary.ts";
 import { placeholders, sampleValues } from "./icu.ts";
 import { getMessages, namespaces } from "./index.ts";
 import { checkNamespace, flattenMessages, type MetaEntry } from "./messages-check.ts";
-import { createNodeTranslator } from "./node-translator.ts";
+import { createNodeTranslator, type NodeTranslator } from "./node-translator.ts";
 import { checkUzString } from "./uz-apostrophes.ts";
 
 const base = fileURLToPath(new URL("../messages/", import.meta.url));
@@ -270,13 +270,35 @@ describe("compat.missing_data and the field dictionary", () => {
     }
   });
 
+  // The example of the fieldNameKeyOf JSDoc (packages/domain/src/compat/message-keys.ts), as written there: tsc checks
+  // that it compiles under the strict settings of the repository, the tests below run it on the real texts.
+  const showIssue = (issue: CompatIssue, t: NodeTranslator): string => {
+    const key = fieldNameKeyOf(issue);
+    const field = key !== undefined && t.has(key) ? t(key) : String(issue.params.field);
+    return t(issue.messageKey, { ...issue.params, field });
+  };
+  const noData = (params: CompatIssue["params"]): CompatIssue => ({
+    ruleId: "PSU_WATTAGE",
+    severity: "warn",
+    productIds: [],
+    messageKey: "compat.missing_data",
+    params,
+  });
+
   it.each(LOCALES)("%s: the issue is shown with the field name, not the technical key", (locale) => {
     const t = createNodeTranslator(locale, "compat");
-    const params = { field: "tgpW", category: "gpu" };
-    const text = t("compat.missing_data", { ...params, field: t(fieldNameKey(params.category, params.field)) });
+    const text = showIssue(noData({ field: "tgpW", category: "gpu" }), t);
     expect(text).not.toContain("tgpW");
     expect(text).toContain(t("compat.field.gpu.tgpW"));
     expect(text).not.toContain("{");
+  });
+
+  it.each(LOCALES)("%s: without a name the technical field is shown (the one fallback rule)", (locale) => {
+    const t = createNodeTranslator(locale, "compat");
+    // the dictionary has no such field: t.has(key) is false
+    expect(showIssue(noData({ field: "futureField", category: "gpu" }), t)).toContain("«futureField»");
+    // the category is a number: there is no key at all
+    expect(showIssue(noData({ field: "tgpW", category: 7 }), t)).toContain("«tgpW»");
   });
 });
 

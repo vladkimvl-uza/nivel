@@ -1,4 +1,4 @@
-import type { RuleId } from "./types.ts";
+import type { CompatIssue, RuleId } from "./types.ts";
 
 export const MESSAGE_KEY_PREFIX = "compat.";
 
@@ -6,19 +6,33 @@ export const MESSAGE_KEY_PREFIX = "compat.";
 export const FIELD_NAME_KEY_PREFIX = "compat.field.";
 
 /**
- * Key of the display name of a spec field (namespace `compat`, texts in packages/i18n). Convention for
- * `compat.missing_data`, whose params are `{ field, category }` (the technical names, e.g. "tgpW" of "gpu"): the caller
- * shows the name of the field, not the technical key, by passing it into the message:
- *
- *   const label = t(fieldNameKey(issue.params.category, issue.params.field));
- *   t(issue.messageKey, { ...issue.params, field: label });
- *
- * `compat.field.*` has a name for every field of `SpecMap` and for the plan position "placement" of an arm and a desk
- * (the only field a rule reports that is not a spec field; tests keep the dictionary in step). For a key that does not
- * exist, check with `t.has(key)` first and show the technical name instead of failing.
+ * Key of the display name of a field (namespace `compat`, texts in packages/i18n): `compat.field.<category>.<field>`,
+ * e.g. `fieldNameKey("gpu", "tgpW")`. The dictionary has a name for every field of `SpecMap` and for the plan position
+ * "placement" of an arm and a desk (the only field a rule reports that is not a spec field; tests keep it in step).
+ * It takes strings; to name the field of an issue use `fieldNameKeyOf`: `issue.params.category` is
+ * `string | number | undefined` for the compiler.
  */
 export function fieldNameKey(category: string, field: string): string {
   return `${FIELD_NAME_KEY_PREFIX}${category}.${field}`;
+}
+
+/**
+ * Key of the name of the field a `compat.missing_data` issue is about, or `undefined` when `params.category` or
+ * `params.field` is not a non-empty string (`CompatIssue.params` holds `string | number`). Convention for showing the
+ * issue: the caller passes the name of the field, not its technical key, into the message as `field`:
+ *
+ *   const key = fieldNameKeyOf(issue);
+ *   const field = key !== undefined && t.has(key) ? t(key) : String(issue.params.field);
+ *   const text = t(issue.messageKey, { ...issue.params, field });
+ *
+ * Fallback, one rule: when there is no name (`key` is `undefined` or `t.has(key)` is false), show the technical
+ * `params.field` as it is. The example compiles under the strict settings of the repository: a test holds a copy of it
+ * (packages/i18n/src/compat-messages.test.ts).
+ */
+export function fieldNameKeyOf(issue: Pick<CompatIssue, "params">): string | undefined {
+  const { category, field } = issue.params;
+  if (typeof category !== "string" || category === "" || typeof field !== "string" || field === "") return undefined;
+  return fieldNameKey(category, field);
 }
 
 export interface MessageKeySpec {
