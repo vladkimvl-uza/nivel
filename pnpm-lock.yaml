@@ -230,6 +230,9 @@ catalogs:
     react-dom:
       specifier: 19.3.0
       version: 19.3.0
+    sharp:
+      specifier: 0.35.5
+      version: 0.35.5
     three:
       specifier: 0.186.1
       version: 0.186.1
@@ -277,9 +280,21 @@ importers:
       '@nivel/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@nivel/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@nivel/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nivel/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@nivel/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)
       next:
         specifier: 'catalog:'
         version: 16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -289,7 +304,16 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.3.0(react@19.3.0)
+      sharp:
+        specifier: 'catalog:'
+        version: 0.35.5(@types/node@24.19.1)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
     devDependencies:
+      '@nivel/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
@@ -3063,8 +3087,7 @@ snapshots:
 
   '@grammyjs/types@5.0.0': {}
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.5':
     optionalDependencies:
@@ -4041,8 +4064,7 @@ snapshots:
 
   scheduler@0.28.0: {}
 
-  semver@7.8.5:
-    optional: true
+  semver@7.8.5: {}
 
   serialize-error@13.0.2:
     dependencies:
@@ -4083,7 +4105,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
       '@types/node': 24.19.1
-    optional: true
 
   signal-exit@4.1.0: {}
 

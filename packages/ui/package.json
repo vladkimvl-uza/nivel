@@ -7,10 +7,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/react.ts",
+    "./logo-motion": "./src/logo-motion/index.ts",
     "./styles.css": "./src/styles/index.css",
     "./themes.css": "./src/themes/themes.css",
     "./fonts/*": "./fonts/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./media/*": "./media/*"
   },
   "peerDependencies": {
     "react": "catalog:"
