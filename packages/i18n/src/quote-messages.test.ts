@@ -67,19 +67,26 @@ describe("namespace quote", () => {
     expect(text).not.toMatch(/\p{Script=Cyrillic}/u);
   });
 
-  it("writes Russian in Cyrillic, with the thresholds of the rule (5 % reserve, 25 % memory and SSD)", () => {
+  it("writes Russian in Cyrillic and no dollars", () => {
     const ru = Object.fromEntries(flattenMessages(read("ru")));
-    expect(ru["quote.reserve_high"]).toMatch(/25\s?%/);
-    expect(ru["quote.reserve_high"]).toMatch(/5\s?%/);
     for (const v of Object.values(ru)) expect(v).toMatch(/\p{Script=Cyrillic}/u);
     for (const v of Object.values(ru)) expect(v).not.toMatch(/\$|USD/);
   });
 
-  it("writes the Uzbek thresholds as 25 foiz and 5 foiz", () => {
+  it("names no threshold in the texts: the percentages are owner settings (FeeSettings), not the text's business", () => {
+    for (const kind of ["ru", "uz"]) {
+      for (const [k, v] of flattenMessages(read(kind))) expect(v, `${kind} ${k}`).not.toMatch(/\d/);
+    }
+  });
+
+  it("never calls the free window free of charge: it is an unoccupied slot, the selection service is paid", () => {
+    for (const [k, v] of flattenMessages(read("ru"))) expect(v, `ru ${k}`).not.toMatch(/бесплатн/i);
+    for (const [k, v] of flattenMessages(read("uz"))) expect(v, `uz ${k}`).not.toMatch(/bepul/i);
+    const ru = Object.fromEntries(flattenMessages(read("ru")));
     const uz = Object.fromEntries(flattenMessages(read("uz")));
-    const text = uz["quote.reserve_high"] ?? "";
-    expect(text).toMatch(/25 foiz/);
-    expect(text).toMatch(/5 foiz/);
+    expect(ru["quote.free_window_unavailable"]).toMatch(/свободн/);
+    expect(ru["quote.free_window_unavailable"]).toMatch(/платн/);
+    expect(uz["quote.free_window_unavailable"]).toMatch(/pullik/);
   });
 });
 
@@ -100,6 +107,11 @@ describe("warnings of computeQuote resolve to texts", () => {
   it("the three scenarios emit exactly the three keys of the request", () => {
     const keys = scenarios.flatMap(([, q]) => q.warnings.map((w) => w.key));
     expect(keys.sort()).toEqual([...KEYS].sort());
+  });
+
+  it("quote.empty also covers an estimate whose only lines are the customer's own items (nothing adds to the cost)", () => {
+    const q = computeQuote([line(3_000_000, { customerOwned: true })], DEFAULT_FEE_SETTINGS, ctx());
+    expect(q.warnings.map((w) => w.key)).toContain("quote.empty");
   });
 
   it.each(["uz", "ru"] as const)("%s: t(warning.key, warning.params) gives a text for every warning", (locale) => {
