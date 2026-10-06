@@ -75,8 +75,17 @@ const CAPABILITIES = {
   "orders.create": ["admin"],
   "quotes.write": ["admin"],
   "payments.write": ["admin"],
+  /**
+   * The bot (after ACCEPT and CANCEL by the owner) and the worker (the jobs the site queued) expect payments through
+   * sales.expect_payment(); the admin writes the table itself and the site has no right to either.
+   */
+  "payments.expect": ["bot", "worker"],
   "purchases.write": ["admin"],
   "acts.write": ["admin"],
+  /** The press of the button of the customer signs an act through sales.sign_act(); the admin records acts itself. */
+  "acts.sign_button": ["bot"],
+  /** A request of the site is bound to a customer by the owner in the admin panel (the database refuses the others). */
+  "leads.bind": ["admin"],
   "reports.write": ["admin"],
   "ledger.write": ["admin", "worker"],
   /** The reserve ledger is read by the owner's panel and the worker; the bot and the site do not see it. */

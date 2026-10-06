@@ -188,18 +188,6 @@ async function findExisting(ex: Executor, c: NewCustomerInput): Promise<string |
   return null;
 }
 
-/** The contact of a lead that the site could not link to a customer travels in the comment, for the owner to merge by hand. */
-function unlinkedComment(input: CreateLeadInput): string {
-  const c = input.customer;
-  const who = [c?.displayName, c?.phoneE164, c?.telegramUsername].filter((x) => x !== undefined).join(", ");
-  return `[contact, not linked to a customer: ${who}]${
-    input.comment
-      ? `
-${input.comment}`
-      : ""
-  }`;
-}
-
 /**
  * Opens a lead of a person who wrote on the site or in the bot. Returns the number the person is told. The id of the
  * customer is for the bot and the staff only: the site gets none, so that it cannot be used to find out who is a customer.
@@ -236,7 +224,16 @@ export async function create(
       wantedBy: input.wantedBy ?? null,
       scope: input.scope,
       budgetBand,
-      comment: customerId === null ? unlinkedComment(input) : (input.comment ?? null),
+      comment: input.comment ?? null,
+      // A request that could not be linked to a customer keeps the contact of the person in its own columns, for the
+      // owner to merge by hand (bindCustomer); the 12-month retention of the request clears them too.
+      ...(customerId === null
+        ? {
+            contactPhone: input.customer?.phoneE164 ?? null,
+            contactName: input.customer?.displayName ?? null,
+            contactUsername: input.customer?.telegramUsername ?? null,
+          }
+        : {}),
       now,
     });
     await ops.enqueueOutbox(tx, {
@@ -308,5 +305,50 @@ export async function convert(
       after: { orderId: order.id, number: order.number },
     });
     return { orderId: order.id, number: order.number, created: true };
+  });
+}
+
+/**
+ * The owner links a request of the site that had no customer to the customer he chose (the site cannot tell who a phone
+ * belongs to). Once: a request that has a customer is never rebound. Only the admin panel does it (the database refuses
+ * the bot), the owner or the assistant, with a row in the audit log. `bound` is false when the request already has this
+ * very customer.
+ */
+export async function bindCustomer(
+  input: { leadId: string; customerId: string },
+  actor: ActorRef,
+  rt?: Runtime,
+): Promise<{ bound: boolean }> {
+  const r = runtimeOf(rt);
+  requireStaff(actor, "binding a request to a customer");
+  requireCapability(r, "leads.bind");
+  const leadId = assertUuid(input.leadId, "leadId");
+  const customerId = assertUuid(input.customerId, "customerId");
+  return r.db.transaction(async (tx) => {
+    await lockBy(tx, `lead:${leadId}`);
+    const lead = await tx.query.leads.findFirst({
+      columns: { id: true, customerId: true },
+      where: (t, { eq }) => eq(t.id, leadId),
+    });
+    if (!lead) throw new NotFoundError("lead");
+    const customer = await tx.query.customers.findFirst({
+      columns: { id: true },
+      where: (t, { eq }) => eq(t.id, customerId),
+    });
+    if (!customer) throw new NotFoundError("customer");
+    if (lead.customerId === customerId) return { bound: false };
+    if (lead.customerId !== null) {
+      throw ValidationError.of("leadId", "lead_already_bound", "the request already has another customer");
+    }
+    if (!(await sales.bindLeadCustomer(tx, leadId, customerId))) throw new NotFoundError("lead");
+    await ops.appendAudit(tx, {
+      actor: auditActor(actor),
+      action: "lead.bind_customer",
+      entity: "sales.leads",
+      entityId: leadId,
+      before: { customerId: null },
+      after: { customerId },
+    });
+    return { bound: true };
   });
 }

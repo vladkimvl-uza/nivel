@@ -2,7 +2,7 @@
 // of eight characters, with the quote and the verdict of compatibility that the SERVER calculated from its own prices;
 // whatever sums the client has are not looked at. A saved configuration never changes: a changed one is saved again
 // and names its parent.
-import { sales } from "@nivel/db/repos";
+import { DbRuleError, sales } from "@nivel/db/repos";
 import type { BuildLine } from "@nivel/domain/catalog";
 import type { Task } from "@nivel/domain/compat";
 import { MAX_BUDGET_SUM } from "@nivel/domain/fee";
@@ -123,24 +123,26 @@ export async function save(input: SaveConfigInput, rt?: Runtime): Promise<SavedC
   assertJsonObject(prefs, "prefs", FREE_JSON);
 
   const t = computed.totals;
-  const saved = await insertWithCode(r, {
-    kind: input.kind,
-    parentId: parentId ?? null,
-    items,
-    room: input.room ?? null,
-    prefs: Object.keys(prefs).length > 0 ? prefs : null,
-    engineVersion: ENGINE_VERSION,
-    ruleSetVersion: computed.ruleSetVersion,
-    priceSnapshot: computed.priceSnapshot,
-    quote: serializeTotals(t, {
-      compatVerdict: computed.compatVerdict,
-      shelfLifeHours: computed.shelfLifeHours,
-      quoteKind: input.kind,
+  const saved = await keepingSize(() =>
+    insertWithCode(r, {
+      kind: input.kind,
+      parentId: parentId ?? null,
+      items,
+      room: input.room ?? null,
+      prefs: Object.keys(prefs).length > 0 ? prefs : null,
+      engineVersion: ENGINE_VERSION,
+      ruleSetVersion: computed.ruleSetVersion,
+      priceSnapshot: computed.priceSnapshot,
+      quote: serializeTotals(t, {
+        compatVerdict: computed.compatVerdict,
+        shelfLifeHours: computed.shelfLifeHours,
+        quoteKind: input.kind,
+      }),
+      compat: JSON.parse(JSON.stringify(compat)) as Record<string, unknown>,
+      createdVia: input.createdVia,
+      customerId: customerId ?? null,
     }),
-    compat: JSON.parse(JSON.stringify(compat)) as Record<string, unknown>,
-    createdVia: input.createdVia,
-    customerId: customerId ?? null,
-  });
+  );
   return {
     id: saved.id,
     publicCode: saved.publicCode,
@@ -158,6 +160,33 @@ export async function save(input: SaveConfigInput, rt?: Runtime): Promise<SavedC
     },
     compat: compat as SavedConfig["compat"],
   };
+}
+
+/**
+ * The database measures the free JSON as it keeps it (jsonb), not as the text that came: what the check of the text let
+ * through and the database refuses is the same answer to the person, with the name of the field.
+ */
+async function keepingSize<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    if (e instanceof DbRuleError && e.code === "check_violation") {
+      const field =
+        e.constraint === "configurations_prefs_size_chk"
+          ? "prefs"
+          : e.constraint === "configurations_room_size_chk"
+            ? "room"
+            : null;
+      if (field !== null) {
+        throw ValidationError.of(
+          field,
+          "json_too_large",
+          `${field} must not exceed ${FREE_JSON.maxBytes} bytes as it is stored`,
+        );
+      }
+    }
+    throw e;
+  }
 }
 
 /** 40 random bits make a collision very unlikely; the unique index is the judge, so a second code is tried. */

@@ -51,7 +51,14 @@ export async function loadCustomerContact(ex: Executor, customerId: string): Pro
 async function ensureExpectedPayment(env: EffectEnv, kind: keyof typeof PAYMENT_PAIRS, amount: number): Promise<void> {
   const { tx, order } = env;
   if (!can(env.rt, "payments.write")) {
-    // The database gives no role but the admin the right to write payments: the admin side picks the job up.
+    if (can(env.rt, "payments.expect")) {
+      // The bot (the owner pressed the button in the group) and the worker expect the payment through the function of
+      // the database: it checks the pair, the sum and the order, and a repeat answers the expectation that is there.
+      // The amount is the one the automaton computed from this transaction's data, never a word of a payload.
+      await sales.expectPaymentAsRole(tx, { orderId: order.id, kind, amountSum: amount });
+      return;
+    }
+    // The site has no right to the function either: the worker picks the job up and computes the sum itself.
     await ops.enqueueOutbox(tx, {
       kind: "job",
       dedupeKey: `${env.keyPrefix}:pay:${kind}`,

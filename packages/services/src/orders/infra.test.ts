@@ -82,6 +82,26 @@ describe("runtime", () => {
     expect(can(rt("bot"), "payments.write")).toBe(false);
     expect(can(rt("web"), "orders.read")).toBe(false);
     expect(can(rt("worker"), "ledger.write")).toBe(true);
+    // The bot and the worker expect payments through the function of the database, the site queues a job.
+    expect(["admin", "bot", "worker", "web"].map((role) => can(rt(role as "web"), "payments.expect"))).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
+    // Only the bot signs an act by the button through the database function; the admin panel writes acts itself.
+    expect(["admin", "bot", "worker", "web"].map((role) => can(rt(role as "web"), "acts.sign_button"))).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ]);
+    expect(["admin", "bot", "worker", "web"].map((role) => can(rt(role as "web"), "leads.bind"))).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
     expect(can(rt("web"), "consents.money")).toBe(false);
     expect(() => requireCapability(rt("web"), "quotes.write")).toThrow(ForbiddenError);
     expect(() => requireCapability(rt("admin"), "quotes.write")).not.toThrow();

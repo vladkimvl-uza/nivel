@@ -189,16 +189,42 @@ describe("ACCEPT by the customer", () => {
     expect(notices(box, "order.accepted")).toHaveLength(1);
     const [reminder] = jobs(box, "accept_reminder");
     expect(reminder?.send_after).toEqual(new Date(at.getTime() + 24 * HOUR));
-    // The bot cannot write payments: the expectations travel as jobs for the admin side.
-    const expects = jobs(box, "payment.expect").map((j) => [j.payload.paymentKind, j.payload.amountSum]);
-    expect(expects).toEqual([
-      ["fee_advance", o.quote.totals.advance],
-      ["purchase_funds", o.quote.totals.purchaseLimit],
+    // The bot writes the expectations itself through sales.expect_payment: no job for the admin side is left.
+    expect(jobs(box, "payment.expect")).toHaveLength(0);
+    const payments = await w.db.$client.query(
+      "select kind, method, direction, amount_sum::int as amount, status from sales.payments where order_id = $1 order by kind",
+      [o.orderId],
+    );
+    expect(payments.rows).toEqual([
+      { kind: "fee_advance", method: "xolis_qr", direction: "in", amount: o.quote.totals.advance, status: "expected" },
+      {
+        kind: "purchase_funds",
+        method: "bank_transfer_ip",
+        direction: "in",
+        amount: o.quote.totals.purchaseLimit,
+        status: "expected",
+      },
     ]);
+    // The same transaction accepted the quote: the bot may not UPDATE sales.quotes, the function of the status did it.
+    const quote = await w.db.$client.query("select status, accepted_at, acceptance from sales.quotes where id = $1", [
+      o.quoteId,
+    ]);
+    expect(quote.rows[0].status).toBe("accepted");
+    expect(quote.rows[0].accepted_at).toEqual(at);
+    expect(quote.rows[0].acceptance).toMatchObject({ channel: "bot", dbRole: "nivel_bot", actorId: o.customerId });
+  });
+
+  it("through the bot twice: the expectations and the acceptance are written once", async () => {
+    const o = await sentOrder(w);
+    const consentIds = await acceptConsents(w, o);
+    const accept = () =>
+      dispatch(o.orderId, { type: "ACCEPT", quoteId: o.quoteId, consentIds, channel: "bot" }, customerActor(o), w.bot);
+    expect(await accept()).toEqual({ ok: true, status: "accepted" });
+    expect(await accept()).toEqual({ ok: true, status: "accepted" });
     const payments = await w.db.$client.query("select count(*)::int as n from sales.payments where order_id = $1", [
       o.orderId,
     ]);
-    expect(payments.rows[0].n).toBe(0);
+    expect(payments.rows[0].n).toBe(2);
   });
 
   it("through the admin role: writes the expected payments itself and marks the quote accepted", async () => {
@@ -244,7 +270,16 @@ describe("ACCEPT by the customer", () => {
     expect(await statusOf(o.orderId)).toBe("accepted");
     const box = await outbox(o.orderId);
     expect(notices(box, "order.accepted")).toHaveLength(1);
+    // The site has no right to the function that expects payments: its jobs wait for the worker, which computes the sums.
     expect(jobs(box, "payment.expect")).toHaveLength(2);
+    const payments = await w.db.$client.query("select count(*)::int as n from sales.payments where order_id = $1", [
+      o.orderId,
+    ]);
+    expect(payments.rows[0].n).toBe(0);
+    // The quote is accepted in the same transaction, by the function of the status, with the role that called it.
+    const quote = await w.db.$client.query("select status, acceptance from sales.quotes where id = $1", [o.quoteId]);
+    expect(quote.rows[0].status).toBe("accepted");
+    expect(quote.rows[0].acceptance).toMatchObject({ channel: "site", dbRole: "nivel_web" });
   });
 
   it("refuses without the consents of the right kinds and writes nothing", async () => {

@@ -3,7 +3,7 @@
 // is signed by the customer's button (the time, the message and the user are the evidence) or recorded by the owner by
 // the photo of the paper act.
 import { acts } from "@nivel/db";
-import { ops, sales } from "@nivel/db/repos";
+import { DbRuleError, ops, sales } from "@nivel/db/repos";
 import { type ActorRef, auditActor, checkActor, requireStaff } from "../orders/actor.ts";
 import { dsl } from "../orders/dsl.ts";
 import { ForbiddenError, NotFoundError, ValidationError, type ValidationIssue } from "../orders/errors.ts";
@@ -128,6 +128,31 @@ export async function generate(
   });
 }
 
+/** What the database function refuses with, as the answers of this scenario (a second press, a press of a stranger). */
+function signError(e: unknown): unknown {
+  if (!(e instanceof DbRuleError)) return e;
+  switch (e.code) {
+    case "act_already_signed":
+      return ValidationError.of("actId", "act_already_signed", "the act is already signed");
+    case "evidence_mismatch":
+      return ValidationError.of(
+        "evidence.telegramUserId",
+        "evidence_mismatch",
+        "the Telegram id of the press is not the Telegram id of the customer of the order",
+      );
+    case "act_not_found":
+      return new NotFoundError("act");
+    case "invalid_evidence":
+      return ValidationError.of(
+        "evidence",
+        "evidence_required",
+        "the press needs the id of the message and the Telegram id",
+      );
+    default:
+      return e;
+  }
+}
+
 const positiveInt = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
 
 /**
@@ -159,7 +184,7 @@ function checkEvidence(via: SignedVia, given: Record<string, unknown> | undefine
 
 /**
  * The customer signs by the button, the owner records the paper act. Only the admin role writes acts: the bot, which reads
- * them, leaves the signature in the outbox for the admin side; the site cannot read acts at all.
+ * them, signs the press of the button through sales.sign_act(); the site cannot read acts at all.
  */
 export async function sign(
   input: { actId: string; via: SignedVia; evidence?: Record<string, unknown> },
@@ -231,21 +256,21 @@ export async function sign(
     }
 
     if (!can(r, "acts.write")) {
-      await ops.enqueueOutbox(tx, {
-        kind: "job",
-        dedupeKey: `act:${actId}:sign`,
-        payload: {
-          job: OUTBOX_JOB.ACT_SIGN,
+      // The bot may not write acts, but the press of the button of the customer reaches the database through a function
+      // that signs only for the customer of the order and only once, with the clock of the database. Nobody else may.
+      if (!can(r, "acts.sign_button") || input.via !== "tg_button") {
+        throw new ForbiddenError(`the ${r.role} role of the database cannot sign an act`);
+      }
+      try {
+        await sales.signActByButton(tx, {
           actId,
-          orderId: order.id,
-          orderNumber: order.number,
-          via: input.via,
-          signedAt: now.toISOString(),
-          actor: auditActor(actor),
-          evidence,
-        },
-      });
-      return { signed: false, queued: true };
+          messageId: evidence.messageId as number,
+          telegramUserId: evidence.telegramUserId as number,
+        });
+      } catch (e) {
+        throw signError(e);
+      }
+      return { signed: true, queued: false };
     }
     await lockBy(tx, `act:${actId}`);
     const { and, eq, isNull } = dsl(tx);

@@ -108,6 +108,14 @@ export async function record(input: RecordConsentInput, rt?: Runtime): Promise<{
       if (e.code === "actor_not_allowed" || e.code === "permission_denied") {
         throw new ForbiddenError(`this process may not record the consent ${input.kind}`);
       }
+      // The text of the evidence was small enough, but the database measures what it keeps (jsonb).
+      if (e.code === "check_violation" && e.constraint === "consents_evidence_size_chk") {
+        throw ValidationError.of(
+          "evidence",
+          "json_too_large",
+          `evidence must not exceed ${EVIDENCE_LIMITS.maxBytes} bytes as it is stored`,
+        );
+      }
     }
     throw e;
   }

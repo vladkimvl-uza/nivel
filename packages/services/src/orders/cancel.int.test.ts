@@ -210,7 +210,7 @@ describe("orders.cancel: after the acceptance, before the purchase", () => {
     expect((await orderRow(o.orderId)).status).toBe("accepted");
   });
 
-  it("works through the bot as the owner: the refunds travel as jobs, the bot writes no payments", async () => {
+  it("works through the bot as the owner: the bot expects the refunds itself, through the function of the database", async () => {
     const o = await paidOrder(w);
     const r = await cancel(
       { orderId: o.orderId, reason: "via the bot" },
@@ -218,11 +218,19 @@ describe("orders.cancel: after the acceptance, before the purchase", () => {
       w.bot,
     );
     expect(r).toEqual({ ok: true, status: "cancelling" });
-    const jobs = await w.db.$client.query(
-      "select payload->>'paymentKind' as kind from ops.outbox where payload->>'orderId' = $1 and payload->>'job' = 'payment.expect' and payload->>'paymentKind' in ('fee_refund', 'funds_refund') order by 1",
+    const expected = await w.db.$client.query(
+      "select kind, direction, method, status, amount_sum::int as amount from sales.payments where order_id = $1 and kind in ('fee_refund', 'funds_refund') order by kind",
       [o.orderId],
     );
-    expect(jobs.rows.map((j) => j.kind)).toEqual(["fee_refund", "funds_refund"]);
+    expect(expected.rows.map((p) => [p.kind, p.direction, p.method, p.status])).toEqual([
+      ["fee_refund", "out", "bank_transfer_out", "expected"],
+      ["funds_refund", "out", "bank_transfer_out", "expected"],
+    ]);
+    const jobs = await w.db.$client.query(
+      "select 1 from ops.outbox where payload->>'orderId' = $1 and payload->>'job' = 'payment.expect'",
+      [o.orderId],
+    );
+    expect(jobs.rowCount).toBe(0);
   });
 });
 

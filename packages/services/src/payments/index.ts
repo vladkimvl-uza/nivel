@@ -1,3 +1,4 @@
+export { type ExpectFromJobInput, expectFromJob } from "./from-job.ts";
 export {
   type ConfirmPaymentInput,
   confirm,
