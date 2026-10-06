@@ -162,15 +162,17 @@ describe("photos from a phone through the real sharp", () => {
     expect(await sanitizeImage(tiff, { fallback })).toMatchObject({ ok: false });
   });
 
-  it("refuses a picture with more pixels than a phone makes", async (ctx) => {
+  it("refuses a picture with more pixels than a phone makes: a few KB of AVIF that held 49 megapixels (900 MB) is refused at the header", async (ctx) => {
     const sharp = needSharp(ctx);
-    const big = await sharp({ create: { width: 9000, height: 9000, channels: 3, background: "#808080" } })
+    const big = await sharp({ create: { width: 7000, height: 7000, channels: 3, background: "#808080" } })
       .avif({ quality: 1, effort: 0 })
       .toBuffer();
-    expect(big.length).toBeLessThan(12 * 1024 * 1024);
+    expect(big.length).toBeLessThan(64 * 1024);
+    const before = process.memoryUsage().rss;
     const r = await sanitizeImage(big, { fallback: createSharpSanitizer(sharp) });
     expect(r.ok).toBe(false);
-  });
+    expect(process.memoryUsage().rss - before).toBeLessThan(150 * 1024 * 1024);
+  }, 90_000);
 
   it("refuses a small AVIF that holds more than 6 megapixels before decoding it (it took 900 MB at 49)", async (ctx) => {
     const sharp = needSharp(ctx);
