@@ -40,6 +40,7 @@ describe("domain contracts", () => {
   });
 
   it("stubs throw NotImplementedError until implemented", () => {
-    expect(() => domain.normalizeUz("o'zbek")).toThrow(domain.NotImplementedError);
+    // Probe a stub that stays unimplemented until WP-05 (autobuild, MVP-1).
+    expect(() => (domain.autobuild as unknown as () => void)()).toThrow(domain.NotImplementedError);
   });
 });
