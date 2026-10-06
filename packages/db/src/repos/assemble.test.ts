@@ -6,13 +6,13 @@ import { describe, expect, it } from "vitest";
 
 // packages/db/sql is the source of the hand-written part of the migrations (triggers, views, functions, grants);
 // assemble.mjs joins it into the custom migration. The migration must always be what the sources say.
-const ASSEMBLE = "../sql/assemble.mjs";
+const ASSEMBLE = "../../sql/assemble.mjs";
 const { assemble, sqlFiles, MODULE_ORDER } = (await import(/* @vite-ignore */ ASSEMBLE)) as {
   assemble(dir?: string): string;
   sqlFiles(dir?: string): string[];
   MODULE_ORDER: string[];
 };
-const MIGRATIONS = fileURLToPath(new URL("../migrations/", import.meta.url));
+const MIGRATIONS = fileURLToPath(new URL("../../migrations/", import.meta.url));
 
 describe("sql/assemble.mjs", () => {
   it("takes every file of every listed module, in module order and then by name", () => {
