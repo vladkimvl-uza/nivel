@@ -29,16 +29,31 @@ export function createGen(seed: number): Gen {
   };
 }
 
-/** Runs `body` for `runs` generated cases; a failure message carries the seed and case index. */
-export function forAll(body: (g: Gen, run: number) => void, opts: { runs?: number; seed?: number } = {}): void {
+/** Fisher-Yates shuffle on the seeded generator; returns a new array. */
+export function shuffle<T>(g: Gen, xs: readonly T[]): T[] {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = g.int(0, i);
+    [a[i], a[j]] = [a[j] as T, a[i] as T];
+  }
+  return a;
+}
+
+/** Runs `body` for `runs` generated cases; a failure message carries the seed and case index. The body must be synchronous. */
+export function forAll(body: (g: Gen, run: number) => undefined, opts: { runs?: number; seed?: number } = {}): void {
   const runs = opts.runs ?? 500;
   const seed = opts.seed ?? 20261006;
   for (let run = 0; run < runs; run++) {
     const caseSeed = seed + run * 7919;
+    let result: unknown;
     try {
-      body(createGen(caseSeed), run);
+      result = body(createGen(caseSeed), run);
     } catch (e) {
-      throw new Error(`property failed (seed ${caseSeed}, run ${run}): ${(e as Error).message}`, { cause: e });
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new Error(`property failed (seed ${caseSeed}, run ${run}): ${reason}`, { cause: e });
+    }
+    if (result instanceof Promise) {
+      throw new TypeError("forAll body must be synchronous: a returned Promise would hide its failures");
     }
   }
 }

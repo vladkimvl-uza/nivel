@@ -5,7 +5,7 @@
     "applyBp": "domain and database: floor(base x rateBp / 10000) must equal the floor column",
     "split": "domain and database: largest-remainder split, ties to the lower index",
     "fee": "domain; the database checks fee_total = fee_commission_line + fee_works_line = fee_advance + fee_final on quotes",
-    "payments": "domain validatePayment and the payments CHECK (3.4): valid=false must be rejected by both",
+    "payments": "domain validatePayment and the payments CHECK (3.4): valid=false must be rejected by both; a confirmed fee payment needs a non-blank fiscal receipt number, so the CHECK must be btrim(fiscal_receipt_no) <> '', not only IS NOT NULL",
     "cancel": "domain settleCancellation; the database checks the closure invariant on fundsToRefund (3.4)"
   },
   "applyBp": [
@@ -1102,6 +1102,134 @@
       "status": "void",
       "fiscalReceiptNo": null,
       "valid": true
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "",
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "fiscalReceiptNo": "   ",
+      "valid": false
     }
   ],
   "cancel": [

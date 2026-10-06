@@ -62,8 +62,18 @@ export function computeFee(
   for (const l of lines) {
     const total = lineTotal(l);
     if (l.customerOwned) continue;
-    if (l.group === "pc") pcBase = addSums(pcBase, total);
-    else if (l.group === "mount") mountBase = addSums(mountBase, total);
+    switch (l.group) {
+      case "pc":
+        pcBase = addSums(pcBase, total);
+        break;
+      case "mount":
+        mountBase = addSums(mountBase, total);
+        break;
+      case "outside_scale":
+        break; // outside the scale: no fee
+      default:
+        throw new RangeError(`Line ${l.key}: unknown fee group ${String(l.group)}`);
+    }
   }
   const parts: FeePart[] = [];
   if (pcBase > 0) parts.push(pcPart(pcBase, s, o.complexBuild));
@@ -122,7 +132,8 @@ export function computeQuote(lines: readonly QuoteLineInput[], s: FeeSettings, c
     const total = lineTotal(l);
     if (l.customerOwned || total === 0) continue;
     if (l.group === "outside_scale") outsideScaleSum = addSums(outsideScaleSum, total);
-    else componentsSum = addSums(componentsSum, total);
+    else if (l.group === "pc" || l.group === "mount") componentsSum = addSums(componentsSum, total);
+    else throw new RangeError(`Line ${l.key}: unknown fee group ${String(l.group)}`);
     if (l.purchasedByIp) {
       purchased = addSums(purchased, total);
       if (l.isRamOrSsd) memory = addSums(memory, total);

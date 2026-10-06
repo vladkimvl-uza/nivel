@@ -99,4 +99,12 @@ describe("validatePayment: kind x method x direction (ARCHITECTURE 3.4)", () => 
       }),
     ).toEqual({ ok: false, errorKey: "payment.kind_unknown" });
   });
+
+  it("does not take object prototype members for payment kinds", () => {
+    for (const kind of ["toString", "constructor", "__proto__", "hasOwnProperty"]) {
+      expect(
+        validatePayment({ kind: kind as PaymentKind, direction: "in", method: "xolis_qr", status: "expected" }),
+      ).toEqual({ ok: false, errorKey: "payment.kind_unknown" });
+    }
+  });
 });

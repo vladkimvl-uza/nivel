@@ -33,29 +33,39 @@ export type PaymentCheck =
   | { ok: true }
   | { ok: false; errorKey: "payment.kind_unknown" | "payment.pair_invalid" | "payment.receipt_required" };
 
-const FEE_KINDS: readonly string[] = ["fee_advance", "fee_final", "fee_extra", "podbor_fee"];
-const FUNDS_KINDS: readonly string[] = ["purchase_funds", "purchase_topup"];
-const REFUND_KINDS: readonly string[] = ["remainder_refund", "fee_refund", "funds_refund"];
+/** Every kind belongs to exactly one flow; the compiler refuses a kind without a group. */
+const KIND_GROUP: Record<PaymentKind, "fee" | "funds" | "refund"> = {
+  fee_advance: "fee",
+  fee_final: "fee",
+  fee_extra: "fee",
+  podbor_fee: "fee",
+  purchase_funds: "funds",
+  purchase_topup: "funds",
+  remainder_refund: "refund",
+  fee_refund: "refund",
+  funds_refund: "refund",
+};
 
 export function validatePayment(p: PaymentInput): PaymentCheck {
-  if (FEE_KINDS.includes(p.kind)) {
-    if (p.direction !== "in" || (p.method !== "xolis_qr" && p.method !== "merchant_card")) {
-      return { ok: false, errorKey: "payment.pair_invalid" };
-    }
-    if (p.status === "confirmed" && (p.fiscalReceiptNo ?? "").trim() === "") {
-      return { ok: false, errorKey: "payment.receipt_required" };
-    }
-    return { ok: true };
+  const group = Object.hasOwn(KIND_GROUP, p.kind) ? KIND_GROUP[p.kind] : undefined;
+  switch (group) {
+    case "fee":
+      if (p.direction !== "in" || (p.method !== "xolis_qr" && p.method !== "merchant_card")) {
+        return { ok: false, errorKey: "payment.pair_invalid" };
+      }
+      if (p.status === "confirmed" && (p.fiscalReceiptNo ?? "").trim() === "") {
+        return { ok: false, errorKey: "payment.receipt_required" };
+      }
+      return { ok: true };
+    case "funds":
+      return p.direction === "in" && p.method === "bank_transfer_ip"
+        ? { ok: true }
+        : { ok: false, errorKey: "payment.pair_invalid" };
+    case "refund":
+      return p.direction === "out" && p.method === "bank_transfer_out"
+        ? { ok: true }
+        : { ok: false, errorKey: "payment.pair_invalid" };
+    default:
+      return { ok: false, errorKey: "payment.kind_unknown" };
   }
-  if (FUNDS_KINDS.includes(p.kind)) {
-    return p.direction === "in" && p.method === "bank_transfer_ip"
-      ? { ok: true }
-      : { ok: false, errorKey: "payment.pair_invalid" };
-  }
-  if (REFUND_KINDS.includes(p.kind)) {
-    return p.direction === "out" && p.method === "bank_transfer_out"
-      ? { ok: true }
-      : { ok: false, errorKey: "payment.pair_invalid" };
-  }
-  return { ok: false, errorKey: "payment.kind_unknown" };
 }

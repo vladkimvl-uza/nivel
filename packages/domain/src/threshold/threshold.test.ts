@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bp, type Sum, sum } from "../money/index.ts";
-import { forAll } from "../money/testkit.ts";
+import { forAll, shuffle } from "../money/testkit.ts";
 import {
   DEFAULT_THRESHOLD_SETTINGS,
   type DealEntry,
@@ -211,7 +211,7 @@ describe("thresholdStatus", () => {
     forAll((g) => {
       const kinds = ["receipt", "fee_in", "fee_refund", "other_income"] as const;
       const entries = Array.from({ length: g.int(0, 10) }, () => entry(g.pick(kinds), g.int(0, 90_000_000)));
-      const shuffled = [...entries].sort(() => (g.bool() ? 1 : -1));
+      const shuffled = shuffle(g, entries);
       const a = thresholdStatus(entries, S(0), 2026, reg);
       const b = thresholdStatus(shuffled, S(0), 2026, reg);
       expect(b).toEqual(a);

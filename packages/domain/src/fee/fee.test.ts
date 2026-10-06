@@ -151,6 +151,12 @@ describe("computeFee: complex build, groups and exclusions", () => {
       RangeError,
     );
   });
+
+  it("refuses a fee group outside the contract instead of silently dropping or counting the line", () => {
+    const alien = pcLine(1_000_000, { group: "garden" as unknown as QuoteLineInput["group"] });
+    expect(() => computeFee([alien], D, { complexBuild: false })).toThrow(/unknown fee group/);
+    expect(() => computeQuote([alien], D, ctx())).toThrow(/unknown fee group/);
+  });
 });
 
 describe("computeFee: two document lines (commission and works)", () => {
