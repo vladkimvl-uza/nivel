@@ -90,4 +90,16 @@ describe("toCsv", () => {
     expect(toCsv([["=1+1", "+cmd", "-2", "@x", "\tTab", "fine"]])).toBe("'=1+1,'+cmd,'-2,'@x,'\tTab,fine\r\n");
     expect(toCsv([["-12"]], { allowNumbers: true })).toBe("-12\r\n");
   });
+
+  it("writes with another delimiter and quotes the cells that contain it", () => {
+    expect(
+      toCsv(
+        [
+          ["a;b", "c"],
+          ["d", "e"],
+        ],
+        { delimiter: ";" },
+      ),
+    ).toBe('"a;b";c\r\nd;e\r\n');
+  });
 });

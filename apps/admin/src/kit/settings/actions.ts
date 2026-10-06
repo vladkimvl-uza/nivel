@@ -80,13 +80,14 @@ export async function saveCalendarAction(_previous: FormState, data: FormData): 
     holidays: source.get("holidays") ?? "",
   };
   if (!user) return denied(typed);
+  // A date that is not a date stops the save: the rest of the form must not be written without it.
+  if (Object.keys(read.errors).length > 0) return { ok: false, errors: read.errors, values: typed };
   const { ipHash } = await requestInfo();
   const result = await getRuntime().settings.saveCalendar(user, read.value, {
     expectedVersion: version(data),
     ...(ipHash ? { ipHash } : {}),
   });
-  if (!result.ok) return { ok: false, errors: { ...result.errors, ...read.errors }, values: typed };
-  if (Object.keys(read.errors).length > 0) return { ok: false, errors: read.errors, values: typed };
+  if (!result.ok) return { ok: false, errors: result.errors, values: typed };
   revalidatePath("/settings/calendar");
   return { ok: true, errors: {}, values: typed, message: `Сохранено.${afterSave(result.revalidated)}` };
 }

@@ -367,3 +367,69 @@ describe("provisioning", () => {
     expect(dup).toMatchObject({ ok: false, problems: ["Учётная запись с таким e-mail уже есть."] });
   });
 });
+
+describe("people (owner)", () => {
+  it("switches an account off, ends its sessions, and switches it on again", async () => {
+    const h = await setup();
+    const helper = await h.service.provisionUser({
+      email: "helper@nivel.uz",
+      role: "assistant",
+      password: PASSWORD,
+      actor: "cli",
+    });
+    if (!helper.ok) throw new Error("provision failed");
+    const secret = base32Decode(helper.totpSecret);
+    const session = await h.service.login({
+      email: "helper@nivel.uz",
+      password: PASSWORD,
+      code: generateTotp(secret, h.clock.now),
+      ipHash: null,
+      ua: null,
+    });
+    if (!session.ok) throw new Error("expected success");
+    const ownerUser = {
+      id: h.user.id,
+      email: "owner@nivel.uz",
+      role: "owner" as const,
+      telegramUserId: null,
+      sessionExpiresAt: h.clock.now,
+    };
+
+    expect(await h.service.setActive(helper.id, false, ownerUser)).toEqual({ ok: true });
+    expect(await h.service.authenticate(session.token)).toBeNull();
+    expect(h.store.accounts.get(helper.id)?.active).toBe(false);
+    expect(await h.service.setActive(helper.id, true, ownerUser)).toEqual({ ok: true });
+    expect(h.store.accounts.get(helper.id)?.active).toBe(true);
+    expect(h.store.audit.map((a) => a.action)).toEqual(
+      expect.arrayContaining(["auth.user_disabled", "auth.user_enabled"]),
+    );
+    expect(await h.service.listAccounts()).toHaveLength(2);
+  });
+
+  it("does not let the owner switch himself off, nor the last owner be switched off, nor an unknown id", async () => {
+    const h = await setup();
+    const ownerUser = {
+      id: h.user.id,
+      email: "owner@nivel.uz",
+      role: "owner" as const,
+      telegramUserId: null,
+      sessionExpiresAt: h.clock.now,
+    };
+    expect(await h.service.setActive(h.user.id, false, ownerUser)).toEqual({ ok: false, reason: "self" });
+    const second = await h.service.provisionUser({
+      email: "second@nivel.uz",
+      role: "owner",
+      password: PASSWORD,
+      actor: "cli",
+    });
+    if (!second.ok) throw new Error("provision failed");
+    // The second owner may switch off the first (there is another owner left: himself) but not the other way round after.
+    const secondUser = { ...ownerUser, id: second.id, email: "second@nivel.uz" };
+    expect(await h.service.setActive(h.user.id, false, secondUser)).toEqual({ ok: true });
+    expect(await h.service.setActive(second.id, false, { ...ownerUser, id: "someone-else" })).toEqual({
+      ok: false,
+      reason: "last_owner",
+    });
+    expect(await h.service.setActive("no-such-id", false, ownerUser)).toEqual({ ok: false, reason: "not_found" });
+  });
+});
