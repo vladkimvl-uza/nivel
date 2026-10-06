@@ -27,6 +27,14 @@ describe("check-ports", () => {
     expect(await isPortFree(port)).toBe(true);
     expect(Array.isArray(await checkPorts(9))).toBe(true);
   });
+
+  it("detects a port bound to 127.0.0.1 only (worker and bot /healthz)", async () => {
+    const server = createServer();
+    await new Promise((r) => server.listen(0, "127.0.0.1", r));
+    const { port } = server.address();
+    expect(await isPortFree(port)).toBe(false);
+    await new Promise((r) => server.close(r));
+  });
 });
 
 describe("check-messages", () => {

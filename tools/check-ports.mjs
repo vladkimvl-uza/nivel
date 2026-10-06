@@ -1,6 +1,6 @@
 // Before `pnpm dev`: the slot's ports must be free and must not collide with other projects on this machine
 // (ARCHITECTURE 2.3, 11.1). Usage: node tools/check-ports.mjs [--slot N]
-import { createServer } from "node:net";
+import { connect, createServer } from "node:net";
 import { parseArgs } from "node:util";
 import { APP_PORT_OFFSETS, appPort, isMain, loadRootEnv, slotFromEnv } from "./lib/env.mjs";
 
@@ -13,13 +13,36 @@ export function slotPorts(slot) {
   return Object.keys(APP_PORT_OFFSETS).map((app) => ({ app, port: appPort(app, slot) }));
 }
 
-/** Resolves true when nothing listens on the port (IPv4 and IPv6 wildcard bind succeeds). */
-export function isPortFree(port) {
+/** Resolves true when something accepts a TCP connection on host:port. */
+function accepts(host, port, timeoutMs = 300) {
+  return new Promise((resolve) => {
+    const socket = connect({ host, port });
+    const done = (result) => {
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(timeoutMs, () => done(false));
+    socket.once("connect", () => done(true));
+    socket.once("error", () => done(false));
+  });
+}
+
+/** Resolves true when the wildcard bind (IPv4 and IPv6) succeeds. */
+function canBindWildcard(port) {
   return new Promise((resolve) => {
     const server = createServer();
     server.once("error", () => resolve(false));
     server.listen({ port, exclusive: true }, () => server.close(() => resolve(true)));
   });
+}
+
+/**
+ * Resolves true when nothing listens on the port. On Windows a wildcard bind succeeds even when another process
+ * listens on 127.0.0.1 only (worker and bot /healthz do), so loopback connections are probed first.
+ */
+export async function isPortFree(port) {
+  if ((await accepts("127.0.0.1", port)) || (await accepts("::1", port))) return false;
+  return canBindWildcard(port);
 }
 
 export async function checkPorts(slot) {
