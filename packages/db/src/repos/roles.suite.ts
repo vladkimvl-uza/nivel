@@ -260,18 +260,79 @@ describe("nivel_admin", () => {
   });
 });
 
+// PostgreSQL gives EXECUTE to PUBLIC on a function whose ACL is NULL, and aclexplode(NULL) has no rows: reading the ACL
+// cannot tell "nobody" from "everybody". has_function_privilege answers for the rights a role really has.
 describe("functions", () => {
-  it("are not executable by PUBLIC: an unknown role would not call them (grants name the four roles)", async () => {
-    const { rows } = await migrator.query<{ fn: string; grantees: string[] }>(
-      `select p.oid::regprocedure::text as fn,
-              coalesce((select array_agg(distinct pg_get_userbyid(a.grantee)) from aclexplode(p.proacl) a
-                         where a.privilege_type = 'EXECUTE' and a.grantee <> 0), '{}') as grantees,
-              exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_exec
+  const APP_SCHEMAS = "('sales', 'ops', 'ai', 'catalog', 'pricing', 'content', 'bot')";
+  const ROLES = ["nivel_web", "nivel_admin", "nivel_bot", "nivel_worker"] as const;
+  /** The SECURITY DEFINER functions and the application roles that may call them (the migrator owns them). */
+  const DEFINER_FUNCTIONS: Record<string, readonly (typeof ROLES)[number][]> = {
+    "sales.apply_transition(uuid,jsonb,text,text,text,jsonb,jsonb)": ROLES,
+    "ai.purge_expired(timestamp with time zone)": ["nivel_admin", "nivel_worker"],
+    "ops.next_number(text,integer)": ["nivel_web", "nivel_admin", "nivel_bot"],
+    "ops.consent_granted(uuid,text)": ROLES,
+    // A trigger function: it runs with the trigger, nobody calls it.
+    "ops.guard_consent()": [],
+  };
+
+  it("are not executable by PUBLIC: none of the functions of the application schemas", async () => {
+    const { rows } = await migrator.query<{ fn: string; public_exec: boolean }>(
+      `select p.oid::regprocedure::text as fn, has_function_privilege('public', p.oid, 'EXECUTE') as public_exec
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname in ('sales', 'ops', 'ai', 'catalog') and p.prokind = 'f' and p.prorettype <> 'trigger'::regtype`,
+        where n.nspname in ${APP_SCHEMAS} and p.prokind = 'f'`,
     );
-    expect(rows.length).toBeGreaterThanOrEqual(6);
-    for (const r of rows as unknown as { fn: string; public_exec: boolean }[]) expect(r.public_exec, r.fn).toBe(false);
+    expect(rows.length).toBeGreaterThanOrEqual(20);
+    expect(rows.filter((r) => r.public_exec).map((r) => r.fn)).toEqual([]);
+  });
+
+  it.each(Object.keys(DEFINER_FUNCTIONS))("%s: PUBLIC cannot execute it", async (fn) => {
+    const r = await one<{ public_exec: boolean }>(
+      migrator,
+      "select has_function_privilege('public', $1::regprocedure, 'EXECUTE') as public_exec",
+      [fn],
+    );
+    expect(r.public_exec).toBe(false);
+  });
+
+  it("lists every SECURITY DEFINER function of the schemas here, each with a fixed search_path", async () => {
+    const { rows } = await migrator.query<{ fn: string; fixed_path: boolean }>(
+      `select p.oid::regprocedure::text as fn,
+              coalesce(p.proconfig @> array['search_path=pg_catalog, pg_temp'], false) as fixed_path
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname in ${APP_SCHEMAS} and p.prosecdef order by 1`,
+    );
+    expect(rows.map((r) => r.fn)).toEqual(Object.keys(DEFINER_FUNCTIONS).sort());
+    expect(rows.filter((r) => !r.fixed_path).map((r) => r.fn)).toEqual([]);
+  });
+
+  it.each(Object.entries(DEFINER_FUNCTIONS))("%s: executable by exactly the named roles", async (fn, allowed) => {
+    for (const role of ROLES) {
+      const r = await one<{ ok: boolean }>(
+        migrator,
+        "select has_function_privilege($1, $2::regprocedure, 'EXECUTE') as ok",
+        [role, fn],
+      );
+      expect(r.ok, `${role} on ${fn}`).toBe(allowed.includes(role));
+    }
+  });
+
+  it("the check sees a function whose ACL is NULL: reading the ACL does not", async () => {
+    // Without the default privileges that withdraw EXECUTE from PUBLIC a new function has a NULL ACL.
+    await migrator.query("begin");
+    try {
+      await migrator.query("alter default privileges for role nivel_migrator grant execute on functions to public");
+      await migrator.query("create function sales.probe_default_acl() returns int language sql as 'select 1'");
+      const r = await one<{ acl_is_null: boolean; seen_in_acl: boolean; public_exec: boolean }>(
+        migrator,
+        `select p.proacl is null as acl_is_null,
+                exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as seen_in_acl,
+                has_function_privilege('public', p.oid, 'EXECUTE') as public_exec
+           from pg_proc p where p.oid = 'sales.probe_default_acl()'::regprocedure`,
+      );
+      expect(r).toEqual({ acl_is_null: true, seen_in_acl: false, public_exec: true });
+    } finally {
+      await migrator.query("rollback");
+    }
   });
 });
 
