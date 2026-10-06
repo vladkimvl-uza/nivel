@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { assembleSnapshot, lossesBp, purchasesCompleteOf, reportStateFrom, type SnapshotInputs } from "./snapshot.ts";
+import {
+  assembleSnapshot,
+  lastObjectionSeq,
+  lossesBp,
+  purchasesCompleteOf,
+  reportStateFrom,
+  resolvedAfterSeqOf,
+  type SnapshotInputs,
+} from "./snapshot.ts";
 
 const sum = (n: number) => n as never;
 const T = (iso: string) => new Date(iso);
@@ -52,17 +60,17 @@ describe("purchasesCompleteOf", () => {
 });
 
 describe("reportStateFrom", () => {
-  const ev = (seq: number, type: string, at: string) => ({ seq, type, at: T(at) });
+  const ev = (seq: number, type: string) => ({ seq, type });
   const until = T("2026-10-16T10:00:00Z");
 
   it("is absent while there is no report", () => {
     expect(
-      reportStateFrom({ events: [], reportExists: false, resolvedAt: null, objectionUntil: null }),
+      reportStateFrom({ events: [], reportExists: false, resolvedAfterSeq: null, objectionUntil: null }),
     ).toBeUndefined();
   });
 
   it("is open and not accepted before the report is sent", () => {
-    expect(reportStateFrom({ events: [], reportExists: true, resolvedAt: null, objectionUntil: null })).toEqual({
+    expect(reportStateFrom({ events: [], reportExists: true, resolvedAfterSeq: null, objectionUntil: null })).toEqual({
       accepted: false,
       objectionOpen: false,
       objectionUntil: null,
@@ -72,9 +80,9 @@ describe("reportStateFrom", () => {
   it("is accepted by the customer or by the term", () => {
     for (const type of ["REPORT_ACCEPTED", "REPORT_DEEMED_ACCEPTED"]) {
       const state = reportStateFrom({
-        events: [ev(1, "SEND_REPORT", "2026-10-13T10:00:00Z"), ev(2, type, "2026-10-14T10:00:00Z")],
+        events: [ev(1, "SEND_REPORT"), ev(2, type)],
         reportExists: true,
-        resolvedAt: null,
+        resolvedAfterSeq: null,
         objectionUntil: until,
       });
       expect(state).toEqual({ accepted: true, objectionOpen: false, objectionUntil: until });
@@ -82,39 +90,49 @@ describe("reportStateFrom", () => {
   });
 
   it("has an open objection until the owner resolves it", () => {
-    const events = [ev(1, "SEND_REPORT", "2026-10-13T10:00:00Z"), ev(2, "OBJECTION", "2026-10-14T10:00:00Z")];
+    const events = [ev(1, "SEND_REPORT"), ev(2, "OBJECTION")];
     expect(
-      reportStateFrom({ events, reportExists: true, resolvedAt: null, objectionUntil: until })?.objectionOpen,
+      reportStateFrom({ events, reportExists: true, resolvedAfterSeq: null, objectionUntil: until })?.objectionOpen,
     ).toBe(true);
     expect(
-      reportStateFrom({ events, reportExists: true, resolvedAt: T("2026-10-14T12:00:00Z"), objectionUntil: until })
-        ?.objectionOpen,
+      reportStateFrom({ events, reportExists: true, resolvedAfterSeq: 2, objectionUntil: until })?.objectionOpen,
     ).toBe(false);
   });
 
   it("opens again when the customer objects after the resolution", () => {
-    const events = [
-      ev(1, "SEND_REPORT", "2026-10-13T10:00:00Z"),
-      ev(2, "OBJECTION", "2026-10-14T10:00:00Z"),
-      ev(3, "OBJECTION", "2026-10-15T10:00:00Z"),
-    ];
+    const events = [ev(1, "SEND_REPORT"), ev(2, "OBJECTION"), ev(3, "OBJECTION")];
     expect(
-      reportStateFrom({ events, reportExists: true, resolvedAt: T("2026-10-14T12:00:00Z"), objectionUntil: until })
-        ?.objectionOpen,
+      reportStateFrom({ events, reportExists: true, resolvedAfterSeq: 2, objectionUntil: until })?.objectionOpen,
     ).toBe(true);
   });
 
   it("looks only at what happened after the last sending of the report", () => {
-    const events = [
-      ev(1, "SEND_REPORT", "2026-10-13T10:00:00Z"),
-      ev(2, "OBJECTION", "2026-10-14T10:00:00Z"),
-      ev(3, "SEND_REPORT", "2026-10-15T10:00:00Z"),
-    ];
-    expect(reportStateFrom({ events, reportExists: true, resolvedAt: null, objectionUntil: until })).toEqual({
+    const events = [ev(1, "SEND_REPORT"), ev(2, "OBJECTION"), ev(3, "SEND_REPORT")];
+    expect(reportStateFrom({ events, reportExists: true, resolvedAfterSeq: null, objectionUntil: until })).toEqual({
       accepted: false,
       objectionOpen: false,
       objectionUntil: until,
     });
+  });
+});
+
+describe("lastObjectionSeq and resolvedAfterSeqOf", () => {
+  const ev = (seq: number, type: string) => ({ seq, type });
+
+  it("finds the newest objection after the last sending of the report, or none", () => {
+    expect(lastObjectionSeq([])).toBeNull();
+    expect(lastObjectionSeq([ev(1, "SEND_REPORT")])).toBeNull();
+    expect(lastObjectionSeq([ev(1, "SEND_REPORT"), ev(2, "OBJECTION"), ev(4, "OBJECTION"), ev(3, "X")])).toBe(4);
+    expect(lastObjectionSeq([ev(1, "SEND_REPORT"), ev(2, "OBJECTION"), ev(3, "SEND_REPORT")])).toBeNull();
+  });
+
+  it("reads the resolution from the number only; a time or rubbish means that nothing is resolved", () => {
+    expect(resolvedAfterSeqOf({ resolvedAfterSeq: 7, resolvedAt: "2026-10-14T12:00:00Z" })).toBe(7);
+    expect(resolvedAfterSeqOf({ resolvedAt: "2026-10-14T12:00:00Z" })).toBeNull();
+    expect(resolvedAfterSeqOf({ resolvedAfterSeq: "7" })).toBeNull();
+    expect(resolvedAfterSeqOf({ resolvedAfterSeq: -1 })).toBeNull();
+    expect(resolvedAfterSeqOf(null)).toBeNull();
+    expect(resolvedAfterSeqOf(undefined)).toBeNull();
   });
 });
 

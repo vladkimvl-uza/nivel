@@ -11,8 +11,8 @@ import { dsl } from "../orders/dsl.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
 import { lockBy } from "../orders/lock.ts";
 import { type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
-import { reportStateFrom } from "../orders/snapshot.ts";
-import { asDate, assertText, assertUuid } from "../orders/validate.ts";
+import { lastObjectionSeq, reportStateFrom, resolvedAfterSeqOf } from "../orders/snapshot.ts";
+import { assertText, assertUuid } from "../orders/validate.ts";
 
 function requireOwner(actorRef: ActorRef): ActorRef {
   const actor = checkActor(actorRef);
@@ -155,12 +155,14 @@ export async function resolveObjection(
       where: (t, { eq }) => eq(t.orderId, orderId),
       orderBy: (t, { desc }) => desc(t.version),
     });
-    const resolvedAt = (report?.objection as { resolvedAt?: string } | null)?.resolvedAt;
-    const events = await sales.listOrderEvents(tx, orderId);
+    const events = (await sales.listOrderEvents(tx, orderId)).map((e) => ({
+      seq: e.seq,
+      type: String((e.event as { type?: unknown }).type),
+    }));
     const state = reportStateFrom({
-      events: events.map((e) => ({ seq: e.seq, type: String((e.event as { type?: unknown }).type), at: e.at })),
+      events,
       reportExists: report !== undefined,
-      resolvedAt: asDate(resolvedAt ?? null),
+      resolvedAfterSeq: resolvedAfterSeqOf(report?.objection),
       objectionUntil: order.objectionUntil,
     });
     if (!report || !state?.objectionOpen) {
@@ -170,7 +172,15 @@ export async function resolveObjection(
     const { eq } = dsl(tx);
     await tx
       .update(commissionReports)
-      .set({ objection: { ...((report.objection as object | null) ?? {}), resolvedAt: now.toISOString(), note } })
+      .set({
+        objection: {
+          ...((report.objection as object | null) ?? {}),
+          // The journal decides which objections are answered; the time is for the human reader only.
+          resolvedAfterSeq: lastObjectionSeq(events),
+          resolvedAt: now.toISOString(),
+          note,
+        },
+      })
       .where(eq(commissionReports.id, report.id));
     await ops.appendAudit(tx, {
       actor: auditActor(actor),

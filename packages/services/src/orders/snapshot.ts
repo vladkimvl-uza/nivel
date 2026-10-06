@@ -123,28 +123,48 @@ export function purchasesCompleteOf(
 export interface JournalEvent {
   seq: number;
   type: string;
-  at: Date;
 }
 
 /**
  * The state of the report as the automaton reads it, from the journal of the order: the report is accepted by the
- * customer or by the term, an objection stays open until the owner resolves it (commission_reports.objection.resolvedAt)
- * and a newer objection opens it again. Only what followed the last sending of the report counts.
+ * customer or by the term, an objection stays open until the owner resolves it and a newer objection opens it again.
+ * Only what followed the last sending of the report counts.
+ *
+ * The resolution is compared with the journal by the sequence number, never by time: the journal is stamped by the clock
+ * of the database and the resolution by the clock of the process, and two clocks must not be compared.
  */
 export function reportStateFrom(i: {
   events: readonly JournalEvent[];
   reportExists: boolean;
-  resolvedAt: Date | null;
+  /** `commission_reports.objection.resolvedAfterSeq`: the last objection of the journal that the owner has answered. */
+  resolvedAfterSeq: number | null;
   objectionUntil: Date | null;
 }): OrderSnapshot["report"] | undefined {
   if (!i.reportExists) return undefined;
-  const lastSend = i.events.filter((e) => e.type === "SEND_REPORT").reduce((m, e) => Math.max(m, e.seq), 0);
-  const since = i.events.filter((e) => e.seq > lastSend);
-  const accepted = since.some((e) => e.type === "REPORT_ACCEPTED" || e.type === "REPORT_DEEMED_ACCEPTED");
-  const objections = since.filter((e) => e.type === "OBJECTION");
-  const last = objections.reduce<Date | null>((m, e) => (m === null || e.at > m ? e.at : m), null);
-  const objectionOpen = last !== null && !(i.resolvedAt !== null && i.resolvedAt >= last);
+  const accepted = sinceLastReport(i.events).some(
+    (e) => e.type === "REPORT_ACCEPTED" || e.type === "REPORT_DEEMED_ACCEPTED",
+  );
+  const lastObjection = lastObjectionSeq(i.events);
+  const objectionOpen = lastObjection !== null && lastObjection > (i.resolvedAfterSeq ?? 0);
   return { accepted, objectionOpen, objectionUntil: i.objectionUntil };
+}
+
+function sinceLastReport(events: readonly JournalEvent[]): JournalEvent[] {
+  const lastSend = events.filter((e) => e.type === "SEND_REPORT").reduce((m, e) => Math.max(m, e.seq), 0);
+  return events.filter((e) => e.seq > lastSend);
+}
+
+/** The sequence number of the newest objection to the report that is out now, or null when there is none. */
+export function lastObjectionSeq(events: readonly JournalEvent[]): number | null {
+  return sinceLastReport(events)
+    .filter((e) => e.type === "OBJECTION")
+    .reduce<number | null>((m, e) => (m === null || e.seq > m ? e.seq : m), null);
+}
+
+/** The state of the objection as `commission_reports.objection` keeps it; a number only, never a time. */
+export function resolvedAfterSeqOf(objection: unknown): number | null {
+  const v = (objection as { resolvedAfterSeq?: unknown } | null | undefined)?.resolvedAfterSeq;
+  return typeof v === "number" && Number.isInteger(v) && v >= 0 ? v : null;
 }
 
 /** Losses in basis points of what was bought: the input of the warranty reserve rate (CONCEPT 2.6). */
@@ -254,7 +274,6 @@ export async function loadSnapshotInputs(
     orderBy: (t, { desc }) => desc(t.version),
   });
   const events = report ? await sales.listOrderEvents(ex, order.id) : [];
-  const resolved = (report?.objection as { resolvedAt?: string } | null)?.resolvedAt;
 
   const inputs: SnapshotInputs = {
     order: {
@@ -298,9 +317,9 @@ export async function loadSnapshotInputs(
         )
       : false,
     report: reportStateFrom({
-      events: events.map((e) => ({ seq: e.seq, type: String((e.event as { type?: unknown }).type), at: e.at })),
+      events: events.map((e) => ({ seq: e.seq, type: String((e.event as { type?: unknown }).type) })),
       reportExists: report !== undefined,
-      resolvedAt: resolved ? new Date(resolved) : null,
+      resolvedAfterSeq: resolvedAfterSeqOf(report?.objection),
       objectionUntil: order.objectionUntil,
     }),
     firstOrderOfCustomer: await isFirstOrder(ex, order.customerId, order.id),

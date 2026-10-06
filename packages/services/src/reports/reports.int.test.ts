@@ -197,6 +197,23 @@ describe("the answer of the customer to the report", () => {
     expect(await accept({ orderId: o.orderId }, customerActor(o), w.bot)).toEqual({ ok: true, status: "report_sent" });
   });
 
+  it("the open objection does not depend on how the journal stamps compare to the process clock", async () => {
+    // The journal is stamped by the database (DEFAULT now()), the resolution by the clock of the process. Here the clock
+    // of the process is behind the clock of the database; the answer of the owner must close the objection all the same.
+    const { o } = await sentReport();
+    w.clock.set(new Date("2025-01-01T10:00:00+05:00"));
+    const stampOfDb = await w.db.$client.query("select now() as n");
+    expect(stampOfDb.rows[0].n.getTime()).toBeGreaterThan(w.clock.now().getTime());
+    expect(
+      await object({ orderId: o.orderId, text: "The SSD is not the one I chose" }, customerActor(o), w.bot),
+    ).toEqual({
+      ok: true,
+      status: "report_sent",
+    });
+    await resolveObjection({ orderId: o.orderId, note: "Shown the receipt" }, owner(), w.admin);
+    expect(await accept({ orderId: o.orderId }, customerActor(o), w.bot)).toEqual({ ok: true, status: "report_sent" });
+  });
+
   it("an objection after the window is too late", async () => {
     const { o } = await sentReport();
     w.clock.advance(4 * DAY); // Saturday 17 October: the window closed on Friday 16
@@ -247,6 +264,7 @@ describe("the answer of the customer to the report", () => {
     );
     expect(rows[0].objection).toMatchObject({ note: "answered" });
     expect(Date.parse(rows[0].objection.resolvedAt)).toBe(w.clock.now().getTime());
+    expect(rows[0].objection.resolvedAfterSeq).toBeGreaterThan(0);
   });
 });
 

@@ -1,4 +1,5 @@
 import { ops } from "@nivel/db/repos";
+import { isoDateInTashkent } from "@nivel/domain/calendar";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ForbiddenError } from "../orders/errors.ts";
 import { acceptedOrder, ownerActor, purchasingOrder } from "../orders/test-support/flow.ts";
@@ -54,8 +55,16 @@ describe("threshold.status", () => {
     expect(r.ok).toBe(true);
     const waiting = await acceptedOrder(w); // accepted, nothing bought yet
 
-    const s = await status({}, w.admin);
-    expect(s.volume).toBe(w.products.cpu.price + o.quote.totals.advance);
+    // The receipt is dated by the clock of the database (bought_at DEFAULT now()), the fee by the fake clock of the
+    // process (confirmed_at). The two years differ once the real year is past 2026, so each part is read in its own year.
+    const dbYear = (await w.db.$client.query("select extract(year from now() at time zone 'Asia/Tashkent')::int as y"))
+      .rows[0].y as number;
+    const clockYear = Number(isoDateInTashkent(w.clock.now()).slice(0, 4));
+    const years = [...new Set([clockYear, dbYear])];
+    const statuses = await Promise.all(years.map((year) => status({ year }, w.admin)));
+    const volume = statuses.reduce((n, s) => n + s.volume, 0);
+    expect(volume).toBe(w.products.cpu.price + o.quote.totals.advance);
+    const s = statuses[0] as (typeof statuses)[number];
     expect(s.committed).toBe(waiting.quote.totals.purchaseLimit + waiting.quote.totals.fee.total);
     expect(s.shareBp).toBe(Math.floor((s.volume * 10_000) / 1_000_000_000));
     expect(s.projectedShareBp).toBeGreaterThanOrEqual(s.shareBp);
