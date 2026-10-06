@@ -1,6 +1,6 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { bp, type Sum, sum } from "../money/index.ts";
-import { forAll } from "../money/testkit.ts";
 import {
   TAX_RISK_RESERVE_BP,
   taxRiskReserve,
@@ -69,17 +69,21 @@ describe("warrantyReserveContribution: 2 % (at least 150 000), then 1 %", () => 
   });
 
   it("property: between 1 % and 2 % of the components, at least the minimum at 2 %", () => {
-    forAll((g) => {
-      const components = g.int(1, 200_000_000);
-      const st = state({
-        balance: S(g.int(0, 20_000_000)),
-        closedOrders: g.int(0, 60),
-        lossesLast12mBp: bp(g.int(0, 200)),
-      });
-      const r = warrantyReserveContribution(S(components), st);
-      expect(r * 100).toBeGreaterThanOrEqual(components);
-      expect(r).toBeLessThanOrEqual(Math.max(Math.ceil(components / 50), 150_000));
-    });
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 200_000_000 }),
+        fc.integer({ min: 0, max: 20_000_000 }),
+        fc.integer({ min: 0, max: 60 }),
+        fc.integer({ min: 0, max: 200 }),
+        (components, balance, closedOrders, losses) => {
+          const st = state({ balance: S(balance), closedOrders, lossesLast12mBp: bp(losses) });
+          const r = warrantyReserveContribution(S(components), st);
+          expect(r * 100).toBeGreaterThanOrEqual(components);
+          expect(r).toBeLessThanOrEqual(Math.max(Math.ceil(components / 50), 150_000));
+        },
+      ),
+      { numRuns: 500 },
+    );
   });
 });
 
@@ -99,5 +103,32 @@ describe("taxRiskReserve: 1 % of purchases until the tax authority answers", () 
   it("rejects negative and fractional input", () => {
     expect(() => taxRiskReserve(S(-1), true)).toThrow(RangeError);
     expect(() => taxRiskReserve(0.5 as unknown as Sum, true)).toThrow(RangeError);
+  });
+  it("rejects a non-boolean flag: a lost field must not silently switch the reserve off", () => {
+    for (const bad of [undefined, null, 0, 1, "", "true"]) {
+      expect(() => taxRiskReserve(S(27_000_000), bad as unknown as boolean)).toThrow(RangeError);
+    }
+  });
+});
+
+describe("warrantyReserveContribution: a broken fund state is an error, never a guessed amount", () => {
+  it("rejects a missing or non-object state", () => {
+    for (const bad of [undefined, null, 5, "x"]) {
+      expect(() => warrantyReserveContribution(S(1_000_000), bad as unknown as WarrantyReserveState)).toThrow(
+        RangeError,
+      );
+    }
+  });
+  it("rejects a state with a lost or invalid field", () => {
+    const ok = state();
+    for (const key of ["balance", "closedOrders", "lossesLast12mBp"] as const) {
+      // A negative balance is data (an overdrawn fund), the other two are counts and cannot be negative.
+      const bads =
+        key === "balance" ? [undefined, null, Number.NaN, 0.5, "1"] : [undefined, null, Number.NaN, -1, 0.5, "1"];
+      for (const bad of bads) {
+        const broken = { ...ok, [key]: bad } as unknown as WarrantyReserveState;
+        expect(() => warrantyReserveContribution(S(1_000_000), broken), `${key}=${String(bad)}`).toThrow(RangeError);
+      }
+    }
   });
 });

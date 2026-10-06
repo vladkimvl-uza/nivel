@@ -1,6 +1,15 @@
 import { bp, sum } from "../money/index.ts";
 import type { FeeSettings } from "./types.ts";
 
+/** Read-only at every level: the defaults are shared by all callers (a runtime freeze backs the type). */
+export type DeepReadonly<T> = T extends string | number | boolean | bigint // branded Sum and Bp stay as they are
+  ? T
+  : T extends readonly (infer U)[]
+    ? readonly DeepReadonly<U>[]
+    : T extends object
+      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+      : T;
+
 function deepFreeze<T>(value: T): T {
   // Always descend: the children of an already (shallow) frozen object may still be mutable. Settings have no cycles.
   if (value !== null && typeof value === "object") {
@@ -14,7 +23,7 @@ function deepFreeze<T>(value: T): T {
  * Default money rules accepted by the owner on 05.10.2026 (DECISIONS R-8, R-9, R-26 and the note on default rules).
  * A test compares these values with the document; the live values come from ops.settings.
  */
-export const DEFAULT_FEE_SETTINGS: FeeSettings = deepFreeze({
+export const DEFAULT_FEE_SETTINGS: DeepReadonly<FeeSettings> = deepFreeze({
   version: "2026-10-05",
   effectiveFrom: "2026-10-05",
   pcLowRateBp: bp(1500),

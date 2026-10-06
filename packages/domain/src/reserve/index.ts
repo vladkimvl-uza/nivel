@@ -22,6 +22,12 @@ export const TAX_RISK_RESERVE_BP = 100;
  * and while losses of the last 12 months are 0.5 % and more: 2 % but not less than 150 000. Otherwise 1 % without a minimum.
  */
 export function warrantyReserveContribution(componentsSum: Sum, st: WarrantyReserveState): Sum {
+  // The fund state is checked before anything else: a lost field must not read as a young fund (higher rate) by accident.
+  if (st === null || typeof st !== "object") throw new RangeError("Warranty reserve state is required");
+  sum(st.balance);
+  if (!Number.isInteger(st.closedOrders) || st.closedOrders < 0) throw new RangeError("Closed orders must be a count");
+  if (!Number.isInteger(st.lossesLast12mBp) || st.lossesLast12mBp < 0)
+    throw new RangeError("Losses must be basis points");
   const base = sum(componentsSum);
   if (base < 0) throw new RangeError("Components sum must not be negative");
   if (base === 0) return sum(0);
@@ -36,6 +42,8 @@ export function warrantyReserveContribution(componentsSum: Sum, st: WarrantyRese
 export function taxRiskReserve(receiptsTotal: Sum, active: boolean): Sum {
   const total = sum(receiptsTotal);
   if (total < 0) throw new RangeError("Receipts total must not be negative");
+  // A lost flag (undefined, null, 0) must not silently switch the fund off.
+  if (typeof active !== "boolean") throw new RangeError("taxRiskActive must be a boolean");
   return active ? applyBp(total, bp(TAX_RISK_RESERVE_BP), "ceil") : sum(0);
 }
 

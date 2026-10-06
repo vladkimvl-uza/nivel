@@ -17,7 +17,7 @@ export interface FeeSettings {
   minFreeWindowPc: Sum;
   minFullCycleSetup: Sum; // 6 700 000, 4 500 000, 13 300 000
   stageSharesBp: { selection: Bp; purchase: Bp; assembly: Bp; handover: Bp }; // 2000/3000/3500/1500, Σ = 10 000
-  commissionLineStages: FeeStage[]; // ["selection","purchase"] → 50 %
+  commissionLineStages: readonly FeeStage[]; // ["selection","purchase"] → 50 %
   advanceBp: Bp; // 3000: 30 % at acceptance, 70 % at handover
   reserveBp: Bp;
   reserveHighBp: Bp;

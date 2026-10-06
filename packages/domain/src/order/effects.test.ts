@@ -182,7 +182,8 @@ describe("effects of purchasing and the report", () => {
 
   it("report acceptance has no effects", () => {
     expect(effectsOf({ status: "report_sent", report: {} }, EVENTS.REPORT_ACCEPTED, "customer")).toEqual([]);
-    expect(effectsOf({ status: "report_sent", report: {} }, EVENTS.REPORT_DEEMED_ACCEPTED, "system")).toEqual([]);
+    const windowClosed = { status: "report_sent", report: { objectionUntil: at(NOW.getTime() - 1) } } as const;
+    expect(effectsOf(windowClosed, EVENTS.REPORT_DEEMED_ACCEPTED, "system")).toEqual([]);
   });
 });
 
@@ -193,7 +194,7 @@ describe("effects of settlement, assembly and handover", () => {
     money: { ...FUNDS, refunded: sum(1_300_000) },
   };
 
-  it("REMAINDER_SETTLED moves 1 % of the receipts to the tax risk reserve (rounded down)", () => {
+  it("REMAINDER_SETTLED moves 1 % of the receipts to the tax risk reserve (rounded up, as in WP-01)", () => {
     expect(effectsOf(settled, EVENTS.REMAINDER_SETTLED, "owner")).toEqual([
       { kind: "ledger", fund: "tax_risk", amount: 90_000 },
     ]);
@@ -202,7 +203,7 @@ describe("effects of settlement, assembly and handover", () => {
       money: { fundsReceived: sum(1_234_599), receiptsTotal: sum(1_234_599), refunded: sum(0) },
     };
     expect(effectsOf(odd, { type: "REMAINDER_SETTLED" }, "owner")).toEqual([
-      { kind: "ledger", fund: "tax_risk", amount: 12_345 },
+      { kind: "ledger", fund: "tax_risk", amount: 12_346 },
     ]);
   });
 
@@ -248,20 +249,28 @@ describe("effects of settlement, assembly and handover", () => {
   });
 
   it.each([
-    [0, 150_000],
     [5_000_000, 150_000],
     [7_500_000, 150_000],
-    [7_500_001, 150_000],
+    [7_500_001, 150_001],
     [7_550_000, 151_000],
     [100_000_000, 2_000_000],
-    [12_345_678, 246_913],
-  ])("HANDOVER warranty reserve for receipts %s is %s (2 %%, at least 150 000, rounded down)", (receipts, expected) => {
+    [12_345_678, 246_914],
+  ])("HANDOVER warranty reserve for receipts %s is %s (2 %%, at least 150 000, rounded up)", (receipts, expected) => {
     const effects = effectsOf(
       { status: "delivering", money: { fundsReceived: sum(receipts), receiptsTotal: sum(receipts) } },
       EVENTS.HANDOVER,
       "customer",
     );
     expect(effects).toContainEqual({ kind: "ledger", fund: "warranty", amount: expected });
+  });
+
+  it("HANDOVER of an order without receipts has nothing to reserve", () => {
+    const effects = effectsOf(
+      { status: "delivering", money: { fundsReceived: sum(0), receiptsTotal: sum(0) } },
+      EVENTS.HANDOVER,
+      "owner",
+    );
+    expect(effects.some((e) => e.kind === "ledger")).toBe(false);
   });
 
   it("HANDOVER on a leap day keeps the last day of the shorter month", () => {
@@ -275,11 +284,16 @@ describe("effects of settlement, assembly and handover", () => {
 });
 
 describe("effects of PODBOR_DELIVERED", () => {
-  it("credits the fee within podborCreditDays (aftercare job watches the term)", () => {
+  it("sets podborCreditUntil = delivery + podborCreditDays (WP-00, ADR-007 item 2)", () => {
     expect(effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner")).toEqual([
-      { kind: "schedule", job: "aftercare", at: at(NOW.getTime() + 30 * DAY) },
+      { kind: "set", field: "podborCreditUntil", at: at(NOW.getTime() + 30 * DAY) },
       { kind: "notify", to: "customer", templateKey: "order.podbor_delivered" },
     ]);
+  });
+
+  it("emits no aftercare job: the credit term must not look like an after-sale task", () => {
+    const effects = effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner");
+    expect(effects.filter((e) => e.kind === "schedule")).toEqual([]);
   });
 
   it("the credit term comes from the settings", () => {
@@ -291,8 +305,34 @@ describe("effects of PODBOR_DELIVERED", () => {
       NOW,
       settings,
     );
-    expect(effects[0]).toEqual({ kind: "schedule", job: "aftercare", at: at(NOW.getTime() + 14 * DAY) });
+    expect(effects[0]).toEqual({ kind: "set", field: "podborCreditUntil", at: at(NOW.getTime() + 14 * DAY) });
   });
+
+  it("a zero-day term ends at the moment of delivery", () => {
+    const effects = effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner", NOW, {
+      ...SETTINGS,
+      podborCreditDays: 0,
+    });
+    expect(effects[0]).toEqual({ kind: "set", field: "podborCreditUntil", at: at(NOW.getTime()) });
+  });
+
+  it("counts from the delivery instant, not from the clock of another event", () => {
+    const later = tk("2026-11-30T23:30:00");
+    const effects = effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner", later);
+    expect(effects[0]).toEqual({ kind: "set", field: "podborCreditUntil", at: tk("2026-12-30T23:30:00") });
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 1e12])(
+    "refuses a broken podborCreditDays %s instead of emitting an invalid date",
+    (days) => {
+      expect(() =>
+        transition(order({ status: "estimate_sent", kind: "podbor" }), EVENTS.PODBOR_DELIVERED, "owner", NOW, CAL, {
+          ...SETTINGS,
+          podborCreditDays: days,
+        }),
+      ).toThrow(RangeError);
+    },
+  );
 });
 
 describe("effects of cancellation", () => {

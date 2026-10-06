@@ -10,7 +10,7 @@ export interface ThresholdSettings {
   annualLimit: Sum;
   registrationDate?: IsoDate;
   planCap?: Sum;
-  alertsBp: Bp[];
+  alertsBp: readonly Bp[];
   proportion: "without_registration_day" | "with_registration_day"; // default: without (lower bound)
 }
 export interface ThresholdStatus {

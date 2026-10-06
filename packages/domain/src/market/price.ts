@@ -3,6 +3,8 @@ import { assertMarketPolicy } from "./policy.ts";
 import type { ExcludeReason, MarketPolicy, MarketPrice, PriceObservation } from "./types.ts";
 
 const DAY_MS = 86_400_000;
+/** An observation may be ahead of `now` by this much (time zones, clock skew); it then counts as age 0. */
+const MAX_AHEAD_MS = DAY_MS;
 /** Samples of 3-5 vendors use the fixed band, from 6 the MAD rule (block 08, 5.3). */
 const SMALL_SAMPLE_MAX = 5;
 /** Scale that makes MAD comparable to a standard deviation (block 08, 5.3). */
@@ -15,7 +17,7 @@ type Flag = MarketPrice["flags"][number];
 interface Candidate {
   obs: PriceObservation;
   price: number;
-  /** Age at `now` in ms; a timestamp from the future counts as 0. */
+  /** Age at `now` in ms; a timestamp up to 24 hours ahead (checked in validate) counts as 0. */
   ageMs: number;
 }
 
@@ -52,7 +54,7 @@ function isBetter(a: Candidate, b: Candidate): boolean {
   return a.obs.id < b.obs.id;
 }
 
-function validate(o: PriceObservation, productId: string): void {
+function validate(o: PriceObservation, productId: string, nowMs: number): void {
   if (o.productId !== productId) {
     throw new RangeError(`Observation ${o.id} belongs to ${o.productId}, expected ${productId}`);
   }
@@ -61,6 +63,9 @@ function validate(o: PriceObservation, productId: string): void {
   }
   if (!(o.observedAt instanceof Date) || !Number.isFinite(o.observedAt.getTime())) {
     throw new RangeError(`Observation ${o.id}: invalid observation time`);
+  }
+  if (o.observedAt.getTime() - nowMs > MAX_AHEAD_MS) {
+    throw new RangeError(`Observation ${o.id}: observed more than 24 hours ahead of asOf`);
   }
 }
 
@@ -114,7 +119,7 @@ export function computeMarketPrice(obs: readonly PriceObservation[], now: Date, 
   // 1. Eligibility filters.
   const eligible: Candidate[] = [];
   for (const o of obs) {
-    validate(o, first.productId);
+    validate(o, first.productId, nowMs);
     const c: Candidate = { obs: o, price: o.priceSum, ageMs: Math.max(0, nowMs - o.observedAt.getTime()) };
     const reason = eligibilityReason(c, policy);
     if (reason === null) eligible.push(c);

@@ -1,9 +1,10 @@
 // ARCHITECTURE 4.1: defaults of the domain match the owner's documents, and a test compares them.
 import { describe, expect, it } from "vitest";
+import { bp, sum } from "../money/index.ts";
 import { repoFile } from "../money/testkit.ts";
 import { TAX_RISK_RESERVE_BP, WARRANTY_RESERVE } from "../reserve/index.ts";
 import { DEFAULT_THRESHOLD_SETTINGS } from "../threshold/index.ts";
-import { DEFAULT_FEE_SETTINGS as D } from "./index.ts";
+import { DEFAULT_FEE_SETTINGS as D, type FeeSettings, type FeeStage } from "./index.ts";
 
 const doc = (file: string): string => repoFile(`docs/${file}`).replace(/\s+/g, " ");
 const decisions = doc("DECISIONS.md");
@@ -90,6 +91,29 @@ describe("DEFAULT_FEE_SETTINGS vs DECISIONS and CONCEPT", () => {
       (D as { pcLowRateBp: number }).pcLowRateBp = 1;
     }).toThrow(TypeError);
   });
+
+  // WP-00, ADR-007 item 1: the stage list is a read-only contract; the checks below are enforced by `tsc -b`.
+  it("typed read-only: the defaults reject writes at compile time and at run time", () => {
+    // @ts-expect-error commissionLineStages of the defaults is read-only
+    expect(() => D.commissionLineStages.push("assembly")).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error the defaults object itself is read-only
+      D.advanceBp = bp(1);
+    }).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error nested objects of the defaults are read-only too
+      D.stageSharesBp.selection = bp(1);
+    }).toThrow(TypeError);
+    expect(D.commissionLineStages).toEqual(["selection", "purchase"]);
+  });
+
+  it("FeeSettings accepts a read-only list of stages without a cast", () => {
+    const stages: readonly FeeStage[] = Object.freeze(["selection"] as const);
+    const s: FeeSettings = { ...D, commissionLineStages: stages };
+    expect(s.commissionLineStages).toBe(stages);
+    // @ts-expect-error the list in the contract is read-only
+    expect(() => s.commissionLineStages.push("handover")).toThrow(TypeError);
+  });
 });
 
 describe("reserve and threshold defaults vs documents", () => {
@@ -113,5 +137,16 @@ describe("reserve and threshold defaults vs documents", () => {
     expect(architecture).toContain("Оповещения — 60, 70 (бухгалтер уровня 2), 80, 90, 100 %");
     expect(DEFAULT_THRESHOLD_SETTINGS.alertsBp).toEqual([6000, 7000, 8000, 9000, 10_000]);
     expect(DEFAULT_THRESHOLD_SETTINGS.proportion).toBe("without_registration_day");
+  });
+
+  it("threshold defaults are typed read-only and frozen (WP-00, ADR-007 item 1)", () => {
+    expect(Object.isFrozen(DEFAULT_THRESHOLD_SETTINGS)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_THRESHOLD_SETTINGS.alertsBp)).toBe(true);
+    // @ts-expect-error alertsBp of the defaults is read-only
+    expect(() => DEFAULT_THRESHOLD_SETTINGS.alertsBp.push(bp(1))).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error the defaults object itself is read-only
+      DEFAULT_THRESHOLD_SETTINGS.annualLimit = sum(1);
+    }).toThrow(TypeError);
   });
 });

@@ -335,6 +335,68 @@ describe("filters of block 08, 5.2", () => {
     expect(r.median).toBe(11_200_000);
   });
 
+  // WP-00, ADR-007 item 5: time zones and clock skew explain up to 24 hours; more is a data error.
+  describe("observation time ahead of asOf", () => {
+    const ahead = (ms: number) => new Date(NOW.getTime() + ms);
+    const three = (observedAt: Date) => [
+      obs("a", "v1", 11_000_000, { observedAt }),
+      obs("b", "v2", 11_200_000),
+      obs("c", "v3", 11_400_000),
+    ];
+
+    it.each([1, HOUR_MS, 23 * HOUR_MS, 24 * HOUR_MS - 1, 24 * HOUR_MS])(
+      "%i ms ahead (within 24 hours) counts as age 0",
+      (ms) => {
+        const r = compute(three(ahead(ms)));
+        expect(r.excluded).toEqual([]);
+        expect(r.median).toBe(11_200_000);
+        expect(r.vendors).toBe(3);
+        // The other two are 24 h old, so the future one must not make the maximum age negative or larger.
+        expect(r.maxAgeDays).toBe(1);
+      },
+    );
+
+    it("the only observation 24 hours ahead has age 0", () => {
+      const r = compute([obs("a", "v1", 11_000_000, { observedAt: ahead(24 * HOUR_MS) })]);
+      expect(r.maxAgeDays).toBe(0);
+      expect(r.min).toBe(11_000_000);
+    });
+
+    it.each([24 * HOUR_MS + 1, 25 * HOUR_MS, 48 * HOUR_MS, 365 * 24 * HOUR_MS])(
+      "%i ms ahead (more than 24 hours) is a data error, like a price <= 0",
+      (ms) => {
+        expect(() => compute(three(ahead(ms)))).toThrow(RangeError);
+      },
+    );
+
+    it("the message names the observation and the reason", () => {
+      expect(() => compute(three(ahead(25 * HOUR_MS)))).toThrow(/Observation a: .*ahead/);
+    });
+
+    it("an observation that would be excluded anyway is still checked (used, out of stock, private)", () => {
+      const late = ahead(25 * HOUR_MS);
+      expect(() =>
+        compute([
+          ...offers([11_000_000, 11_200_000]),
+          obs("u", "vu", 9_000_000, { observedAt: late, condition: "used" }),
+        ]),
+      ).toThrow(RangeError);
+      expect(() =>
+        compute([
+          ...offers([11_000_000, 11_200_000]),
+          obs("p", "vp", 9_000_000, { observedAt: late, vendorKind: "private" }),
+        ]),
+      ).toThrow(RangeError);
+    });
+
+    it("depends on asOf: the same observation is fine for a later asOf", () => {
+      const observedAt = ahead(30 * HOUR_MS);
+      expect(() => computeMarketPrice(three(observedAt), NOW, P)).toThrow(RangeError);
+      const later = new Date(NOW.getTime() + 6 * HOUR_MS);
+      expect(computeMarketPrice(three(observedAt), later, P).vendors).toBe(3);
+    });
+  });
+
   it("everything excluded: empty result, low confidence", () => {
     const r = compute(offers([11_000_000, 11_200_000], { vendorKind: "private" }));
     expect(r).toMatchObject({

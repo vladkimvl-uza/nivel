@@ -1,6 +1,6 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { type Bp, bp, sum } from "../money/index.ts";
-import { forAll, type Gen } from "../money/testkit.ts";
 import {
   computeFee,
   computeQuote,
@@ -184,45 +184,49 @@ describe("computeFee: two document lines (commission and works)", () => {
 });
 
 describe("computeFee: properties", () => {
-  const randomLines = (g: Gen): QuoteLineInput[] =>
-    Array.from({ length: g.int(1, 8) }, (_, i) =>
-      line({
-        key: `k${i}`,
-        group: g.pick(["pc", "mount", "outside_scale"] as const),
-        qty: g.int(0, 4),
-        unitSum: g.int(0, 30_000_000),
-        customerOwned: g.int(0, 5) === 0,
+  const randomLines = fc
+    .array(
+      fc.record({
+        group: fc.constantFrom("pc", "mount", "outside_scale"),
+        qty: fc.integer({ min: 0, max: 4 }),
+        unitSum: fc.integer({ min: 0, max: 30_000_000 }),
+        customerOwned: fc.integer({ min: 0, max: 5 }).map((n) => n === 0),
       }),
-    );
+      { minLength: 1, maxLength: 8 },
+    )
+    .map((rows): QuoteLineInput[] => rows.map((r, i) => line({ key: `k${i}`, ...r })));
 
   it("parts and both document lines add up to the total", () => {
-    forAll((g) => {
-      const f = computeFee(randomLines(g), D, { complexBuild: g.bool() });
-      expect(f.parts.reduce((a, p) => a + p.amount, 0)).toBe(f.total);
-      expect(f.commissionLine + f.worksLine).toBe(f.total);
-      expect(f.effectiveRateBp).toBeLessThanOrEqual(1500);
-    });
+    fc.assert(
+      fc.property(randomLines, fc.boolean(), (lines, complexBuild) => {
+        const f = computeFee(lines, D, { complexBuild });
+        expect(f.parts.reduce((a, p) => a + p.amount, 0)).toBe(f.total);
+        expect(f.commissionLine + f.worksLine).toBe(f.total);
+        expect(f.effectiveRateBp).toBeLessThanOrEqual(1500);
+      }),
+      { numRuns: 500 },
+    );
   });
 
   it("fee <= 15 % of the base, and >= 10 % for bases from 6.7 mln without complex build", () => {
-    forAll(
-      (g) => {
-        const base = g.int(6_700_000, 400_000_000);
+    fc.assert(
+      fc.property(fc.integer({ min: 6_700_000, max: 400_000_000 }), (base) => {
         const fee = feeOf(base);
         expect(fee * 10_000).toBeLessThanOrEqual(base * 1500);
         expect(fee).toBeGreaterThanOrEqual(Math.floor(base / 10));
         expect(fee).toBeGreaterThanOrEqual(Math.floor((base * 1000) / 10_000));
-      },
-      { runs: 2000 },
+      }),
+      { numRuns: 2000 },
     );
   });
 
   it("fee never decreases when the base grows", () => {
-    forAll((g) => {
-      const a = g.int(0, 100_000_000);
-      const b = a + g.int(0, 100_000_000);
-      expect(feeOf(b)).toBeGreaterThanOrEqual(feeOf(a));
-    });
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 100_000_000 }), fc.integer({ min: 0, max: 100_000_000 }), (a, grow) => {
+        expect(feeOf(a + grow)).toBeGreaterThanOrEqual(feeOf(a));
+      }),
+      { numRuns: 500 },
+    );
   });
 });
 
@@ -427,24 +431,28 @@ describe("computeQuote: estimate validity period", () => {
 
 describe("computeQuote: properties", () => {
   it("advance + final = fee, grand total = limit + fee, limit >= bought lines", () => {
-    forAll((g) => {
-      const lines = Array.from({ length: g.int(1, 8) }, (_, i) =>
-        line({
-          key: `k${i}`,
-          group: g.pick(["pc", "mount", "outside_scale"] as const),
-          qty: g.int(0, 3),
-          unitSum: g.int(0, 20_000_000),
-          isRamOrSsd: g.bool(),
-          customerOwned: g.int(0, 5) === 0,
-          purchasedByIp: g.bool(),
-        }),
-      );
-      const q = computeQuote(lines, D, ctx({ complexBuild: g.bool(), freeWindowAvailable: g.bool() }));
-      expect(q.advance + q.final).toBe(q.fee.total);
-      expect(q.grandTotal).toBe(q.purchaseLimit + q.fee.total);
-      expect(q.reserveSum % 10_000).toBe(0);
-      expect(q.purchaseLimit).toBeGreaterThanOrEqual(q.reserveSum);
-    });
+    const lineRows = fc.array(
+      fc.record({
+        group: fc.constantFrom("pc", "mount", "outside_scale"),
+        qty: fc.integer({ min: 0, max: 3 }),
+        unitSum: fc.integer({ min: 0, max: 20_000_000 }),
+        isRamOrSsd: fc.boolean(),
+        customerOwned: fc.integer({ min: 0, max: 5 }).map((n) => n === 0),
+        purchasedByIp: fc.boolean(),
+      }),
+      { minLength: 1, maxLength: 8 },
+    );
+    fc.assert(
+      fc.property(lineRows, fc.boolean(), fc.boolean(), (rows, complexBuild, freeWindowAvailable) => {
+        const lines = rows.map((r, i) => line({ key: `k${i}`, ...r }));
+        const q = computeQuote(lines, D, ctx({ complexBuild, freeWindowAvailable }));
+        expect(q.advance + q.final).toBe(q.fee.total);
+        expect(q.grandTotal).toBe(q.purchaseLimit + q.fee.total);
+        expect(q.reserveSum % 10_000).toBe(0);
+        expect(q.purchaseLimit).toBeGreaterThanOrEqual(q.reserveSum);
+      }),
+      { numRuns: 500 },
+    );
   });
 });
 
@@ -507,28 +515,37 @@ describe("partsBudgetFromTotal: client budget -> parts", () => {
   }
 
   it("property: the largest parts whose quote does not exceed the budget", () => {
-    forAll(
-      (g) => {
-        const budget = S(g.int(0, 200_000_000));
-        const reserve: Bp = g.pick([bp(300), bp(500), bp(0)]);
-        const parts = partsBudgetFromTotal(budget, D, reserve);
-        expect(quoteCost(parts, reserve)).toBeLessThanOrEqual(budget);
-        expect(quoteCost(parts + 1, reserve)).toBeGreaterThan(budget);
-      },
-      { runs: 300 },
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 200_000_000 }),
+        fc.constantFrom(bp(300), bp(500), bp(0)),
+        (budgetN, reserve: Bp) => {
+          const budget = S(budgetN);
+          const parts = partsBudgetFromTotal(budget, D, reserve);
+          expect(quoteCost(parts, reserve)).toBeLessThanOrEqual(budget);
+          expect(quoteCost(parts + 1, reserve)).toBeGreaterThan(budget);
+        },
+      ),
+      { numRuns: 300 },
     );
   });
 
   it("property: the same holds over the whole allowed range up to the domain limit", () => {
-    forAll(
-      (g) => {
-        const budget = S(g.pick([g.int(0, 1_000_000_000), g.int(1_000_000_000, 1_000_000_000_000)]));
-        const reserve: Bp = g.pick([bp(300), bp(500), bp(0)]);
-        const parts = partsBudgetFromTotal(budget, D, reserve);
-        expect(quoteCost(parts, reserve)).toBeLessThanOrEqual(budget);
-        expect(quoteCost(parts + 1, reserve)).toBeGreaterThan(budget);
-      },
-      { runs: 300 },
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          fc.integer({ min: 0, max: 1_000_000_000 }),
+          fc.integer({ min: 1_000_000_000, max: 1_000_000_000_000 }),
+        ),
+        fc.constantFrom(bp(300), bp(500), bp(0)),
+        (budgetN, reserve: Bp) => {
+          const budget = S(budgetN);
+          const parts = partsBudgetFromTotal(budget, D, reserve);
+          expect(quoteCost(parts, reserve)).toBeLessThanOrEqual(budget);
+          expect(quoteCost(parts + 1, reserve)).toBeGreaterThan(budget);
+        },
+      ),
+      { numRuns: 300 },
     );
   });
 });

@@ -6,7 +6,7 @@ import { addMonthsTashkent, DAY_MS } from "../calendar/tashkent.ts";
 import type { CancelPoint } from "../cancel/types.ts";
 import type { FeeSettings } from "../fee/types.ts";
 import type { Sum } from "../money/types.ts";
-import { receiptsReserve, warrantyReserve } from "./reserves.ts";
+import { taxRiskReserve, warrantyReserveContribution } from "../reserve/index.ts";
 import type { Actor, Effect, GuardError, OrderEvent, OrderSnapshot, OrderStatus, WorkCalendar } from "./types.ts";
 
 type EventType = OrderEvent["type"];
@@ -60,6 +60,26 @@ const isValidDate = (d: unknown): d is Date => d instanceof Date && !Number.isNa
 /** Fail closed: an estimate without a usable validUntil is treated as expired, never as valid for ever. */
 const expired = (o: OrderSnapshot, now: Date): boolean =>
   !isValidDate(o.quote?.validUntil) || now.getTime() > o.quote.validUntil.getTime();
+/** Delivery + whole days; a broken setting is a bug that must fail loudly, never become an invalid date. */
+function podborCreditUntil(delivered: Date, days: number): Date {
+  const until = after(delivered, days * DAY_MS);
+  if (!Number.isInteger(days) || days < 0 || !isValidDate(until)) {
+    throw new RangeError(`transition: invalid podborCreditDays ${String(days)}`);
+  }
+  return until;
+}
+/** Reserve inputs of the snapshot; a snapshot without them is a caller bug, never a reason to guess an amount. */
+function reserveInputs(o: OrderSnapshot): OrderSnapshot["reserves"] {
+  const r = o.reserves;
+  // Both inputs are checked on either event: a lost taxRiskActive must not switch the tax reserve off after a JSON round trip.
+  if (r == null || typeof r.taxRiskActive !== "boolean" || r.warranty == null || typeof r.warranty !== "object") {
+    throw new RangeError("transition: the snapshot has no valid reserves (fund state, taxRiskActive)");
+  }
+  return r;
+}
+/** A ledger entry of a fund; nothing to record when the contribution is zero. */
+const ledger = (fund: Extract<Effect, { kind: "ledger" }>["fund"], amount: Sum): Effect[] =>
+  amount > 0 ? [{ kind: "ledger", fund, amount }] : [];
 const notify = (to: "customer" | "owner_topic", templateKey: string): Effect => ({ kind: "notify", to, templateKey });
 const expectPayment = (
   paymentKind: Extract<Effect, { kind: "expect_payment" }>["paymentKind"],
@@ -252,10 +272,14 @@ export const RULES: readonly Rule[] = [
     event: "OBJECTION",
     to: "report_sent",
     actors: ["customer"],
-    // The window itself (objectionUntil) is not in the snapshot: after it the system sends REPORT_DEEMED_ACCEPTED,
-    // and an objection to an accepted report is rejected here.
-    guard: ({ o, e }) =>
-      o.report === undefined || o.report.accepted || blank(e.text) ? "invalid_transition" : undefined,
+    // The window is report.objectionUntil: an objection is possible up to and including that instant. With no known
+    // window (null) the customer is not cut off; an unusable value fails closed.
+    guard: ({ o, e, now }) => {
+      if (o.report === undefined || o.report.accepted || blank(e.text)) return "invalid_transition";
+      const until = o.report.objectionUntil;
+      if (until == null) return undefined;
+      return isValidDate(until) && now.getTime() <= until.getTime() ? undefined : "invalid_transition";
+    },
     effects: () => [notify("owner_topic", "order.report_objection")],
   }),
   rule({
@@ -270,8 +294,15 @@ export const RULES: readonly Rule[] = [
     event: "REPORT_DEEMED_ACCEPTED",
     to: "report_sent",
     actors: ["system"],
-    // "The term has expired" is the job objection_window firing as the system actor.
-    guard: ({ o }) => reportAcceptanceGuard(o),
+    // "The term has expired" is the job objection_window firing as the system actor, strictly after objectionUntil.
+    // Without a window (null) there is no term to expire, so the report is never deemed accepted.
+    guard: ({ o, now }) => {
+      const error = reportAcceptanceGuard(o);
+      if (error !== undefined) return error;
+      const until = o.report?.objectionUntil;
+      if (until == null || !isValidDate(until)) return "invalid_transition";
+      return now.getTime() > until.getTime() ? undefined : "report_objection_open";
+    },
   }),
   rule({
     from: ["report_sent"],
@@ -285,10 +316,8 @@ export const RULES: readonly Rule[] = [
       // Funds received = receipts + refunded: the remainder has gone back (or there was none).
       return reconciled(o) ? undefined : "not_reconciled";
     },
-    effects: ({ o }) => {
-      const amount = receiptsReserve(o.money.receiptsTotal);
-      return amount > 0 ? [{ kind: "ledger", fund: "tax_risk", amount }] : [];
-    },
+    // The amounts come from the functions of WP-01 (reserve/index.ts), the single source of the reserve rules.
+    effects: ({ o }) => ledger("tax_risk", taxRiskReserve(o.money.receiptsTotal, reserveInputs(o).taxRiskActive)),
   }),
   rule({
     from: ["settled"],
@@ -338,7 +367,8 @@ export const RULES: readonly Rule[] = [
         ...AFTERCARE_DAYS.map(
           (days): Effect => ({ kind: "schedule", job: "aftercare", at: after(now, days * DAY_MS) }),
         ),
-        { kind: "ledger", fund: "warranty", amount: warrantyReserve(o.money.receiptsTotal) },
+        // The receipts of the order stand in for the components sum until the snapshot carries it.
+        ...ledger("warranty", warrantyReserveContribution(o.money.receiptsTotal, reserveInputs(o).warranty)),
         notify("customer", "order.handed_over"),
       ];
     },
@@ -365,8 +395,9 @@ export const RULES: readonly Rule[] = [
       return blank(e.paymentId) ? "payments_incomplete" : undefined;
     },
     effects: ({ now, s }) => [
-      // The Podbor fee is credited when the customer orders within podborCreditDays; the aftercare job watches the term.
-      { kind: "schedule", job: "aftercare", at: after(now, s.podborCreditDays * DAY_MS) },
+      // The Podbor fee is credited when the customer orders within podborCreditDays. This is a stored term
+      // (orders.podbor_credit_until), not a job: an aftercare job is a post-sale task and must not be confused with it.
+      { kind: "set", field: "podborCreditUntil", at: podborCreditUntil(now, s.podborCreditDays) },
       notify("customer", "order.podbor_delivered"),
     ],
   }),

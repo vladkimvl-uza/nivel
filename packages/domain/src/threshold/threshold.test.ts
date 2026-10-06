@@ -1,6 +1,6 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { bp, type Sum, sum } from "../money/index.ts";
-import { forAll, shuffle } from "../money/testkit.ts";
+import { type Bp, bp, type Sum, sum } from "../money/index.ts";
 import {
   DEFAULT_THRESHOLD_SETTINGS,
   type DealEntry,
@@ -137,6 +137,15 @@ describe("thresholdStatus", () => {
     expect(at(1_000_000_000)).toEqual([6000, 7000, 8000, 9000, 10_000]);
   });
 
+  it("takes a read-only list of alerts without a cast and does not change it (WP-00, ADR-007 item 1)", () => {
+    const alerts: readonly Bp[] = Object.freeze([bp(9000), bp(6000)]);
+    const s: ThresholdSettings = settings({ alertsBp: alerts });
+    expect(thresholdStatus([entry("receipt", 950_000_000)], S(0), 2026, s).crossedAlerts).toEqual([6000, 9000]);
+    expect(alerts).toEqual([9000, 6000]);
+    // @ts-expect-error the list in the contract is read-only
+    expect(() => s.alertsBp.push(bp(1))).toThrow(TypeError);
+  });
+
   it("sorts and de-duplicates configured alerts", () => {
     const s = settings({ alertsBp: [bp(9000), bp(6000), bp(9000), bp(7000)] });
     const st = thresholdStatus([entry("receipt", 950_000_000)], S(0), 2026, s);
@@ -208,16 +217,26 @@ describe("thresholdStatus", () => {
   });
 
   it("property: the order of entries does not matter, and a receipt never lowers the share", () => {
-    forAll((g) => {
-      const kinds = ["receipt", "fee_in", "fee_refund", "other_income"] as const;
-      const entries = Array.from({ length: g.int(0, 10) }, () => entry(g.pick(kinds), g.int(0, 90_000_000)));
-      const shuffled = shuffle(g, entries);
-      const a = thresholdStatus(entries, S(0), 2026, reg);
-      const b = thresholdStatus(shuffled, S(0), 2026, reg);
-      expect(b).toEqual(a);
-      const more = thresholdStatus([...entries, entry("receipt", g.int(0, 50_000_000))], S(0), 2026, reg);
-      expect(more.shareBp).toBeGreaterThanOrEqual(a.shareBp);
-      expect(more.crossedAlerts.length).toBeGreaterThanOrEqual(a.crossedAlerts.length);
-    });
+    const kinds = ["receipt", "fee_in", "fee_refund", "other_income"] as const;
+    const row = fc.record({ kind: fc.constantFrom(...kinds), amount: fc.integer({ min: 0, max: 90_000_000 }) });
+    // The entries and the same entries in another order.
+    const entriesAndPermutation = fc
+      .array(row, { maxLength: 10 })
+      .chain((rows) =>
+        fc.tuple(fc.constant(rows), fc.shuffledSubarray(rows, { minLength: rows.length, maxLength: rows.length })),
+      );
+    fc.assert(
+      fc.property(entriesAndPermutation, fc.integer({ min: 0, max: 50_000_000 }), ([rows, permuted], extra) => {
+        const entries = rows.map((r) => entry(r.kind, r.amount));
+        const shuffled = permuted.map((r) => entry(r.kind, r.amount));
+        const a = thresholdStatus(entries, S(0), 2026, reg);
+        const b = thresholdStatus(shuffled, S(0), 2026, reg);
+        expect(b).toEqual(a);
+        const more = thresholdStatus([...entries, entry("receipt", extra)], S(0), 2026, reg);
+        expect(more.shareBp).toBeGreaterThanOrEqual(a.shareBp);
+        expect(more.crossedAlerts.length).toBeGreaterThanOrEqual(a.crossedAlerts.length);
+      }),
+      { numRuns: 500 },
+    );
   });
 });

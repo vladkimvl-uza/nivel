@@ -520,6 +520,7 @@ export declare function computeMarketPrice(obs: readonly PriceObservation[], now
 - Меньше трёх продавцов — `median = null`, `confidence = "low"`, клиенту — «цена уточняется, от X».
 - Доверие: high — ≥ 5 продавцов и ≤ 3 дней; medium — 3–4 продавца или 4–7 дней; low — остальное.
 - Тест-пример: курс `"11772.95"` × 1 000 $ = 11 772 950 сум; RX 550 за 39 млн отсекается.
+- Время наблюдения: позже `asOf` не более чем на 24 часа (часовые пояса) — возраст 0; больше — `RangeError`, ошибка данных, как цена ≤ 0 (ADR-007).
 
 ### 4.6. Плата, смета, этапы
 
@@ -531,7 +532,7 @@ export interface FeeSettings {
   mountRateBp: Bp; complexRateBp: Bp;                       // 1500, 1500
   minFullCyclePc: Sum; minFreeWindowPc: Sum; minFullCycleSetup: Sum;        // 6 700 000, 4 500 000, 13 300 000
   stageSharesBp: { selection: Bp; purchase: Bp; assembly: Bp; handover: Bp }; // 2000/3000/3500/1500, Σ = 10 000
-  commissionLineStages: ("selection" | "purchase" | "assembly" | "handover")[]; // ["selection","purchase"] → 50 %
+  commissionLineStages: readonly ("selection" | "purchase" | "assembly" | "handover")[]; // ["selection","purchase"] → 50 %
   advanceBp: Bp;                                            // 3000: 30 % at acceptance, 70 % at handover
   reserveBp: Bp; reserveHighBp: Bp; reserveHighShareBp: Bp; // 300, 500, 2500 (RAM+SSD ≥ 25 % → 5 %; owner confirms)
   reserveRoundStep: number;                                 // 10 000, round up
@@ -614,14 +615,15 @@ export declare function settleCancellation(i: CancelInput, s: FeeSettings, now: 
 ```ts
 // packages/domain/src/threshold/types.ts
 export interface DealEntry { kind: "receipt" | "fee_in" | "fee_refund" | "other_income"; amount: Sum; date: IsoDate }
-export interface ThresholdSettings { annualLimit: Sum; registrationDate?: IsoDate; planCap?: Sum; alertsBp: Bp[];
+export interface ThresholdSettings { annualLimit: Sum; registrationDate?: IsoDate; planCap?: Sum; alertsBp: readonly Bp[];
   proportion: "without_registration_day" | "with_registration_day"; }   // default: without (lower bound)
 export interface ThresholdStatus { year: number; limit: Sum; volume: Sum; committed: Sum; shareBp: Bp;
   projectedShareBp: Bp; crossedAlerts: Bp[]; overPlanCap: boolean; remaining: Sum; }
 /** Registration year: floor(annualLimit / daysInYear × days). */
 export declare function thresholdForYear(year: number, s: ThresholdSettings): Sum;
 export declare function thresholdStatus(entries: readonly DealEntry[], committed: Sum, year: number, s: ThresholdSettings): ThresholdStatus;
-export declare function warrantyReserveContribution(componentsSum: Sum, st: { balance: Sum; closedOrders: number; lossesLast12mBp: Bp }): Sum;
+export interface WarrantyReserveState { balance: Sum; closedOrders: number; lossesLast12mBp: Bp }
+export declare function warrantyReserveContribution(componentsSum: Sum, st: WarrantyReserveState): Sum;
 export declare function taxRiskReserve(receiptsTotal: Sum, active: boolean): Sum;
 ```
 
@@ -662,10 +664,11 @@ export interface OrderSnapshot {
   quote?: { id: string; status: string; validUntil?: Date; compatVerdict: CompatResult["verdict"]; manuallyChecked: boolean;
     eligibility: Eligibility; purchaseLimit: Sum; advance: Sum; final: Sum; hasNonReturnable: boolean };
   money: { fundsReceived: Sum; receiptsTotal: Sum; refunded: Sum; documentedLosses: Sum; hasLimitOverrunConsent: boolean };
-  purchasesComplete: boolean; report?: { accepted: boolean; objectionOpen: boolean };
+  purchasesComplete: boolean; report?: { accepted: boolean; objectionOpen: boolean; objectionUntil: Date | null };
   firstOrderOfCustomer: boolean; grandTotal: Sum; purchaseNotBefore?: Date;
   offer: { uz: "stub" | "lawyer_approved" | "published"; ru: "stub" | "lawyer_approved" | "published" };
   appMode: "development" | "staging" | "production";
+  reserves: { warranty: WarrantyReserveState; taxRiskActive: boolean };   // ADR-007: входы правил резервов WP-01
 }
 export type Effect =
   | { kind: "notify"; to: "customer" | "owner_topic"; templateKey: string; params?: Record<string, string | number> }
@@ -673,7 +676,7 @@ export type Effect =
   | { kind: "render_pdf"; doc: "quote" | "commission_report" | "act_materials" | "act_customer_parts" | "act_handover" | "passport" | "warranty"; watermarkDraft: boolean }
   | { kind: "expect_payment"; paymentKind: "fee_advance" | "purchase_funds" | "fee_final" | "fee_extra" | "remainder_refund" | "fee_refund" | "funds_refund"; amount: Sum }
   | { kind: "ledger"; fund: "warranty" | "tax_risk"; amount: Sum }
-  | { kind: "set"; field: "purchaseNotBefore" | "warrantyUntil" | "reportDueAt" | "objectionUntil" | "refundDueAt"; at: Date };
+  | { kind: "set"; field: "purchaseNotBefore" | "warrantyUntil" | "reportDueAt" | "objectionUntil" | "refundDueAt" | "podborCreditUntil"; at: Date };
 export type GuardError =
   | "actor_not_allowed" | "invalid_transition" | "estimate_expired" | "manual_check_missing" | "compat_block"
   | "not_eligible" | "offer_not_published" | "consent_missing" | "payments_incomplete" | "purchase_too_early"
@@ -700,16 +703,16 @@ export declare function customerStatus(s: OrderStatus): "submitted" | "estimate_
 | `purchasing` | `PURCHASE_RECORDED` | `purchasing` | owner, assistant | `Σ` чеков ≤ лимита или согласие `limit_overrun`; `Σ` чеков ≤ полученных денег; чек или ЭСФ и фото, либо согласие `no_receipt_purchase` | фото чека клиенту |
 | `purchasing` | `PURCHASE_DONE` | `report_due` | owner | все строки закуплены или сняты с согласием `replacement` | `reportDueAt` = +24 ч (цель), крайний +48 ч |
 | `report_due` | `SEND_REPORT` | `report_sent` | owner | отчёт собран из закупок | PDF; `objectionUntil` +3 рабочих дня; `refundDueAt` +5 рабочих дней |
-| `report_sent` | `OBJECTION` | `report_sent` | customer | в пределах срока | тема владельцу |
-| `report_sent` | `REPORT_ACCEPTED` / `REPORT_DEEMED_ACCEPTED` | `report_sent` | customer / system | нет открытых возражений; для deemed — срок истёк | — |
-| `report_sent` | `REMAINDER_SETTLED` | `settled` | owner | отчёт принят; `fundsReceived = receiptsTotal + refunded`; возврат остатка подтверждён или остаток 0 | отчисления в резервы |
+| `report_sent` | `OBJECTION` | `report_sent` | customer | не позже `objectionUntil`; отчёт не принят | тема владельцу |
+| `report_sent` | `REPORT_ACCEPTED` / `REPORT_DEEMED_ACCEPTED` | `report_sent` | customer / system | нет открытых возражений; для deemed — `now` строго позже `objectionUntil` | — |
+| `report_sent` | `REMAINDER_SETTLED` | `settled` | owner | отчёт принят; `fundsReceived = receiptsTotal + refunded`; возврат остатка подтверждён или остаток 0 | отчисление в налоговый резерв (`taxRiskReserve`) |
 | `settled` | `MATERIALS_ACCEPTED` | `assembling` | owner | акт приёма материала заказчика (ГК ст. 661) | — |
 | `assembling` | `ASSEMBLED` | `testing` | owner, assistant | — | фото этапов клиенту |
 | `testing` | `TESTS_PASSED` | `ready` | owner, assistant | протокол 6–8 ч без ошибок, паспорт заполнен | PDF паспорта |
 | `ready` | `DISPATCH` | `delivering` | owner | окно согласовано | — |
-| `delivering` | `HANDOVER` | `handed_over` | owner (+ кнопка клиента) | акт сдачи; `fee_final` подтверждён через QR с чеком | `warrantyUntil` = +12 мес.; резерв гарантии; aftercare 7 и 30 дней; гарантии магазинов −30 дней |
+| `delivering` | `HANDOVER` | `handed_over` | owner (+ кнопка клиента) | акт сдачи; `fee_final` подтверждён через QR с чеком | `warrantyUntil` = +12 мес.; резерв гарантии (`warrantyReserveContribution`); aftercare 7 и 30 дней; гарантии магазинов −30 дней |
 | `handed_over` | `CLOSE` | `closed` | system | сведено; все документы; нет открытых возражений | — |
-| `estimate_sent` (вид `podbor`) | `PODBOR_DELIVERED` | `podbor_delivered` | owner | оферта uz и ru опубликована; `podbor_fee` с чеком через QR | `podborCreditUntil` +30 дней |
+| `estimate_sent` (вид `podbor`) | `PODBOR_DELIVERED` | `podbor_delivered` | owner | оферта uz и ru опубликована; `podbor_fee` с чеком через QR | `set podborCreditUntil` = +`podborCreditDays` суток (без задачи `aftercare`) |
 | любое до `handed_over` | `CANCEL` | `cancelling` | owner (по заявлению клиента) | `settleCancellation` посчитан | `expect_payment` возвратов и `fee_extra`; корректировка дохода (НК ст. 466) — задача бухгалтеру |
 | `cancelling` | `CANCEL_SETTLED` | `cancelled` | owner | все ожидаемые платежи подтверждены или аннулированы с причиной; сверка денег | — |
 
@@ -1073,7 +1076,7 @@ const msg = await stream.finalMessage();
 | `orders.reminders` | каждые 5 мин | заявка без ответа 15 мин (в часы ответа); неоплаченная смета 24 ч; отчёт 24/48 ч; `REPORT_DEEMED_ACCEPTED` по сроку; возврат остатка 5 р. д.; ЭСФ 10 дней; снятие поста «Идей» 48 ч |
 | `warranty.sla` | каждые 15 мин | сроки гарантийных случаев |
 | `warranty.vendor_expiry` | 09:00 | гарантия продавца кончается через 30 дней |
-| `aftercare` | 10:00 | звонки через 7 и 30 дней, профилактика через 6–12 месяцев, срок зачёта «Подбора» |
+| `aftercare` | 10:00 | звонки через 7 и 30 дней, профилактика через 6–12 месяцев; срок зачёта «Подбора» читается из `orders.podbor_credit_until`, отдельной задачи нет (ADR-007) |
 | `threshold.check` | 06:00 и после платежа или чека | `thresholdStatus`, оповещения, снимок раз в сутки |
 | `pdf.render` | по событию | документы uz/ru → `ops.files` |
 | `ideas.embed.check` | понедельник 08:00 (R1) | доступность постов через oEmbed |
@@ -1251,6 +1254,7 @@ const msg = await stream.finalMessage();
 | Node на машине | Оставить 25.9 глобально, проект на 24.21 через pnpm; поставить 24 глобально | Оставить 25.9; проект сам скачивает 24.21 |
 | Пакетный менеджер | pnpm 12.9.1; npm workspaces | pnpm |
 | Округление платы | Вниз до сума; до 1 000 сум | Вниз до сума (ставка не выходит за шкалу) |
+| Округление резервов (гарантийного и налогового) | Вверх; вниз | Вверх: резерв — защитный фонд, недобор хуже лишней сотни сумов (решение интегратора 06.10.2026, ADR-007 п. 4) |
 | Порог резерва 5 % | Доля памяти и SSD ≥ 25 %; ≥ 30 % | 25 %, пересмотр после 10 смет |
 | Срок смешанной сметы | 24 ч; по строкам | 24 ч, если есть хоть одна не мебельная строка |
 | Удержание при отказе после тестов | 85 %; 100 % | 85 % до заключения юриста |

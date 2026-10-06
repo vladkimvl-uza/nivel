@@ -1,7 +1,7 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FEE_SETTINGS, type FeeSettings } from "../fee/index.ts";
 import { bp, type Sum, sum } from "../money/index.ts";
-import { forAll } from "../money/testkit.ts";
 import type { WorkCalendar } from "../order/types.ts";
 import { type CancelInput, type CancelPoint, settleCancellation } from "./index.ts";
 
@@ -223,26 +223,32 @@ describe("settleCancellation: funds and deadline", () => {
   });
 
   it("never refunds more than was received", () => {
-    forAll((g) => {
-      const fundsReceived = g.int(0, 50_000_000);
-      const receiptsTotal = g.int(0, 60_000_000);
-      const shopRefunds = g.int(0, 60_000_000);
-      const documentedLosses = g.int(0, 60_000_000);
-      const i = input("after_purchase_before_assembly", {
-        fundsReceived: S(fundsReceived),
-        receiptsTotal: S(receiptsTotal),
-        shopRefunds: S(shopRefunds),
-        documentedLosses: S(documentedLosses),
-      });
-      const valid = shopRefunds <= receiptsTotal && fundsReceived - receiptsTotal + shopRefunds - documentedLosses >= 0;
-      if (!valid) {
-        expect(() => settle(i)).toThrow(RangeError);
-        return;
-      }
-      const r = settle(i);
-      expect(r.fundsToRefund).toBeGreaterThanOrEqual(0);
-      expect(r.fundsToRefund).toBeLessThanOrEqual(fundsReceived);
-    });
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 50_000_000 }),
+        fc.integer({ min: 0, max: 60_000_000 }),
+        fc.integer({ min: 0, max: 60_000_000 }),
+        fc.integer({ min: 0, max: 60_000_000 }),
+        (fundsReceived, receiptsTotal, shopRefunds, documentedLosses) => {
+          const i = input("after_purchase_before_assembly", {
+            fundsReceived: S(fundsReceived),
+            receiptsTotal: S(receiptsTotal),
+            shopRefunds: S(shopRefunds),
+            documentedLosses: S(documentedLosses),
+          });
+          const valid =
+            shopRefunds <= receiptsTotal && fundsReceived - receiptsTotal + shopRefunds - documentedLosses >= 0;
+          if (!valid) {
+            expect(() => settle(i)).toThrow(RangeError);
+            return;
+          }
+          const r = settle(i);
+          expect(r.fundsToRefund).toBeGreaterThanOrEqual(0);
+          expect(r.fundsToRefund).toBeLessThanOrEqual(fundsReceived);
+        },
+      ),
+      { numRuns: 500 },
+    );
   });
 
   it("refuses stage shares that earn more than the fee", () => {
@@ -285,32 +291,46 @@ describe("settleCancellation: properties", () => {
   ];
 
   it("earned <= fee; refund and invoice are exclusive; paid - refund + invoice = earned", () => {
-    forAll((g) => {
-      const fee = S(g.int(0, 10_000_000));
-      const feePaid = S(g.int(0, fee));
-      const i = input(g.pick(points), {
-        fee,
-        feePaid,
-        assemblyDoneBp: bp(g.int(0, 10_000)),
-        fundsReceived: S(50_000_000),
-        receiptsTotal: S(g.int(0, 50_000_000)),
-      });
-      const r = settle(i);
-      expect(r.feeEarned).toBeLessThanOrEqual(fee);
-      expect(r.feeToRefund * r.feeToInvoice).toBe(0);
-      expect(feePaid - r.feeToRefund + r.feeToInvoice).toBe(r.feeEarned);
-      expect(r.fundsToRefund).toBe(50_000_000 - i.receiptsTotal);
-    });
+    fc.assert(
+      fc.property(
+        fc
+          .integer({ min: 0, max: 10_000_000 })
+          .chain((fee) => fc.tuple(fc.constant(fee), fc.integer({ min: 0, max: fee }))),
+        fc.constantFrom(...points),
+        fc.integer({ min: 0, max: 10_000 }),
+        fc.integer({ min: 0, max: 50_000_000 }),
+        ([feeN, feePaidN], point, doneBp, receiptsTotal) => {
+          const fee = S(feeN);
+          const feePaid = S(feePaidN);
+          const i = input(point, {
+            fee,
+            feePaid,
+            assemblyDoneBp: bp(doneBp),
+            fundsReceived: S(50_000_000),
+            receiptsTotal: S(receiptsTotal),
+          });
+          const r = settle(i);
+          expect(r.feeEarned).toBeLessThanOrEqual(fee);
+          expect(r.feeToRefund * r.feeToInvoice).toBe(0);
+          expect(feePaid - r.feeToRefund + r.feeToInvoice).toBe(r.feeEarned);
+          expect(r.fundsToRefund).toBe(50_000_000 - i.receiptsTotal);
+        },
+      ),
+      { numRuns: 500 },
+    );
   });
 
   it("earned fee never decreases along the order lifecycle", () => {
-    forAll((g) => {
-      const fee = S(g.int(0, 100_000_000));
-      const done = bp(g.int(0, 10_000));
-      const earned = points.map((p) => settle(input(p, { fee, feePaid: S(0), assemblyDoneBp: done })).feeEarned);
-      for (let k = 1; k < earned.length; k++) {
-        expect(earned[k] as number).toBeGreaterThanOrEqual(earned[k - 1] as number);
-      }
-    });
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 100_000_000 }), fc.integer({ min: 0, max: 10_000 }), (feeN, doneBp) => {
+        const fee = S(feeN);
+        const done = bp(doneBp);
+        const earned = points.map((p) => settle(input(p, { fee, feePaid: S(0), assemblyDoneBp: done })).feeEarned);
+        for (let k = 1; k < earned.length; k++) {
+          expect(earned[k] as number).toBeGreaterThanOrEqual(earned[k - 1] as number);
+        }
+      }),
+      { numRuns: 500 },
+    );
   });
 });
