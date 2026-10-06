@@ -1,7 +1,7 @@
 // Repositories of the ai schema: conversations, the append-only message journal, daily counters (ARCHITECTURE 3.3, 8).
 import { asc, eq, sql } from "drizzle-orm";
 import { conversations, messages, usageDaily } from "../schema/ai.ts";
-import { guarded } from "./errors.ts";
+import { expectUpdated, guarded } from "./errors.ts";
 import type { Executor } from "./executor.ts";
 
 export type ConversationInsert = Omit<
@@ -45,7 +45,7 @@ export async function addConversationUsage(
   id: string,
   u: { costMicroUsd: number; filterHits?: number; outcome?: (typeof conversations.$inferSelect)["outcome"] },
 ): Promise<void> {
-  await guarded(() =>
+  const rows = await guarded(() =>
     db
       .update(conversations)
       .set({
@@ -53,11 +53,13 @@ export async function addConversationUsage(
         filterHits: sql`${conversations.filterHits} + ${u.filterHits ?? 0}`,
         ...(u.outcome ? { outcome: u.outcome } : {}),
       })
-      .where(eq(conversations.id, id)),
+      .where(eq(conversations.id, id))
+      .returning({ id: conversations.id }),
   );
+  expectUpdated(rows, "conversation", id);
 }
 
-/** Adds to the counters of a day and a model (kept for 12 months). */
+/** Adds to the counters of a day and a model (kept for 12 months); the token counts are added key by key. */
 export async function addDailyUsage(
   db: Executor,
   u: { day: string; model: string; costMicroUsd: number; conversations?: number; tokens?: Record<string, number> },
@@ -77,6 +79,13 @@ export async function addDailyUsage(
         set: {
           costMicroUsd: sql`${usageDaily.costMicroUsd} + ${u.costMicroUsd}`,
           conversations: sql`${usageDaily.conversations} + ${u.conversations ?? 0}`,
+          ...(u.tokens
+            ? {
+                tokens: sql`(select coalesce(jsonb_object_agg(t.k, coalesce((${usageDaily.tokens} ->> t.k)::numeric, 0)
+                    + coalesce((${JSON.stringify(u.tokens)}::jsonb ->> t.k)::numeric, 0)), '{}'::jsonb)
+                  from (select jsonb_object_keys(coalesce(${usageDaily.tokens}, '{}'::jsonb) || ${JSON.stringify(u.tokens)}::jsonb) as k) t)`,
+              }
+            : {}),
         },
       }),
   );

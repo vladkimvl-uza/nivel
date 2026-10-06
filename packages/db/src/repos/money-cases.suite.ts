@@ -369,3 +369,107 @@ describe("reconciliation when an order closes or is cancelled", () => {
     }
   });
 });
+
+describe("reversing rows cannot repeat or exceed what they correct", () => {
+  const reverse = (c: pg.Client, orderId: string, original: string, amount: number, extra = "") =>
+    pgError(
+      c,
+      `insert into sales.payments (order_id, kind, direction, method, amount_sum, status, reversal_of, confirmed_by, confirmed_at)
+       values ($1, 'purchase_funds', 'in', 'bank_transfer_ip', $3, 'confirmed', $2, 'owner', now()) ${extra}`,
+      [orderId, original, amount],
+    );
+  const reverseOk = (c: pg.Client, orderId: string, original: string, amount: number) =>
+    c.query(
+      `insert into sales.payments (order_id, kind, direction, method, amount_sum, status, reversal_of, confirmed_by, confirmed_at)
+       values ($1, 'purchase_funds', 'in', 'bank_transfer_ip', $3, 'confirmed', $2, 'owner', now())`,
+      [orderId, original, amount],
+    );
+
+  it("refuses a second full reversal of the same payment", async () => {
+    const { orderId } = await createOrder(migrator);
+    const p = await insertPayment(migrator, { orderId, kind: "purchase_funds", amount: 2_000_000, status: "confirmed" });
+    await reverseOk(migrator, orderId, p, -2_000_000);
+    expect((await reverse(migrator, orderId, p, -2_000_000)).message).toMatch(/invalid_reversal/);
+    const net = await one<{ s: string }>(migrator, "select sum(amount_sum)::text as s from sales.payments where order_id = $1", [
+      orderId,
+    ]);
+    expect(net.s).toBe("0");
+  });
+
+  it("allows partial reversals up to the original amount, not a sum more", async () => {
+    const { orderId } = await createOrder(migrator);
+    const p = await insertPayment(migrator, { orderId, kind: "purchase_funds", amount: 2_000_000, status: "confirmed" });
+    await reverseOk(migrator, orderId, p, -500_000);
+    await reverseOk(migrator, orderId, p, -1_000_000);
+    expect((await reverse(migrator, orderId, p, -500_001)).message).toMatch(/invalid_reversal/);
+    await reverseOk(migrator, orderId, p, -500_000);
+  });
+
+  it("refuses a reversal of an unconfirmed payment, of a reversal, or of a payment of another order", async () => {
+    const a = await createOrder(migrator);
+    const b = await createOrder(migrator);
+    const expected = await insertPayment(migrator, { orderId: a.orderId, kind: "purchase_funds", amount: 1_000_000 });
+    expect((await reverse(migrator, a.orderId, expected, -1_000_000)).message).toMatch(/invalid_reversal/);
+    const confirmed = await insertPayment(migrator, {
+      orderId: a.orderId,
+      kind: "purchase_funds",
+      amount: 1_000_000,
+      status: "confirmed",
+    });
+    expect((await reverse(migrator, b.orderId, confirmed, -1_000_000)).message).toMatch(/invalid_reversal/);
+    await reverseOk(migrator, a.orderId, confirmed, -400_000);
+    const rev = await one<{ id: string }>(
+      migrator,
+      "select id from sales.payments where reversal_of = $1",
+      [confirmed],
+    );
+    expect((await reverse(migrator, a.orderId, rev.id, -100_000)).message).toMatch(/invalid_reversal/);
+  });
+
+  it("refuses a reversal that changes the kind, the direction or the method", async () => {
+    const { orderId } = await createOrder(migrator);
+    const p = await insertPayment(migrator, { orderId, kind: "fee_advance", amount: 450_000, status: "confirmed" });
+    const e = await pgError(
+      migrator,
+      `insert into sales.payments (order_id, kind, direction, method, amount_sum, status, reversal_of, confirmed_by, confirmed_at)
+       values ($1, 'purchase_funds', 'in', 'bank_transfer_ip', -450000, 'confirmed', $2, 'owner', now())`,
+      [orderId, p],
+    );
+    expect(e.message).toMatch(/invalid_reversal/);
+  });
+});
+
+describe("returns to the shop cannot repeat or exceed the purchase", () => {
+  it("refuses returns above the purchase in one row or in several", async () => {
+    const o = await createOrder(migrator, { purchaseLimit: 5_000_000 });
+    await receiveFunds(migrator, o.orderId, 5_000_000);
+    const bought = await insertPurchase(migrator, { orderId: o.orderId, vendorId, amount: 1_000_000 });
+    await expect(insertPurchase(migrator, { orderId: o.orderId, vendorId, amount: -1_000_001, refundOf: bought })).rejects.toThrow(
+      /invalid_refund/,
+    );
+    await insertPurchase(migrator, { orderId: o.orderId, vendorId, amount: -600_000, refundOf: bought });
+    await expect(insertPurchase(migrator, { orderId: o.orderId, vendorId, amount: -400_001, refundOf: bought })).rejects.toThrow(
+      /invalid_refund/,
+    );
+    await insertPurchase(migrator, { orderId: o.orderId, vendorId, amount: -400_000, refundOf: bought });
+  });
+
+  it("refuses a return of another order, of another shop, or of a return", async () => {
+    const a = await createOrder(migrator, { purchaseLimit: 5_000_000 });
+    const b = await createOrder(migrator, { purchaseLimit: 5_000_000 });
+    await receiveFunds(migrator, a.orderId, 5_000_000);
+    await receiveFunds(migrator, b.orderId, 5_000_000);
+    const bought = await insertPurchase(migrator, { orderId: a.orderId, vendorId, amount: 1_000_000 });
+    await expect(insertPurchase(migrator, { orderId: b.orderId, vendorId, amount: -100, refundOf: bought })).rejects.toThrow(
+      /invalid_refund/,
+    );
+    const other = await createVendor(migrator);
+    await expect(insertPurchase(migrator, { orderId: a.orderId, vendorId: other, amount: -100, refundOf: bought })).rejects.toThrow(
+      /invalid_refund/,
+    );
+    const ret = await insertPurchase(migrator, { orderId: a.orderId, vendorId, amount: -100, refundOf: bought });
+    await expect(insertPurchase(migrator, { orderId: a.orderId, vendorId, amount: -10, refundOf: ret })).rejects.toThrow(
+      /invalid_refund/,
+    );
+  });
+});

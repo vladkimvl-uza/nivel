@@ -6,3 +6,4 @@ import "./pricing.suite.ts";
 import "./content.suite.ts";
 import "./ai-bot.suite.ts";
 import "./roles-repos.suite.ts";
+import "./repos-edge.suite.ts";

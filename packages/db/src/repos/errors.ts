@@ -14,6 +14,8 @@ export type DbRuleCode =
   | "no_current_quote"
   | "actor_not_allowed"
   | "change_not_allowed"
+  | "invalid_refund"
+  | "invalid_reversal"
   | "counters_only_grow"
   | "number_not_allowed"
   | "consent_mismatch"
@@ -42,6 +44,8 @@ const KEYED: ReadonlySet<string> = new Set<DbRuleCode>([
   "no_current_quote",
   "actor_not_allowed",
   "change_not_allowed",
+  "invalid_refund",
+  "invalid_reversal",
   "counters_only_grow",
   "number_not_allowed",
   "consent_mismatch",
@@ -106,6 +110,11 @@ export function toRuleError(e: unknown): DbRuleError | null {
     default:
       return null;
   }
+}
+
+/** An UPDATE that matched no row means a wrong id: it must not look like a success. */
+export function expectUpdated(rows: readonly unknown[], what: string, id: string): void {
+  if (rows.length === 0) throw new Error(`${what} ${id} not found`);
 }
 
 /** Runs `fn` and rethrows a database rule violation as DbRuleError; other errors pass through untouched. */

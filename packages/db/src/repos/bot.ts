@@ -39,7 +39,7 @@ export async function purgeProcessedUpdates(db: Executor, days = 7, now: Date = 
   return rows.length;
 }
 
-/** Subscribes (again) to a topic; the consent row proves the permission. */
+/** Subscribes (again) to a topic; the consent row proves the permission and is kept when none is given again. */
 export async function subscribe(
   db: Executor,
   telegramUserId: number,
@@ -52,7 +52,10 @@ export async function subscribe(
       .values({ telegramUserId, topic, consentId: consentId ?? null })
       .onConflictDoUpdate({
         target: [subscriptions.telegramUserId, subscriptions.topic],
-        set: { unsubscribedAt: null, consentId: consentId ?? null },
+        set: {
+          unsubscribedAt: null,
+          consentId: sql`coalesce(${consentId ?? null}::uuid, ${subscriptions.consentId})`,
+        },
       }),
   );
 }

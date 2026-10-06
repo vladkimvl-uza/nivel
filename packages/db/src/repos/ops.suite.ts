@@ -132,7 +132,7 @@ describe("outbox", () => {
     const claimed = await db.transaction(async (tx) => {
       const batch = await claimOutbox(tx, 10);
       // A second relay on another connection sees nothing of the locked rows (SKIP LOCKED).
-      const other = await claimOutbox(db, 10);
+      const other = await db.transaction((tx2) => claimOutbox(tx2, 10));
       return { batch, other };
     });
     expect(claimed.batch.map((r) => r.id)).toEqual([high.id, low.id]);
@@ -142,7 +142,7 @@ describe("outbox", () => {
     await markOutboxSent(db, high.id);
     expect(await markOutboxFailed(db, low.id, "429", { maxAttempts: 2, retryAfterMs: 1000 })).toBe("pending");
     expect(await markOutboxFailed(db, low.id, "429", { maxAttempts: 2, retryAfterMs: 1000 })).toBe("failed");
-    const left = await claimOutbox(db, 10, new Date(Date.now() + 7_200_000));
+    const left = await db.transaction((tx2) => claimOutbox(tx2, 10, new Date(Date.now() + 7_200_000)));
     expect(left.map((r) => r.id)).toEqual([later.id]);
     await expect(markOutboxFailed(db, "00000000-0000-7000-8000-000000000000", "x")).rejects.toThrow(/not found/);
   });

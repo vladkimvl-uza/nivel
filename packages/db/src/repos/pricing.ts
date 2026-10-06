@@ -1,7 +1,7 @@
 // Repositories of the pricing schema: vendors, offers, observations, market prices, rates (ARCHITECTURE 3.3, 4.5).
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import { fxRates, marketPrices, offers, priceObservations, skuMappings, vendors } from "../schema/pricing.ts";
-import { guarded } from "./errors.ts";
+import { expectUpdated, guarded } from "./errors.ts";
 import type { Executor } from "./executor.ts";
 
 export type VendorInsert = Omit<typeof vendors.$inferInsert, "id" | "createdAt">;
@@ -146,15 +146,25 @@ export async function excludeObservation(
   id: string,
   reason: NonNullable<ObservationRow["excludeReason"]>,
 ): Promise<void> {
-  await guarded(() =>
-    db.update(priceObservations).set({ excluded: true, excludeReason: reason }).where(eq(priceObservations.id, id)),
+  const rows = await guarded(() =>
+    db
+      .update(priceObservations)
+      .set({ excluded: true, excludeReason: reason })
+      .where(eq(priceObservations.id, id))
+      .returning({ id: priceObservations.id }),
   );
+  expectUpdated(rows, "observation", id);
 }
 
 export async function restoreObservation(db: Executor, id: string): Promise<void> {
-  await guarded(() =>
-    db.update(priceObservations).set({ excluded: false, excludeReason: null }).where(eq(priceObservations.id, id)),
+  const rows = await guarded(() =>
+    db
+      .update(priceObservations)
+      .set({ excluded: false, excludeReason: null })
+      .where(eq(priceObservations.id, id))
+      .returning({ id: priceObservations.id }),
   );
+  expectUpdated(rows, "observation", id);
 }
 
 /** Observations of a position, newest first, since a moment; excluded ones only on request. */

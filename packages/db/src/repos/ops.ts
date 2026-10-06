@@ -13,8 +13,8 @@ import {
   settings,
   thresholdSnapshots,
 } from "../schema/ops.ts";
-import { DbRuleError } from "./errors.ts";
-import type { Executor } from "./executor.ts";
+import { DbRuleError, expectUpdated } from "./errors.ts";
+import type { Executor, Tx } from "./executor.ts";
 
 export type SettingRow = typeof settings.$inferSelect;
 export type AuditInput = Omit<typeof auditLog.$inferInsert, "id" | "at"> & { at?: Date };
@@ -24,17 +24,17 @@ export type FileInsert = Omit<typeof files.$inferInsert, "id" | "createdAt">;
 export type AdminUserRow = typeof adminUsers.$inferSelect;
 
 // ---- settings ---------------------------------------------------------------------------------------------------
-export async function getSetting<T = unknown>(
-  db: Executor,
-  key: string,
-): Promise<{ value: T; version: number } | null> {
+/** The value is jsonb: the caller checks it against the schema of its key (no cast is made here). */
+export async function getSetting(db: Executor, key: string): Promise<{ value: unknown; version: number } | null> {
   const [row] = await db.select().from(settings).where(eq(settings.key, key));
-  return row ? { value: row.value as T, version: row.version } : null;
+  return row ? { value: row.value, version: row.version } : null;
 }
 
 /**
  * Writes a setting and journals the change in ops.audit_log in one transaction. With `expectedVersion` the change is
- * refused (stale_status) when somebody else changed the setting meanwhile; without it the value is simply set.
+ * refused (stale_status) when somebody else changed the setting meanwhile (0 means "the key does not exist yet");
+ * the version is compared in the UPDATE itself, so two writers with the same version cannot both win. Without it the
+ * value is simply set.
  */
 export async function setSetting(
   db: Executor,
@@ -43,28 +43,34 @@ export async function setSetting(
   by: string,
   opts: { expectedVersion?: number; ipHash?: string } = {},
 ): Promise<{ version: number }> {
+  const expected = opts.expectedVersion;
+  const stale = (actual: number | string) =>
+    new DbRuleError("stale_status", `stale_status: setting ${key} is at version ${actual}, expected ${expected}`);
   return db.transaction(async (tx) => {
-    const before = await getSetting(tx, key);
-    if (opts.expectedVersion !== undefined && (before?.version ?? 0) !== opts.expectedVersion) {
-      throw new DbRuleError(
-        "stale_status",
-        `stale_status: setting ${key} is at version ${before?.version ?? 0}, expected ${opts.expectedVersion}`,
-      );
-    }
+    // The row is locked until the end of the transaction, so "before" is what this change replaces.
+    const [current] = await tx.select().from(settings).where(eq(settings.key, key)).for("update");
+    const before = current ? { value: current.value, version: current.version } : null;
+    if (expected !== undefined && (before?.version ?? 0) !== expected) throw stale(before?.version ?? 0);
     let version: number;
     if (before) {
       const [row] = await tx
         .update(settings)
         .set({ value, updatedBy: by })
-        .where(eq(settings.key, key))
+        .where(
+          expected === undefined ? eq(settings.key, key) : and(eq(settings.key, key), eq(settings.version, expected)),
+        )
         .returning({ version: settings.version });
-      version = row?.version ?? before.version + 1;
+      if (!row) throw stale("another");
+      version = row.version;
     } else {
+      // Two first writers: the second one finds the key taken and loses.
       const [row] = await tx
         .insert(settings)
         .values({ key, value, updatedBy: by })
+        .onConflictDoNothing()
         .returning({ version: settings.version });
-      version = row?.version ?? 1;
+      if (!row) throw stale("another");
+      version = row.version;
     }
     await appendAudit(tx, {
       actor: by,
@@ -126,8 +132,8 @@ export async function enqueueOutbox(db: Executor, input: OutboxInput): Promise<{
   return { id: existing.id, duplicate: true };
 }
 
-/** The next batch for the relay. Call inside a transaction: rows stay locked (SKIP LOCKED) until it ends. */
-export async function claimOutbox(db: Executor, limit: number, now: Date = new Date()): Promise<OutboxRow[]> {
+/** The next batch for the relay. Needs a transaction: the rows stay locked (SKIP LOCKED) until it ends. */
+export async function claimOutbox(db: Tx, limit: number, now: Date = new Date()): Promise<OutboxRow[]> {
   return db
     .select()
     .from(outbox)
@@ -138,7 +144,12 @@ export async function claimOutbox(db: Executor, limit: number, now: Date = new D
 }
 
 export async function markOutboxSent(db: Executor, id: string, now: Date = new Date()): Promise<void> {
-  await db.update(outbox).set({ status: "sent", sentAt: now, lastError: null }).where(eq(outbox.id, id));
+  const rows = await db
+    .update(outbox)
+    .set({ status: "sent", sentAt: now, lastError: null })
+    .where(eq(outbox.id, id))
+    .returning({ id: outbox.id });
+  expectUpdated(rows, "outbox row", id);
 }
 
 /** A failed attempt: retried after `retryAfterMs`, `failed` for good after `maxAttempts` attempts. */

@@ -571,7 +571,7 @@ describe("payments", () => {
       amountSum: 2_000_000,
     });
     const confirmed = await confirmPayment(owner, bad, { by: "o", bankDocNo: "PP-1" });
-    await reversePayment(owner, confirmed, { by: "o", bankDocNo: "PP-2" });
+    await reversePayment(owner, confirmed.id, { by: "o", bankDocNo: "PP-2" });
     expect((await orderMoney(owner, o.orderId)).fundsReceived).toBe(0);
     const rows = await listPayments(owner, o.orderId);
     expect(rows.map((r) => [r.status, r.amountSum])).toEqual([

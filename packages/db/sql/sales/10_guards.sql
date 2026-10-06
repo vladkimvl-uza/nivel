@@ -43,6 +43,38 @@ CREATE TRIGGER payments_guard BEFORE UPDATE OR DELETE ON sales.payments
 CREATE TRIGGER payments_no_truncate BEFORE TRUNCATE ON sales.payments
   FOR EACH STATEMENT EXECUTE FUNCTION ops.forbid_mutation();
 --> statement-breakpoint
+-- A reversing row corrects one confirmed payment of the same order, kind, direction and method, and all the
+-- reversals of a payment together never exceed it: a repeated request cannot write the correction twice.
+-- (A reversal with the wrong sign is left to payments_amount_chk.)
+CREATE FUNCTION sales.guard_payment_reversal() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_orig sales.payments%ROWTYPE;
+  v_reversed numeric;
+BEGIN
+  IF NEW.reversal_of IS NULL OR NEW.amount_sum >= 0 THEN
+    RETURN NEW;
+  END IF;
+  -- The lock serialises two requests that reverse the same payment.
+  SELECT * INTO v_orig FROM sales.payments p WHERE p.id = NEW.reversal_of FOR UPDATE;
+  IF NOT FOUND OR v_orig.order_id <> NEW.order_id OR v_orig.status <> 'confirmed' OR v_orig.reversal_of IS NOT NULL
+     OR v_orig.kind <> NEW.kind OR v_orig.direction <> NEW.direction OR v_orig.method <> NEW.method THEN
+    RAISE EXCEPTION 'invalid_reversal: payment % is not a confirmed payment of order % with the same kind, direction and method',
+      NEW.reversal_of, NEW.order_id USING ERRCODE = 'check_violation';
+  END IF;
+  SELECT coalesce(-sum(p.amount_sum), 0) INTO v_reversed
+    FROM sales.payments p WHERE p.reversal_of = v_orig.id AND p.status <> 'void';
+  IF v_reversed - NEW.amount_sum > v_orig.amount_sum THEN
+    RAISE EXCEPTION 'invalid_reversal: reversals % would exceed the payment %', v_reversed - NEW.amount_sum, v_orig.amount_sum
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER payments_reversal BEFORE INSERT ON sales.payments
+  FOR EACH ROW EXECUTE FUNCTION sales.guard_payment_reversal();
+--> statement-breakpoint
 -- ---- purchases: limit, funds, receipts (ARCHITECTURE 3.4) ---------------------------------------------------
 CREATE FUNCTION sales.guard_purchase() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -50,12 +82,30 @@ DECLARE
   v_limit bigint;
   v_total numeric;
   v_funds numeric;
+  v_orig sales.purchases%ROWTYPE;
+  v_returned numeric;
 BEGIN
   IF TG_OP = 'UPDATE' AND NEW.order_id <> OLD.order_id THEN
     RAISE EXCEPTION 'immutable: a purchase never moves to another order' USING ERRCODE = 'check_violation';
   END IF;
   -- Serialise purchases of one order: the sums below must not race.
   PERFORM 1 FROM sales.orders o WHERE o.id = NEW.order_id FOR UPDATE;
+
+  -- A return to the shop reduces one purchase of the same order and shop, and all returns of it together stay within
+  -- it: a repeated request cannot give the limit and the funds back twice. (The wrong sign is purchases_amount_chk's.)
+  IF TG_OP = 'INSERT' AND NEW.refund_of IS NOT NULL AND NEW.amount_sum < 0 THEN
+    SELECT * INTO v_orig FROM sales.purchases p WHERE p.id = NEW.refund_of;
+    IF NOT FOUND OR v_orig.order_id <> NEW.order_id OR v_orig.refund_of IS NOT NULL
+       OR v_orig.vendor_id IS DISTINCT FROM NEW.vendor_id THEN
+      RAISE EXCEPTION 'invalid_refund: purchase % is not a purchase of order % in the same shop', NEW.refund_of, NEW.order_id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    SELECT coalesce(-sum(p.amount_sum), 0) INTO v_returned FROM sales.purchases p WHERE p.refund_of = v_orig.id;
+    IF v_returned - NEW.amount_sum > v_orig.amount_sum THEN
+      RAISE EXCEPTION 'invalid_refund: returns % would exceed the purchase %', v_returned - NEW.amount_sum, v_orig.amount_sum
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
 
   SELECT q.purchase_limit INTO v_limit
     FROM sales.orders o JOIN sales.quotes q ON q.id = o.current_quote_id

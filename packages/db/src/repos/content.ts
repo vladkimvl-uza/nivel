@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { ideaPosts, legalDocuments, pages, policyTexts } from "../schema/content.ts";
-import { guarded } from "./errors.ts";
+import { expectUpdated, guarded } from "./errors.ts";
 import type { Executor } from "./executor.ts";
 
 export type PolicyTopic = (typeof policyTexts.$inferSelect)["topic"];
@@ -124,9 +124,14 @@ export async function createLegalDocument(
 
 /** Publishes a version: from now on it never changes, consents refer to its hash. */
 export async function publishLegalDocument(db: Executor, id: string, effectiveFrom: string): Promise<void> {
-  await guarded(() =>
-    db.update(legalDocuments).set({ status: "published", effectiveFrom }).where(eq(legalDocuments.id, id)),
+  const rows = await guarded(() =>
+    db
+      .update(legalDocuments)
+      .set({ status: "published", effectiveFrom })
+      .where(eq(legalDocuments.id, id))
+      .returning({ id: legalDocuments.id }),
   );
+  expectUpdated(rows, "legal document", id);
 }
 
 /** The newest published version of a document in a language, or null (the offer is then still a stub). */
@@ -151,7 +156,7 @@ export async function listPublishedIdeas(db: Executor, o: { includeDemo?: boolea
 
 /** The author withdrew the permission: the post is hidden now and must be gone within 48 hours. */
 export async function revokeIdeaPermission(db: Executor, id: string, now: Date = new Date()): Promise<void> {
-  await guarded(() =>
+  const rows = await guarded(() =>
     db
       .update(ideaPosts)
       .set({
@@ -160,6 +165,8 @@ export async function revokeIdeaPermission(db: Executor, id: string, now: Date =
         takedownDue: new Date(now.getTime() + 48 * 3_600_000),
         status: "takedown",
       })
-      .where(eq(ideaPosts.id, id)),
+      .where(eq(ideaPosts.id, id))
+      .returning({ id: ideaPosts.id }),
   );
+  expectUpdated(rows, "idea post", id);
 }

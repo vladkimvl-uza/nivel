@@ -16,7 +16,7 @@ import {
   quotes,
   reserveLedger,
 } from "../schema/sales.ts";
-import { guarded } from "./errors.ts";
+import { expectUpdated, guarded } from "./errors.ts";
 import type { Executor } from "./executor.ts";
 import { consentGranted, nextNumber } from "./ops.ts";
 
@@ -105,12 +105,14 @@ export async function setLeadStatus(
   status: "in_review" | "converted" | "rejected" | "spam",
   rejectReason?: string,
 ): Promise<void> {
-  await guarded(() =>
+  const rows = await guarded(() =>
     db
       .update(leads)
       .set({ status, rejectReason: rejectReason ?? null })
-      .where(eq(leads.id, id)),
+      .where(eq(leads.id, id))
+      .returning({ id: leads.id }),
   );
+  expectUpdated(rows, "lead", id);
 }
 
 // ---- orders -----------------------------------------------------------------------------------------------------
@@ -209,7 +211,7 @@ export async function markQuoteSent(
   o: { checkedBy: string; at?: Date; validUntil?: Date; watermarkDraft?: boolean },
 ): Promise<void> {
   const at = o.at ?? new Date();
-  await guarded(() =>
+  const rows = await guarded(() =>
     db
       .update(quotes)
       .set({
@@ -220,8 +222,10 @@ export async function markQuoteSent(
         validUntil: o.validUntil ?? null,
         ...(o.watermarkDraft !== undefined ? { watermarkDraft: o.watermarkDraft } : {}),
       })
-      .where(eq(quotes.id, id)),
+      .where(eq(quotes.id, id))
+      .returning({ id: quotes.id }),
   );
+  expectUpdated(rows, "quote", id);
 }
 
 export async function markQuoteAccepted(
@@ -230,13 +234,21 @@ export async function markQuoteAccepted(
   acceptance: Record<string, unknown>,
   at: Date = new Date(),
 ): Promise<void> {
-  await guarded(() =>
-    db.update(quotes).set({ status: "accepted", acceptedAt: at, acceptance }).where(eq(quotes.id, id)),
+  const rows = await guarded(() =>
+    db
+      .update(quotes)
+      .set({ status: "accepted", acceptedAt: at, acceptance })
+      .where(eq(quotes.id, id))
+      .returning({ id: quotes.id }),
   );
+  expectUpdated(rows, "quote", id);
 }
 
 export async function setQuoteStatus(db: Executor, id: string, status: "expired" | "superseded"): Promise<void> {
-  await guarded(() => db.update(quotes).set({ status }).where(eq(quotes.id, id)));
+  const rows = await guarded(() =>
+    db.update(quotes).set({ status }).where(eq(quotes.id, id)).returning({ id: quotes.id }),
+  );
+  expectUpdated(rows, "quote", id);
 }
 
 // ---- payments ---------------------------------------------------------------------------------------------------
@@ -291,12 +303,25 @@ export async function confirmPayment(db: Executor, id: string, c: ConfirmInput):
 }
 
 export async function voidPayment(db: Executor, id: string): Promise<void> {
-  await guarded(() => db.update(payments).set({ status: "void" }).where(eq(payments.id, id)));
+  const rows = await guarded(() =>
+    db.update(payments).set({ status: "void" }).where(eq(payments.id, id)).returning({ id: payments.id }),
+  );
+  expectUpdated(rows, "payment", id);
 }
 
-/** A confirmed payment is corrected with a confirmed reversing row of the negative amount. */
-export async function reversePayment(db: Executor, original: PaymentRow, c: ConfirmInput): Promise<string> {
+/**
+ * A confirmed payment is corrected with a confirmed reversing row of the negative amount: the whole payment, or the
+ * part `amountSum` (positive). The original is read here, never taken from the caller; the database refuses a
+ * reversal of an unconfirmed payment and reversals that together exceed the payment (invalid_reversal).
+ */
+export async function reversePayment(
+  db: Executor,
+  originalId: string,
+  c: ConfirmInput & { amountSum?: number },
+): Promise<string> {
   const at = c.at ?? new Date();
+  const [original] = await db.select().from(payments).where(eq(payments.id, originalId));
+  if (!original) throw new Error(`payment ${originalId} not found`);
   const [row] = await guarded(() =>
     db
       .insert(payments)
@@ -305,7 +330,7 @@ export async function reversePayment(db: Executor, original: PaymentRow, c: Conf
         kind: original.kind,
         direction: original.direction,
         method: original.method,
-        amountSum: -original.amountSum,
+        amountSum: -(c.amountSum ?? original.amountSum),
         status: "confirmed",
         reversalOf: original.id,
         confirmedBy: c.by,
