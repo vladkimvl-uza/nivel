@@ -359,7 +359,7 @@ function cleanWebp(input: Buffer): SanitizeResult {
 /** The part of sharp this file uses; `import sharp from "sharp"` fits it. */
 export interface SharpPipeline {
   rotate(): SharpPipeline;
-  flatten(options: { background: string }): SharpPipeline;
+  flatten(options: { background: { r: number; g: number; b: number } }): SharpPipeline;
   jpeg(options: { quality: number }): SharpPipeline;
   toBuffer(options: { resolveWithObject: true }): Promise<{ data: Buffer; info: { format: string } }>;
 }
@@ -407,7 +407,7 @@ export function createSharpSanitizer(sharp: SharpFactory): FallbackSanitizer {
     try {
       const { data, info } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
         .rotate()
-        .flatten({ background: "#ffffff" })
+        .flatten({ background: { r: 255, g: 255, b: 255 } })
         .jpeg({ quality: JPEG_QUALITY })
         .toBuffer({ resolveWithObject: true });
       if (info.format !== "jpeg") return fail(UNSUPPORTED);
