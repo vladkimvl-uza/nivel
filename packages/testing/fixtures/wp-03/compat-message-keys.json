@@ -1,0 +1,308 @@
+[
+  {
+    "key": "compat.missing_data",
+    "rule": "*",
+    "params": ["field", "category"],
+    "ru": "Для проверки не хватает характеристики «{field}»: уточните её у продавца или проверьте вручную."
+  },
+  {
+    "key": "compat.socket_mismatch",
+    "rule": "CPU_MB_SOCKET",
+    "params": ["cpuSocket", "boardSocket"],
+    "ru": "Сокет процессора ({cpuSocket}) не совпадает с сокетом платы ({boardSocket})."
+  },
+  {
+    "key": "compat.chipset_unsupported",
+    "rule": "CPU_MB_CHIPSET",
+    "params": ["chipset", "supported"],
+    "ru": "Процессор не работает с чипсетом платы {chipset}. Подходят чипсеты: {supported}."
+  },
+  {
+    "key": "compat.bios_update_flashback",
+    "rule": "CPU_MB_BIOS",
+    "params": ["chipset", "minBios", "shippedBios"],
+    "ru": "Для процессора нужна прошивка BIOS не ниже {minBios}, на плате {shippedBios} (чипсет {chipset}). Плату можно обновить без процессора кнопкой BIOS Flashback."
+  },
+  {
+    "key": "compat.bios_update_seller",
+    "rule": "CPU_MB_BIOS",
+    "params": ["chipset", "minBios", "shippedBios"],
+    "ru": "Для процессора нужна прошивка BIOS не ниже {minBios}, на плате {shippedBios} (чипсет {chipset}). Попросите продавца обновить BIOS до сборки."
+  },
+  {
+    "key": "compat.no_video_output",
+    "rule": "CPU_NO_VIDEO",
+    "params": [],
+    "ru": "У процессора нет встроенной графики, а видеокарты в сборке нет: изображения не будет."
+  },
+  {
+    "key": "compat.mem_type_board",
+    "rule": "MEM_TYPE",
+    "params": ["ramType", "boardType"],
+    "ru": "Память {ramType} не подходит к плате: плата работает с {boardType}."
+  },
+  {
+    "key": "compat.mem_type_cpu",
+    "rule": "MEM_TYPE",
+    "params": ["ramType", "cpuTypes"],
+    "ru": "Процессор не работает с памятью {ramType}: он поддерживает {cpuTypes}."
+  },
+  {
+    "key": "compat.mem_slots_exceeded",
+    "rule": "MEM_SLOTS",
+    "params": ["modules", "slots"],
+    "ru": "Модулей памяти {modules}, слотов на плате {slots}."
+  },
+  {
+    "key": "compat.mem_capacity_exceeded",
+    "rule": "MEM_CAPACITY",
+    "params": ["totalGb", "maxGb"],
+    "ru": "Объём памяти {totalGb} ГБ выше максимума платы — {maxGb} ГБ."
+  },
+  {
+    "key": "compat.mem_speed_reduced",
+    "rule": "MEM_SPEED",
+    "params": ["ramMts", "effectiveMts"],
+    "ru": "Память {ramMts} МТ/с будет работать на {effectiveMts} МТ/с: выше плата или процессор не поддерживают."
+  },
+  {
+    "key": "compat.mem_cooler_clearance",
+    "rule": "MEM_COOLER_CLEARANCE",
+    "params": ["ramMm", "clearanceMm"],
+    "ru": "Память высотой {ramMm} мм может упереться в кулер: зазор под память {clearanceMm} мм."
+  },
+  {
+    "key": "compat.board_not_supported",
+    "rule": "MB_CASE_FORMFACTOR",
+    "params": ["board", "supported"],
+    "ru": "Корпус не рассчитан на плату формата {board}. Он поддерживает: {supported}."
+  },
+  {
+    "key": "compat.gpu_too_long",
+    "rule": "GPU_CASE_LENGTH",
+    "params": ["gpuMm", "caseMm"],
+    "ru": "Корпус не вмещает видеокарту {gpuMm} мм: максимум {caseMm} мм."
+  },
+  {
+    "key": "compat.gpu_tight_fit",
+    "rule": "GPU_CASE_LENGTH",
+    "params": ["gpuMm", "caseMm", "marginMm"],
+    "ru": "Видеокарта {gpuMm} мм входит в корпус с запасом всего {marginMm} мм (максимум {caseMm} мм): проверьте."
+  },
+  {
+    "key": "compat.gpu_slots_exceeded",
+    "rule": "GPU_SLOT_WIDTH",
+    "params": ["gpuSlots", "caseSlots"],
+    "ru": "Видеокарта занимает слотов: {gpuSlots}, а в корпусе слотов расширения: {caseSlots}. Проверьте."
+  },
+  {
+    "key": "compat.cooler_socket_unsupported",
+    "rule": "COOLER_SOCKET",
+    "params": ["cpuSocket", "cooler"],
+    "ru": "{cooler, select, air {Кулер} aio {Жидкостное охлаждение} other {Охлаждение}} не поддерживает сокет процессора {cpuSocket}."
+  },
+  {
+    "key": "compat.cooler_too_tall",
+    "rule": "COOLER_CASE_HEIGHT",
+    "params": ["coolerMm", "caseMm"],
+    "ru": "Кулер высотой {coolerMm} мм не помещается в корпус: максимум {caseMm} мм."
+  },
+  {
+    "key": "compat.cooler_tight_fit",
+    "rule": "COOLER_CASE_HEIGHT",
+    "params": ["coolerMm", "caseMm", "marginMm"],
+    "ru": "Кулер {coolerMm} мм входит в корпус с запасом {marginMm} мм (максимум {caseMm} мм): проверьте."
+  },
+  {
+    "key": "compat.cooler_underpowered",
+    "rule": "COOLER_TDP",
+    "params": ["coolerW", "cpuW"],
+    "ru": "Кулер рассчитан на {coolerW} Вт, а процессор может потреблять до {cpuW} Вт: проверьте."
+  },
+  {
+    "key": "compat.aio_no_mount",
+    "rule": "AIO_RADIATOR_MOUNT",
+    "params": ["radMm"],
+    "ru": "В корпусе нет места под радиатор {radMm} мм."
+  },
+  {
+    "key": "compat.aio_too_thick",
+    "rule": "AIO_RADIATOR_THICKNESS",
+    "params": ["thicknessMm", "maxMm"],
+    "ru": "Радиатор с вентиляторами толщиной {thicknessMm} мм, а место в корпусе — до {maxMm} мм: проверьте."
+  },
+  {
+    "key": "compat.psu_below_peak",
+    "rule": "PSU_WATTAGE",
+    "params": ["psuW", "peakW"],
+    "ru": "Блок питания {psuW} Вт слабее расчётного пика сборки — {peakW} Вт."
+  },
+  {
+    "key": "compat.psu_below_recommended",
+    "rule": "PSU_WATTAGE",
+    "params": ["psuW", "recommendedW", "peakW"],
+    "ru": "Для сборки рекомендуем блок питания не менее {recommendedW} Вт (расчётный пик {peakW} Вт), выбран {psuW} Вт."
+  },
+  {
+    "key": "compat.psu_low_headroom",
+    "rule": "PSU_WATTAGE",
+    "params": ["headroomPct", "minPct", "peakW"],
+    "ru": "У блока питания запас мощности {headroomPct} % при расчётном пике {peakW} Вт, рекомендуем не менее {minPct} %."
+  },
+  {
+    "key": "compat.psu_8pin_missing",
+    "rule": "PSU_GPU_CONNECTORS",
+    "params": ["need", "have"],
+    "ru": "Видеокарте нужно разъёмов питания 8-pin: {need}, у блока питания: {have}."
+  },
+  {
+    "key": "compat.psu_12v2x6_missing",
+    "rule": "PSU_GPU_CONNECTORS",
+    "params": ["need", "have"],
+    "ru": "Видеокарте нужен разъём 12V-2x6 ({need}), у блока питания родных кабелей: {have}, переходника в комплекте карты нет."
+  },
+  {
+    "key": "compat.psu_12v2x6_adapter",
+    "rule": "PSU_GPU_CONNECTORS",
+    "params": ["need", "have"],
+    "ru": "Видеокарта подключается через переходник из своего комплекта: нужно разъёмов 12V-2x6 — {need}, родных у блока питания — {have}. Проверьте кабели."
+  },
+  {
+    "key": "compat.psu_form_factor_unsupported",
+    "rule": "PSU_CASE_FORMFACTOR",
+    "params": ["psuFF", "supported"],
+    "ru": "Блок питания формата {psuFF} не подходит к корпусу: он поддерживает {supported}."
+  },
+  {
+    "key": "compat.psu_too_long",
+    "rule": "PSU_CASE_LENGTH",
+    "params": ["psuMm", "caseMm"],
+    "ru": "Блок питания длиной {psuMm} мм может не поместиться в корпус: максимум {caseMm} мм."
+  },
+  {
+    "key": "compat.m2_slots_exceeded",
+    "rule": "M2_SLOTS",
+    "params": ["nvme", "slots"],
+    "ru": "Накопителей NVMe {nvme}, слотов M.2 на плате {slots}."
+  },
+  {
+    "key": "compat.m2_too_long",
+    "rule": "M2_LENGTH",
+    "params": ["ssdMm", "slotMm"],
+    "ru": "Накопитель M.2 длиной {ssdMm} мм не помещается в слот: максимум {slotMm} мм."
+  },
+  {
+    "key": "compat.m2_disables_sata",
+    "rule": "M2_SATA_SHARING",
+    "params": ["sataDrives", "usablePorts"],
+    "ru": "Занятый слот M.2 отключает порты SATA: накопителей SATA {sataDrives}, рабочих портов останется {usablePorts}."
+  },
+  {
+    "key": "compat.sata_ports_exceeded",
+    "rule": "SATA_PORTS",
+    "params": ["sata", "ports"],
+    "ru": "Накопителей SATA {sata}, портов на плате {ports}."
+  },
+  {
+    "key": "compat.argb_headers_short",
+    "rule": "ARGB_HEADERS",
+    "params": ["need", "have"],
+    "ru": "Устройств с подсветкой ARGB (5 В): {need}, разъёмов на плате: {have}. Проверьте."
+  },
+  {
+    "key": "compat.rgb_headers_short",
+    "rule": "ARGB_HEADERS",
+    "params": ["need", "have"],
+    "ru": "Устройств с подсветкой RGB (12 В): {need}, разъёмов на плате: {have}. Проверьте."
+  },
+  {
+    "key": "compat.fan_mounts_exceeded",
+    "rule": "FAN_HEADERS",
+    "params": ["need", "have"],
+    "ru": "Вентиляторов {need}, мест под них в корпусе {have}."
+  },
+  {
+    "key": "compat.fan_headers_short",
+    "rule": "FAN_HEADERS",
+    "params": ["need", "have"],
+    "ru": "Вентиляторов {need}, разъёмов на плате {have}: понадобится разветвитель."
+  },
+  {
+    "key": "compat.no_wireless",
+    "rule": "WIFI_FOR_TASK",
+    "params": ["task"],
+    "ru": "Для {task, select, streaming {стрима} office {офиса и учёбы} other {выбранной задачи}} на плате нет ни Wi-Fi, ни Bluetooth: понадобится внешний адаптер."
+  },
+  {
+    "key": "compat.monitors_wider_than_desk",
+    "rule": "DESK_WIDTH_MONITORS",
+    "params": ["monitorsMm", "deskMm"],
+    "ru": "Мониторы в ряд занимают {monitorsMm} мм, ширина столешницы {deskMm} мм."
+  },
+  {
+    "key": "compat.eye_distance_short",
+    "rule": "DESK_DEPTH_EYES",
+    "params": ["eyeMm", "minMm"],
+    "ru": "Расстояние до глаз около {eyeMm} мм, рекомендуется от {minMm} мм: стол слишком мелкий для монитора на подставке."
+  },
+  {
+    "key": "compat.eye_distance_long",
+    "rule": "DESK_DEPTH_EYES",
+    "params": ["eyeMm", "maxMm"],
+    "ru": "Расстояние до глаз около {eyeMm} мм, рекомендуется до {maxMm} мм: стол слишком глубокий для монитора на подставке."
+  },
+  {
+    "key": "compat.arm_vesa_unsupported",
+    "rule": "ARM_VESA",
+    "params": ["monitorVesa", "armVesa"],
+    "ru": "Кронштейн не подходит к монитору: у монитора VESA {monitorVesa}, кронштейн рассчитан на {armVesa}."
+  },
+  {
+    "key": "compat.arm_monitor_no_vesa",
+    "rule": "ARM_VESA",
+    "params": [],
+    "ru": "У монитора нет крепления VESA: на кронштейн его не установить."
+  },
+  {
+    "key": "compat.arm_overload",
+    "rule": "ARM_LOAD",
+    "params": ["weightKg", "maxKg"],
+    "ru": "Монитор весит {weightKg} кг, кронштейн выдерживает до {maxKg} кг."
+  },
+  {
+    "key": "compat.arm_underload",
+    "rule": "ARM_LOAD",
+    "params": ["weightKg", "minKg"],
+    "ru": "Монитор весит {weightKg} кг, а кронштейну нужно не меньше {minKg} кг: плечо не удержит положение."
+  },
+  {
+    "key": "compat.arm_diagonal_out_of_range",
+    "rule": "ARM_DIAGONAL",
+    "params": ["diagIn", "minIn", "maxIn"],
+    "ru": "Диагональ монитора {diagIn} дюймов вне диапазона кронштейна ({minIn}–{maxIn} дюймов): проверьте."
+  },
+  {
+    "key": "compat.arm_desk_thickness",
+    "rule": "ARM_DESK_THICKNESS",
+    "params": ["deskMm", "minMm", "maxMm"],
+    "ru": "Толщина столешницы {deskMm} мм, а кронштейн крепится к столешнице {minMm}–{maxMm} мм."
+  },
+  {
+    "key": "compat.arm_clamp_over_leg",
+    "rule": "ARM_CLAMP_ZONE",
+    "params": ["xMm", "fromMm", "toMm"],
+    "ru": "Струбцина на отметке {xMm} мм попадает на опору стола ({fromMm}–{toMm} мм): сдвиньте кронштейн."
+  },
+  {
+    "key": "compat.chair_rollback_short",
+    "rule": "CHAIR_ROLLBACK",
+    "params": ["freeMm", "needMm"],
+    "ru": "Позади стола свободно {freeMm} мм, для отката кресла нужно {needMm} мм."
+  },
+  {
+    "key": "compat.chair_user_height",
+    "rule": "CHAIR_USER_HEIGHT",
+    "params": ["userCm", "minCm", "maxCm"],
+    "ru": "Рост {userCm} см вне диапазона кресла ({minCm}–{maxCm} см): проверьте."
+  }
+]

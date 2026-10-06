@@ -537,7 +537,7 @@ export const PC_SCENARIOS: Record<
         parts: pcBuild({ cpu: { maxPowerW: 150 }, gpu: { tgpW: 200, vendorRecommendedPsuW: 0 }, psu: { watts: 550 } }),
         key: "compat.psu_low_headroom",
         severity: "warn",
-        params: { headroomBp: 2545, minBp: 3000, peakW: 410 },
+        params: { headroomPct: 25, minPct: 30, peakW: 410 },
         products: ["psu"],
       },
     ],

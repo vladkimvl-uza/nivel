@@ -49,8 +49,8 @@ export const psuWattage = pcRule({
     } else if (headroomBp !== undefined && headroomBp < settings.psuHeadroomWarnBp) {
       found.push(
         issue("PSU_WATTAGE", "warn", ids, "compat.psu_low_headroom", {
-          headroomBp,
-          minBp: settings.psuHeadroomWarnBp,
+          headroomPct: Math.floor(headroomBp / 100),
+          minPct: Math.floor(settings.psuHeadroomWarnBp / 100),
           peakW,
         }),
       );
