@@ -30,7 +30,7 @@ export class FakeClock {
 }
 
 const specs = JSON.parse(
-  readFileSync(new URL("../../../testing/fixtures/wp-03/default-specs.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../../../testing/fixtures/wp-03/default-specs.json", import.meta.url), "utf8"),
 ) as Record<string, Record<string, unknown>>;
 
 /** The positions of the PC of the tests: category, whole median price in sums, whether the position is returnable. */

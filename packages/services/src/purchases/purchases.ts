@@ -12,6 +12,7 @@ import { NotFoundError, ValidationError, type ValidationIssue } from "../orders/
 import { lockBy } from "../orders/lock.ts";
 import { type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
 import { assertUuid, isUuid } from "../orders/validate.ts";
+import { OUTBOX_JOB } from "../outbox/contract.ts";
 
 const MAX_QTY = 99;
 const MAX_SUM = 1_000_000_000_000;
@@ -201,7 +202,7 @@ export async function record(
       await ops.enqueueOutbox(tx, {
         kind: "job",
         dedupeKey: `purchase:${purchaseId}:threshold`,
-        payload: { job: "threshold.check", orderId, purchaseId },
+        payload: { job: OUTBOX_JOB.THRESHOLD_CHECK, orderId, purchaseId },
       });
     }
     return dispatched;

@@ -9,6 +9,7 @@ import { type ActorRef, auditActor, checkActor } from "../orders/actor.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
 import { type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
 import { assertText, assertUuid, assertWholeSum } from "../orders/validate.ts";
+import { OUTBOX_JOB } from "../outbox/contract.ts";
 import { FEE_KINDS, isPaymentKind, PAYMENT_PAIRS } from "./pairs.ts";
 
 /** Money is the owner's: the assistant never expects, confirms, voids or reverses a payment (ARCHITECTURE 4.9). */
@@ -43,7 +44,7 @@ function threshold(tx: Executor, orderId: string, paymentId: string) {
   return ops.enqueueOutbox(tx, {
     kind: "job",
     dedupeKey: `payment:${paymentId}:threshold`,
-    payload: { job: "threshold.check", orderId, paymentId },
+    payload: { job: OUTBOX_JOB.THRESHOLD_CHECK, orderId, paymentId },
   });
 }
 

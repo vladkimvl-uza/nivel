@@ -12,6 +12,7 @@ import {
   type TransitionResult,
   transition,
 } from "@nivel/domain/order";
+import { OUTBOX_JOB } from "../outbox/contract.ts";
 import { type ActorRef, checkActor } from "./actor.ts";
 import { POINT_BY_STATUS, paidFee, purchaseTotals, settle } from "./cancel.ts";
 import { buildChanges } from "./changes.ts";
@@ -234,7 +235,7 @@ export async function dispatchInTx(
     // A reminder 24 hours after the acceptance if the prepayment has not come (the worker checks the flags when it fires).
     effects.push({
       kind: "job",
-      job: "accept_reminder",
+      job: OUTBOX_JOB.ACCEPT_REMINDER,
       at: new Date(now.getTime() + 24 * HOUR_MS),
       key: "accept_reminder",
     });

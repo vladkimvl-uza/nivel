@@ -8,6 +8,7 @@ import { NotFoundError, ValidationError, type ValidationIssue } from "../orders/
 import { lockBy } from "../orders/lock.ts";
 import { type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
 import { assertUuid } from "../orders/validate.ts";
+import { OUTBOX_TEMPLATE } from "../outbox/contract.ts";
 
 const CHANNELS = ["web", "bot", "tma", "admin", "ai"] as const;
 const SCOPES = ["pc", "pc_periph", "setup", "podbor"] as const;
@@ -165,7 +166,7 @@ export async function create(
       dedupeKey: `lead:${lead.id}:created`,
       payload: {
         target: "owner_topic",
-        templateKey: "lead.created",
+        templateKey: OUTBOX_TEMPLATE.LEAD_CREATED,
         leadId: lead.id,
         params: {
           number: lead.number,

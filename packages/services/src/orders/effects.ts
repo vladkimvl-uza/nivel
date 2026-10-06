@@ -6,6 +6,7 @@
 import { type Executor, ops, sales } from "@nivel/db/repos";
 import { sum } from "@nivel/domain/money";
 import type { Effect } from "@nivel/domain/order";
+import { OUTBOX_JOB } from "../outbox/contract.ts";
 import { PAYMENT_PAIRS } from "../payments/pairs.ts";
 import { can, type Runtime } from "./runtime.ts";
 import type { OrderRow } from "./snapshot.ts";
@@ -55,7 +56,7 @@ async function ensureExpectedPayment(env: EffectEnv, kind: keyof typeof PAYMENT_
       kind: "job",
       dedupeKey: `${env.keyPrefix}:pay:${kind}`,
       payload: {
-        job: "payment.expect",
+        job: OUTBOX_JOB.PAYMENT_EXPECT,
         orderId: order.id,
         orderNumber: order.number,
         paymentKind: kind,
@@ -125,7 +126,7 @@ export async function runEffects(env: EffectEnv, effects: readonly ServiceEffect
         break;
       case "render_pdf":
         await enqueue(env, `pdf:${effect.doc}`, {
-          job: "pdf.render",
+          job: OUTBOX_JOB.PDF_RENDER,
           doc: effect.doc,
           watermarkDraft: effect.watermarkDraft,
         });
@@ -145,7 +146,7 @@ export async function runEffects(env: EffectEnv, effects: readonly ServiceEffect
           });
         } else {
           await enqueue(env, `ledger:${effect.fund}`, {
-            job: "ledger.append",
+            job: OUTBOX_JOB.LEDGER_APPEND,
             fund: effect.fund,
             amountSum: effect.amount,
             reason,

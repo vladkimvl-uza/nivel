@@ -10,6 +10,7 @@ import { ForbiddenError, NotFoundError, ValidationError, type ValidationIssue } 
 import { lockBy } from "../orders/lock.ts";
 import { can, type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
 import { assertUuid } from "../orders/validate.ts";
+import { OUTBOX_JOB } from "../outbox/contract.ts";
 
 export type ActKind = "material_acceptance" | "customer_parts" | "handover";
 export type SignedVia = "tg_button" | "paper_photo" | "site_button";
@@ -97,7 +98,13 @@ export async function generate(
     await ops.enqueueOutbox(tx, {
       kind: "job",
       dedupeKey: `act:${row.id}:pdf`,
-      payload: { job: "pdf.render", doc: ACT_DOC[input.kind], actId: row.id, orderId, orderNumber: order.number },
+      payload: {
+        job: OUTBOX_JOB.PDF_RENDER,
+        doc: ACT_DOC[input.kind],
+        actId: row.id,
+        orderId,
+        orderNumber: order.number,
+      },
     });
     await ops.appendAudit(tx, {
       actor: auditActor(actor),
@@ -156,7 +163,7 @@ export async function sign(
         kind: "job",
         dedupeKey: `act:${actId}:sign`,
         payload: {
-          job: "act.sign",
+          job: OUTBOX_JOB.ACT_SIGN,
           actId,
           orderId: order.id,
           orderNumber: order.number,
