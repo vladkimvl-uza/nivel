@@ -44,8 +44,27 @@ export async function createCustomer(db: Executor, input: CustomerInsert): Promi
   return row.id;
 }
 
-export async function findCustomerByTelegramId(db: Executor, telegramUserId: number) {
-  const [row] = await db.select().from(customers).where(eq(customers.telegramUserId, telegramUserId));
+/**
+ * What every public role may read of a customer: the column rights of the site (00_grants.sql) are the narrowest, and a
+ * SELECT of a column the role has no right to (the phone, the address, the Telegram name) fails with 42501 and rolls
+ * back the transaction of the caller. The bot reads the rest with its own query.
+ */
+export type CustomerView = Pick<
+  typeof customers.$inferSelect,
+  "id" | "displayName" | "lang" | "district" | "telegramUserId" | "age18Confirmed" | "createdAt"
+>;
+const customerView = {
+  id: customers.id,
+  displayName: customers.displayName,
+  lang: customers.lang,
+  district: customers.district,
+  telegramUserId: customers.telegramUserId,
+  age18Confirmed: customers.age18Confirmed,
+  createdAt: customers.createdAt,
+};
+
+export async function findCustomerByTelegramId(db: Executor, telegramUserId: number): Promise<CustomerView | null> {
+  const [row] = await db.select(customerView).from(customers).where(eq(customers.telegramUserId, telegramUserId));
   return row ?? null;
 }
 

@@ -184,14 +184,29 @@ export async function recordConsent(db: Executor, input: ConsentInput): Promise<
   return row.id;
 }
 
+/**
+ * What every public role may read of a consent: the column rights of the site (00_grants.sql) are the narrowest, and a
+ * SELECT of a column the role has no right to fails with 42501 and rolls back the transaction of the caller. The
+ * evidence, the document and the hash of the text are for the admin and the bot, which read them with their own query.
+ */
+export type ConsentView = Pick<ConsentRow, "id" | "customerId" | "orderId" | "kind" | "granted" | "at">;
+const consentView = {
+  id: consents.id,
+  customerId: consents.customerId,
+  orderId: consents.orderId,
+  kind: consents.kind,
+  granted: consents.granted,
+  at: consents.at,
+};
+
 /** The newest row of the kind for the order: a withdrawal is a newer row with granted = false. */
 export async function latestConsent(
   db: Executor,
   orderId: string,
   kind: ConsentRow["kind"],
-): Promise<ConsentRow | null> {
+): Promise<ConsentView | null> {
   const [row] = await db
-    .select()
+    .select(consentView)
     .from(consents)
     .where(and(eq(consents.orderId, orderId), eq(consents.kind, kind)))
     .orderBy(desc(consents.at), desc(consents.id))
@@ -199,8 +214,15 @@ export async function latestConsent(
   return row ?? null;
 }
 
+/**
+ * Whether the newest consent of the kind is a grant. Asked of the database function the triggers use, so that the
+ * repository and the guards cannot disagree, and with no column rights needed: any role that calls it may.
+ */
 export async function consentGranted(db: Executor, orderId: string, kind: ConsentRow["kind"]): Promise<boolean> {
-  return (await latestConsent(db, orderId, kind))?.granted === true;
+  const { rows } = await db.execute<{ granted: boolean }>(
+    sql`select ops.consent_granted(${orderId}::uuid, ${kind}) as granted`,
+  );
+  return rows[0]?.granted === true;
 }
 
 // ---- files ------------------------------------------------------------------------------------------------------
