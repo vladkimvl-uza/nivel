@@ -107,6 +107,24 @@ describe("catalog resource", () => {
     expect(columns).not.toContain("isDemo");
   });
 
+  it.each(["constructor", "__proto__", "toString"])(
+    "a row with the category %s fails by itself, the other rows are still read",
+    async (name) => {
+      const { resource } = make();
+      const width = GPU_CSV.split("\n")[0]?.split(",").length ?? 0;
+      const row = [name, "A", "B", ...Array(width - 3).fill("")].join(",");
+      const preview = await resource.importPreview(owner, `${GPU_CSV}\n${row}\n`);
+      expect(preview.ok).toBe(true);
+      if (!preview.ok) return;
+      expect(preview.rows.map((r) => r.status)).toEqual(["new", "error"]);
+      expect(preview.rows[1]?.errors).toHaveProperty("category");
+    },
+  );
+
+  it.each(["constructor", "__proto__", "toString"])("the template of the category %s has no columns", (name) => {
+    expect(make().resource.csvColumns(name)).toEqual([]);
+  });
+
   it("previews a GPU row from a file, and creates it as a draft", async () => {
     const { resource, store, audits } = make();
     const preview = await resource.importPreview(owner, GPU_CSV);

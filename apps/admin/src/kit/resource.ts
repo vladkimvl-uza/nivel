@@ -7,7 +7,7 @@ import { type Role, requireRole } from "../auth/roles.ts";
 import type { SessionUser } from "../auth/service.ts";
 import { parseCsv } from "./csv.ts";
 import { cellsSource, type FieldSource, formatIssues, nameOf, readFields } from "./form.ts";
-import { describeSchema, type FieldNode, fieldsOf, humanize } from "./schema.ts";
+import { armOf, describeSchema, type FieldNode, fieldsOf, humanize } from "./schema.ts";
 
 // ---- definition ---------------------------------------------------------------------------------------------------
 
@@ -541,7 +541,7 @@ export function defineResource<T extends z.ZodType>(def: ResourceDef<T>): Resour
       const fields =
         root.kind === "variant"
           ? discriminatorValue
-            ? (root.arms?.[discriminatorValue] ?? [])
+            ? (armOf(root, discriminatorValue) ?? [])
             : []
           : (root.children ?? []);
       return columnsOf(

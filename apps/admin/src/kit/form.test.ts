@@ -276,6 +276,11 @@ describe("readFields: structures", () => {
 describe("readFields: variant (a catalog position)", () => {
   const node = describeSchema(ProductSpecsSchema);
 
+  it.each(["constructor", "__proto__", "toString"])("a category named %s is a wrong value, not a crash", (name) => {
+    const { problems } = readFields(node, fd([["category", name]]));
+    expect(problems).toEqual({ category: "Выберите значение." });
+  });
+
   it("reads the arm named by the category", () => {
     const { value, problems } = readFields(
       node,

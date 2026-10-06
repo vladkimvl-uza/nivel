@@ -53,6 +53,19 @@ function setup() {
   return { rows, audits, deps: { files: createFsFileSink(dir), registry, audit: sink } };
 }
 
+describe("saveUpload: names of Object.prototype are not kinds of file", () => {
+  it.each(["constructor", "__proto__", "toString", "hasOwnProperty"])(
+    "refuses kind %s before anything is stored",
+    async (kind) => {
+      const { deps, rows } = setup();
+      const r = await saveUpload(deps, { actor: owner, bytes: photo(), kind });
+      expect(r).toEqual({ ok: false, error: "Неизвестный вид файла." });
+      expect(rows.size).toBe(0);
+      expect(await readdir(dir)).toEqual([]);
+    },
+  );
+});
+
 describe("saveUpload", () => {
   it("strips the location from the photo before anything is stored, and names the file by the hash of what is stored", async () => {
     const { deps, rows } = setup();

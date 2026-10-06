@@ -359,12 +359,17 @@ export function describeSchema(schema: z.ZodType): FieldNode {
   return root;
 }
 
+/** The arm of a variant for a value of the discriminator: only own keys count (`constructor` is not a category). */
+export function armOf(node: FieldNode, chosen: string): FieldNode[] | undefined {
+  return node.arms && Object.hasOwn(node.arms, chosen) ? node.arms[chosen] : undefined;
+}
+
 /** The fields to show for a value: for a variant, the arm named by the discriminator; `null` when none is chosen. */
 export function fieldsOf(node: FieldNode, value: unknown): FieldNode[] {
   if (node.kind === "group") return node.children ?? [];
   if (node.kind === "variant" && node.discriminator && node.arms) {
     const chosen = (value as Record<string, unknown> | null | undefined)?.[node.discriminator];
-    return typeof chosen === "string" ? (node.arms[chosen] ?? []) : [];
+    return typeof chosen === "string" ? (armOf(node, chosen) ?? []) : [];
   }
   return [];
 }

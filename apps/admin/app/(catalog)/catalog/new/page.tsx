@@ -23,7 +23,7 @@ export default async function NewPositionPage({
   const names = await categoryNames(runtime.db);
   const arms = runtime.catalog.root.arms ?? {};
 
-  if (!category || !(category in arms)) {
+  if (!category || !Object.hasOwn(arms, category)) {
     return (
       <>
         <PageTitle

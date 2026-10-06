@@ -157,6 +157,7 @@ describe("describeSchema: structures", () => {
     expect(node.options?.map((o) => o.value)).toEqual(["a", "b"]);
     expect(fieldsOf(node, { kind: "b" }).map((f) => f.key)).toEqual(["kind", "y"]);
     expect(fieldsOf(node, { kind: "zzz" })).toEqual([]);
+    for (const name of ["constructor", "__proto__", "toString"]) expect(fieldsOf(node, { kind: name })).toEqual([]);
     expect(fieldsOf(node, {})).toEqual([]);
     expect(fieldsOf(node, null)).toEqual([]);
   });

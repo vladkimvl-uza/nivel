@@ -1,7 +1,7 @@
 // admin kit: from submitted text to a typed value, and from validation errors to Russian messages. The same reader
 // serves HTML forms and CSV rows (a row is just another source of named fields), so a position imported from a file and
 // a position typed by hand pass through one set of rules.
-import type { FieldNode } from "./schema.ts";
+import { armOf, type FieldNode } from "./schema.ts";
 
 /** Suffix of the checkbox "unknown" next to a structured field: ticked means `null`. */
 export const UNKNOWN_SUFFIX = "__unknown";
@@ -266,7 +266,7 @@ function readNode(node: FieldNode, at: string[], ctx: Ctx): unknown {
     case "variant": {
       const discriminator = node.discriminator ?? "";
       const chosen = ctx.source.get(nameOf([...at, discriminator]))?.trim() ?? "";
-      const arm = node.arms?.[chosen];
+      const arm = armOf(node, chosen);
       if (!arm) {
         ctx.problems[nameOf([...at, discriminator])] = "Выберите значение.";
         return {};

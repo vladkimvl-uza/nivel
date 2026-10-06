@@ -95,7 +95,7 @@ export async function saveUpload(
   input: { actor: SessionUser; bytes: Buffer; kind: string },
 ): Promise<UploadResult> {
   requirePermission(input.actor, "upload.write");
-  const kind = UPLOAD_KINDS[input.kind];
+  const kind = Object.hasOwn(UPLOAD_KINDS, input.kind) ? UPLOAD_KINDS[input.kind] : undefined;
   if (!kind) return { ok: false, error: "Неизвестный вид файла." };
   if (input.bytes.length > MAX_UPLOAD_BYTES) return { ok: false, error: "Файл больше 12 МБ." };
 

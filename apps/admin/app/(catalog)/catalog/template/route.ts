@@ -15,7 +15,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!can(user.role, "catalog.import")) return new Response("Недостаточно прав.", { status: 403 });
   const category = new URL(request.url).searchParams.get("category") ?? "";
   const { catalog } = getRuntime();
-  if (!catalog.root.arms || !(category in catalog.root.arms))
+  if (!catalog.root.arms || !Object.hasOwn(catalog.root.arms, category))
     return new Response("Неизвестная категория.", { status: 404 });
   const body = `${BOM}${toCsv([catalog.csvColumns(category)], { delimiter: ";" })}`;
   return new Response(body, {
