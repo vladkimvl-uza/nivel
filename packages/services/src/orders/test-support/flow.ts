@@ -47,8 +47,8 @@ export async function draftOrder(
 }
 
 /** The estimate is checked by the owner and sent. */
-export async function sentOrder(w: World): Promise<TestOrder> {
-  const o = await draftOrder(w);
+export async function sentOrder(w: World, draft: Parameters<typeof draftOrder>[1] = {}): Promise<TestOrder> {
+  const o = await draftOrder(w, draft);
   const r = await send({ orderId: o.orderId, quoteId: o.quoteId }, ownerActor(w), w.admin);
   if (!r.ok) throw new Error(`the estimate was not sent: ${r.error}`);
   return o;
@@ -82,8 +82,8 @@ export async function acceptConsents(w: World, o: TestOrder, o2: { nonReturnable
 }
 
 /** The customer accepts the offer and the estimate (the bot acts for the customer). */
-export async function acceptedOrder(w: World): Promise<TestOrder> {
-  const o = await sentOrder(w);
+export async function acceptedOrder(w: World, draft: Parameters<typeof draftOrder>[1] = {}): Promise<TestOrder> {
+  const o = await sentOrder(w, draft);
   const consentIds = await acceptConsents(w, o);
   const r = await dispatch(
     o.orderId,

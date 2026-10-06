@@ -2,7 +2,6 @@
 // work and no order of the full cycle (from 6.7 million) waits in the queue. Only then an estimate of 4.5-6.7 million is
 // eligible. Needs the right to read orders (the site passes `false` instead).
 import type { Executor } from "@nivel/db/repos";
-import type { FeeSettings } from "@nivel/domain/fee";
 import { dsl } from "./dsl.ts";
 
 /** Statuses of an order that takes the hands of the owner: from the first purchase to the handover. */
@@ -19,10 +18,7 @@ export const IN_WORK_STATUSES = [
 
 export const IN_WORK_LIMIT = 2;
 
-export async function freeWindowAvailable(
-  ex: Executor,
-  settings: Pick<FeeSettings, "minFullCyclePc">,
-): Promise<boolean> {
+export async function freeWindowAvailable(ex: Executor, settings: { minFullCyclePc: number }): Promise<boolean> {
   const { sql } = dsl(ex);
   const { rows } = await ex.execute<{ in_work: string; big_waiting: string }>(sql`
     select
