@@ -5,11 +5,23 @@ import { getMessages, type Messages } from "./catalog.ts";
 import type { AppLocale } from "./locales.ts";
 import { assertLocale } from "./locales.ts";
 
-export type TranslationValues = Record<string, string | number | boolean | Date | null | undefined>;
+/** Same as use-intl: no booleans, null or undefined. A value that is "not there" must be an error, not an empty text. */
+export type TranslationValues = Record<string, string | number | Date>;
 
 export interface NodeTranslator {
   (key: string, values?: TranslationValues): string;
   has(key: string): boolean;
+}
+
+/** use-intl turns undefined, null and false into "" or 0 (and NaN into "NaN"); a customer must never see that. */
+function assertUsableValues(key: string, values: TranslationValues): void {
+  for (const [name, value] of Object.entries(values)) {
+    const ok =
+      typeof value === "string" ||
+      (typeof value === "number" && Number.isFinite(value)) ||
+      (value instanceof Date && !Number.isNaN(value.getTime()));
+    if (!ok) throw new TypeError(`Value of "${name}" for message "${key}" is not usable (${String(value)})`);
+  }
 }
 
 /**
@@ -22,6 +34,7 @@ export function createNodeTranslator(
   messages?: Record<string, Messages>,
 ): NodeTranslator {
   assertLocale(locale);
+  // The namespace is a plain string here: a test may supply one that is not registered, through `messages`.
   const t = createTranslator({
     locale,
     namespace,
@@ -30,11 +43,14 @@ export function createNodeTranslator(
     onError(error: Error) {
       throw error;
     },
-  } as never) as unknown as {
-    (key: string, values?: TranslationValues): string;
-    has(key: string): boolean;
-  };
-  const translate = ((key: string, values?: TranslationValues) => t(key, values)) as NodeTranslator;
+  } as Parameters<typeof createTranslator>[0]) as unknown as NodeTranslator;
+  const translate = ((key: string, values?: TranslationValues) => {
+    // Always pass an object: the production build of use-intl returns the raw ICU template when `values` is falsy,
+    // without compiling it, so a forgotten {name} would reach the customer in plain Node (but not under Vitest).
+    const given = values ?? {};
+    assertUsableValues(key, given);
+    return t(key, given);
+  }) as NodeTranslator;
   translate.has = (key) => t.has(key);
   return translate;
 }
