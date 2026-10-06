@@ -145,6 +145,7 @@
 }
 
 /* ---------- intro stage (LogoIntro) ---------- */
+/* The stage fills its parent. The lamp pool behind the still lockup is an inline background (themes/logo-motion.ts). */
 .nv-logo-intro {
   position: relative;
   display: grid;
@@ -154,10 +155,31 @@
   min-height: 160px;
   overflow: hidden;
   background-color: var(--bg);
+  container-type: size;
 }
 
+/* The lockup takes the same share of the frame as the 3D camera: 62 % of the width, 80 % on a phone (below 700 px). */
 .nv-logo-intro__still {
-  width: min(80%, 62vh * 4.2);
+  width: 62%;
+}
+
+@container (max-width: 699px) {
+  .nv-logo-intro__still {
+    width: 80%;
+  }
+}
+
+/* With container units the lockup also keeps to half of the height, as the camera does in a wide frame. */
+@supports (width: 1cqw) {
+  .nv-logo-intro__still {
+    width: min(62cqw, calc(100cqh * 0.5 * 348.6 / 83));
+  }
+
+  @container (max-width: 699px) {
+    .nv-logo-intro__still {
+      width: min(80cqw, calc(100cqh * 0.5 * 348.6 / 83));
+    }
+  }
 }
 
 .nv-logo-intro__canvas {
@@ -166,6 +188,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* "±0.000" over the shelf: the intro positions and sizes it every frame, the stylesheet only sets the look. */
@@ -181,6 +205,11 @@
   pointer-events: none;
   opacity: 0;
   transform-origin: 100% 100%;
+}
+
+/* While the 3D plays, the canvas covers the still lockup (no fade: the intro starts from the empty plate). */
+.nv-logo-intro[data-state="playing"] .nv-logo-intro__canvas {
+  opacity: 1;
 }
 
 .nv-logo-intro[data-state="playing"] .nv-logo-intro__still {
