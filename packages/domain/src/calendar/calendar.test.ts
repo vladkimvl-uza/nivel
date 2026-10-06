@@ -1,17 +1,6 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { addMonthsTashkent, createWorkCalendar, isoDateInTashkent, tashkentTime } from "./index.ts";
-
-/** Deterministic PRNG (mulberry32); fast-check is not in the dependencies yet. */
-function makeRng(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /** Local Asia/Tashkent wall time (UTC+5, no DST) to an instant. */
 const tk = (iso: string): Date => new Date(`${iso}+05:00`);
@@ -213,27 +202,29 @@ describe("addWorkingDays", () => {
   });
 
   it("property: the result of n >= 1 is a working day, strictly increasing in n, exactly n working days apart", () => {
-    const rng = makeRng(20261006);
     const holidays = ["2026-10-13", "2026-11-02", "2026-12-08", "2027-01-01"];
     const c = createWorkCalendar(holidays, HOURS);
-    for (let i = 0; i < 300; i += 1) {
-      const start = new Date(Date.UTC(2026, 9, 1) + Math.floor(rng() * 120 * 86_400_000));
-      let previous = start.getTime();
-      for (let n = 1; n <= 8; n += 1) {
-        const out = c.addWorkingDays(start, n);
-        expect(c.isWorkingDay(isoDateInTashkent(out))).toBe(true);
-        expect(out.getTime()).toBeGreaterThan(previous);
-        previous = out.getTime();
-        // Time of day is preserved.
-        expect((out.getTime() - start.getTime()) % 86_400_000).toBe(0);
-        // Count the working days in (start, out].
-        let count = 0;
-        for (let t = start.getTime() + 86_400_000; t <= out.getTime(); t += 86_400_000) {
-          if (c.isWorkingDay(isoDateInTashkent(new Date(t)))) count += 1;
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 120 * 86_400_000 - 1 }), (offset) => {
+        const start = new Date(Date.UTC(2026, 9, 1) + offset);
+        let previous = start.getTime();
+        for (let n = 1; n <= 8; n += 1) {
+          const out = c.addWorkingDays(start, n);
+          expect(c.isWorkingDay(isoDateInTashkent(out))).toBe(true);
+          expect(out.getTime()).toBeGreaterThan(previous);
+          previous = out.getTime();
+          // Time of day is preserved.
+          expect((out.getTime() - start.getTime()) % 86_400_000).toBe(0);
+          // Count the working days in (start, out].
+          let count = 0;
+          for (let t = start.getTime() + 86_400_000; t <= out.getTime(); t += 86_400_000) {
+            if (c.isWorkingDay(isoDateInTashkent(new Date(t)))) count += 1;
+          }
+          expect(count).toBe(n);
         }
-        expect(count).toBe(n);
-      }
-    }
+      }),
+      { numRuns: 300 },
+    );
   });
 });
 
@@ -263,14 +254,16 @@ describe("nextWorkingDayStart: the start of the next working day", () => {
   });
 
   it("is strictly after the input and lands in the response hours", () => {
-    const rng = makeRng(31);
-    for (let i = 0; i < 300; i += 1) {
-      const from = new Date(Date.UTC(2026, 9, 1) + Math.floor(rng() * 90 * 86_400_000));
-      const out = cal.nextWorkingDayStart(from);
-      expect(out.getTime()).toBeGreaterThan(from.getTime());
-      expect(cal.isResponseHours(out)).toBe(true);
-      expect(tashkentTime(out)).toEqual({ hour: 10, minute: 0 });
-    }
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 90 * 86_400_000 - 1 }), (offset) => {
+        const from = new Date(Date.UTC(2026, 9, 1) + offset);
+        const out = cal.nextWorkingDayStart(from);
+        expect(out.getTime()).toBeGreaterThan(from.getTime());
+        expect(cal.isResponseHours(out)).toBe(true);
+        expect(tashkentTime(out)).toEqual({ hour: 10, minute: 0 });
+      }),
+      { numRuns: 300 },
+    );
   });
 
   it("rejects an invalid Date", () => {

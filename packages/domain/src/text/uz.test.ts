@@ -1,17 +1,6 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { normalizeUz, uzSearchKey, uzTextApi } from "./index.ts";
-
-/** Deterministic PRNG (mulberry32); fast-check is not in the dependencies yet. */
-function makeRng(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 const OKINA = "ʻ"; // U+02BB
 const TUTUQ = "ʼ"; // U+02BC
@@ -143,41 +132,40 @@ describe("uzTextApi", () => {
   });
 });
 
-describe("properties (seeded generator)", () => {
+describe("properties (fast-check)", () => {
   const alphabet = ["o", "g", "O", "G", "a", "k", "z", " ", "'", "‘", "’", "`", "ʼ", "ʻ", "я", "😀", "1"];
-  const sample = (rng: () => number): string => {
-    const n = Math.floor(rng() * 24);
-    let s = "";
-    for (let i = 0; i < n; i += 1) s += alphabet[Math.floor(rng() * alphabet.length)];
-    return s;
-  };
+  /** 0 to 23 characters of the alphabet above. */
+  const sample = fc.array(fc.constantFrom(...alphabet), { maxLength: 23 }).map((chars) => chars.join(""));
 
   it("normalizeUz is idempotent", () => {
-    const rng = makeRng(20261006);
-    for (let i = 0; i < 2000; i += 1) {
-      const s = sample(rng);
-      const once = normalizeUz(s);
-      expect(normalizeUz(once)).toBe(once);
-    }
+    fc.assert(
+      fc.property(sample, (s) => {
+        const once = normalizeUz(s);
+        expect(normalizeUz(once)).toBe(once);
+      }),
+      { numRuns: 2000 },
+    );
   });
 
   it("normalizeUz leaves no U+0027, U+2018, U+2019 or U+0060 between Latin letters", () => {
-    const rng = makeRng(7);
-    for (let i = 0; i < 2000; i += 1) {
-      const out = normalizeUz(sample(rng));
-      expect(out).not.toMatch(/(?<=\p{Script=Latin})['‘’`](?=\p{Script=Latin})/u);
-    }
+    fc.assert(
+      fc.property(sample, (s) => {
+        expect(normalizeUz(s)).not.toMatch(/(?<=\p{Script=Latin})['‘’`](?=\p{Script=Latin})/u);
+      }),
+      { numRuns: 2000 },
+    );
   });
 
   it("uzSearchKey is idempotent and equal for every apostrophe spelling", () => {
-    const rng = makeRng(99);
-    for (let i = 0; i < 1000; i += 1) {
-      const s = sample(rng);
-      const key = uzSearchKey(s);
-      expect(uzSearchKey(key)).toBe(key);
-      for (const m of ["'", "’"]) {
-        expect(uzSearchKey(s.replaceAll("ʻ", m).replaceAll("ʼ", m))).toBe(key);
-      }
-    }
+    fc.assert(
+      fc.property(sample, (s) => {
+        const key = uzSearchKey(s);
+        expect(uzSearchKey(key)).toBe(key);
+        for (const m of ["'", "’"]) {
+          expect(uzSearchKey(s.replaceAll("ʻ", m).replaceAll("ʼ", m))).toBe(key);
+        }
+      }),
+      { numRuns: 1000 },
+    );
   });
 });

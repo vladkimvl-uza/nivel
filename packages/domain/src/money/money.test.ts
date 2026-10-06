@@ -1,8 +1,10 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { addSums, applyBp, bp, roundTo, splitByShares, sum } from "./index.ts";
-import { forAll } from "./testkit.ts";
 
 const S = sum;
+/** Cases per property (the earlier self-made runner used 500). */
+const RUNS = { numRuns: 500 };
 const B = bp;
 type SumT = ReturnType<typeof sum>;
 type BpT = ReturnType<typeof bp>;
@@ -74,18 +76,21 @@ describe("applyBp", () => {
   });
 
   it("property: floor <= exact <= ceil, ceil - floor <= 1, half_up between them", () => {
-    forAll((g) => {
-      const base = S(g.int(0, 5_000_000_000));
-      const rate = B(g.int(0, 10_000));
-      const fl = applyBp(base, rate, "floor");
-      const ce = applyBp(base, rate, "ceil");
-      const hu = applyBp(base, rate, "half_up");
-      expect(fl * 10_000).toBeLessThanOrEqual(base * rate);
-      expect(ce * 10_000).toBeGreaterThanOrEqual(base * rate);
-      expect(ce - fl).toBeLessThanOrEqual(1);
-      expect(hu).toBeGreaterThanOrEqual(fl);
-      expect(hu).toBeLessThanOrEqual(ce);
-    });
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 5_000_000_000 }), fc.integer({ min: 0, max: 10_000 }), (b, r) => {
+        const base = S(b);
+        const rate = B(r);
+        const fl = applyBp(base, rate, "floor");
+        const ce = applyBp(base, rate, "ceil");
+        const hu = applyBp(base, rate, "half_up");
+        expect(fl * 10_000).toBeLessThanOrEqual(base * rate);
+        expect(ce * 10_000).toBeGreaterThanOrEqual(base * rate);
+        expect(ce - fl).toBeLessThanOrEqual(1);
+        expect(hu).toBeGreaterThanOrEqual(fl);
+        expect(hu).toBeLessThanOrEqual(ce);
+      }),
+      RUNS,
+    );
   });
 });
 
@@ -114,15 +119,21 @@ describe("roundTo", () => {
     expect(() => roundTo(1.5 as unknown as SumT, 10, "floor")).toThrow(RangeError);
   });
   it("property: result is a multiple of step and within one step of the value", () => {
-    forAll((g) => {
-      const v = S(g.int(-100_000_000, 100_000_000));
-      const step = g.pick([1, 10, 1000, 10_000]);
-      for (const mode of ["floor", "half_up", "ceil"] as const) {
-        const r = roundTo(v, step, mode);
-        expect(r % step === 0).toBe(true);
-        expect(Math.abs(r - v)).toBeLessThan(step);
-      }
-    });
+    fc.assert(
+      fc.property(
+        fc.integer({ min: -100_000_000, max: 100_000_000 }),
+        fc.constantFrom(1, 10, 1000, 10_000),
+        (n, step) => {
+          const v = S(n);
+          for (const mode of ["floor", "half_up", "ceil"] as const) {
+            const r = roundTo(v, step, mode);
+            expect(r % step === 0).toBe(true);
+            expect(Math.abs(r - v)).toBeLessThan(step);
+          }
+        },
+      ),
+      RUNS,
+    );
   });
 });
 
@@ -153,24 +164,31 @@ describe("splitByShares", () => {
   });
 
   it("property: parts add up to the total and each part is within one sum of its exact share", () => {
-    forAll((g) => {
-      const total = S(g.int(-1_000_000_000, 5_000_000_000));
-      const n = g.int(1, 6);
-      const cuts = Array.from({ length: n - 1 }, () => g.int(0, 10_000)).sort((a, b) => a - b);
-      const shares: number[] = [];
-      let prev = 0;
-      for (const c of [...cuts, 10_000]) {
-        shares.push(c - prev);
-        prev = c;
-      }
-      const parts = splitByShares(total, shares.map(B));
-      expect(parts).toHaveLength(n);
-      expect(parts.reduce((a, b) => a + b, 0)).toBe(total);
-      parts.forEach((p, i) => {
-        const exact = (total * (shares[i] as number)) / 10_000;
-        expect(Math.abs(p - exact)).toBeLessThan(1);
-      });
-    });
+    fc.assert(
+      fc.property(
+        fc.integer({ min: -1_000_000_000, max: 5_000_000_000 }),
+        // 1 to 6 parts: n - 1 cuts of the 10 000 scale, the shares are the gaps between them
+        fc.array(fc.integer({ min: 0, max: 10_000 }), { minLength: 0, maxLength: 5 }),
+        (t, rawCuts) => {
+          const total = S(t);
+          const cuts = [...rawCuts].sort((a, b) => a - b);
+          const shares: number[] = [];
+          let prev = 0;
+          for (const c of [...cuts, 10_000]) {
+            shares.push(c - prev);
+            prev = c;
+          }
+          const parts = splitByShares(total, shares.map(B));
+          expect(parts).toHaveLength(cuts.length + 1);
+          expect(parts.reduce((a, b) => a + b, 0)).toBe(total);
+          parts.forEach((p, i) => {
+            const exact = (total * (shares[i] as number)) / 10_000;
+            expect(Math.abs(p - exact)).toBeLessThan(1);
+          });
+        },
+      ),
+      RUNS,
+    );
   });
 });
 

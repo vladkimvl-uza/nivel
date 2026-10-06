@@ -1,6 +1,6 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { bp, type Sum, sum } from "../money/index.ts";
-import { forAll } from "../money/testkit.ts";
 import {
   TAX_RISK_RESERVE_BP,
   taxRiskReserve,
@@ -69,17 +69,21 @@ describe("warrantyReserveContribution: 2 % (at least 150 000), then 1 %", () => 
   });
 
   it("property: between 1 % and 2 % of the components, at least the minimum at 2 %", () => {
-    forAll((g) => {
-      const components = g.int(1, 200_000_000);
-      const st = state({
-        balance: S(g.int(0, 20_000_000)),
-        closedOrders: g.int(0, 60),
-        lossesLast12mBp: bp(g.int(0, 200)),
-      });
-      const r = warrantyReserveContribution(S(components), st);
-      expect(r * 100).toBeGreaterThanOrEqual(components);
-      expect(r).toBeLessThanOrEqual(Math.max(Math.ceil(components / 50), 150_000));
-    });
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 200_000_000 }),
+        fc.integer({ min: 0, max: 20_000_000 }),
+        fc.integer({ min: 0, max: 60 }),
+        fc.integer({ min: 0, max: 200 }),
+        (components, balance, closedOrders, losses) => {
+          const st = state({ balance: S(balance), closedOrders, lossesLast12mBp: bp(losses) });
+          const r = warrantyReserveContribution(S(components), st);
+          expect(r * 100).toBeGreaterThanOrEqual(components);
+          expect(r).toBeLessThanOrEqual(Math.max(Math.ceil(components / 50), 150_000));
+        },
+      ),
+      { numRuns: 500 },
+    );
   });
 });
 
