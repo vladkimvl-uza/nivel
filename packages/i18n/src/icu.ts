@@ -15,8 +15,10 @@ interface ParseResult {
 class IcuSyntaxError extends Error {}
 
 const NAME = /[^\s{},#<>']+/y;
+/** Argument names as the real parser (formatjs) reads them: no dots, dashes or colons. */
+const ARG_NAME = /[A-Za-z0-9_]+/y;
 const STRUCTURED = new Set(["plural", "select", "selectordinal"]);
-const TAG = /<\/?[A-Za-z][\w-]*\s*\/?>/y;
+const TAG = /<(\/?)([A-Za-z][\w-]*)\s*(\/?)>/y;
 
 class Parser {
   readonly args: IcuArgument[] = [];
@@ -32,9 +34,10 @@ class Parser {
     if (this.pos < this.src.length) throw new IcuSyntaxError(`unexpected "}" at position ${this.pos}`);
   }
 
-  /** Text with arguments; stops at an unmatched "}" (the caller consumes it). */
+  /** Text with arguments; stops at an unmatched "}" (the caller consumes it). Tags must balance inside one message. */
   private message(depth: number, inPlural = false): void {
     const s = this.src;
+    const openTags: string[] = [];
     while (this.pos < s.length) {
       const c = s[this.pos];
       if (c === "'") {
@@ -47,11 +50,22 @@ class Parser {
       } else if (c === "<") {
         TAG.lastIndex = this.pos;
         const m = TAG.exec(s);
-        this.pos += m ? m[0].length : 1;
+        if (m) {
+          const [whole, closing, name = "", selfClosing] = m;
+          if (closing) {
+            if (openTags.pop() !== name) throw new IcuSyntaxError(`unmatched closing tag </${name}>`);
+          } else if (!selfClosing) {
+            openTags.push(name);
+          }
+          this.pos += whole.length;
+        } else {
+          this.pos++;
+        }
       } else {
         this.pos++;
       }
     }
+    if (openTags.length > 0) throw new IcuSyntaxError(`unclosed tag <${openTags[openTags.length - 1]}>`);
     if (depth > 0) throw new IcuSyntaxError("unclosed {");
   }
 
@@ -76,9 +90,9 @@ class Parser {
     while (/\s/.test(this.src[this.pos] ?? "")) this.pos++;
   }
 
-  private word(what: string): string {
-    NAME.lastIndex = this.pos;
-    const m = NAME.exec(this.src);
+  private word(what: string, pattern: RegExp = NAME): string {
+    pattern.lastIndex = this.pos;
+    const m = pattern.exec(this.src);
     if (!m) throw new IcuSyntaxError(`${what} expected at position ${this.pos}`);
     this.pos += m[0].length;
     return m[0];
@@ -89,7 +103,7 @@ class Parser {
     if (this.src[this.pos] === "}" || this.pos >= this.src.length) {
       throw new IcuSyntaxError(this.pos >= this.src.length ? "unclosed {" : "empty argument {}");
     }
-    const name = this.word("argument name");
+    const name = this.word("argument name", ARG_NAME);
     this.skipSpace();
     const c = this.src[this.pos];
     if (c === "}") {
@@ -174,4 +188,26 @@ export function placeholders(message: string): string[] {
 /** Sorted, unique "name:type" pairs: {n} and {n, number} are different contracts for the code that fills them. */
 export function placeholderSignature(message: string): string[] {
   return [...new Set(run(message).args.map((a) => `${a.name}:${a.type}`))].sort();
+}
+
+const NUMERIC = new Set(["number", "plural", "selectordinal"]);
+const DATED = new Set(["date", "time"]);
+
+/**
+ * Values that satisfy every argument of a message: a number for number, plural and selectordinal, a Date for date and time,
+ * "other" for select, a short string for the rest. For tests that format whole catalogs.
+ */
+export function sampleValues(message: string): Record<string, string | number | Date> {
+  const out: Record<string, string | number | Date> = {};
+  for (const { name, type } of run(message).args) {
+    if (name in out && type === "argument") continue;
+    out[name] = NUMERIC.has(type)
+      ? 2
+      : DATED.has(type)
+        ? new Date("2026-10-06T10:00:00Z")
+        : type === "select"
+          ? "other"
+          : "x";
+  }
+  return out;
 }

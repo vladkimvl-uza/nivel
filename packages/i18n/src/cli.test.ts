@@ -153,7 +153,7 @@ describe("runImport", () => {
     expect(runImport(["x.xlsx", "--wat"], io())).toBe(2);
   });
 
-  it.todo("после слияния WP-02: --normalize без подмены вызывает настоящую normalizeUz из @nivel/domain");
+  it.todo("after the WP-02 merge: --normalize without a stub calls the real normalizeUz from @nivel/domain");
 });
 
 describe("runNewLatin", () => {

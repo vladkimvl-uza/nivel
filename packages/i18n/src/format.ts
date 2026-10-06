@@ -30,13 +30,14 @@ const partsFormat = new Intl.DateTimeFormat("en-GB", {
 });
 
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
-const WITH_OFFSET =
-  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+const WITH_OFFSET = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 
 function isCalendarDate(yyyy: string, mm: string, dd: string): boolean {
   const probe = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)));
   return (
-    probe.getUTCFullYear() === Number(yyyy) && probe.getUTCMonth() === Number(mm) - 1 && probe.getUTCDate() === Number(dd)
+    probe.getUTCFullYear() === Number(yyyy) &&
+    probe.getUTCMonth() === Number(mm) - 1 &&
+    probe.getUTCDate() === Number(dd)
   );
 }
 

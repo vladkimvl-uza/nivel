@@ -88,7 +88,9 @@ export function checkNamespace(
       if (/\$|\bUSD\b/.test(text)) out.push(`${ns}: ${lang} "${k}" mentions dollars; prices are in sums only`);
     }
     if (ruText !== undefined && icuOk && placeholderSignature(uzText).join() !== placeholderSignature(ruText).join()) {
-      out.push(`${ns}: key "${k}" placeholders differ: uz {${placeholderSignature(uzText).join(", ")}} vs ru {${placeholderSignature(ruText).join(", ")}}`);
+      out.push(
+        `${ns}: key "${k}" placeholders differ: uz {${placeholderSignature(uzText).join(", ")}} vs ru {${placeholderSignature(ruText).join(", ")}}`,
+      );
     }
   }
   return out;

@@ -49,14 +49,18 @@ describe("createNodeTranslator in plain Node (production build of use-intl)", ()
   });
 
   it("still renders a message without arguments and a message with its arguments", () => {
-    const r = runInPlainNode(`console.log(t("plain") + "|" + t("hi", { name: "Aziz" }) + "|" + t("items", { count: 2 }));`);
+    const r = runInPlainNode(
+      `console.log(t("plain") + "|" + t("hi", { name: "Aziz" }) + "|" + t("items", { count: 2 }));`,
+    );
     expect(r.status, r.stderr).toBe(0);
     expect(r.stdout.trim()).toBe("Salom|Salom, Aziz!|2 ta mahsulot");
   });
 });
 
 describe("createNodeTranslator values", () => {
-  const t = createNodeTranslator("uz", "demo", { demo: { hi: "Salom, {name}!", items: "{count, plural, other {# ta}}" } });
+  const t = createNodeTranslator("uz", "demo", {
+    demo: { hi: "Salom, {name}!", items: "{count, plural, other {# ta}}" },
+  });
 
   it("rejects undefined and null values instead of printing an empty text", () => {
     expect(() => t("hi", { name: undefined as never })).toThrow(/name/);

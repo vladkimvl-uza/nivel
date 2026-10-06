@@ -108,7 +108,7 @@ describe("Uzbek text API re-exported from the domain (ARCHITECTURE 4.12)", () =>
   });
 
   it.todo(
-    "после слияния WP-02: normalizeUz из @nivel/i18n приводит oʻ, gʻ после o/g к U+02BB, прочие апострофы между буквами к U+02BC",
+    "after the WP-02 merge: normalizeUz from @nivel/i18n turns apostrophes after o/g into U+02BB and other apostrophes between letters into U+02BC",
   );
-  it.todo('после слияния WP-02: uzSearchKey("o\'yin") совпадает с uzSearchKey("oʻyin") (поиск по каталогу)');
+  it.todo(`after the WP-02 merge: uzSearchKey("o'yin") equals uzSearchKey("oʻyin") (catalog search)`);
 });

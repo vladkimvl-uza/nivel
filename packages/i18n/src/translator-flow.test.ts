@@ -351,12 +351,16 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
 
   it("rejects ICU placeholders that differ from the Russian source", () => {
     const { report } = run((wb) => wb.set("site", "hello", "uz", "Salom, {ism}!"));
-    expect(report.errors).toEqual(["row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {ism:argument}"]);
+    expect(report.errors).toEqual([
+      "row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {ism:argument}",
+    ]);
   });
 
   it("shows the types when only the type of a placeholder differs", () => {
     const { report } = run((wb) => wb.set("site", "hello", "uz", "Hi {name, number}"));
-    expect(report.errors).toEqual(["row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {name:number}"]);
+    expect(report.errors).toEqual([
+      "row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {name:number}",
+    ]);
   });
 
   it("rejects a placeholder that was dropped", () => {
@@ -475,7 +479,7 @@ describe("import: normalization hook (normalizeUz comes from WP-02)", () => {
   });
 
   it.todo(
-    "после слияния WP-02: normalizeUz из @nivel/domain приводит oʻ, gʻ к U+02BB и прочие апострофы к U+02BC в импорте",
+    "after the WP-02 merge: the import runs the real normalizeUz from @nivel/domain (oʻ, gʻ to U+02BB, other apostrophes to U+02BC)",
   );
 });
 

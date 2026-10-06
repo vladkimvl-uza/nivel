@@ -1,5 +1,6 @@
+import { createTranslator } from "use-intl/core";
 import { describe, expect, it } from "vitest";
-import { checkIcuSyntax, placeholderSignature, placeholders } from "./icu.ts";
+import { checkIcuSyntax, placeholderSignature, placeholders, sampleValues } from "./icu.ts";
 
 describe("placeholders", () => {
   it("returns sorted argument names", () => {
@@ -67,6 +68,53 @@ describe("checkIcuSyntax", () => {
   });
 });
 
+describe("what the real parser (use-intl) rejects", () => {
+  it.each([
+    ["unclosed tag", "Narx <b>{sum}"],
+    ["closing tag without opening", "Narx {sum}</b>"],
+    ["mismatched tags", "<b>Narx</i> {sum}"],
+    ["tag closed in another branch", "{n, plural, one {<b>a} other {b</b>}}"],
+    ["dot in an argument name", "Salom {user.name}"],
+    ["dash in an argument name", "Salom {a-b}"],
+    ["colon in an argument name", "Salom {a:b}"],
+  ])("reports %s", (_name, message) => {
+    expect(checkIcuSyntax(message)).toEqual(expect.any(String));
+  });
+
+  it.each([
+    "<b>Narx</b> {sum}",
+    "Qator<br/>ikkinchi",
+    "<b><i>{x}</i></b>",
+    "{n, plural, one {<b>#</b> kun} other {<b>#</b> kun}}",
+    "{user_name} {a1} {0}",
+    "1 < 2 and {x}",
+  ])("accepts %j", (message) => {
+    expect(checkIcuSyntax(message)).toBeNull();
+  });
+});
+
+describe("sampleValues", () => {
+  it("gives a string for plain and select arguments, a number for number-like ones, a Date for date and time", () => {
+    const values = sampleValues(
+      "{a} {n, number} {c, plural, one {#} other {#}} {o, selectordinal, other {#}} {d, date} {t, time} {g, select, x {y} other {z}}",
+    );
+    expect(values).toEqual({
+      a: expect.any(String),
+      n: expect.any(Number),
+      c: expect.any(Number),
+      o: expect.any(Number),
+      d: expect.any(Date),
+      t: expect.any(Date),
+      g: "other",
+    });
+  });
+
+  it("finds arguments nested in branches and returns nothing for plain text", () => {
+    expect(Object.keys(sampleValues("{n, plural, other {{who} bought #}}")).sort()).toEqual(["n", "who"]);
+    expect(sampleValues("Matn")).toEqual({});
+  });
+});
+
 describe("ICU details", () => {
   it.each([
     "{n, plural, offset:1 =0 {hech kim} one {# kishi} other {# kishi}}",
@@ -102,5 +150,37 @@ describe("ICU details", () => {
 
   it("returns what it found before a syntax error", () => {
     expect(placeholders("{a} {b")).toEqual(["a"]);
+  });
+});
+
+describe("agreement with the real parser", () => {
+  // use-intl reports unparsable messages as INVALID_MESSAGE; anything else (a missing tag function, say) is not a syntax error.
+  function realParserRejects(message: string): boolean {
+    let invalid = false;
+    const t = createTranslator({
+      locale: "uz",
+      messages: { m: message },
+      onError(error: { code?: string }) {
+        if (error.code === "INVALID_MESSAGE") invalid = true;
+      },
+    } as Parameters<typeof createTranslator>[0]) as unknown as (key: string, values: object) => string;
+    t("m", { ...sampleValues(message), b: () => "", i: () => "" });
+    return invalid;
+  }
+
+  it.each([
+    "Salom {name}",
+    "<b>Narx</b> {sum}",
+    "{n, plural, one {# kun} other {# kun}}",
+    "Narx <b>{sum}",
+    "Narx {sum}</b>",
+    "<b>Narx</i> {sum}",
+    "Salom {user.name}",
+    "Salom {a-b}",
+    "{n, plural, one {# kun}}",
+    "Salom {name",
+    "Salom {}",
+  ])("agrees on %j", (message) => {
+    expect(checkIcuSyntax(message) !== null).toBe(realParserRejects(message));
   });
 });
