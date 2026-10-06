@@ -2,6 +2,7 @@
 // four runtimes of the same throwaway database, one per role of the application, with a shared fake clock, a catalog of
 // eight positions with market prices, published offers, the accounts of the owner and the assistant and one shop.
 // The harness (packages/testing) has already pointed every DATABASE_URL_* at the database of this test file.
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { categories, createDb, type Db, marketPrices, vendors } from "@nivel/db";
 import { catalog, content, ops, sales } from "@nivel/db/repos";
@@ -242,4 +243,23 @@ export async function newCustomer(w: World, lang: "uz" | "ru" = "uz"): Promise<s
 /** The eight positions of the PC as lines of a build. */
 export function pcLines(w: World): BuildLine[] {
   return PC_CATALOG.map((p) => ({ productId: w.products[p.key].id, qty: 1 }));
+}
+
+/** A registered file (a photo of a receipt, a statement): the registry row only, the bytes are not needed here. */
+export async function newFile(
+  w: World,
+  o: { kind?: string; retention?: "order_warranty_plus_3y" | "tax_5y" } = {},
+): Promise<string> {
+  const key = `test/${randomUUID()}`;
+  return ops.registerFile(w.db, {
+    sha256: createHash("sha256").update(key).digest("hex"),
+    mime: "image/jpeg",
+    bytes: 1024,
+    storageKey: key,
+    kind: o.kind ?? "receipt_photo",
+    isPublic: false,
+    containsPd: false,
+    retentionClass: o.retention ?? "tax_5y",
+    createdBy: "test",
+  });
 }

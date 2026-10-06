@@ -4,6 +4,7 @@
 import { record } from "../consents/index.ts";
 import { convert, create as createLead } from "../leads/index.ts";
 import { dispatch } from "../orders/dispatch.ts";
+import { confirm, expect as expectPayment } from "../payments/index.ts";
 import { type BuiltQuote, build } from "../quotes/build.ts";
 import type { ManualLine } from "../quotes/compute.ts";
 import { send } from "../quotes/send.ts";
@@ -89,6 +90,38 @@ export async function acceptedOrder(w: World): Promise<TestOrder> {
     w.bot,
   );
   if (!r.ok) throw new Error(`the estimate was not accepted: ${r.error}`);
+  return o;
+}
+
+/** The advance and the money for purchases are paid and confirmed, both flags are up (the owner opens them). */
+export async function paidOrder(w: World): Promise<TestOrder & { advanceId: string; fundsId: string }> {
+  w.clock.set(new Date("2026-10-12T10:00:00+05:00"));
+  const o = await acceptedOrder(w);
+  const advanceId = (await expectPayment({ orderId: o.orderId, kind: "fee_advance" }, ownerActor(w), w.admin))
+    .paymentId;
+  const fundsId = (await expectPayment({ orderId: o.orderId, kind: "purchase_funds" }, ownerActor(w), w.admin))
+    .paymentId;
+  await confirm({ paymentId: advanceId, fiscalReceiptNo: `FR-${advanceId.slice(-8)}` }, ownerActor(w), w.admin);
+  await confirm({ paymentId: fundsId, bankDocNo: `PP-${fundsId.slice(-8)}` }, ownerActor(w), w.admin);
+  const a = await dispatch(o.orderId, { type: "FEE_PREPAID", paymentId: advanceId }, ownerActor(w), w.admin);
+  const f = await dispatch(
+    o.orderId,
+    { type: "FUNDS_RECEIVED", paymentIds: [fundsId], receivedAt: w.clock.now() },
+    ownerActor(w),
+    w.admin,
+  );
+  if (!a.ok || !f.ok) throw new Error(`the payments were not accepted: ${JSON.stringify([a, f])}`);
+  return { ...o, advanceId, fundsId };
+}
+
+/** The next working day has come and the owner starts the purchases. */
+export async function purchasingOrder(
+  w: World,
+): Promise<ReturnType<typeof paidOrder> extends Promise<infer T> ? T : never> {
+  const o = await paidOrder(w);
+  w.clock.set(new Date("2026-10-13T10:00:00+05:00"));
+  const r = await dispatch(o.orderId, { type: "START_PURCHASE" }, ownerActor(w), w.admin);
+  if (!r.ok) throw new Error(`the purchase did not start: ${r.error}`);
   return o;
 }
 
