@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -83,5 +83,29 @@ describe("check-ownership", () => {
     ).toEqual([]);
     expect(checkFiles(["apps/web/app/x/(marketing)/page.tsx"], "WP-16", ownership)).toHaveLength(1);
     expect(checkFiles(["packages/ui/src/direction/b/stamp.tsx"], "WP-09", ownership)).toHaveLength(1);
+  });
+});
+
+describe("OWNERSHIP.md: registry of translation namespaces", () => {
+  const text = readFileSync(join(ROOT, "docs", "arch", "OWNERSHIP.md"), "utf8");
+  const section = (text.split(/^## /m).find((s) => s.startsWith("Реестр пространств имён")) ?? "").replace(/\r/g, "");
+
+  it("has a section with the three rules", () => {
+    expect(section).not.toBe("");
+    // 1. The package that needs a namespace writes its files.
+    expect(section).toContain("packages/i18n/messages/{uz,ru,meta}/<ns>.json");
+    expect(section).toMatch(/пишет пакет, которому (это )?пространство нужно/);
+    // 2. The integrator adds the registration at merge.
+    expect(section).toContain("packages/i18n/src/catalog.ts");
+    expect(section).toMatch(/интегратор/);
+    // 3. Strict check before the merge.
+    expect(section).toContain("NIVEL_STRICT_NAMESPACES=1");
+  });
+
+  it("does not turn into a list of owners: its bullets are not read as globs of a work package", () => {
+    const { owners } = parseOwnership(text);
+    expect([...owners.keys()].every((k) => /^WP-\d{2}$/.test(k))).toBe(true);
+    // The namespace files are still owned by the packages that are named in OWNERSHIP.md.
+    expect(owners.get("WP-12")?.include).toContain("packages/i18n/messages/{uz,ru,meta}/pdf.json");
   });
 });
