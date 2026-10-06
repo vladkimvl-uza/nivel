@@ -140,6 +140,48 @@ describe("sign-in", () => {
     expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(0);
   });
 
+  it("checks at most five passwords when many sign-ins arrive at once: the attempt is claimed before it is checked", async () => {
+    // Twenty requests read the account before any of them has been counted; the limit must still hold.
+    const store = new MemoryAuthStore();
+    const inner = createNodeArgon2Hasher({ memoryKiB: 64, passes: 1 });
+    let checked = 0;
+    const service = createAuthService({
+      store,
+      hasher: {
+        hash: (p) => inner.hash(p),
+        verify: async (stored, p) => {
+          checked += 1;
+          return inner.verify(stored, p);
+        },
+      },
+      dataKey: randomBytes(32),
+      now: () => T0,
+      issuer: "Nivel admin",
+    });
+    const made = await service.provisionUser({
+      email: "owner@nivel.uz",
+      role: "owner",
+      password: PASSWORD,
+      actor: "cli",
+    });
+    if (!made.ok) throw new Error("provision failed");
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        service.login({ email: "owner@nivel.uz", password: PASSWORD, code: "000000", ipHash: null, ua: null }),
+      ),
+    );
+    expect(checked).toBe(AUTH_POLICY.lockAfterFailures);
+    expect(results.filter((r) => !r.ok && r.reason === "locked").length).toBeGreaterThanOrEqual(15);
+    expect(store.accounts.get(made.id)?.failedLogins).toBe(AUTH_POLICY.lockAfterFailures);
+    expect(store.audit.filter((a) => a.action === "auth.login_failed")).toHaveLength(AUTH_POLICY.lockAfterFailures);
+  });
+
+  it("the fifth attempt, if it is right, gets in and clears the claim it made", async () => {
+    for (let i = 0; i < 4; i += 1) await attempt(h, { password: WRONG });
+    expect((await attempt(h)).ok).toBe(true);
+    expect(h.store.accounts.get(h.user.id)).toMatchObject({ failedLogins: 0, lockedUntil: null });
+  });
+
   it("does not let a switched-off account in", async () => {
     await h.store.setActive(h.user.id, false);
     expect(await attempt(h)).toEqual({ ok: false, reason: "invalid" });
@@ -317,10 +359,19 @@ describe("account", () => {
 
   it("binds a Telegram id, rejects junk and an id of another account, and unbinds with an empty value", async () => {
     const h = await setup();
-    expect(await h.service.bindTelegram(h.user.id, " 123456789 ")).toEqual({ ok: true, telegramUserId: 123456789 });
+    // Every change of the binding asks for the password and a code of a new period, as the other sensitive changes do.
+    const bind = (userId: string, telegram: string, over: Partial<{ password: string; code: string }> = {}) => {
+      h.clock.advance(31_000);
+      return h.service.bindTelegram(userId, {
+        telegram,
+        password: over.password ?? PASSWORD,
+        code: over.code ?? h.codeNow(),
+      });
+    };
+    expect(await bind(h.user.id, " 123456789 ")).toEqual({ ok: true, telegramUserId: 123456789 });
     expect(h.store.accounts.get(h.user.id)?.telegramUserId).toBe(123456789);
     for (const junk of ["abc", "-5", "0", "12.5", "1e3", "9007199254740993", "+123"]) {
-      expect(await h.service.bindTelegram(h.user.id, junk)).toEqual({ ok: false, reason: "format" });
+      expect(await bind(h.user.id, junk)).toEqual({ ok: false, reason: "format" });
     }
     const other = await h.service.provisionUser({
       email: "helper@nivel.uz",
@@ -329,10 +380,39 @@ describe("account", () => {
       actor: "cli",
     });
     if (!other.ok) throw new Error("provision failed");
-    expect(await h.service.bindTelegram(other.id, "123456789")).toEqual({ ok: false, reason: "taken" });
-    expect(await h.service.bindTelegram(h.user.id, "")).toEqual({ ok: true, telegramUserId: null });
+    const otherSecret = base32Decode(other.totpSecret);
+    h.clock.advance(31_000);
+    expect(
+      await h.service.bindTelegram(other.id, {
+        telegram: "123456789",
+        password: PASSWORD,
+        code: generateTotp(otherSecret, h.clock.now),
+      }),
+    ).toEqual({ ok: false, reason: "taken" });
+    expect(await bind(h.user.id, "")).toEqual({ ok: true, telegramUserId: null });
     expect(h.store.accounts.get(h.user.id)?.telegramUserId).toBeNull();
-    expect(h.store.audit.filter((a) => a.action === "auth.telegram_bound")).toHaveLength(2);
+    const journal = h.store.audit.filter((a) => a.action === "auth.telegram_bound");
+    expect(journal).toHaveLength(2);
+    // The journal keeps what was there and what is there now: a taken-over binding can be seen afterwards.
+    expect(journal[1]).toMatchObject({ before: { telegramUserId: 123456789 }, after: { telegramUserId: null } });
+  });
+
+  it("does not change the binding without the right password and a fresh code; a wrong try counts toward the lock", async () => {
+    const h = await setup();
+    const tryBind = (over: Partial<{ password: string; code: string }>) =>
+      h.service.bindTelegram(h.user.id, {
+        telegram: "123456789",
+        password: over.password ?? PASSWORD,
+        code: over.code ?? h.codeNow(),
+      });
+    expect(await tryBind({ password: WRONG })).toEqual({ ok: false, reason: "invalid" });
+    expect(await tryBind({ code: "000000" })).toEqual({ ok: false, reason: "invalid" });
+    expect(await tryBind({ code: "" })).toEqual({ ok: false, reason: "invalid" });
+    expect(h.store.accounts.get(h.user.id)?.telegramUserId).toBeNull();
+    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBeGreaterThanOrEqual(2);
+    expect(h.store.audit.map((a) => a.action)).not.toContain("auth.telegram_bound");
+    // A recovery code is not a fresh code of the app: it opens the way in, not this change.
+    expect(await tryBind({ code: h.user.recoveryCodes[0] ?? "" })).toEqual({ ok: false, reason: "invalid" });
   });
 });
 

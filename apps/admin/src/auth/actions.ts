@@ -101,7 +101,11 @@ export async function changePasswordAction(_previous: AccountState, data: FormDa
 export async function bindTelegramAction(_previous: AccountState, data: FormData): Promise<AccountState> {
   try {
     const user = await requireActionUser("account.self");
-    const result = await getRuntime().auth.bindTelegram(user.id, text(data, "telegram"));
+    const result = await getRuntime().auth.bindTelegram(user.id, {
+      telegram: text(data, "telegram"),
+      password: text(data, "password"),
+      code: text(data, "code"),
+    });
     revalidatePath("/account");
     if (result.ok) {
       return {
@@ -112,13 +116,13 @@ export async function bindTelegramAction(_previous: AccountState, data: FormData
             : "Telegram привязан: бот узнает вас по этому номеру.",
       };
     }
-    return {
-      ok: false,
-      message:
-        result.reason === "taken"
-          ? "Этот Telegram-номер уже привязан к другой учётной записи."
-          : "Нужен числовой Telegram id (только цифры). Его показывает бот @userinfobot или команда /id в нашем боте.",
-    };
+    const messages = {
+      taken: "Этот Telegram-номер уже привязан к другой учётной записи.",
+      invalid: "Пароль или код неверные. Код нужен новый: дождитесь, пока в приложении сменятся цифры.",
+      format:
+        "Нужен числовой Telegram id (только цифры). Его показывает бот @userinfobot или команда /id в нашем боте.",
+    } as const;
+    return { ok: false, message: messages[result.reason] };
   } catch (error) {
     const denied = forbiddenMessage(error);
     if (denied) return { ok: false, message: denied };

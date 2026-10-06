@@ -85,17 +85,31 @@ test.describe("роли", () => {
     await page.goto(`${admin.baseURL}/account`);
     await expect(page.getByTestId("account-telegram")).toHaveText("не привязан");
 
-    await page.getByTestId("telegram-form").getByLabel("Telegram id").fill("123456789");
-    await page.getByTestId("telegram-form").getByRole("button", { name: "Сохранить" }).click();
-    await expect(page.getByTestId("telegram-form").locator(".adm-flash--ok")).toContainText("Telegram привязан");
+    const form = page.getByTestId("telegram-form");
+    const submit = async (telegram: string, password: string, code: string) => {
+      // После ответа React очищает поля формы: заполняем все заново.
+      await form.getByLabel("Telegram id").fill(telegram);
+      await form.getByLabel("Пароль").fill(password);
+      await form.getByLabel("Код из приложения").fill(code);
+      await form.getByRole("button", { name: "Сохранить" }).click();
+    };
+    // Привязка решает, кому бот поверит как владельцу: с чужим паролем (одного сеанса мало) она не меняется.
+    await submit("123456789", "not-the-password-at-all", owner.code(1));
+    await expect(form.locator(".adm-flash--error")).toContainText("Пароль или код неверные");
+    expect(
+      await admin.query("select 1 from ops.admin_users where id = $1 and telegram_user_id is not null", [owner.id]),
+    ).toHaveLength(0);
+
+    // Код при входе уже использован: нужен код следующего периода.
+    await submit("123456789", owner.password, owner.code(1));
+    await expect(form.locator(".adm-flash--ok")).toContainText("Telegram привязан");
     const [row] = await admin.query<{ telegram_user_id: string }>(
       "select telegram_user_id from ops.admin_users where id = $1",
       [owner.id],
     );
     expect(row?.telegram_user_id).toBe("123456789");
 
-    await page.getByTestId("telegram-form").getByLabel("Telegram id").fill("не число");
-    await page.getByTestId("telegram-form").getByRole("button", { name: "Сохранить" }).click();
-    await expect(page.getByTestId("telegram-form").locator(".adm-flash--error")).toContainText("числовой Telegram id");
+    await submit("не число", owner.password, owner.code(1));
+    await expect(form.locator(".adm-flash--error")).toContainText("числовой Telegram id");
   });
 });

@@ -79,10 +79,14 @@ export interface AuthService {
     userId: string,
     input: { current: string; next: string; keepToken?: string },
   ): Promise<{ ok: true } | { ok: false; reason: "invalid" } | { ok: false; reason: "policy"; problems: string[] }>;
+  /**
+   * The Telegram id is what the bot trusts to say "this is the owner": changing it asks for the password and a code of
+   * the app, as issuing recovery codes does. An empty `telegram` unbinds.
+   */
   bindTelegram(
     userId: string,
-    text: string,
-  ): Promise<{ ok: true; telegramUserId: number | null } | { ok: false; reason: "format" | "taken" }>;
+    input: { telegram: string; password: string; code: string },
+  ): Promise<{ ok: true; telegramUserId: number | null } | { ok: false; reason: "format" | "taken" | "invalid" }>;
   regenerateRecoveryCodes(
     userId: string,
     input: { password: string; code: string },
@@ -129,10 +133,17 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     sessionExpiresAt: expiresAt,
   });
 
-  /** Counts the failure and answers with the lock when this one was the last allowed. */
-  async function fail(account: AdminAccount, reason: string, ipHash: string | null): Promise<LoginResult> {
+  /**
+   * Journals the failure of an attempt that was claimed before it was checked (`claimAttempt`), and answers with the
+   * lock when this attempt was the last allowed one.
+   */
+  async function fail(
+    account: AdminAccount,
+    reason: string,
+    ipHash: string | null,
+    state: { failedLogins: number; lockedUntil: Date | null },
+  ): Promise<LoginResult> {
     const at = now();
-    const state = await store.recordFailure(account.id, lockRule, at);
     await audit({
       actor: actorOf(account),
       action: "auth.login_failed",
@@ -193,6 +204,25 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     return { ok: true, usedRecovery, recoveryLeft: next.recovery.length };
   }
 
+  /**
+   * A sensitive change inside a live session asks again for the password and a code of a new period of the app (not a
+   * recovery code). A wrong answer counts toward the lock like a wrong sign-in does. The account when both are right.
+   */
+  async function reverify(userId: string, input: { password: string; code: string }): Promise<AdminAccount | null> {
+    const account = await store.findById(userId);
+    if (!account?.active) return null;
+    if (!(await hasher.verify(account.passwordHash, input.password))) {
+      await store.recordFailure(account.id, lockRule, now());
+      return null;
+    }
+    const factor = await checkSecondFactor(account, input.code, false);
+    if (!factor.ok) {
+      await store.recordFailure(account.id, lockRule, now());
+      return null;
+    }
+    return account;
+  }
+
   return {
     async login(input) {
       const email = normalizeEmail(input.email);
@@ -218,12 +248,6 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       if (account.lockedUntil && account.lockedUntil > at) {
         return { ok: false, reason: "locked", lockedUntil: account.lockedUntil };
       }
-      if (account.failedLogins > 0 && account.lockedUntil && account.lockedUntil <= at) {
-        // The lock has run out: the next failure is the first of a new series, not the sixth.
-        await store.resetFailures(account.id);
-        account.failedLogins = 0;
-        account.lockedUntil = null;
-      }
       if (!account.active) {
         await hasher.verify(await dummyHash(), input.password);
         await audit({
@@ -237,10 +261,18 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         return INVALID;
       }
 
+      // The attempt is taken before anything is checked: requests that arrive together read the same account, and only
+      // the claim in the database decides how many of them may check a password and a code.
+      const claim = await store.claimAttempt(account.id, lockRule, at);
+      if (!claim.claimed) {
+        return claim.lockedUntil && claim.lockedUntil > at
+          ? { ok: false, reason: "locked", lockedUntil: claim.lockedUntil }
+          : INVALID;
+      }
       if (!(await hasher.verify(account.passwordHash, input.password)))
-        return fail(account, "wrong_password", input.ipHash);
+        return fail(account, "wrong_password", input.ipHash, claim);
       const factor = await checkSecondFactor(account, input.code, true);
-      if (!factor.ok) return fail(account, factor.reason, input.ipHash);
+      if (!factor.ok) return fail(account, factor.reason, input.ipHash, claim);
 
       await store.resetFailures(account.id);
       const token = randomBytes(32).toString("base64url");
@@ -355,34 +387,33 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       return { ok: true };
     },
 
-    async bindTelegram(userId, text) {
-      const raw = text.trim();
+    async bindTelegram(userId, input) {
+      const raw = input.telegram.trim();
       let value: number | null = null;
       if (raw !== "") {
         if (!/^[1-9]\d{0,15}$/.test(raw)) return { ok: false, reason: "format" };
         value = Number(raw);
         if (!Number.isSafeInteger(value)) return { ok: false, reason: "format" };
       }
+      const account = await reverify(userId, input);
+      if (!account) return INVALID;
+      const before = account.telegramUserId;
       const result = await store.setTelegramUserId(userId, value);
       if (result === "taken") return { ok: false, reason: "taken" };
       await audit({
-        actor: `admin:${userId}`,
+        actor: actorOf(account),
         action: "auth.telegram_bound",
         entity: "ops.admin_users",
         entityId: userId,
+        before: { telegramUserId: before },
         after: { telegramUserId: value },
       });
       return { ok: true, telegramUserId: value };
     },
 
     async regenerateRecoveryCodes(userId, input) {
-      const account = await store.findById(userId);
-      if (!account || !(await hasher.verify(account.passwordHash, input.password))) return INVALID;
-      const factor = await checkSecondFactor(account, input.code, false);
-      if (!factor.ok) {
-        await store.recordFailure(account.id, lockRule, now());
-        return INVALID;
-      }
+      const account = await reverify(userId, input);
+      if (!account) return INVALID;
       const fresh = await store.findById(userId);
       const bundle = fresh?.totpSecretEnc ? openSecret(fresh.totpSecretEnc, dataKey, userId) : null;
       if (!fresh?.totpSecretEnc || !bundle) return INVALID;

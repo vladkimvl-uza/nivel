@@ -82,6 +82,28 @@ export function createPgAuthStore(db: Db): AuthStore {
       return ops.recordFailedLogin(db, id, { lockAfter: rule.lockAfter, lockMinutes: rule.lockMinutes, now });
     },
 
+    async claimAttempt(id, rule, now) {
+      // One statement decides and counts. `expired` is a lock that has run out: the series starts again from one.
+      const { rows } = await query<{ failed_logins: number; locked_until: Date | null }>(
+        `update ops.admin_users
+            set failed_logins = case when locked_until is not null then 1 else failed_logins + 1 end,
+                locked_until = case
+                  when (case when locked_until is not null then 1 else failed_logins + 1 end) >= $3::int
+                    then $2::timestamptz + make_interval(mins => $4::int)
+                  else null end
+          where id = $1 and (locked_until is null or locked_until <= $2::timestamptz)
+        returning failed_logins, locked_until`,
+        [id, now.toISOString(), rule.lockAfter, rule.lockMinutes],
+      );
+      const row = rows[0];
+      if (row) return { claimed: true as const, failedLogins: row.failed_logins, lockedUntil: row.locked_until };
+      const current = await query<{ locked_until: Date | null }>(
+        "select locked_until from ops.admin_users where id = $1",
+        [id],
+      );
+      return { claimed: false as const, lockedUntil: current.rows[0]?.locked_until ?? null };
+    },
+
     async resetFailures(id) {
       await ops.resetFailedLogins(db, id);
     },

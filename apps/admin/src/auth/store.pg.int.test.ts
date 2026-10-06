@@ -102,6 +102,33 @@ describe("sign-in on PostgreSQL", () => {
     expect(await auditActions(u.id)).toContain("auth.locked");
   });
 
+  it("twenty sign-ins at once count five attempts, not twenty: the attempt is claimed in one statement", async () => {
+    const u = await newUser("burst@nivel.test");
+    const results = await Promise.all(Array.from({ length: 20 }, () => login("burst@nivel.test", PASSWORD, "000000")));
+    expect(results.every((r) => !r.ok)).toBe(true);
+    const { rows } = await db.$client.query<{ failed_logins: number }>(
+      "select failed_logins from ops.admin_users where id = $1",
+      [u.id],
+    );
+    expect(rows[0]?.failed_logins).toBe(5);
+    expect((await auditActions(u.id)).filter((a) => a === "auth.login_failed")).toHaveLength(5);
+    expect(await login("burst@nivel.test", PASSWORD, u.code())).toMatchObject({ ok: false, reason: "locked" });
+  });
+
+  it("claims again from one once the lock has run out", async () => {
+    const u = await newUser("burst-2@nivel.test");
+    for (let i = 0; i < 5; i += 1) await login("burst-2@nivel.test", WRONG, "000000");
+    await db.$client.query("update ops.admin_users set locked_until = now() - interval '1 minute' where id = $1", [
+      u.id,
+    ]);
+    expect(await login("burst-2@nivel.test", WRONG, "000000")).toEqual({ ok: false, reason: "invalid" });
+    const { rows } = await db.$client.query<{ failed_logins: number; locked_until: Date | null }>(
+      "select failed_logins, locked_until from ops.admin_users where id = $1",
+      [u.id],
+    );
+    expect(rows[0]).toEqual({ failed_logins: 1, locked_until: null });
+  });
+
   it("a session ends by idleness and by the absolute limit", async () => {
     const u = await newUser("owner-4@nivel.test");
     const idle = await login("owner-4@nivel.test", PASSWORD, u.code());
@@ -156,8 +183,11 @@ describe("sign-in on PostgreSQL", () => {
 
     const a = await newUser("tg-a@nivel.test");
     const b = await newUser("tg-b@nivel.test", "assistant");
-    expect(await service.bindTelegram(a.id, "7000000001")).toEqual({ ok: true, telegramUserId: 7000000001 });
-    expect(await service.bindTelegram(b.id, "7000000001")).toEqual({ ok: false, reason: "taken" });
+    const bind = (u: typeof a, telegram: string, password = PASSWORD) =>
+      service.bindTelegram(u.id, { telegram, password, code: u.code() });
+    expect(await bind(a, "7000000001", WRONG)).toEqual({ ok: false, reason: "invalid" });
+    expect(await bind(a, "7000000001")).toEqual({ ok: true, telegramUserId: 7000000001 });
+    expect(await bind(b, "7000000001")).toEqual({ ok: false, reason: "taken" });
     const { rows } = await db.$client.query<{ telegram_user_id: string }>(
       "select telegram_user_id from ops.admin_users where id = $1",
       [a.id],

@@ -69,6 +69,24 @@ export function TelegramForm({ current }: { current: number | null }) {
         defaultValue={current === null ? "" : String(current)}
         hint="Число. Бот проверяет по нему, что команды владельца пишет именно этот человек. Пусто — отвязать."
       />
+      <TextField
+        id="telegram-password"
+        name="password"
+        label="Пароль"
+        type="password"
+        autoComplete="current-password"
+        required
+        hint="Привязка решает, кому бот поверит как владельцу, поэтому её меняют только с паролем и свежим кодом."
+      />
+      <TextField
+        id="telegram-code"
+        name="code"
+        label="Код из приложения"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        required
+        hint="Новый код: тот, что вы только что вводили при входе, второй раз не подойдёт."
+      />
       <div className="adm-actions">
         <Button type="submit" disabled={pending}>
           Сохранить

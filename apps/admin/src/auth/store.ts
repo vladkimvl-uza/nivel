@@ -62,6 +62,19 @@ export interface AuthStore {
     rule: { lockAfter: number; lockMinutes: number },
     now: Date,
   ): Promise<{ failedLogins: number; lockedUntil: Date | null }>;
+  /**
+   * Takes one sign-in attempt before the password is checked, in one statement: an account that is locked (the lock has
+   * not run out) gives nothing; otherwise the count goes up by one (from zero after a lock that has run out) and the
+   * account is locked when the count reaches `lockAfter`. Concurrent requests therefore cannot check more passwords
+   * than the rule allows. A right sign-in then clears the claim with `resetFailures`.
+   */
+  claimAttempt(
+    id: string,
+    rule: { lockAfter: number; lockMinutes: number },
+    now: Date,
+  ): Promise<
+    { claimed: true; failedLogins: number; lockedUntil: Date | null } | { claimed: false; lockedUntil: Date | null }
+  >;
   resetFailures(id: string): Promise<void>;
   /** Replaces the sealed bundle only when it still is `expected`: two sign-ins cannot both spend one recovery code. */
   replaceTotpBundle(id: string, expected: string | null, next: string): Promise<boolean>;

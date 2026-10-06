@@ -126,27 +126,65 @@ describe("the own account", () => {
     ).toBe("Текущий пароль неверный.");
   });
 
-  it("binds and unbinds the Telegram id, refuses junk and an id of another account", async () => {
+  it("binds and unbinds the Telegram id with the password and a fresh code; refuses junk and an id of another account", async () => {
     await newAccount("tg@nivel.test", "assistant").then(async (other) => {
-      await fake.runtime.auth.bindTelegram(other.made.id, "555");
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(Date.now() + 31_000);
+        await fake.runtime.auth.bindTelegram(other.made.id, {
+          telegram: "555",
+          password: PASSWORD,
+          code: other.code(),
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
+    const { secret } = await fake.signInAs("owner");
+    const base = Date.now();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      let step = 0;
+      // Each submission comes a period later than the one before: a code is good for one use.
+      const bind = (fields: Record<string, string>, over: { password?: string; code?: string } = {}) => {
+        step += 1;
+        vi.setSystemTime(base + step * 31_000);
+        return actions.bindTelegramAction(
+          {},
+          form({ password: over.password ?? PASSWORD, code: over.code ?? generateTotp(secret, new Date()), ...fields }),
+        );
+      };
+      expect(await bind({ telegram: "123456789" })).toMatchObject({
+        ok: true,
+        message: expect.stringContaining("Telegram привязан"),
+      });
+      expect(await bind({ telegram: "" })).toMatchObject({ ok: true, message: "Привязка Telegram снята." });
+      expect(await bind({ telegram: "abc" })).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("числовой Telegram id"),
+      });
+      expect(await bind({ telegram: "555" })).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("уже привязан"),
+      });
+      // The wrong password or a code that was already used changes nothing and says why.
+      expect(await bind({ telegram: "777" }, { password: "nope-nope-nope-nope" })).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("Пароль или код неверные"),
+      });
+      expect(await bind({ telegram: "777" }, { code: "000000" })).toMatchObject({ ok: false });
+      const owner = [...fake.authStore.accounts.values()].find((a) => a.role === "owner");
+      expect(owner?.telegramUserId).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a stolen session alone cannot take over the binding of the bot", async () => {
     await fake.signInAs("owner");
-    expect(await actions.bindTelegramAction({}, form({ telegram: "123456789" }))).toMatchObject({
-      ok: true,
-      message: expect.stringContaining("Telegram привязан"),
-    });
-    expect(await actions.bindTelegramAction({}, form({ telegram: "" }))).toMatchObject({
-      ok: true,
-      message: "Привязка Telegram снята.",
-    });
-    expect(await actions.bindTelegramAction({}, form({ telegram: "abc" }))).toMatchObject({
-      ok: false,
-      message: expect.stringContaining("числовой Telegram id"),
-    });
-    expect(await actions.bindTelegramAction({}, form({ telegram: "555" }))).toMatchObject({
-      ok: false,
-      message: expect.stringContaining("уже привязан"),
-    });
+    const result = await actions.bindTelegramAction({}, form({ telegram: "999000111" }));
+    expect(result).toMatchObject({ ok: false, message: expect.stringContaining("Пароль или код неверные") });
+    expect([...fake.authStore.accounts.values()].every((a) => a.telegramUserId === null)).toBe(true);
   });
 
   it("issues new recovery codes after a check of the password and a code, shows them once", async () => {

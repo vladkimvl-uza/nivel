@@ -32,8 +32,8 @@ export interface TestUser {
   password: string;
   role: Role;
   recoveryCodes: string[];
-  /** The code the authenticator app would show now. */
-  code(): string;
+  /** The code the authenticator app would show now, or `periods` periods of 30 s later (the server accepts one ahead). */
+  code(periods?: number): string;
 }
 
 export interface AdminHarness {
@@ -317,7 +317,7 @@ async function boot(parallelIndex: number, releaseSlot: () => void): Promise<Adm
         password,
         role,
         recoveryCodes: made.recoveryCodes,
-        code: () => generateTotp(secret, new Date()),
+        code: (periods = 0) => generateTotp(secret, new Date(Date.now() + periods * 30_000)),
       };
     },
     async stop() {
