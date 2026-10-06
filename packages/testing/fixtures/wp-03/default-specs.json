@@ -1,0 +1,205 @@
+{
+  "cpu": {
+    "socket": "AM5",
+    "cores": 6,
+    "threads": 12,
+    "boostGhz": 5,
+    "tdpW": 65,
+    "maxPowerW": 88,
+    "hasIgpu": false,
+    "memTypes": ["DDR5"],
+    "memMaxMts": {
+      "DDR5": 5200
+    },
+    "boxCooler": false,
+    "chipsets": ["B650", "X670", "B850", "X870"],
+    "minBiosByChipset": {
+      "B650": "1.20"
+    }
+  },
+  "mb": {
+    "socket": "AM5",
+    "chipset": "B650",
+    "formFactor": "mATX",
+    "ramType": "DDR5",
+    "ramSlots": 4,
+    "ramMaxGb": 192,
+    "ramMaxMts": 6400,
+    "m2": [
+      {
+        "id": "M2_1",
+        "pcieGen": 5,
+        "maxLenMm": 80,
+        "disablesSata": []
+      },
+      {
+        "id": "M2_2",
+        "pcieGen": 4,
+        "maxLenMm": 110,
+        "disablesSata": [3, 4]
+      }
+    ],
+    "sataPorts": 4,
+    "pcieX16Slots": 1,
+    "fanHeaders": 6,
+    "argb5vHeaders": 2,
+    "rgb12vHeaders": 1,
+    "wifi": true,
+    "bluetooth": true,
+    "biosFlashback": true,
+    "shippedBios": "1.30"
+  },
+  "ram": {
+    "type": "DDR5",
+    "kitGb": 16,
+    "modules": 2,
+    "mts": 5200,
+    "cl": 40,
+    "profile": "EXPO",
+    "heightMm": 34,
+    "lighting": false
+  },
+  "ssd": {
+    "iface": "nvme",
+    "formFactor": "M.2-2280",
+    "capacityGb": 1000,
+    "pcieGen": 4,
+    "tbw": 600
+  },
+  "gpu": {
+    "chip": "RTX 5060",
+    "vramGb": 8,
+    "lengthMm": 240,
+    "heightMm": 120,
+    "slots": 2,
+    "power": [
+      {
+        "conn": "8pin",
+        "count": 1
+      }
+    ],
+    "adapterInBox": false,
+    "tgpW": 145,
+    "vendorRecommendedPsuW": 550,
+    "hwEncoders": ["NVENC"]
+  },
+  "psu": {
+    "watts": 650,
+    "rating": "bronze",
+    "formFactor": "ATX",
+    "lengthMm": 140,
+    "modular": "semi",
+    "pcie8pin": 2,
+    "native12v2x6": 0,
+    "atx3": false
+  },
+  "case": {
+    "boards": ["ATX", "mATX", "Mini-ITX"],
+    "gpuMaxLenMm": 330,
+    "gpuMaxLenWithFrontRadMm": 300,
+    "coolerMaxHeightMm": 165,
+    "radiators": [
+      {
+        "side": "top",
+        "sizesMm": [120, 140, 240, 280],
+        "maxThicknessMm": 55
+      },
+      {
+        "side": "front",
+        "sizesMm": [120, 140, 240, 280, 360],
+        "maxThicknessMm": 55
+      },
+      {
+        "side": "rear",
+        "sizesMm": [120]
+      }
+    ],
+    "psuFF": ["ATX"],
+    "psuMaxLenMm": 180,
+    "expansionSlots": 7,
+    "fanMounts": 8,
+    "fansIncluded": 2,
+    "dimsMm": {
+      "w": 215,
+      "d": 430,
+      "h": 450
+    }
+  },
+  "cooler_air": {
+    "sockets": ["AM5", "AM4", "LGA1700"],
+    "heightMm": 155,
+    "ramClearanceMm": 40,
+    "tdpRatedW": 180
+  },
+  "aio": {
+    "sockets": ["AM5", "AM4", "LGA1700", "LGA1851"],
+    "radMm": 360,
+    "radThicknessWithFansMm": 52,
+    "tubeLenMm": 400,
+    "pumpW": 15
+  },
+  "fan": {
+    "sizeMm": 120,
+    "count": 3,
+    "conn": "4pin",
+    "argb": false
+  },
+  "monitor": {
+    "diagIn": 27,
+    "aspect": "16:9",
+    "resolution": "2560x1440",
+    "hz": 180,
+    "panelWmm": 614,
+    "panelHmm": 360,
+    "depthWithStandMm": 210,
+    "standFootprintMm": {
+      "w": 250,
+      "d": 200
+    },
+    "weightNoStandKg": 4.5,
+    "vesa": "100x100",
+    "curved": false
+  },
+  "arm": {
+    "reachMinMm": 100,
+    "reachMaxMm": 450,
+    "poleHeightMm": 400,
+    "mount": "clamp",
+    "topThicknessMinMm": 10,
+    "topThicknessMaxMm": 85,
+    "vesa": ["75x75", "100x100"],
+    "loadMinKg": 2,
+    "loadMaxKg": 9,
+    "diagMinIn": 13,
+    "diagMaxIn": 32,
+    "screens": 1
+  },
+  "desk": {
+    "topWmm": 1400,
+    "topDmm": 700,
+    "heightMinMm": 720,
+    "heightMaxMm": 720,
+    "topThicknessMm": 25,
+    "legZonesMm": [
+      {
+        "fromMm": 0,
+        "toMm": 100
+      },
+      {
+        "fromMm": 1300,
+        "toMm": 1400
+      }
+    ],
+    "cableCutout": true,
+    "loadKg": 80,
+    "motors": 0
+  },
+  "chair": {
+    "baseDiamMm": 680,
+    "seatHeightMinMm": 430,
+    "seatHeightMaxMm": 520,
+    "rollbackZoneMm": 750,
+    "userHeightCm": [160, 190],
+    "userMaxKg": 120
+  }
+}
