@@ -335,7 +335,9 @@ export const RULES: readonly Rule[] = [
       return [
         { kind: "set", field: "warrantyUntil", at: warrantyUntil },
         { kind: "schedule", job: "warranty_end", at: warrantyUntil },
-        ...AFTERCARE_DAYS.map((days): Effect => ({ kind: "schedule", job: "aftercare", at: after(now, days * DAY_MS) })),
+        ...AFTERCARE_DAYS.map(
+          (days): Effect => ({ kind: "schedule", job: "aftercare", at: after(now, days * DAY_MS) }),
+        ),
         { kind: "ledger", fund: "warranty", amount: warrantyReserve(o.money.receiptsTotal) },
         notify("customer", "order.handed_over"),
       ];
