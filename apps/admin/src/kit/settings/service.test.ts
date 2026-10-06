@@ -90,9 +90,10 @@ function setup() {
   const outbox: string[][] = [];
   const revalidator = {
     ok: true,
-    revalidate: async (tags: string[]) => (
-      calls.push(tags), revalidator.ok ? { ok: true as const } : { ok: false as const, error: "web down" }
-    ),
+    revalidate: async (tags: string[]) => {
+      calls.push(tags);
+      return revalidator.ok ? { ok: true as const } : { ok: false as const, error: "web down" };
+    },
   };
   const service = createSettingsService({
     store,
@@ -152,7 +153,9 @@ describe("fee settings with a version and an effective date", () => {
       { expectedVersion: 1 },
     );
     expect(r).toMatchObject({ ok: true, scheduled: true });
-    expect((store.data.get("money.fee_settings")?.value as { pcLowRateBp: number }).pcLowRateBp).toBe(1500);
+    expect((store.data.get("money.fee_settings")?.value as { pcLowRateBp: number } | undefined)?.pcLowRateBp).toBe(
+      1500,
+    );
     expect(store.data.get("money.fee_settings.next")?.value).toMatchObject({
       version: "2026-11-01",
       pcLowRateBp: 1400,
@@ -242,7 +245,9 @@ describe("fee settings with a version and an effective date", () => {
       { ...feeInput, effectiveFrom: "2026-10-06", pcLowRateBp: 1300 },
       { expectedVersion: 2 },
     );
-    expect((store.data.get("money.fee_settings")?.value as { version: string }).version).toBe("2026-10-06.2");
+    expect((store.data.get("money.fee_settings")?.value as { version: string } | undefined)?.version).toBe(
+      "2026-10-06.2",
+    );
   });
 
   it("a scheduled change can be cancelled, and comes into force when its day arrives", async () => {
@@ -398,9 +403,10 @@ describe("http revalidator", () => {
       baseUrl: "http://127.0.0.1:3400/",
       key,
       now: () => new Date("2026-10-06T07:00:00Z"),
-      fetch: async (url, init) => (
-        seen.push({ url: String(url), init: init ?? {} }), new Response("{}", { status: 200 })
-      ),
+      fetch: async (url, init) => {
+        seen.push({ url: String(url), init: init ?? {} });
+        return new Response("{}", { status: 200 });
+      },
     });
     expect(await revalidator.revalidate(["settings", "fee"])).toEqual({ ok: true });
     const call = seen[0];
