@@ -11,6 +11,8 @@ describe("toRuleError", () => {
     ["not_reconciled: funds 1, purchases 0", "not_reconciled"],
     ["consent_missing: a purchase without a receipt needs the consent", "consent_missing"],
     ["actor_not_allowed: nivel_web as owner cannot apply ACCEPT", "actor_not_allowed"],
+    ["change_not_allowed: customer may not write the order field funds_received", "change_not_allowed"],
+    ["payments_incomplete: no confirmed fee advance for the order", "payments_incomplete"],
     ["invalid_transition: ACCEPT is not allowed from estimate_draft", "invalid_transition"],
     ["direct_status_change: orders.status is changed only by sales.apply_transition()", "direct_status_change"],
     ["append_only: ops.audit_log forbids UPDATE", "append_only"],

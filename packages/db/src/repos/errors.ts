@@ -13,6 +13,8 @@ export type DbRuleCode =
   | "consent_missing"
   | "no_current_quote"
   | "actor_not_allowed"
+  | "change_not_allowed"
+  | "payments_incomplete"
   | "invalid_transition"
   | "stale_status"
   | "order_not_found"
@@ -36,6 +38,8 @@ const KEYED: ReadonlySet<string> = new Set<DbRuleCode>([
   "consent_missing",
   "no_current_quote",
   "actor_not_allowed",
+  "change_not_allowed",
+  "payments_incomplete",
   "invalid_transition",
   "stale_status",
   "order_not_found",

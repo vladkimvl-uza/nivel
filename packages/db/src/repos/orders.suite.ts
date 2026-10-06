@@ -1,6 +1,17 @@
+import { orderTransitionTable } from "@nivel/domain/order";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { connectAs, createOrder, driveTo, ORDER_PATH, one, pgError, transition } from "./testkit.ts";
+import {
+  connectAs,
+  createOrder,
+  driveTo,
+  insertPayment,
+  ORDER_PATH,
+  one,
+  pgError,
+  receiveFunds,
+  transition,
+} from "./testkit.ts";
 
 // ARCHITECTURE 4.9, 4.13: the status changes only through sales.apply_transition(); every step is journaled.
 let migrator: pg.Client;
@@ -90,6 +101,7 @@ describe("order status is changed only by apply_transition", () => {
   it("writes the order fields given in changes and refuses unknown ones", async () => {
     const { orderId } = await createOrder(migrator);
     await driveTo(admin, orderId, "accepted");
+    await receiveFunds(admin, orderId, 10_000_000);
     await transition(admin, orderId, "FUNDS_RECEIVED", {
       changes: {
         funds_received: true,
@@ -133,9 +145,12 @@ describe("the status graph", () => {
   it.each(INVALID)("refuses %s + %s", async (from, event) => {
     const { orderId } = await createOrder(migrator);
     if (from !== "estimate_draft") await driveTo(admin, orderId, from);
-    const e = await pgError(admin, "select * from sales.apply_transition($1, $2::jsonb, 'owner', 'x')", [
+    // An actor that table 4.9 lists for the event, so that only the graph can refuse it.
+    const actor = orderTransitionTable().find((r) => r.event === event)?.actors[0] ?? "owner";
+    const e = await pgError(admin, "select * from sales.apply_transition($1, $2::jsonb, $3, 'x')", [
       orderId,
       JSON.stringify({ type: event }),
+      actor,
     ]);
     expect(e.message).toMatch(/invalid_transition/);
   });
@@ -228,6 +243,185 @@ describe("who may call", () => {
     expect(a.message).toMatch(/invalid_actor/);
     const b = await pgError(admin, "select * from sales.apply_transition($1, '{}', 'owner', 'x')", [orderId]);
     expect(b.message).toMatch(/invalid_event/);
+  });
+});
+
+describe('who may send which event (ARCHITECTURE 4.9, column "who")', () => {
+  const KINDS = ["system", "customer", "owner", "assistant"] as const;
+  const TABLE = orderTransitionTable();
+  const EVENTS = [...new Map(TABLE.map((r) => [r.event, r.actors])).entries()];
+
+  it("holds the same graph and the same actors as packages/domain", async () => {
+    const { rows } = await migrator.query<{ f: string; e: string; t: string; a: string[] }>(
+      "select from_status as f, event_type as e, to_status as t, actors as a from sales.order_transitions",
+    );
+    const fromDb = rows.map((r) => `${r.f}|${r.e}|${r.t}|${[...r.a].sort().join(",")}`).sort();
+    const fromDomain = TABLE.map((r) => `${r.from}|${r.event}|${r.to}|${[...r.actors].sort().join(",")}`).sort();
+    expect(fromDb).toEqual(fromDomain);
+  });
+
+  it("refuses every actor that table 4.9 does not list for the event, whatever the status", async () => {
+    const { orderId } = await createOrder(migrator);
+    for (const [event, actors] of EVENTS) {
+      for (const kind of KINDS.filter((k) => !actors.includes(k))) {
+        const e = await pgError(admin, "select * from sales.apply_transition($1, $2::jsonb, $3, $4)", [
+          orderId,
+          JSON.stringify({ type: event }),
+          kind,
+          "x",
+        ]);
+        expect(e.message, `${kind} sends ${event}`).toMatch(/actor_not_allowed/);
+      }
+    }
+  });
+
+  it("does not stop a listed actor at the actor check", async () => {
+    const { orderId } = await createOrder(migrator);
+    for (const [event, actors] of EVENTS) {
+      for (const kind of actors) {
+        const e = await pgError(admin, "select * from sales.apply_transition($1, $2::jsonb, $3, $4, $5)", [
+          orderId,
+          JSON.stringify({ type: event }),
+          kind,
+          "x",
+          "accepted", // never the real status: the call ends in stale_status without changing the order
+        ]);
+        expect(e.message, `${kind} sends ${event}`).not.toMatch(/actor_not_allowed/);
+      }
+    }
+  });
+
+  it("keeps the public site from cancelling or settling an order and from writing its money fields", async () => {
+    const { orderId } = await createOrder(migrator);
+    await driveTo(admin, orderId, "accepted");
+    await receiveFunds(admin, orderId, 10_000_000);
+    const call = (event: string, changes: object = {}) =>
+      pgError(web, "select * from sales.apply_transition($1, $2::jsonb, 'customer', 'x', null, null, $3::jsonb)", [
+        orderId,
+        JSON.stringify({ type: event }),
+        JSON.stringify(changes),
+      ]);
+    expect((await call("CANCEL")).message).toMatch(/actor_not_allowed/);
+    expect((await call("FUNDS_RECEIVED", { funds_received: true })).message).toMatch(/actor_not_allowed/);
+    expect((await call("START_PURCHASE")).message).toMatch(/actor_not_allowed/);
+    expect((await call("CANCEL_SETTLED", { documented_losses_sum: 10_000_000 })).message).toMatch(/actor_not_allowed/);
+    const row = await one<{ status: string; funds_received: boolean; losses: string }>(
+      migrator,
+      "select status, funds_received, documented_losses_sum::text as losses from sales.orders where id = $1",
+      [orderId],
+    );
+    expect(row).toEqual({ status: "accepted", funds_received: false, losses: "0" });
+  });
+
+  it("keeps the worker to the events of the system", async () => {
+    const { orderId } = await createOrder(migrator);
+    await driveTo(admin, orderId, "accepted");
+    const e = await pgError(
+      worker,
+      `select * from sales.apply_transition($1, '{"type":"FUNDS_RECEIVED"}', 'system', 'x', null, null, '{"funds_received":true}')`,
+      [orderId],
+    );
+    expect(e.message).toMatch(/actor_not_allowed/);
+  });
+
+  it("lets the bot act for customers and the owner, never as the system", async () => {
+    const bot = await connectAs("BOT");
+    try {
+      const { orderId } = await createOrder(migrator);
+      await transition(admin, orderId, "SEND_ESTIMATE");
+      const e = await pgError(
+        bot,
+        `select * from sales.apply_transition($1, '{"type":"EXPIRE"}', 'system', 'x')`,
+        [orderId],
+      );
+      expect(e.message).toMatch(/actor_not_allowed/);
+      expect((await transition(bot, orderId, "ACCEPT")).to).toBe("accepted");
+    } finally {
+      await bot.end();
+    }
+  });
+});
+
+describe("which order fields an actor may write with an event", () => {
+  const apply = (client: pg.Client, orderId: string, event: string, kind: string, changes: object) =>
+    pgError(client, "select * from sales.apply_transition($1, $2::jsonb, $3, 'x', null, null, $4::jsonb)", [
+      orderId,
+      JSON.stringify({ type: event }),
+      kind,
+      JSON.stringify(changes),
+    ]);
+
+  it.each([
+    ["customer", "ACCEPT", { documented_losses_sum: 1 }],
+    ["customer", "ACCEPT", { funds_received: true }],
+    ["customer", "ACCEPT", { fee_prepaid: true }],
+    ["customer", "ACCEPT", { cancel: { point: "x" } }],
+    ["customer", "ACCEPT", { purchase_not_before: "2026-10-07T05:00:00Z" }],
+    ["system", "EXPIRE", { documented_losses_sum: 1 }],
+    ["system", "EXPIRE", { funds_received: true }],
+    ["assistant", "PURCHASE_RECORDED", { refund_due_at: "2026-10-07T05:00:00Z" }],
+  ])("refuses %s with %s writing %j", async (kind, event, changes) => {
+    const { orderId } = await createOrder(migrator);
+    await transition(admin, orderId, "SEND_ESTIMATE");
+    const e = await apply(admin, orderId, event, kind, changes);
+    expect(e.message).toMatch(/change_not_allowed/);
+    expect(e.code).toBe("42501");
+    const row = await one<{ status: string }>(migrator, "select status from sales.orders where id = $1", [orderId]);
+    expect(row.status).toBe("estimate_sent");
+  });
+
+  it("lets the customer set the acceptance time", async () => {
+    const { orderId } = await createOrder(migrator);
+    await transition(admin, orderId, "SEND_ESTIMATE");
+    await transition(web, orderId, "ACCEPT", { changes: { accepted_at: "2026-10-06T09:00:00Z" } });
+    const row = await one<{ accepted_at: Date }>(migrator, "select accepted_at from sales.orders where id = $1", [
+      orderId,
+    ]);
+    expect(row.accepted_at.toISOString()).toBe("2026-10-06T09:00:00.000Z");
+  });
+
+  it("raises the fee flag only with a confirmed advance, the funds flag only with the whole purchase limit", async () => {
+    const { orderId } = await createOrder(migrator, { purchaseLimit: 10_000_000 });
+    await driveTo(admin, orderId, "accepted");
+    expect((await apply(admin, orderId, "FEE_PREPAID", "owner", { fee_prepaid: true })).message).toMatch(
+      /payments_incomplete/,
+    );
+    await insertPayment(admin, { orderId, kind: "fee_advance", amount: 450_000, status: "expected" });
+    expect((await apply(admin, orderId, "FEE_PREPAID", "owner", { fee_prepaid: true })).message).toMatch(
+      /payments_incomplete/,
+    );
+    await insertPayment(admin, { orderId, kind: "fee_advance", amount: 450_000, status: "confirmed" });
+    await transition(admin, orderId, "FEE_PREPAID", { changes: { fee_prepaid: true } });
+
+    expect((await apply(admin, orderId, "FUNDS_RECEIVED", "owner", { funds_received: true })).message).toMatch(
+      /payments_incomplete/,
+    );
+    await receiveFunds(admin, orderId, 9_999_999);
+    expect((await apply(admin, orderId, "FUNDS_RECEIVED", "owner", { funds_received: true })).message).toMatch(
+      /payments_incomplete/,
+    );
+    await receiveFunds(admin, orderId, 1);
+    await transition(admin, orderId, "FUNDS_RECEIVED", { changes: { funds_received: true } });
+    const row = await one<{ fee_prepaid: boolean; funds_received: boolean }>(
+      migrator,
+      "select fee_prepaid, funds_received from sales.orders where id = $1",
+      [orderId],
+    );
+    expect(row).toEqual({ fee_prepaid: true, funds_received: true });
+  });
+
+  it("records the database role of the caller in the audit row", async () => {
+    const { orderId } = await createOrder(migrator);
+    await transition(admin, orderId, "SEND_ESTIMATE");
+    await transition(web, orderId, "ACCEPT");
+    const rows = await migrator.query<{ action: string; role: string | null }>(
+      "select action, after ->> 'db_role' as role from ops.audit_log where entity_id = $1 order by at, id",
+      [orderId],
+    );
+    expect(rows.rows.map((r) => [r.action, r.role])).toEqual([
+      ["order.SEND_ESTIMATE", "nivel_admin"],
+      ["order.ACCEPT", "nivel_web"],
+    ]);
   });
 });
 

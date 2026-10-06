@@ -1,52 +1,54 @@
 -- WP-06: the order status graph, sales.apply_transition() and the guard that makes it the only way to change a
--- status (ARCHITECTURE 3.4, 4.9, 4.13). The graph repeats table 4.9 of the architecture as data; the guards of the
--- finite-state machine itself (who, when, which flags) stay in packages/domain.
+-- status (ARCHITECTURE 3.4, 4.9, 4.13). The graph repeats table 4.9 of the architecture as data, with the actors
+-- allowed for each event; the other guards of the finite-state machine (when, which flags) stay in packages/domain.
 
 CREATE TABLE sales.order_transitions (
   from_status text NOT NULL,
   event_type text NOT NULL,
   to_status text NOT NULL,
+  -- Who may send the event (table 4.9, column "who"); packages/domain holds the same list and a test compares them.
+  actors text[] NOT NULL,
   PRIMARY KEY (from_status, event_type)
 );
 --> statement-breakpoint
-INSERT INTO sales.order_transitions (from_status, event_type, to_status) VALUES
-  ('estimate_draft', 'SEND_ESTIMATE', 'estimate_sent'),
-  ('estimate_sent', 'EXPIRE', 'estimate_expired'),
-  ('estimate_sent', 'REVISE', 'estimate_draft'),
-  ('estimate_expired', 'REVISE', 'estimate_draft'),
-  ('estimate_sent', 'ACCEPT', 'accepted'),
-  ('estimate_sent', 'PODBOR_DELIVERED', 'podbor_delivered'),
-  ('accepted', 'FEE_PREPAID', 'accepted'),
-  ('accepted', 'FUNDS_RECEIVED', 'accepted'),
-  ('accepted', 'MEETING_DONE', 'accepted'),
-  ('accepted', 'START_PURCHASE', 'purchasing'),
-  ('purchasing', 'PURCHASE_RECORDED', 'purchasing'),
-  ('purchasing', 'PURCHASE_DONE', 'report_due'),
-  ('report_due', 'SEND_REPORT', 'report_sent'),
-  ('report_sent', 'OBJECTION', 'report_sent'),
-  ('report_sent', 'REPORT_ACCEPTED', 'report_sent'),
-  ('report_sent', 'REPORT_DEEMED_ACCEPTED', 'report_sent'),
-  ('report_sent', 'REMAINDER_SETTLED', 'settled'),
-  ('settled', 'MATERIALS_ACCEPTED', 'assembling'),
-  ('assembling', 'ASSEMBLED', 'testing'),
-  ('testing', 'TESTS_PASSED', 'ready'),
-  ('ready', 'DISPATCH', 'delivering'),
-  ('delivering', 'HANDOVER', 'handed_over'),
-  ('handed_over', 'CLOSE', 'closed'),
-  ('cancelling', 'CANCEL_SETTLED', 'cancelled'),
+INSERT INTO sales.order_transitions (from_status, event_type, to_status, actors) VALUES
+  ('estimate_draft', 'SEND_ESTIMATE', 'estimate_sent', ARRAY['owner']),
+  ('estimate_sent', 'EXPIRE', 'estimate_expired', ARRAY['system']),
+  ('estimate_sent', 'REVISE', 'estimate_draft', ARRAY['owner']),
+  ('estimate_expired', 'REVISE', 'estimate_draft', ARRAY['owner']),
+  ('estimate_sent', 'ACCEPT', 'accepted', ARRAY['customer']),
+  ('estimate_sent', 'PODBOR_DELIVERED', 'podbor_delivered', ARRAY['owner']),
+  ('accepted', 'FEE_PREPAID', 'accepted', ARRAY['owner']),
+  ('accepted', 'FUNDS_RECEIVED', 'accepted', ARRAY['owner']),
+  ('accepted', 'MEETING_DONE', 'accepted', ARRAY['owner']),
+  ('accepted', 'START_PURCHASE', 'purchasing', ARRAY['owner']),
+  ('purchasing', 'PURCHASE_RECORDED', 'purchasing', ARRAY['owner', 'assistant']),
+  ('purchasing', 'PURCHASE_DONE', 'report_due', ARRAY['owner']),
+  ('report_due', 'SEND_REPORT', 'report_sent', ARRAY['owner']),
+  ('report_sent', 'OBJECTION', 'report_sent', ARRAY['customer']),
+  ('report_sent', 'REPORT_ACCEPTED', 'report_sent', ARRAY['customer']),
+  ('report_sent', 'REPORT_DEEMED_ACCEPTED', 'report_sent', ARRAY['system']),
+  ('report_sent', 'REMAINDER_SETTLED', 'settled', ARRAY['owner']),
+  ('settled', 'MATERIALS_ACCEPTED', 'assembling', ARRAY['owner']),
+  ('assembling', 'ASSEMBLED', 'testing', ARRAY['owner', 'assistant']),
+  ('testing', 'TESTS_PASSED', 'ready', ARRAY['owner', 'assistant']),
+  ('ready', 'DISPATCH', 'delivering', ARRAY['owner']),
+  ('delivering', 'HANDOVER', 'handed_over', ARRAY['owner', 'customer']),
+  ('handed_over', 'CLOSE', 'closed', ARRAY['system']),
+  ('cancelling', 'CANCEL_SETTLED', 'cancelled', ARRAY['owner']),
   -- CANCEL: any status before handed_over.
-  ('estimate_draft', 'CANCEL', 'cancelling'),
-  ('estimate_sent', 'CANCEL', 'cancelling'),
-  ('estimate_expired', 'CANCEL', 'cancelling'),
-  ('accepted', 'CANCEL', 'cancelling'),
-  ('purchasing', 'CANCEL', 'cancelling'),
-  ('report_due', 'CANCEL', 'cancelling'),
-  ('report_sent', 'CANCEL', 'cancelling'),
-  ('settled', 'CANCEL', 'cancelling'),
-  ('assembling', 'CANCEL', 'cancelling'),
-  ('testing', 'CANCEL', 'cancelling'),
-  ('ready', 'CANCEL', 'cancelling'),
-  ('delivering', 'CANCEL', 'cancelling');
+  ('estimate_draft', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('estimate_sent', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('estimate_expired', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('accepted', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('purchasing', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('report_due', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('report_sent', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('settled', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('assembling', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('testing', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('ready', 'CANCEL', 'cancelling', ARRAY['owner']),
+  ('delivering', 'CANCEL', 'cancelling', ARRAY['owner']);
 --> statement-breakpoint
 ALTER TABLE sales.order_transitions
   ADD CONSTRAINT order_transitions_from_chk CHECK (from_status IN (
@@ -56,7 +58,9 @@ ALTER TABLE sales.order_transitions
   ADD CONSTRAINT order_transitions_to_chk CHECK (to_status IN (
     'estimate_draft', 'estimate_sent', 'estimate_expired', 'accepted', 'purchasing', 'report_due', 'report_sent',
     'settled', 'assembling', 'testing', 'ready', 'delivering', 'handed_over', 'closed', 'podbor_delivered',
-    'cancelling', 'cancelled'));
+    'cancelling', 'cancelled')),
+  ADD CONSTRAINT order_transitions_actors_chk CHECK (
+    cardinality(actors) > 0 AND actors <@ ARRAY['system', 'customer', 'owner', 'assistant']);
 --> statement-breakpoint
 -- The only writer of orders.status. Runs as the migrator; callers need EXECUTE only.
 -- One call = one transaction step: status, sales.order_events and ops.audit_log. The service adds ops.outbox rows
@@ -82,10 +86,12 @@ DECLARE
     'current_quote_id', 'offer_version_uz_id', 'offer_version_ru_id', 'accepted_at', 'report_due_at',
     'objection_until', 'refund_due_at', 'handed_over_at', 'warranty_until', 'podbor_credit_until',
     'cancel', 'documented_losses_sum'];
-  -- Money events the assistant never fires (ARCHITECTURE 4.9); second line next to packages/domain.
-  v_owner_only text[] := ARRAY[
-    'FEE_PREPAID', 'FUNDS_RECEIVED', 'START_PURCHASE', 'REMAINDER_SETTLED', 'HANDOVER', 'CANCEL', 'CANCEL_SETTLED',
-    'SEND_ESTIMATE'];
+  -- Fields each kind of actor may write together with its event. The money fields (flags that open purchases,
+  -- the deadlines of refunds, the documented losses of the closing check) belong to the owner only.
+  v_actor_keys text[];
+  v_event_actors text[];
+  v_net numeric;
+  v_limit numeric;
 BEGIN
   IF v_type IS NULL THEN
     RAISE EXCEPTION 'invalid_event: the event has no type' USING ERRCODE = 'invalid_parameter_value';
@@ -93,16 +99,32 @@ BEGIN
   IF p_actor_kind NOT IN ('system', 'customer', 'owner', 'assistant') THEN
     RAISE EXCEPTION 'invalid_actor: %', p_actor_kind USING ERRCODE = 'invalid_parameter_value';
   END IF;
-  -- Who may call at all: the public site acts for customers, the worker for the system.
+  -- Who may call at all: the public site acts for customers, the worker for the system, the bot never for the system.
   IF (session_user = 'nivel_web' AND p_actor_kind <> 'customer')
      OR (session_user = 'nivel_worker' AND p_actor_kind <> 'system')
-     OR (p_actor_kind = 'assistant' AND v_type = ANY (v_owner_only)) THEN
+     OR (session_user = 'nivel_bot' AND p_actor_kind = 'system') THEN
     RAISE EXCEPTION 'actor_not_allowed: % as % cannot apply %', session_user, p_actor_kind, v_type
       USING ERRCODE = 'insufficient_privilege';
   END IF;
+  -- Who may send this event (table 4.9). An unknown event falls through to invalid_transition below.
+  SELECT t.actors INTO v_event_actors FROM sales.order_transitions t WHERE t.event_type = v_type LIMIT 1;
+  IF FOUND AND NOT (p_actor_kind = ANY (v_event_actors)) THEN
+    RAISE EXCEPTION 'actor_not_allowed: % cannot send % (allowed: %)', p_actor_kind, v_type, v_event_actors
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  v_actor_keys := CASE p_actor_kind
+    WHEN 'owner' THEN v_allowed
+    WHEN 'customer' THEN ARRAY['accepted_at', 'offer_version_uz_id', 'offer_version_ru_id', 'handed_over_at', 'warranty_until']
+    WHEN 'system' THEN ARRAY['report_due_at', 'objection_until', 'refund_due_at']
+    ELSE ARRAY[]::text[]
+  END;
   FOR v_key IN SELECT jsonb_object_keys(coalesce(p_changes, '{}'::jsonb)) LOOP
     IF NOT (v_key = ANY (v_allowed)) THEN
       RAISE EXCEPTION 'unknown_change: % is not a changeable order field', v_key USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+    IF NOT (v_key = ANY (v_actor_keys)) THEN
+      RAISE EXCEPTION 'change_not_allowed: % may not write the order field %', p_actor_kind, v_key
+        USING ERRCODE = 'insufficient_privilege';
     END IF;
   END LOOP;
 
@@ -116,6 +138,25 @@ BEGIN
   SELECT t.to_status INTO v_to FROM sales.order_transitions t WHERE t.from_status = v_from AND t.event_type = v_type;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'invalid_transition: % is not allowed from %', v_type, v_from USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- The flags that open the next money step follow the confirmed payments (the same sums the closing check uses).
+  IF (p_changes ->> 'fee_prepaid')::boolean IS TRUE THEN
+    SELECT coalesce(sum(p.amount_sum), 0) INTO v_net FROM sales.payments p
+      WHERE p.order_id = p_order_id AND p.status = 'confirmed' AND p.kind = 'fee_advance';
+    IF v_net <= 0 THEN
+      RAISE EXCEPTION 'payments_incomplete: no confirmed fee advance for the order' USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  IF (p_changes ->> 'funds_received')::boolean IS TRUE THEN
+    SELECT coalesce(sum(p.amount_sum), 0) INTO v_net FROM sales.payments p
+      WHERE p.order_id = p_order_id AND p.status = 'confirmed' AND p.kind IN ('purchase_funds', 'purchase_topup');
+    SELECT q.purchase_limit INTO v_limit FROM sales.quotes q
+      JOIN sales.orders o ON o.current_quote_id = q.id WHERE o.id = p_order_id;
+    IF v_net <= 0 OR v_net < coalesce(v_limit, 0) THEN
+      RAISE EXCEPTION 'payments_incomplete: confirmed purchase funds % are below the purchase limit %', v_net, coalesce(v_limit, 0)
+        USING ERRCODE = 'check_violation';
+    END IF;
   END IF;
 
   PERFORM set_config('nivel.apply_transition', 'on', true);
@@ -147,7 +188,8 @@ BEGIN
   INSERT INTO ops.audit_log (actor, action, entity, entity_id, before, after)
   VALUES (p_actor_kind || ':' || p_actor_id, 'order.' || v_type, 'sales.orders', p_order_id::text,
           jsonb_build_object('status', v_from),
-          jsonb_build_object('status', v_to, 'event', p_event, 'changes', coalesce(p_changes, '{}'::jsonb)));
+          jsonb_build_object('status', v_to, 'event', p_event, 'changes', coalesce(p_changes, '{}'::jsonb),
+                             'db_role', session_user));
 
   out_seq := v_seq;
   out_from := v_from;
