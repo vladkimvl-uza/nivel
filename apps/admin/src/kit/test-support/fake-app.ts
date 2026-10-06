@@ -19,6 +19,14 @@ import type { FileRegistry, RegisteredFile } from "../upload/save.ts";
 export const jar = new Map<string, string>();
 export const requestHeaders = new Headers();
 
+export interface CookieWrite {
+  name: string;
+  value: string;
+  options: Record<string, unknown> | undefined;
+}
+/** Every Set-Cookie of the call being tested, with its attributes: the browser acts on them, not on the jar. */
+export const cookieWrites: CookieWrite[] = [];
+
 /** What `redirect()` of Next.js does: it throws; the test catches it and reads where to. */
 export class RedirectSignal extends Error {
   readonly url: string;
@@ -31,8 +39,16 @@ export class RedirectSignal extends Error {
 export const nextHeadersMock = {
   cookies: async () => ({
     get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) as string } : undefined),
-    set: (name: string, value: string) => void jar.set(name, value),
-    delete: (name: string) => void jar.delete(name),
+    set: (name: string, value: string, options?: Record<string, unknown>) => {
+      cookieWrites.push({ name, value, options });
+      // A browser drops a cookie that is set with Max-Age=0. A `__Host-` cookie without Secure is not accepted at all,
+      // not even to be removed (RFC 6265bis 4.1.3.2): that write changes nothing.
+      const accepted = !name.startsWith("__Host-") || options?.secure === true;
+      if (!accepted) return;
+      if (options?.maxAge === 0) jar.delete(name);
+      else jar.set(name, value);
+    },
+    // No `delete`: Next.js writes it without Secure, which a browser refuses for a `__Host-` cookie. Use `set`.
   }),
   headers: async () => requestHeaders,
 };
@@ -113,6 +129,7 @@ export const PASSWORD = "correct-horse-battery-staple";
 
 export function createFakeApp() {
   jar.clear();
+  cookieWrites.length = 0;
   for (const key of [...requestHeaders.keys()]) requestHeaders.delete(key);
 
   const authStore = new MemoryAuthStore();

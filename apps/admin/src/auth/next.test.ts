@@ -1,6 +1,6 @@
 // The session in Next.js: guards of pages and of actions, the cookie, what the journal may know of the caller.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "./policy.ts";
+import { AUTH_POLICY, SESSION_COOKIE } from "./policy.ts";
 import { ForbiddenError } from "./roles.ts";
 
 const app = vi.hoisted(() => ({ current: null as unknown }));
@@ -15,7 +15,7 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-const { createFakeApp, jar, requestHeaders } = await import("../kit/test-support/fake-app.ts");
+const { cookieWrites, createFakeApp, jar, requestHeaders } = await import("../kit/test-support/fake-app.ts");
 const next = await import("./next.ts");
 
 let fake: Awaited<ReturnType<typeof createFakeApp>>;
@@ -72,6 +72,28 @@ describe("the cookie and the address", () => {
     expect(await next.endSession()).toBe("t".repeat(43));
     expect(jar.has(SESSION_COOKIE)).toBe(false);
     expect(await next.endSession()).toBeUndefined();
+  });
+
+  it("the cookie lives as long as a session can (the server ends it after 8 hours of silence), not 8 hours from the sign-in", async () => {
+    await next.startSession("t".repeat(43));
+    expect(cookieWrites.at(-1)?.options).toEqual({
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+      maxAge: AUTH_POLICY.absoluteDays * 24 * 3600,
+    });
+  });
+
+  it("the cookie is removed with the same attributes it was set with, Secure included: a __Host- cookie needs them", async () => {
+    await next.startSession("t".repeat(43));
+    await next.endSession();
+    expect(cookieWrites.at(-1)).toMatchObject({
+      name: SESSION_COOKIE,
+      value: "",
+      options: { maxAge: 0, path: "/", secure: true, httpOnly: true, sameSite: "strict" },
+    });
+    expect(jar.has(SESSION_COOKIE)).toBe(false);
   });
 
   it("takes the first address of X-Forwarded-For, then X-Real-IP; knows nothing without them; cuts a long User-Agent", async () => {

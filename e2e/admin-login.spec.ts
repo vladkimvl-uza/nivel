@@ -21,6 +21,9 @@ test.describe("вход в админку", () => {
     expect(cookie?.secure).toBe(true);
     expect(cookie?.sameSite).toBe("Strict");
     expect(cookie?.path).toBe("/");
+    // Срок бездействия (8 ч) проверяет сервер и сдвигает его с каждым запросом; cookie живёт до предела сеанса (7 суток),
+    // иначе рабочий день дольше 8 часов обрывался бы через 8 часов после входа.
+    expect(cookie?.expires ?? 0).toBeGreaterThan(Date.now() / 1000 + 6 * 24 * 3600);
 
     // В базе только хэш токена сеанса, не сам токен.
     const sessions = await admin.query<{ token_sha256: string }>(
@@ -33,6 +36,8 @@ test.describe("вход в админку", () => {
 
     await page.getByRole("button", { name: "Выйти" }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
+    // Cookie снят в браузере: «__Host-» без Secure браузер отвергает, и удаление не сработало бы.
+    expect((await context.cookies()).find((c) => c.name === "__Host-nv_admin")).toBeUndefined();
     await page.goto(`${admin.baseURL}/catalog`);
     await expect(page).toHaveURL(/\/sign-in$/);
   });

@@ -51,20 +51,23 @@ export async function guardAction(permission: Permission, action: string, entity
 
 export const NOT_ALLOWED = "Недостаточно прав для этого действия.";
 
+// The attributes of the cookie. `__Host-` requires Secure and Path=/, and a browser refuses a Set-Cookie of such a name
+// without them, also one that only removes the cookie: so the removal repeats all of them (`store.delete` does not).
+const COOKIE_ATTRIBUTES = { httpOnly: true, secure: true, sameSite: "strict", path: "/" } as const;
+
+/**
+ * The cookie lives as long as a session may (7 days). The 8 hours of silence are checked by the server, which slides the
+ * expiry on every request; a cookie can be renewed only in a middleware or an action, so it cannot slide with it, and a
+ * cookie of 8 hours would end a working day that has gone on longer than that.
+ */
 export async function startSession(token: string): Promise<void> {
-  (await cookies()).set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-    path: "/",
-    maxAge: AUTH_POLICY.idleHours * 3600,
-  });
+  (await cookies()).set(SESSION_COOKIE, token, { ...COOKIE_ATTRIBUTES, maxAge: AUTH_POLICY.absoluteDays * 24 * 3600 });
 }
 
 export async function endSession(): Promise<string | undefined> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
-  store.delete(SESSION_COOKIE);
+  if (token) store.set(SESSION_COOKIE, "", { ...COOKIE_ATTRIBUTES, maxAge: 0 });
   return token;
 }
 
