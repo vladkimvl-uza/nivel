@@ -76,6 +76,11 @@ describe("convertToSum: invalid input", () => {
     expect(() => convertToSum("1", usd(11772.95 as unknown as string))).toThrow(RangeError);
   });
 
+  it("rejects absurdly long decimal strings", () => {
+    expect(() => convertToSum("1".repeat(41), usd("1"))).toThrow(RangeError);
+    expect(() => convertToSum("1", usd(`1.${"0".repeat(60)}`))).toThrow(RangeError);
+  });
+
   it("rejects a result beyond the safe integer range", () => {
     expect(() => convertToSum("9007199254740993", usd("1"))).toThrow(RangeError);
     expect(() => convertToSum("9007199254740", usd("1000000"))).toThrow(RangeError);

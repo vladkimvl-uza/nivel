@@ -428,6 +428,19 @@ describe("result shape and purity", () => {
     expect(r.excluded.map((e) => e.observationId)).toEqual(["a1", "b2", "c3"]);
   });
 
+  it("duplicate observation ids do not break determinism", () => {
+    const twin = (vendor: string, over: Partial<PriceObservation> = {}) => obs("same", vendor, 11_300_000, over);
+    const good = offers([11_000_000, 11_200_000, 11_400_000]);
+    const a = compute([twin("v8"), twin("v9"), ...good]);
+    const b = compute([...good, twin("v9"), twin("v8")]);
+    expect(a).toEqual(b);
+    const used = compute([twin("v8", { condition: "used" }), twin("v9", { isFromPrice: true }), ...good]);
+    expect(used.excluded).toEqual([
+      { observationId: "same", reason: "from_price" },
+      { observationId: "same", reason: "used_or_refurb" },
+    ]);
+  });
+
   it("every observation is either counted or excluded", () => {
     const input = [
       ...offers([11_000_000, 11_200_000, 11_400_000, 39_000_000]),
