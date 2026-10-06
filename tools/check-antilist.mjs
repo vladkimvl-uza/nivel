@@ -74,7 +74,7 @@ export function checkText(path, text) {
     const c = colorRe.exec(line);
     if (c) out.push(`${at}: anti-list color ${c[0]}`);
     if (/backdrop-filter|backdropFilter/.test(line)) out.push(`${at}: backdrop-filter (glass) is forbidden`);
-    else if (/(?<![\w-])blur\(|feGaussianBlur/.test(line))
+    else if (/(?<![\w.-])blur\(|feGaussianBlur/.test(line))
       out.push(`${at}: blur is forbidden (no glass, no glow, no haze)`);
     if (/drop-shadow\(/.test(line)) out.push(`${at}: drop-shadow is forbidden (paper shadows are box-shadow roles)`);
     if (/box-shadow|boxShadow|text-shadow|textShadow/i.test(line)) {

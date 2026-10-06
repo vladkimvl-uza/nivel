@@ -57,6 +57,15 @@ describe("check-antilist: design system rules (DESIGN_SYSTEM section 8)", () => 
     expect(checkText("a.css", "filter: drop-shadow(0 0 8px var(--accent));").join()).toContain("drop-shadow");
   });
 
+  it("does not take the DOM method element.blur() or a local function for the blur filter", () => {
+    expect(checkText("apps/web/src/menu.tsx", "buttonRef.current?.blur();")).toEqual([]);
+    expect(checkText("apps/web/src/menu.tsx", "document.activeElement?.blur();")).toEqual([]);
+    expect(checkText("apps/web/src/form.ts", "input.blur()")).toEqual([]);
+    expect(checkText("apps/web/src/form.ts", 'el.style.filter = "blur(4px)";').join()).toContain("blur");
+    expect(checkText("apps/web/src/form.ts", "const s = `blur(${n}px)`;").join()).toContain("blur");
+    expect(checkText("a.css", "backdrop-filter:blur(8px);").join()).toBeTruthy();
+  });
+
   it("forbids a colored text-shadow (a glow) but allows a gray one", () => {
     expect(checkText("a.css", "text-shadow: 0 0 12px rgba(240, 106, 48, 0.8);").join()).toContain("glow");
     expect(checkText("packages/ui/src/themes/x.css", "text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);")).toEqual([]);
