@@ -770,7 +770,7 @@ export function buildSeeds(): BuildSeed[] {
   return out;
 }
 
-const ROLE = (task: Task, slot: string) =>
+const roleOf = (task: Task, slot: string) =>
   PRIMARY_SLOTS[task].includes(slot) ? "primary" : SECONDARY_SLOTS[task].includes(slot) ? "secondary" : "support";
 
 // ---- rule set 1 and settings --------------------------------------------------------------------------------------
@@ -952,7 +952,7 @@ export async function seedRules(
       await client.query(
         `insert into catalog.base_build_items (base_build_id, position, slot, price_class_id, qty, role)
          select $1, $2, $3, pc.id, $4, $5 from catalog.price_classes pc where pc.key = $6`,
-        [id, position + 1, category, qty ?? 1, ROLE(b.task, category), classKey],
+        [id, position + 1, category, qty ?? 1, roleOf(b.task, category), classKey],
       );
       items += 1;
     }

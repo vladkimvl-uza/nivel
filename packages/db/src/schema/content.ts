@@ -12,7 +12,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import { createdAt, localized, oneOf, pk, tstz } from "../repos/columns.ts";
+import { createdAt, localized, oneOf, pk, tstz, updatedAt } from "../repos/columns.ts";
 import { adminUsers, consents, files } from "./ops.ts";
 import { configurations, orders } from "./sales.ts";
 
@@ -58,7 +58,7 @@ export const pages = content.table(
     noindex: boolean("noindex").notNull().default(false),
     publishedAt: tstz("published_at"),
     createdAt: createdAt(),
-    updatedAt: createdAt("updated_at"),
+    updatedAt: updatedAt(),
   },
   (t) => [
     unique("pages_slug_key").on(t.slug),

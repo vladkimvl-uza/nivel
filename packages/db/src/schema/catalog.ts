@@ -13,7 +13,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { createdAt, localized, oneOf, pk, tstz } from "../repos/columns.ts";
+import { createdAt, localized, oneOf, pk, tstz, updatedAt } from "../repos/columns.ts";
 import { adminUsers, files } from "./ops.ts";
 
 /** PostgreSQL schema "catalog" (ARCHITECTURE 3.1, 3.3). */
@@ -122,7 +122,7 @@ export const products = catalog.table(
     verifiedBy: uuid("verified_by").references(() => adminUsers.id),
     isDemo: boolean("is_demo").notNull().default(false),
     createdAt: createdAt(),
-    updatedAt: createdAt("updated_at"),
+    updatedAt: updatedAt(),
     /** STORED copies of the keys the compatibility rules filter on (B-tree indexed). */
     specSocket: text("spec_socket").generatedAlwaysAs(sql`specs ->> 'socket'`),
     specRamType: text("spec_ram_type").generatedAlwaysAs(

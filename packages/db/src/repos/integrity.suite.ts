@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { connectAs, createOrder, one, pgError, uniq } from "./testkit.ts";
@@ -108,13 +111,8 @@ describe("sales.quotes", () => {
   }
 
   it("freezes totals, lines and dates after sent", async () => {
+    // The lines of a sent quote are covered by the next test; here the quote itself is frozen.
     const o = await createOrder(c);
-    await c
-      .query(
-        "insert into sales.quote_lines (quote_id, title_snapshot, category_code, fee_group, qty, unit_market_sum) values ($1, 'CPU', 'cpu', 'pc', 1, 2000000)",
-        [o.quoteId],
-      )
-      .catch(() => {});
     await send(o.quoteId);
     for (const set of [
       "components_sum = 1",
@@ -280,7 +278,8 @@ describe("content.legal_documents", () => {
   });
 });
 
-// One row per declared CHECK that the tests above do not already touch.
+// One row per declared CHECK rule that the tests above do not already touch. A foreign key is checked after the
+// row has passed its CHECKs, so a random uuid stands for a parent that is not needed.
 describe("CHECK constraints", () => {
   async function category(code: string) {
     await c.query(
@@ -460,6 +459,136 @@ describe("CHECK constraints", () => {
       sql: "insert into ai.conversations (channel, lang, model) values ('web', 'en', 'm')",
       constraint: "conversations_lang_chk",
     },
+    {
+      name: "AI conversations: the cost is not negative",
+      sql: "insert into ai.conversations (channel, lang, model, cost_micro_usd) values ('web', 'uz', 'm', -1)",
+      constraint: "conversations_cost_chk",
+    },
+    {
+      name: "AI messages: numbered from 1",
+      sql: "insert into ai.messages (conversation_id, seq, role, content) values (gen_random_uuid(), 0, 'user', '\"x\"')",
+      constraint: "messages_seq_chk",
+    },
+    {
+      name: "AI usage: the cost of a day is not negative",
+      sql: "insert into ai.usage_daily (day, model, cost_micro_usd) values ('2037-01-01', 'm', -1)",
+      constraint: "usage_daily_cost_chk",
+    },
+    {
+      name: "analogs: a position is not its own analog",
+      sql: "insert into catalog.analogs (product_id, analog_product_id) values ('$product', '$product')",
+      constraint: "analogs_not_self_chk",
+    },
+    {
+      name: "base build items: a positive quantity",
+      sql: "insert into catalog.base_build_items (base_build_id, slot, price_class_id, qty) select b.id, 'cpu', pc.id, 0 from catalog.base_builds b, catalog.price_classes pc limit 1",
+      constraint: "base_build_items_qty_chk",
+    },
+    {
+      name: "categories: a positive freshness term",
+      sql: "insert into catalog.categories (code, category_group, name, fee_group_default, freshness_days, returnable_default) values ('zz', 'pc', '{}', 'pc', 0, true)",
+      constraint: "categories_freshness_chk",
+    },
+    {
+      name: "price classes: a ladder and a step go together",
+      sql: "insert into catalog.price_classes (category_code, key, name, ladder_code) values ('cpu', 'chk.ladder', '{}', 'gpu')",
+      constraint: "price_classes_ladder_step_chk",
+    },
+    {
+      name: "products: specs are an object",
+      sql: "insert into catalog.products (slug, category_code, brand, model, specs) values ('chk-specs', 'cpu', 'B', 'M', '[]')",
+      constraint: "products_specs_object_chk",
+    },
+    {
+      name: "legal documents: the hash is 64 hex characters",
+      sql: "insert into content.legal_documents (kind, version, lang, body_md, text_sha256) values ('privacy', 'sha1', 'ru', 'x', 'nothex')",
+      constraint: "legal_documents_sha_chk",
+    },
+    {
+      name: "policy texts: versions start at 1",
+      sql: "insert into content.policy_texts (topic, body, version) values ('fee', '{}', 0)",
+      constraint: "policy_texts_version_chk",
+    },
+    {
+      name: "admin sessions: the token is stored as a SHA-256 hash",
+      sql: "insert into ops.admin_sessions (token_sha256, user_id, expires_at) values ('plain-token', gen_random_uuid(), now())",
+      constraint: "admin_sessions_token_chk",
+    },
+    {
+      name: "files: the size is not negative",
+      sql: "insert into ops.files (sha256, mime, bytes, storage_key, kind, retention_class) values (repeat('a', 64), 'image/png', -1, 'k/neg', 'photo', 'media')",
+      constraint: "files_bytes_chk",
+    },
+    {
+      name: "threshold snapshots: the share is not negative",
+      sql: "insert into ops.threshold_snapshots (year, as_of, deals_sum, committed_sum, limit_sum, share_bp) values (2037, '2037-01-01', 1, 1, 1, -1)",
+      constraint: "threshold_snapshots_share_chk",
+    },
+    {
+      name: "market prices: a median is positive",
+      sql: "insert into pricing.market_prices (product_id, as_of, median_sum, vendors_n, confidence) values ('$product', '2037-01-01', 0, 3, 'low')",
+      constraint: "market_prices_median_chk",
+    },
+    {
+      name: "market prices: the minimum is not above the maximum",
+      sql: "insert into pricing.market_prices (product_id, as_of, min_sum, max_sum, confidence) values ('$product', '2037-01-02', 10, 5, 'low')",
+      constraint: "market_prices_order_chk",
+    },
+    {
+      name: "vendors: the return term is not negative",
+      sql: "insert into pricing.vendors (name, kind, price_source, return_days) values ('chk return', 'shop', 'manual', -1)",
+      constraint: "vendors_return_days_chk",
+    },
+    {
+      name: "commission reports: versions start at 1",
+      sql: "insert into sales.commission_reports (order_id, version, received_sum, spent_sum, remainder_sum, lines) values ('$order', 0, 0, 0, 0, '[]')",
+      constraint: "commission_reports_version_chk",
+    },
+    {
+      name: "order events: numbered from 1",
+      sql: "insert into sales.order_events (order_id, seq, actor_kind, actor_id, event, from_status, to_status) values ('$order', 0, 'owner', 'x', '{}', 'estimate_draft', 'estimate_sent')",
+      constraint: "order_events_seq_chk",
+    },
+    {
+      name: "order transitions: an edge names at least one actor",
+      sql: "insert into sales.order_transitions (from_status, event_type, to_status, actors) values ('closed', 'REOPEN', 'accepted', '{}')",
+      constraint: "order_transitions_actors_chk",
+    },
+    {
+      name: "orders: documented losses are not negative (they enter the closing check)",
+      sql: "insert into sales.orders (number, customer_id, kind, documented_losses_sum) values ('NV-2026-8101', '$customer', 'pc', -1)",
+      constraint: "orders_losses_chk",
+    },
+    {
+      name: "quote lines: a positive quantity",
+      sql: "insert into sales.quote_lines (quote_id, title_snapshot, category_code, fee_group, qty, unit_market_sum) values (gen_random_uuid(), 'x', 'cpu', 'pc', 0, 1)",
+      constraint: "quote_lines_qty_chk",
+    },
+    {
+      name: "quote lines: the market price is not negative",
+      sql: "insert into sales.quote_lines (quote_id, title_snapshot, category_code, fee_group, qty, unit_market_sum) values (gen_random_uuid(), 'x', 'cpu', 'pc', 1, -1)",
+      constraint: "quote_lines_sum_chk",
+    },
+    {
+      name: "quotes: an accepted quote has its acceptance time",
+      sql: "insert into sales.quotes (order_id, version, status, totals, components_sum, reserve_bp, reserve_sum, purchase_limit, fee_total, fee_commission_line, fee_works_line, fee_advance, fee_final, settings_version) values ('$order', 7, 'accepted', '{}', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'v')",
+      constraint: "quotes_accepted_chk",
+    },
+    {
+      name: "quotes: versions start at 1",
+      sql: "insert into sales.quotes (order_id, version, totals, components_sum, reserve_bp, reserve_sum, purchase_limit, fee_total, fee_commission_line, fee_works_line, fee_advance, fee_final, settings_version) values ('$order', 0, '{}', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'v')",
+      constraint: "quotes_version_chk",
+    },
+    {
+      name: "warranty cases: the cost from the reserve is not negative",
+      sql: "insert into sales.warranty_cases (number, order_id, description, cost_from_reserve_sum) values ('G-2026-8201', '$order', 'x', -1)",
+      constraint: "warranty_cases_cost_chk",
+    },
+    {
+      name: "warranty cases: number format",
+      sql: "insert into sales.warranty_cases (number, order_id, description) values ('G-26-1', '$order', 'x')",
+      constraint: "warranty_cases_number_chk",
+    },
   ];
 
   it.each(CASES)("$name", async ({ sql, constraint }) => {
@@ -513,5 +642,46 @@ describe("CHECK constraints", () => {
       `insert into catalog.products (slug, category_code, brand, model, status, specs)
        values ('v-ok', 'gpu', 'B', 'M', 'verified', '{"lengthMm": 300, "power": [{"conn":"8pin","count":1}], "tgpW": 160}')`,
     );
+  });
+});
+
+// Every CHECK of the application schemas is either exercised by a test of this package (its name appears in a suite or
+// in the money-case table) or is an enumeration, which the schema files generate from the same list as the TypeScript
+// union of the column. A new rule CHECK without a test fails here.
+describe("coverage of the CHECK constraints", () => {
+  // Redundant on purpose, with the reason: the first CHECK of the same column fires first in every case.
+  const EXCLUDED: Record<string, string> = {
+    orders_scheme_not_sale_chk:
+      "contract_scheme = 'sale' is already outside the list of orders_scheme_chk; this one keeps the ban if the list grows",
+  };
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const FIXTURES = join(HERE, "../../../testing/fixtures/wp-06");
+  const sources = [
+    ...readdirSync(HERE)
+      .filter((f) => /\.(suite\.ts|int\.test\.ts)$/.test(f))
+      .map((f) => readFileSync(join(HERE, f), "utf8")),
+    ...readdirSync(FIXTURES)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => readFileSync(join(FIXTURES, f), "utf8")),
+  ].join("\n");
+
+  it("leaves no rule CHECK without a test", async () => {
+    const { rows } = await c.query<{ name: string; def: string }>(
+      `select k.conname as name, pg_get_constraintdef(k.oid) as def
+         from pg_constraint k join pg_class t on t.oid = k.conrelid join pg_namespace n on n.oid = t.relnamespace
+        where k.contype = 'c' and n.nspname in ('catalog', 'pricing', 'sales', 'content', 'ai', 'bot', 'ops')`,
+    );
+    expect(rows.length).toBeGreaterThan(150);
+    const isEnumeration = (def: string) => /^CHECK \(\(?[a-z_]+ (= ANY \(ARRAY\[|= ')/.test(def);
+    const untested = rows.filter((r) => !sources.includes(r.name) && !isEnumeration(r.def) && !(r.name in EXCLUDED));
+    expect(untested.map((r) => `${r.name}: ${r.def}`)).toEqual([]);
+  });
+
+  it("keeps every exclusion tied to a CHECK that exists", async () => {
+    const { rows } = await c.query<{ name: string }>(
+      "select conname as name from pg_constraint where contype = 'c' and conname = any($1)",
+      [Object.keys(EXCLUDED)],
+    );
+    expect(rows.map((r) => r.name).sort()).toEqual(Object.keys(EXCLUDED).sort());
   });
 });

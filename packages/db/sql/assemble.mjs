@@ -14,14 +14,24 @@ const SQL_DIR = dirname(fileURLToPath(import.meta.url));
 export const MODULE_ORDER = ["ops", "catalog", "pricing", "sales", "content", "ai", "bot", "roles"];
 const BREAKPOINT = "--> statement-breakpoint";
 
-/** All SQL files in the order they run. */
+/**
+ * All SQL files in the order they run. A module without a directory is skipped (bot has no SQL yet); a directory
+ * that is not in MODULE_ORDER is an error, because its triggers and grants would silently stay out of the migration.
+ */
 export function sqlFiles(dir = SQL_DIR) {
+  const unlisted = readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !MODULE_ORDER.includes(d.name))
+    .map((d) => d.name);
+  if (unlisted.length > 0) {
+    throw new Error(`sql modules missing from MODULE_ORDER in assemble.mjs: ${unlisted.join(", ")}`);
+  }
   return MODULE_ORDER.flatMap((module) => {
     let names = [];
     try {
       names = readdirSync(join(dir, module)).filter((n) => n.endsWith(".sql"));
-    } catch {
-      return [];
+    } catch (e) {
+      if (e && e.code === "ENOENT") return [];
+      throw e;
     }
     return names.sort().map((n) => join(dir, module, n));
   });

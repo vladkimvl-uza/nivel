@@ -50,6 +50,7 @@ describe("ops.consents", () => {
       (await pgError(migrator, "update ops.consents set granted = false where id = $1", [row.id])).message,
     ).toMatch(APPEND_ONLY);
     expect((await pgError(migrator, "delete from ops.consents where id = $1", [row.id])).message).toMatch(APPEND_ONLY);
+    expect((await pgError(migrator, "truncate ops.consents cascade")).message).toMatch(APPEND_ONLY);
     await migrator.query("insert into ops.consents (customer_id, kind, granted) values ($1, 'marketing', false)", [
       customerId,
     ]);
@@ -90,6 +91,7 @@ describe("sales.order_events and sales.reserve_ledger", () => {
     expect((await pgError(migrator, "delete from sales.order_events where order_id = $1", [orderId])).message).toMatch(
       APPEND_ONLY,
     );
+    expect((await pgError(migrator, "truncate sales.order_events")).message).toMatch(APPEND_ONLY);
     const ledger = await one<{ id: string }>(
       migrator,
       "insert into sales.reserve_ledger (fund, order_id, amount_sum, reason) values ('warranty', $1, 150000, 'contribution') returning id",

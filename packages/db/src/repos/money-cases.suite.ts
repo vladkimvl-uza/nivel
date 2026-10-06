@@ -370,6 +370,23 @@ describe("reconciliation when an order closes or is cancelled", () => {
   });
 });
 
+describe("purchase rows with an impossible quantity or discount", () => {
+  it.each([
+    ["a quantity of zero", 0, 0, "purchases_qty_chk"],
+    ["a negative discount", 1, -1, "purchases_discount_chk"],
+  ])("refuses %s", async (_name, qty, discount, constraint) => {
+    const o = await createOrder(migrator);
+    await receiveFunds(migrator, o.orderId, 1_000_000);
+    const e = await pgError(
+      migrator,
+      `insert into sales.purchases (order_id, vendor_id, qty, amount_sum, paid_via, receipt_kind, receipt_no, bought_by, discount_sum)
+       values ($1, $2, $3, 100, 'bank_transfer', 'fiscal', 'R-q', 'x', $4)`,
+      [o.orderId, vendorId, qty, discount],
+    );
+    expect(e.message).toMatch(new RegExp(constraint));
+  });
+});
+
 describe("reversing rows cannot repeat or exceed what they correct", () => {
   const reverse = (c: pg.Client, orderId: string, original: string, amount: number, extra = "") =>
     pgError(

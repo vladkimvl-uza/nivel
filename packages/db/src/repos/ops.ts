@@ -15,6 +15,7 @@ import {
 } from "../schema/ops.ts";
 import { DbRuleError, expectUpdated } from "./errors.ts";
 import type { Executor, Tx } from "./executor.ts";
+import { MS_PER_MINUTE } from "./time.ts";
 
 export type SettingRow = typeof settings.$inferSelect;
 export type AuditInput = Omit<typeof auditLog.$inferInsert, "id" | "at"> & { at?: Date };
@@ -166,7 +167,7 @@ export async function markOutboxFailed(
       attempts: sql`${outbox.attempts} + 1`,
       lastError: error,
       status: sql`case when ${outbox.attempts} + 1 >= ${opts.maxAttempts ?? 5} then 'failed' else 'pending' end`,
-      sendAfter: sql`${new Date(now.getTime() + (opts.retryAfterMs ?? 60_000)).toISOString()}::timestamptz`,
+      sendAfter: sql`${new Date(now.getTime() + (opts.retryAfterMs ?? MS_PER_MINUTE)).toISOString()}::timestamptz`,
     })
     .where(eq(outbox.id, id))
     .returning({ status: outbox.status });
@@ -307,7 +308,7 @@ export async function recordFailedLogin(
   opts: { lockAfter: number; lockMinutes: number; now?: Date },
 ): Promise<{ failedLogins: number; lockedUntil: Date | null }> {
   const now = opts.now ?? new Date();
-  const lockUntil = new Date(now.getTime() + opts.lockMinutes * 60_000).toISOString();
+  const lockUntil = new Date(now.getTime() + opts.lockMinutes * MS_PER_MINUTE).toISOString();
   const [row] = await db
     .update(adminUsers)
     .set({

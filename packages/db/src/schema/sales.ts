@@ -18,7 +18,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { createdAt, oneOf, pk, sumCol, tstz } from "../repos/columns.ts";
+import { createdAt, oneOf, pk, sumCol, tstz, updatedAt } from "../repos/columns.ts";
 import { products } from "./catalog.ts";
 import { ideaPosts, legalDocuments } from "./content.ts";
 import { adminUsers, files } from "./ops.ts";
@@ -227,7 +227,7 @@ export const orders = sales.table(
     tgTopicId: bigint("tg_topic_id", { mode: "number" }),
     assignee: uuid("assignee").references(() => adminUsers.id),
     createdAt: createdAt(),
-    updatedAt: createdAt("updated_at"),
+    updatedAt: updatedAt(),
   },
   (t) => [
     unique("orders_number_key").on(t.number),

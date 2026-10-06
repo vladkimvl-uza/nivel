@@ -3,6 +3,7 @@ import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { processedUpdates, sessions, subscriptions } from "../schema/bot.ts";
 import { guarded } from "./errors.ts";
 import type { Executor } from "./executor.ts";
+import { MS_PER_DAY } from "./time.ts";
 
 export async function getSession(db: Executor, key: string): Promise<Record<string, unknown> | null> {
   const [row] = await db.select({ value: sessions.value }).from(sessions).where(eq(sessions.key, key));
@@ -34,7 +35,7 @@ export async function markUpdateProcessed(db: Executor, updateId: number): Promi
 export async function purgeProcessedUpdates(db: Executor, days = 7, now: Date = new Date()): Promise<number> {
   const rows = await db
     .delete(processedUpdates)
-    .where(lt(processedUpdates.at, new Date(now.getTime() - days * 86_400_000)))
+    .where(lt(processedUpdates.at, new Date(now.getTime() - days * MS_PER_DAY)))
     .returning({ id: processedUpdates.updateId });
   return rows.length;
 }

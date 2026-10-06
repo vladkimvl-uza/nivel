@@ -21,6 +21,7 @@ import {
 import { expectUpdated, guarded } from "./errors.ts";
 import type { Executor } from "./executor.ts";
 import { consentGranted, nextNumber } from "./ops.ts";
+import { MS_PER_HOUR, TASHKENT_UTC_OFFSET_HOURS } from "./time.ts";
 
 export type CustomerInsert = Omit<typeof customers.$inferInsert, "id" | "createdAt" | "erasedAt">;
 export type OrderRow = typeof orders.$inferSelect;
@@ -33,7 +34,7 @@ export type PurchaseInsert = Omit<typeof purchases.$inferInsert, "id" | "boughtA
 
 /** Business calendar year (Asia/Tashkent, UTC+5): numbers restart on 1 January local time. */
 export function tashkentYear(at: Date): number {
-  return new Date(at.getTime() + 5 * 3_600_000).getUTCFullYear();
+  return new Date(at.getTime() + TASHKENT_UTC_OFFSET_HOURS * MS_PER_HOUR).getUTCFullYear();
 }
 
 // ---- customers --------------------------------------------------------------------------------------------------

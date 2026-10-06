@@ -12,6 +12,8 @@ export const tstz = (name: string) => timestamp(name, { withTimezone: true, mode
 
 /** `timestamptz NOT NULL DEFAULT now()`. */
 export const createdAt = (name = "created_at") => tstz(name).notNull().defaultNow();
+/** The change time of a row: set by the touch trigger of the table on every UPDATE. */
+export const updatedAt = () => createdAt("updated_at");
 
 /** Whole sums: `bigint`, read as a JS number (safe up to 9·10^15, ARCHITECTURE 3.1). */
 export const sumCol = (name: string) => bigint(name, { mode: "number" });

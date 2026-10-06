@@ -5,6 +5,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { ideaPosts, legalDocuments, pages, policyTexts } from "../schema/content.ts";
 import { expectUpdated, guarded } from "./errors.ts";
 import type { Executor } from "./executor.ts";
+import { MS_PER_HOUR } from "./time.ts";
 
 export type PolicyTopic = (typeof policyTexts.$inferSelect)["topic"];
 export type LegalKind = (typeof legalDocuments.$inferSelect)["kind"];
@@ -64,13 +65,13 @@ export async function getPolicy(db: Executor, topic: PolicyTopic) {
     .orderBy(desc(policyTexts.version))
     .limit(1);
   if (approved) return approved;
-  const [any] = await db
+  const [newest] = await db
     .select()
     .from(policyTexts)
     .where(eq(policyTexts.topic, topic))
     .orderBy(desc(policyTexts.version))
     .limit(1);
-  return any ?? null;
+  return newest ?? null;
 }
 
 export async function addPolicyVersion(
@@ -162,7 +163,7 @@ export async function revokeIdeaPermission(db: Executor, id: string, now: Date =
       .set({
         permissionStatus: "revoked",
         revokedAt: now,
-        takedownDue: new Date(now.getTime() + 48 * 3_600_000),
+        takedownDue: new Date(now.getTime() + 48 * MS_PER_HOUR),
         status: "takedown",
       })
       .where(eq(ideaPosts.id, id))
