@@ -79,6 +79,8 @@ const CAPABILITIES = {
   "acts.write": ["admin"],
   "reports.write": ["admin"],
   "ledger.write": ["admin", "worker"],
+  /** The reserve ledger is read by the owner's panel and the worker; the bot and the site do not see it. */
+  "ledger.read": ["admin", "worker"],
   /** Money consents (limit overrun, no receipt, replacement, third-party payer) are not recorded by the site. */
   "consents.money": ["admin", "bot"],
 } as const satisfies Record<string, readonly DbRole[]>;

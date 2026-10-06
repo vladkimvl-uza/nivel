@@ -31,3 +31,14 @@ export function assertInstant(value: unknown, path: string): Date {
   }
   return value;
 }
+
+/**
+ * An instant read by a raw query: drizzle hands timestamps of `execute()` over as text ("2026-10-13 05:00:00+00"),
+ * while the query builders map them to Date. Null stays null; text that is not an instant is a broken row.
+ */
+export function asDate(value: unknown): Date | null {
+  if (value === null || value === undefined) return null;
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(d.getTime())) throw new Error(`a timestamp of the database is not a date: ${String(value)}`);
+  return d;
+}
