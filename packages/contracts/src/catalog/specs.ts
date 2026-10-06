@@ -97,6 +97,8 @@ const posNum = z.number().positive();
 const nonNegNum = z.number().nonnegative();
 const pcieGen = z.union([z.literal(3), z.literal(4), z.literal(5)]);
 const text = z.string().min(1);
+/** A BIOS version: some digit or Latin letter is needed to compare it ("1.30", "F15", "7D75v1.A0", "3003"). */
+const biosVersion = z.string().regex(/[0-9A-Za-z]/, { error: "a BIOS version needs a digit or a Latin letter" });
 
 /** All values may be `null` (unknown); a key that is optional in the complete shape stays optional. */
 type NullableShape<S extends Record<string, z.ZodType>> = { [K in keyof S]: z.ZodNullable<S[K]> };
@@ -118,7 +120,7 @@ const cpuShape = {
   memMaxMts: z.partialRecord(RamTypeSchema, posInt),
   boxCooler: z.boolean(),
   chipsets: z.array(text).min(1),
-  minBiosByChipset: z.record(z.string(), text).exactOptional(),
+  minBiosByChipset: z.record(z.string(), biosVersion).exactOptional(),
 };
 
 export const M2SlotSchema = z.strictObject({
@@ -145,7 +147,7 @@ const boardShape = {
   wifi: z.boolean(),
   bluetooth: z.boolean(),
   biosFlashback: z.boolean(),
-  shippedBios: text.exactOptional(),
+  shippedBios: biosVersion.exactOptional(),
 };
 
 const ramShape = {
@@ -298,6 +300,10 @@ export const CpuSpecsSchema = z
   .refine((s) => s.maxPowerW >= s.tdpW, {
     error: "maxPowerW must not be below tdpW",
     path: ["maxPowerW"],
+  })
+  .refine((s) => s.memTypes.every((t) => s.memMaxMts[t] !== undefined), {
+    error: "every supported memory type needs a speed limit in memMaxMts",
+    path: ["memMaxMts"],
   }) satisfies z.ZodType<CpuSpecs>;
 export const BoardSpecsSchema = z.strictObject(boardShape) satisfies z.ZodType<BoardSpecs>;
 export const RamSpecsSchema = z.strictObject(ramShape) satisfies z.ZodType<RamSpecs>;

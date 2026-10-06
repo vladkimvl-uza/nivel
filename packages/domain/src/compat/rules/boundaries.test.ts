@@ -163,6 +163,17 @@ describe("PSU_WATTAGE boundaries (block 28, 3.4)", () => {
 });
 
 describe("CPU_MB_BIOS details", () => {
+  it.each([
+    ["F15", "1.20"], // a board of another vendor writes versions differently from the floor
+    ["1.30", "неизвестно"],
+    ["3003", "F9"],
+  ])("versions that cannot be ordered (%s against %s) are missing data, never 'fine'", (shippedBios, minBios) => {
+    const parts = pcBuild({ cpu: { minBiosByChipset: { B650: minBios } }, mb: { shippedBios } });
+    const r = run(parts);
+    expect(r.verdict).toBe("incomplete");
+    expect(keys(of(parts, "CPU_MB_BIOS"))).toEqual(["compat.missing_data"]);
+    expect(r.missingData).toContainEqual({ productId: "mb", field: "shippedBios" });
+  });
   it("an equal BIOS version is enough", () => {
     expect(of(pcBuild({ cpu: { minBiosByChipset: { B650: "1.30" } } }), "CPU_MB_BIOS")).toEqual([]);
   });
@@ -214,6 +225,17 @@ describe("memory rules with a partial build", () => {
       mb: { ramMaxMts: 6400 },
     });
     expect(of(parts, "MEM_SPEED")).toEqual([]);
+  });
+  it("MEM_SPEED: a supported memory type without a limit in the processor table is missing data, not 'fine'", () => {
+    const parts = pcBuild({
+      ram: { type: "DDR4", mts: 3200 },
+      cpu: { memTypes: ["DDR4", "DDR5"], memMaxMts: { DDR5: 5200 } },
+      mb: { ramType: "DDR4", ramMaxMts: 3600 },
+    });
+    const r = run(parts);
+    expect(r.missingData).toContainEqual({ productId: "cpu", field: "memMaxMts" });
+    expect(r.verdict).toBe("incomplete");
+    expect(of(parts, "MEM_SPEED").map((i) => i.messageKey)).toEqual(["compat.missing_data"]);
   });
   it("MEM_SPEED with memory exactly at the limit is fine", () => {
     expect(of(pcBuild({ ram: { mts: 5200 } }), "MEM_SPEED")).toEqual([]);

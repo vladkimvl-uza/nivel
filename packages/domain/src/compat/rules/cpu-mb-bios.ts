@@ -4,7 +4,8 @@ import { compareVersions } from "../versions.ts";
 
 /**
  * The processor needs a BIOS newer than the one the board ships with.
- * `minBiosByChipset` absent means the processor has no BIOS floor; `null` means unknown. Always a warning:
+ * `minBiosByChipset` absent means the processor has no BIOS floor; `null` means unknown; versions that cannot be
+ * ordered (different notations) are reported as missing `shippedBios`. Always a warning:
  * with flashback the buyer can update without a processor, otherwise the seller must flash it.
  */
 export const cpuMbBios = pcRule({
@@ -25,7 +26,13 @@ export const cpuMbBios = pcRule({
     if (minBios === undefined) return [];
     const shippedBios = p.need(mb, "mb", "shippedBios");
     if (shippedBios === undefined) return p.result([]);
-    if (compareVersions(shippedBios, minBios) >= 0) return [];
+    const order = compareVersions(shippedBios, minBios);
+    if (order === undefined) {
+      // another notation than the floor: neither "new enough" nor "too old" can be said
+      p.missing(mb, "shippedBios");
+      return p.result([]);
+    }
+    if (order >= 0) return [];
     const flashback = p.need(mb, "mb", "biosFlashback");
     if (flashback === undefined) return p.result([]);
     return [

@@ -85,6 +85,18 @@ describe("value rules (complete specs)", () => {
     expect(bad("ssd", { iface: "nvme", formFactor: "2.5" })).toBe(false);
     expect(bad("ssd", { iface: "sata", formFactor: "2.5" })).toBe(true);
   });
+  it("consistency: every memory type the processor supports has a speed limit", () => {
+    expect(bad("cpu", { memTypes: ["DDR4", "DDR5"], memMaxMts: { DDR5: 5600 } })).toBe(false);
+    expect(bad("cpu", { memTypes: ["DDR5"], memMaxMts: {} })).toBe(false);
+    expect(bad("cpu", { memTypes: ["DDR4", "DDR5"], memMaxMts: { DDR4: 3200, DDR5: 5600 } })).toBe(true);
+  });
+  it("BIOS versions hold a digit or a Latin letter (shapes like 1.30, F15, 7D75v1.A0, 3003)", () => {
+    for (const v of ["?", "—", "неизвестно", " "]) {
+      expect(bad("mb", { shippedBios: v }), `shippedBios ${v}`).toBe(false);
+      expect(bad("cpu", { minBiosByChipset: { B650: v } }), `minBios ${v}`).toBe(false);
+    }
+    for (const v of ["1.30", "F15", "7D75v1.A0", "3003"]) expect(bad("mb", { shippedBios: v })).toBe(true);
+  });
   it("consistency: the front radiator limit is not above the ordinary GPU limit", () => {
     expect(bad("case", { gpuMaxLenMm: 300, gpuMaxLenWithFrontRadMm: 320 })).toBe(false);
   });

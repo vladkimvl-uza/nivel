@@ -8,10 +8,15 @@ function tokens(version: string): string[] {
   );
 }
 
-/** Negative when `a` is older than `b`, positive when newer, 0 when equal. Digits sort before letters. */
-export function compareVersions(a: string, b: string): number {
+/**
+ * Negative when `a` is older than `b`, positive when newer, 0 when equal. `undefined` when the versions cannot be
+ * ordered: one has no token at all (no digit or Latin letter), or at the first difference one token is a number and
+ * the other letters ("F15" against "1.20": different notations of different vendors say nothing about which is newer).
+ */
+export function compareVersions(a: string, b: string): number | undefined {
   const ta = tokens(a);
   const tb = tokens(b);
+  if (ta.length === 0 || tb.length === 0) return undefined;
   const n = Math.max(ta.length, tb.length);
   for (let i = 0; i < n; i++) {
     const x = ta[i];
@@ -24,7 +29,7 @@ export function compareVersions(a: string, b: string): number {
       const d = Number(x) - Number(y);
       if (d !== 0) return d;
     } else if (xNum !== yNum) {
-      return xNum ? -1 : 1;
+      return undefined;
     } else if (x !== y) {
       return x < y ? -1 : 1;
     }
