@@ -21,8 +21,10 @@ export const requestHeaders = new Headers();
 
 /** What `redirect()` of Next.js does: it throws; the test catches it and reads where to. */
 export class RedirectSignal extends Error {
-  constructor(readonly url: string) {
+  readonly url: string;
+  constructor(url: string) {
     super(`redirect to ${url}`);
+    this.url = url;
   }
 }
 
