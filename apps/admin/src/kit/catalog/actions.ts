@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { guardAction, NOT_ALLOWED } from "../../auth/next.ts";
 import { getRuntime } from "../../auth/runtime.ts";
+import { decodeCsvBytes } from "../csv.ts";
 import { formDataSource } from "../form.ts";
 import type { FormState } from "../ui/SchemaForm.tsx";
 import type { CatalogValue } from "./resource.ts";
@@ -79,16 +80,19 @@ export interface ImportState {
   failed?: { line: number; message: string }[];
 }
 
-const MAX_FILE = 1_048_576;
+// Next.js stops the body of a server action at 1 MB, and the second step sends the text of the file again as a hidden
+// field: the file is limited to half of that, so that the message below reaches the person instead of a failed request.
+const MAX_FILE_BYTES = 512 * 1024;
+const TOO_BIG = "Файл больше 512 КБ.";
 
 async function fileText(data: FormData): Promise<string | { error: string }> {
   const file = data.get("file");
   if (file instanceof File && file.size > 0) {
-    if (file.size > MAX_FILE) return { error: "Файл больше 1 МБ." };
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return new TextDecoder("utf-8").decode(bytes);
+    if (file.size > MAX_FILE_BYTES) return { error: TOO_BIG };
+    return decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
   }
   const pasted = text(data, "csv");
+  if (Buffer.byteLength(pasted, "utf8") > MAX_FILE_BYTES) return { error: TOO_BIG };
   return pasted.trim() === "" ? { error: "Выберите файл CSV." } : pasted;
 }
 

@@ -127,3 +127,15 @@ export function toCsv(
     /["\r\n]/.test(cell) || cell.includes(delimiter) ? `"${cell.replace(/"/g, '""')}"` : cell;
   return rows.map((row) => `${row.map((c) => quote(guard(c))).join(delimiter)}\r\n`).join("");
 }
+
+/**
+ * The text of a file: UTF-8 (a BOM is dropped) and, when the bytes are not valid UTF-8, Windows-1251: Russian Excel
+ * writes "CSV (comma delimited)" in that encoding, and reading it as UTF-8 would silently turn Cyrillic into U+FFFD.
+ */
+export function decodeCsvBytes(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder("windows-1251").decode(bytes);
+  }
+}

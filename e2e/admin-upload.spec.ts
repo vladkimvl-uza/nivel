@@ -95,6 +95,39 @@ test.describe("загрузка файла с телефона", () => {
     expect(await admin.query("select 1 from ops.files where created_by = $1", [`admin:${helper.id}`])).toHaveLength(1);
   });
 
+  test("снимок на 3 МБ проходит: лимит тела действия Next (1 МБ) загрузке не мешает", async ({ page, admin }) => {
+    const helper = await admin.createUser("assistant");
+    await signIn(page, admin, helper);
+    await page.goto(`${admin.baseURL}/files`);
+    // Реальный кадр весит 2-8 МБ: добавляем нули в данные изображения, перед маркером конца.
+    const small = phonePhoto();
+    const big = Buffer.concat([small.subarray(0, -2), Buffer.alloc(3 * 1024 * 1024), small.subarray(-2)]);
+    expect(big.length).toBeGreaterThan(3 * 1024 * 1024);
+    await page.locator("#upload-photo").setInputFiles({ name: "IMG_BIG.jpg", mimeType: "image/jpeg", buffer: big });
+    await page.getByRole("button", { name: "Загрузить" }).click();
+    await expect(page.getByTestId("upload-form").locator(".adm-flash--ok")).toContainText(
+      "Координаты и данные съёмки из него удалены",
+    );
+    const [file] = await admin.query<{ storage_key: string; bytes: string }>(
+      "select storage_key, bytes::text from ops.files where created_by = $1",
+      [`admin:${helper.id}`],
+    );
+    const saved = readFileSync(join(admin.filesDir, file?.storage_key ?? ""));
+    expect(saved.length).toBeGreaterThan(3 * 1024 * 1024);
+    expect(saved.toString("latin1")).not.toContain("GPS-41.2995N");
+  });
+
+  test("файл больше 12 МБ отклоняется сообщением формы, а не сбоем страницы", async ({ page, admin }) => {
+    const helper = await admin.createUser("assistant");
+    await signIn(page, admin, helper);
+    await page.goto(`${admin.baseURL}/files`);
+    const huge = Buffer.alloc(12 * 1024 * 1024 + 1024, 1);
+    await page.locator("#upload-photo").setInputFiles({ name: "huge.jpg", mimeType: "image/jpeg", buffer: huge });
+    await page.getByRole("button", { name: "Загрузить" }).click();
+    await expect(page.getByTestId("upload-form").locator(".adm-flash--error")).toContainText("Файл больше 12 МБ.");
+    expect(await admin.query("select 1 from ops.files where created_by = $1", [`admin:${helper.id}`])).toHaveLength(0);
+  });
+
   test("не снимок не принимается", async ({ page, admin }) => {
     const helper = await admin.createUser("assistant");
     await signIn(page, admin, helper);

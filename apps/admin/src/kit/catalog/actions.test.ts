@@ -139,14 +139,39 @@ describe("import from a file", () => {
     });
   });
 
-  it("refuses a file over a megabyte", async () => {
+  // Next.js stops the body of a server action at 1 MB, with the wrapping of the form and the hidden copy of the text in
+  // the second step: the file is limited with a margin, so that the message below is what the person sees.
+  it("refuses a file over 512 KB, and the same text pasted", async () => {
     await fake.signInAs("owner");
     const data = new FormData();
-    data.set("file", new File([new Uint8Array(1_048_577)], "big.csv"));
+    data.set("file", new File([new Uint8Array(512 * 1024 + 1)], "big.csv"));
     expect(await actions.previewImportAction({ phase: "idle" }, data)).toEqual({
       phase: "error",
-      error: "Файл больше 1 МБ.",
+      error: "Файл больше 512 КБ.",
     });
+    expect(await actions.previewImportAction({ phase: "idle" }, form({ csv: "я".repeat(300 * 1024) }))).toEqual({
+      phase: "error",
+      error: "Файл больше 512 КБ.",
+    });
+  });
+
+  it("reads a file saved by Russian Excel as Windows-1251, and a UTF-8 file with its BOM", async () => {
+    await fake.signInAs("owner");
+    const text = "category,brand,model,mpn,spec.chip,spec.vramGb\ngpu,АСУС,Двойная,CP-1,GeForce RTX 5070,12\n";
+    // Windows-1251: Cyrillic capitals А..Я are C0..DF, small letters E0..FF; the ASCII part is the same.
+    const cp1251 = (s: string) =>
+      Uint8Array.from([...s].map((c) => (c >= "А" && c <= "я" ? c.charCodeAt(0) - 0x410 + 0xc0 : c.charCodeAt(0))));
+    const legacy = new FormData();
+    legacy.set("file", new File([cp1251(text)], "excel.csv"));
+    const a = await actions.previewImportAction({ phase: "idle" }, legacy);
+    expect(a).toMatchObject({ phase: "preview", counts: { new: 1, error: 0 } });
+    expect(a.rows?.[0]?.label).toBe("АСУС Двойная");
+    expect(a.csv).not.toContain(String.fromCharCode(0xfffd));
+
+    const modern = new FormData();
+    modern.set("file", new File([String.fromCharCode(0xfeff), text], "utf8.csv"));
+    const b = await actions.previewImportAction({ phase: "idle" }, modern);
+    expect(b.rows?.[0]?.label).toBe("АСУС Двойная");
   });
 
   it("the assistant has no import, in either step", async () => {
