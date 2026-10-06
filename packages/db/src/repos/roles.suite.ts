@@ -1,5 +1,6 @@
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { APP_SCHEMAS } from "../index.ts";
 import {
   connectAs,
   createOrder,
@@ -260,10 +261,65 @@ describe("nivel_admin", () => {
   });
 });
 
+// sales.apply_transition() believes the bot as the owner or the assistant only when the id it names is the Telegram id
+// of an active account of ops.admin_users. That holds only while the bot cannot write that table itself: with
+// INSERT or UPDATE the holder of its credentials would create the account it needs. The public roles must have no
+// right of any kind on the table, by the privilege catalogue and by the statements themselves.
+describe("ops.admin_users is out of reach of the site, the bot and the worker", () => {
+  const PUBLIC_ROLES = ["nivel_web", "nivel_bot", "nivel_worker"] as const;
+  const clientOf = (role: (typeof PUBLIC_ROLES)[number]) =>
+    ({ nivel_web: web, nivel_bot: bot, nivel_worker: worker })[role];
+  const STATEMENTS = [
+    "select * from ops.admin_users",
+    "select telegram_user_id from ops.admin_users",
+    "insert into ops.admin_users (email, password_hash, role, telegram_user_id) values ('intruder@example.test', 'x', 'owner', 1)",
+    "update ops.admin_users set telegram_user_id = 1",
+    "update ops.admin_users set role = 'owner'",
+    "update ops.admin_users set active = true",
+    "delete from ops.admin_users",
+  ];
+
+  it.each(PUBLIC_ROLES)("%s: has no table privilege", async (role) => {
+    const r = await one<{ any_right: boolean }>(
+      migrator,
+      "select has_table_privilege($1, 'ops.admin_users', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') as any_right",
+      [role],
+    );
+    expect(r.any_right).toBe(false);
+  });
+
+  it.each(PUBLIC_ROLES)(
+    "%s: has no right on any column, the Telegram id, the role and the flag included",
+    async (role) => {
+      const { rows } = await migrator.query<{ col: string; any_right: boolean }>(
+        `select a.attname as col, has_column_privilege($1, 'ops.admin_users', a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES') as any_right
+         from pg_attribute a where a.attrelid = 'ops.admin_users'::regclass and a.attnum > 0 and not a.attisdropped`,
+        [role],
+      );
+      const cols = rows.map((r) => r.col);
+      expect(cols).toEqual(expect.arrayContaining(["telegram_user_id", "role", "active"]));
+      expect(rows.filter((r) => r.any_right).map((r) => r.col)).toEqual([]);
+    },
+  );
+
+  it.each(PUBLIC_ROLES)("%s: every statement over the table is refused with 42501", async (role) => {
+    for (const statement of STATEMENTS) {
+      expect((await pgError(clientOf(role), statement)).code, `${role}: ${statement}`).toBe(DENIED);
+    }
+  });
+
+  it("the admin panel, which authenticates people itself, keeps its rights (the check is not vacuous)", async () => {
+    const r = await one<{ ok: boolean }>(
+      migrator,
+      "select has_table_privilege('nivel_admin', 'ops.admin_users', 'SELECT,INSERT,UPDATE') as ok",
+    );
+    expect(r.ok).toBe(true);
+  });
+});
+
 // PostgreSQL gives EXECUTE to PUBLIC on a function whose ACL is NULL, and aclexplode(NULL) has no rows: reading the ACL
 // cannot tell "nobody" from "everybody". has_function_privilege answers for the rights a role really has.
 describe("functions", () => {
-  const APP_SCHEMAS = "('sales', 'ops', 'ai', 'catalog', 'pricing', 'content', 'bot')";
   const ROLES = ["nivel_web", "nivel_admin", "nivel_bot", "nivel_worker"] as const;
   /** The SECURITY DEFINER functions and the application roles that may call them (the migrator owns them). */
   const DEFINER_FUNCTIONS: Record<string, readonly (typeof ROLES)[number][]> = {
@@ -279,7 +335,8 @@ describe("functions", () => {
     const { rows } = await migrator.query<{ fn: string; public_exec: boolean }>(
       `select p.oid::regprocedure::text as fn, has_function_privilege('public', p.oid, 'EXECUTE') as public_exec
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname in ${APP_SCHEMAS} and p.prokind = 'f'`,
+        where n.nspname = any($1) and p.prokind = 'f'`,
+      [[...APP_SCHEMAS]],
     );
     expect(rows.length).toBeGreaterThanOrEqual(20);
     expect(rows.filter((r) => r.public_exec).map((r) => r.fn)).toEqual([]);
@@ -299,7 +356,8 @@ describe("functions", () => {
       `select p.oid::regprocedure::text as fn,
               coalesce(p.proconfig @> array['search_path=pg_catalog, pg_temp'], false) as fixed_path
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname in ${APP_SCHEMAS} and p.prosecdef order by 1`,
+        where n.nspname = any($1) and p.prosecdef order by 1`,
+      [[...APP_SCHEMAS]],
     );
     expect(rows.map((r) => r.fn)).toEqual(Object.keys(DEFINER_FUNCTIONS).sort());
     expect(rows.filter((r) => !r.fixed_path).map((r) => r.fn)).toEqual([]);

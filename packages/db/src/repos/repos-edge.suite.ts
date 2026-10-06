@@ -3,7 +3,15 @@ import type { Db } from "../client.ts";
 import { addConversationUsage, addDailyUsage } from "./ai.ts";
 import { subscribe } from "./bot.ts";
 import { publishLegalDocument, revokeIdeaPermission } from "./content.ts";
-import { claimOutbox, enqueueOutbox, getSetting, markOutboxSent, recordConsent, setSetting } from "./ops.ts";
+import {
+  claimOutbox,
+  enqueueOutbox,
+  getSetting,
+  markOutboxFailed,
+  markOutboxSent,
+  recordConsent,
+  setSetting,
+} from "./ops.ts";
 import { excludeObservation, restoreObservation } from "./pricing.ts";
 import {
   confirmPayment,
@@ -220,5 +228,45 @@ describe("the relay claims rows inside a transaction", () => {
     expect(await db.transaction((tx) => claimOutbox(tx, 5))).toEqual([]);
     const batch = await db.transaction((tx) => claimOutbox(tx, 5, new Date(Date.now() + 7_200_000)));
     expect(batch.map((r) => r.id)).toEqual([later.id]);
+  });
+
+  // The retry moment is judged against the clock of the database in claimOutbox, so it is set by the same clock: a
+  // caller an hour behind must not get a retry that is due at once, and burn its attempts on a 429.
+  const sendAfterIn = async (id: string) =>
+    (
+      await db.$client.query<{ ms: number }>(
+        "select (extract(epoch from (send_after - clock_timestamp())) * 1000)::float8 as ms from ops.outbox where id = $1",
+        [id],
+      )
+    ).rows[0]?.ms ?? Number.NaN;
+
+  it("sets the retry moment by the clock of the database, not by the clock of the caller", async () => {
+    await db.$client.query("delete from ops.outbox");
+    const a = await enqueueOutbox(db, { kind: "job", payload: { n: 4 } });
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.now() - 3_600_000) }); // the caller is an hour behind
+    try {
+      expect(await markOutboxFailed(db, a.id, "429", { retryAfterMs: 600_000 })).toBe("pending");
+    } finally {
+      vi.useRealTimers();
+    }
+    const ms = await sendAfterIn(a.id);
+    expect(ms).toBeGreaterThan(590_000);
+    expect(ms).toBeLessThanOrEqual(600_000);
+    expect(await db.transaction((tx) => claimOutbox(tx, 5))).toEqual([]);
+  });
+
+  it("uses the default retry term of a minute and still honours a moment named by the caller", async () => {
+    await db.$client.query("delete from ops.outbox");
+    const a = await enqueueOutbox(db, { kind: "job", payload: { n: 5 } });
+    await markOutboxFailed(db, a.id, "boom");
+    const ms = await sendAfterIn(a.id);
+    expect(ms).toBeGreaterThan(50_000);
+    expect(ms).toBeLessThanOrEqual(60_000);
+    const b = await enqueueOutbox(db, { kind: "job", payload: { n: 6 } });
+    const named = new Date(Date.now() + 7_200_000);
+    await markOutboxFailed(db, b.id, "boom", { now: named, retryAfterMs: 1000 });
+    const msNamed = await sendAfterIn(b.id);
+    expect(msNamed).toBeGreaterThan(7_200_000 - 60_000);
+    expect(msNamed).toBeLessThan(7_200_000 + 60_000);
   });
 });

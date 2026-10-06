@@ -210,13 +210,17 @@ describe("the bot speaks for the owner and the assistant only as an active accou
     expect(r.to).toBe("estimate_sent");
   });
 
-  it("looks for an active account of the role among several rows with the same Telegram id", async () => {
+  it("finds the one account of the Telegram id and judges its role and state", async () => {
     const shared = 6_500_000_000 + uniq();
-    await insertAdminUser(migrator, { role: "owner", telegramUserId: shared, active: false });
-    await insertAdminUser(migrator, { role: "assistant", telegramUserId: shared });
+    const own = await insertAdminUser(migrator, { role: "assistant", telegramUserId: shared, active: false });
     const { orderId } = await createOrder(migrator);
+    // Inactive: the owner's name is refused whatever the role of the account.
     expect((await send(orderId, "SEND_ESTIMATE", "owner", String(shared))).message).toMatch(NOT_AN_ACCOUNT);
-    await insertAdminUser(migrator, { role: "owner", telegramUserId: shared });
+    // Active, but it is the assistant's account: the owner's name is refused.
+    await migrator.query("update ops.admin_users set active = true where id = $1", [own.id]);
+    expect((await send(orderId, "SEND_ESTIMATE", "owner", String(shared))).message).toMatch(NOT_AN_ACCOUNT);
+    // The same account promoted to the owner: now the owner's name passes.
+    await migrator.query("update ops.admin_users set role = 'owner' where id = $1", [own.id]);
     const r = await transition(bot, orderId, "SEND_ESTIMATE", { actorKind: "owner", actorId: String(shared) });
     expect(r.to).toBe("estimate_sent");
   });
@@ -274,12 +278,10 @@ const CUSTOMER_FIELDS: Record<string, readonly string[]> = {
   ACCEPT: ["accepted_at", "offer_version_uz_id", "offer_version_ru_id"],
   HANDOVER: ["handed_over_at", "warranty_until"],
 };
-const SYSTEM_FIELDS = ["report_due_at", "objection_until", "refund_due_at"];
-/** The rule under test: the fields `kind` may write together with `event`. */
+/** The rule under test: the fields `kind` may write together with `event`. The system and the assistant write none. */
 function mayWrite(kind: string, event: string): readonly string[] {
   if (kind === "owner") return CHANGEABLE;
   if (kind === "customer") return CUSTOMER_FIELDS[event] ?? [];
-  if (kind === "system") return SYSTEM_FIELDS;
   return [];
 }
 
@@ -307,6 +309,49 @@ describe("the whitelist of order fields, event by event and actor by actor (tabl
       }
     }
     expect(await orderState(migrator, orderId)).toEqual({ status: "estimate_draft", events: "0" });
+  });
+});
+
+// Table 4.9: EXPIRE, REPORT_DEEMED_ACCEPTED and CLOSE write no order field, so the system has no field to write. The
+// list is empty on purpose: the deadlines the system used to be allowed to set are the owner's to set.
+describe("the system (the worker) writes no order field", () => {
+  const SYSTEM_EVENTS = [
+    ["EXPIRE", "estimate_sent", "estimate_expired"],
+    ["REPORT_DEEMED_ACCEPTED", "report_sent", "report_sent"],
+    ["CLOSE", "handed_over", "closed"],
+  ] as const;
+
+  it.each(SYSTEM_EVENTS)("%s: refuses the worker as the system writing any order field", async (event, status) => {
+    const { orderId } = await createOrder(migrator);
+    await driveTo(admin, orderId, status);
+    const before = await orderState(migrator, orderId);
+    for (const key of CHANGEABLE) {
+      const e = await applyError(worker, orderId, event, "system", { [key]: SAMPLE[key] });
+      expect(e.message, `${event} writing ${key}`).toMatch(/change_not_allowed/);
+      expect(e.code).toBe("42501");
+    }
+    expect(await orderState(migrator, orderId)).toEqual(before);
+  });
+
+  it.each(SYSTEM_EVENTS)("lets the worker send %s without fields", async (event, status, to) => {
+    const { orderId } = await createOrder(migrator);
+    await driveTo(admin, orderId, status);
+    const r = await transition(worker, orderId, event, { actorKind: "system", actorId: "worker" });
+    expect(r.to).toBe(to);
+  });
+
+  it("lets the worker send an event of the system with an empty change set", async () => {
+    const { orderId } = await createOrder(migrator);
+    await driveTo(admin, orderId, "estimate_sent");
+    const r = await transition(worker, orderId, "EXPIRE", { actorKind: "system", actorId: "worker", changes: {} });
+    expect(r.to).toBe("estimate_expired");
+  });
+
+  it("keeps the unknown field apart: it is named unknown_change, not refused as the system's", async () => {
+    const { orderId } = await createOrder(migrator);
+    await driveTo(admin, orderId, "estimate_sent");
+    const e = await applyError(worker, orderId, "EXPIRE", "system", { status: "closed" });
+    expect(e.message).toMatch(/unknown_change/);
   });
 });
 

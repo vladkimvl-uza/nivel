@@ -158,21 +158,28 @@ export async function markOutboxSent(db: Executor, id: string, now: Date = new D
   expectUpdated(rows, "outbox row", id);
 }
 
-/** A failed attempt: retried after `retryAfterMs`, `failed` for good after `maxAttempts` attempts. */
+/**
+ * A failed attempt: retried after `retryAfterMs`, `failed` for good after `maxAttempts` attempts. The retry moment is
+ * set by the clock of the database, the one claimOutbox compares it with; a caller that names `now` (a catch-up run,
+ * a test) gets exactly that moment plus the term.
+ */
 export async function markOutboxFailed(
   db: Executor,
   id: string,
   error: string,
   opts: { maxAttempts?: number; retryAfterMs?: number; now?: Date } = {},
 ): Promise<"pending" | "failed" | "sent"> {
-  const now = opts.now ?? new Date();
+  const retryAfterMs = opts.retryAfterMs ?? MS_PER_MINUTE;
+  const sendAfter = opts.now
+    ? sql`${new Date(opts.now.getTime() + retryAfterMs).toISOString()}::timestamptz`
+    : sql`clock_timestamp() + make_interval(secs => ${retryAfterMs / 1000}::float8)`;
   const [row] = await db
     .update(outbox)
     .set({
       attempts: sql`${outbox.attempts} + 1`,
       lastError: error,
       status: sql`case when ${outbox.attempts} + 1 >= ${opts.maxAttempts ?? 5} then 'failed' else 'pending' end`,
-      sendAfter: sql`${new Date(now.getTime() + (opts.retryAfterMs ?? MS_PER_MINUTE)).toISOString()}::timestamptz`,
+      sendAfter,
     })
     .where(eq(outbox.id, id))
     .returning({ status: outbox.status });

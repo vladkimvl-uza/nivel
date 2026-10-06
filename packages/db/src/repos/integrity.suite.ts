@@ -450,6 +450,11 @@ describe("CHECK constraints", () => {
       constraint: "admin_users_email_key",
     },
     {
+      name: "admin users: one account per Telegram id (the bot's owner check relies on it)",
+      sql: "insert into ops.admin_users (email, password_hash, role, telegram_user_id) values ('tg1@example.test', 'x', 'owner', 7100000001), ('tg2@example.test', 'x', 'assistant', 7100000001)",
+      constraint: "admin_users_telegram_user_id_key",
+    },
+    {
       name: "outbox: a known kind",
       sql: "insert into ops.outbox (kind, payload) values ('sms', '{}')",
       constraint: "outbox_kind_chk",
@@ -642,6 +647,57 @@ describe("CHECK constraints", () => {
       `insert into catalog.products (slug, category_code, brand, model, status, specs)
        values ('v-ok', 'gpu', 'B', 'M', 'verified', '{"lengthMm": 300, "power": [{"conn":"8pin","count":1}], "tgpW": 160}')`,
     );
+  });
+});
+
+describe("ops.admin_users: a Telegram id belongs to one account", () => {
+  const insert = (email: string, telegramUserId: number | null, active = true) =>
+    c.query(
+      "insert into ops.admin_users (email, password_hash, role, telegram_user_id, active) values ($1, 'x', 'owner', $2, $3)",
+      [email, telegramUserId, active],
+    );
+
+  it("lets any number of accounts have no Telegram id", async () => {
+    const n = uniq();
+    await insert(`null-a${n}@example.test`, null);
+    await insert(`null-b${n}@example.test`, null);
+    await insert(`null-c${n}@example.test`, null, false);
+    const r = await one<{ n: string }>(
+      c,
+      "select count(*) as n from ops.admin_users where email like $1 and telegram_user_id is null",
+      [`null-_${n}@example.test`],
+    );
+    expect(r.n).toBe("3");
+  });
+
+  it("refuses a second account with the same Telegram id, active or not", async () => {
+    const tg = 7_200_000_000 + uniq();
+    await insert(`tg-a${tg}@example.test`, tg, false);
+    const e = await pgError(
+      c,
+      "insert into ops.admin_users (email, password_hash, role, telegram_user_id) values ($1, 'x', 'owner', $2)",
+      [`tg-b${tg}@example.test`, tg],
+    );
+    expect(e.code).toBe("23505");
+    expect(e.message).toMatch(/admin_users_telegram_user_id_key/);
+  });
+
+  it("refuses to move an account onto the Telegram id of another", async () => {
+    const tg = 7_300_000_000 + uniq();
+    await insert(`mv-a${tg}@example.test`, tg);
+    await insert(`mv-b${tg}@example.test`, tg + 1);
+    const e = await pgError(c, "update ops.admin_users set telegram_user_id = $1 where email = $2", [
+      tg,
+      `mv-b${tg}@example.test`,
+    ]);
+    expect(e.code).toBe("23505");
+  });
+
+  it("frees the id when the account drops it", async () => {
+    const tg = 7_400_000_000 + uniq();
+    await insert(`fr-a${tg}@example.test`, tg);
+    await c.query("update ops.admin_users set telegram_user_id = null where email = $1", [`fr-a${tg}@example.test`]);
+    await insert(`fr-b${tg}@example.test`, tg);
   });
 });
 

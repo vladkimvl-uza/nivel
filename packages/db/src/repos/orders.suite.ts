@@ -358,6 +358,9 @@ describe("which order fields an actor may write with an event", () => {
     ["customer", "ACCEPT", { purchase_not_before: "2026-10-07T05:00:00Z" }],
     ["system", "EXPIRE", { documented_losses_sum: 1 }],
     ["system", "EXPIRE", { funds_received: true }],
+    ["system", "EXPIRE", { report_due_at: "2026-10-07T05:00:00Z" }],
+    ["system", "EXPIRE", { objection_until: "2026-10-07T05:00:00Z" }],
+    ["system", "EXPIRE", { refund_due_at: "2026-10-07T05:00:00Z" }],
     ["assistant", "PURCHASE_RECORDED", { refund_due_at: "2026-10-07T05:00:00Z" }],
   ])("refuses %s with %s writing %j", async (kind, event, changes) => {
     const { orderId } = await createOrder(migrator);

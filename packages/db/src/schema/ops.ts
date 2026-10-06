@@ -80,6 +80,8 @@ export const adminUsers = ops.table(
   },
   (t) => [
     uniqueIndex("admin_users_email_key").on(sql`lower(${t.email})`),
+    // One account per Telegram id: sales.apply_transition() trusts the bot as the owner or the assistant only by it.
+    uniqueIndex("admin_users_telegram_user_id_key").on(t.telegramUserId).where(sql`${t.telegramUserId} is not null`),
     check("admin_users_role_chk", oneOf(t.role, ADMIN_ROLES)),
   ],
 );
