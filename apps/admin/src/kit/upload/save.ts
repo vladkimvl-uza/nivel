@@ -12,28 +12,40 @@ import { type FallbackSanitizer, sanitizeImage } from "./image.ts";
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
 /**
- * Cleaning a picture holds the whole file and a working copy in memory (and sharp, more), and the admin container has
- * 384 MB. Two cleanings run at once, a few wait, and the rest are turned away with a plain message.
+ * Reading a body and cleaning a picture hold the whole file and working copies in memory (and sharp, more), and the
+ * admin container has 384 MB. Two uploads are worked on at once, a few wait, and the rest are turned away with a plain
+ * message. The place is taken BEFORE the body is read (the handler does it): a request that waits or is turned away
+ * has taken no memory for its body.
  */
 export const MAX_PARALLEL_CLEANINGS = 2;
 export const MAX_WAITING_CLEANINGS = 8;
-const BUSY = "Сервер занят обработкой других снимков. Повторите через минуту.";
+export const BUSY = "Сервер занят обработкой других снимков. Повторите через минуту.";
 
 const cleaning = { active: 0, waiting: [] as Array<() => void> };
 
-/** The slot is taken, or null when the queue is full. The function that gives the slot back is returned. */
-async function takeCleaningSlot(): Promise<(() => void) | null> {
+/** A place among the uploads that are worked on. Give it back once, with `release`. */
+export interface UploadSlot {
+  release(): void;
+}
+
+/** The place, or null when the queue is full. */
+export async function takeUploadSlot(): Promise<UploadSlot | null> {
   if (cleaning.active >= MAX_PARALLEL_CLEANINGS) {
     if (cleaning.waiting.length >= MAX_WAITING_CLEANINGS) return null;
     await new Promise<void>((resolve) => cleaning.waiting.push(resolve));
   } else {
     cleaning.active += 1;
   }
-  return () => {
-    // The slot goes straight to the next in the queue (the count of the active stays), or is freed.
-    const next = cleaning.waiting.shift();
-    if (next) next();
-    else cleaning.active -= 1;
+  let released = false;
+  return {
+    release() {
+      if (released) return;
+      released = true;
+      // The place goes straight to the next in the queue (the count of the active stays), or is freed.
+      const next = cleaning.waiting.shift();
+      if (next) next();
+      else cleaning.active -= 1;
+    },
   };
 }
 
@@ -116,22 +128,26 @@ export type UploadResult =
     }
   | { ok: false; error: string };
 
+/**
+ * `slot`: the place the caller already holds (the handler takes it before it reads the body and gives it back itself).
+ * Without it the cleaning takes a place of its own and gives it back when the picture is cleaned.
+ */
 export async function saveUpload(
   deps: UploadDeps,
-  input: { actor: SessionUser; bytes: Buffer; kind: string },
+  input: { actor: SessionUser; bytes: Buffer; kind: string; slot?: UploadSlot },
 ): Promise<UploadResult> {
   requirePermission(input.actor, "upload.write");
   const kind = Object.hasOwn(UPLOAD_KINDS, input.kind) ? UPLOAD_KINDS[input.kind] : undefined;
   if (!kind) return { ok: false, error: "Неизвестный вид файла." };
   if (input.bytes.length > MAX_UPLOAD_BYTES) return { ok: false, error: "Файл больше 12 МБ." };
 
-  const release = await takeCleaningSlot();
-  if (!release) return { ok: false, error: BUSY };
+  const own = input.slot ? null : await takeUploadSlot();
+  if (!input.slot && !own) return { ok: false, error: BUSY };
   let clean: Awaited<ReturnType<typeof sanitizeImage>>;
   try {
     clean = await sanitizeImage(input.bytes, deps.fallback ? { fallback: deps.fallback } : {});
   } finally {
-    release();
+    own?.release();
   }
   if (!clean.ok) return clean;
 

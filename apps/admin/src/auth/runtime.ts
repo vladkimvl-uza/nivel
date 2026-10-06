@@ -35,7 +35,8 @@ const KEY = Symbol.for("nivel.admin.runtime");
 /**
  * sharp reads the HEIF family and turns and re-encodes phone photos (kit/upload/image.ts). It is a native module kept
  * out of the bundle (`serverExternalPackages`), loaded on the first picture that needs it. Two threads and no cache: the
- * container has 384 MB and cleaning is limited to two pictures at once.
+ * container has 384 MB; uploads are limited to two at once and sharp works on one picture at a time, within the pixel
+ * limits of kit/upload/image.ts.
  */
 async function loadSharp(): Promise<SharpFactory> {
   const sharp = (await import("sharp")).default;

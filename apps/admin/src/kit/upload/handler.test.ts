@@ -9,7 +9,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { createFakeApp } = await import("../test-support/fake-app.ts");
 const { handleUploadRequest, UPLOAD_PATH } = await import("./handler.ts");
-const { MAX_UPLOAD_BYTES } = await import("./save.ts");
+const { MAX_PARALLEL_CLEANINGS, MAX_UPLOAD_BYTES, MAX_WAITING_CLEANINGS } = await import("./save.ts");
 
 let fake: Awaited<ReturnType<typeof createFakeApp>>;
 beforeEach(() => {
@@ -139,6 +139,133 @@ describe("POST /files/upload", () => {
       status: 400,
       body: { ok: false, message: "Не удалось прочитать форму." },
     });
+  });
+
+  it("refuses twelve megabytes of empty parts: the parts are counted before anything is built from them", async () => {
+    await fake.signInAs("owner");
+    const boundary = "BOMB";
+    const part = `--${boundary}\r\nContent-Disposition: form-data; name="a"; filename="f"\r\nContent-Type: image/jpeg\r\n\r\n\r\n`;
+    const body = Buffer.from(part.repeat(Math.floor(MAX_UPLOAD_BYTES / part.length)));
+    const request = new Request(`http://admin.test${UPLOAD_PATH}`, {
+      method: "POST",
+      body,
+      headers: {
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+        "content-length": String(body.length),
+        origin: "http://admin.test",
+        host: "admin.test",
+      },
+    });
+    const parse = vi.spyOn(request, "formData");
+    const before = process.memoryUsage().rss;
+    expect(await answer(await handleUploadRequest(request))).toEqual({
+      status: 400,
+      body: { ok: false, message: "Не удалось прочитать форму." },
+    });
+    expect(parse).not.toHaveBeenCalled();
+    // formData() took 290 MB for such a body.
+    expect(process.memoryUsage().rss - before).toBeLessThan(100 * 1024 * 1024);
+    expect(fake.storedFiles.size).toBe(0);
+  });
+
+  it("stops reading a body that is longer than it declared", async () => {
+    await fake.signInAs("owner");
+    const sent = await post({ bytes: photo("x") });
+    const lie = new Request(sent.url, {
+      method: "POST",
+      body: new Uint8Array(MAX_UPLOAD_BYTES + 128 * 1024),
+      headers: { ...Object.fromEntries(sent.headers), "content-length": "1000" },
+    });
+    // The declared length is small, the body is not: the reading is cut at the limit.
+    const reply = await answer(await handleUploadRequest(lie));
+    expect([400, 413]).toContain(reply.status);
+    expect(fake.storedFiles.size).toBe(0);
+  });
+
+  it("takes its place in the queue before it reads the body: the body of a request that is turned away is never read", async () => {
+    await fake.signInAs("owner");
+    const files = fake.runtime.upload.files;
+    const put = files.put.bind(files);
+    let open: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    files.put = async (key: string, data: Buffer) => {
+      await gate;
+      return put(key, data);
+    };
+    const reads = { count: 0 };
+    const lazy = async (n: number) => {
+      const real = await post({ bytes: photo(`n${n}`, n) });
+      const bytes = Buffer.from(await real.arrayBuffer());
+      // highWaterMark 0: nothing is pulled until somebody reads the body.
+      const stream = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            reads.count += 1;
+            controller.enqueue(bytes);
+            controller.close();
+          },
+        },
+        { highWaterMark: 0 },
+      );
+      return new Request(real.url, {
+        method: "POST",
+        body: stream,
+        headers: real.headers,
+        duplex: "half",
+      } as RequestInit);
+    };
+    const total = MAX_PARALLEL_CLEANINGS + MAX_WAITING_CLEANINGS + 3;
+    const sent = await Promise.all(Array.from({ length: total }, (_, i) => lazy(i)));
+    const pending = sent.map((request) => handleUploadRequest(request));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Only the requests that hold a place have been read: the ones that wait and the ones turned away have not.
+    expect(reads.count).toBe(MAX_PARALLEL_CLEANINGS);
+    open();
+    const replies = await Promise.all(pending.map((p) => p.then((r) => r.status)));
+    expect(replies.filter((status) => status === 503)).toHaveLength(3);
+    expect(replies.filter((status) => status === 200)).toHaveLength(MAX_PARALLEL_CLEANINGS + MAX_WAITING_CLEANINGS);
+  });
+
+  it("gives the place back when the body cannot be read, so that the next upload is not starved", async () => {
+    await fake.signInAs("owner");
+    for (let i = 0; i < MAX_PARALLEL_CLEANINGS + MAX_WAITING_CLEANINGS + 2; i += 1) {
+      const broken = new Request(`http://admin.test${UPLOAD_PATH}`, {
+        method: "POST",
+        body: "no form",
+        headers: {
+          "content-type": "text/plain",
+          "content-length": "7",
+          origin: "http://admin.test",
+          host: "admin.test",
+        },
+      });
+      expect((await handleUploadRequest(broken)).status).toBe(400);
+    }
+    expect((await handleUploadRequest(await post({ bytes: photo("x") }))).status).toBe(200);
+  });
+
+  it("gives up on a client that sends the body too slowly, and gives the place back", async () => {
+    await fake.signInAs("owner");
+    const stream = new ReadableStream<Uint8Array>({ pull: () => new Promise(() => {}) });
+    const slow = new Request(`http://admin.test${UPLOAD_PATH}`, {
+      method: "POST",
+      body: stream,
+      headers: {
+        "content-type": "multipart/form-data; boundary=B",
+        "content-length": "1000",
+        origin: "http://admin.test",
+        host: "admin.test",
+      },
+      duplex: "half",
+    } as RequestInit);
+    const reply = await answer(await handleUploadRequest(slow, { bodyTimeoutMs: 50 }));
+    expect(reply).toEqual({
+      status: 408,
+      body: { ok: false, message: "Файл передаётся слишком медленно. Повторите." },
+    });
+    expect((await handleUploadRequest(await post({ bytes: photo("x") }))).status).toBe(200);
   });
 
   it("refuses a request that did not come from a page of the admin", async () => {
