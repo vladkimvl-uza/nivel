@@ -1,9 +1,9 @@
 import { ops } from "@nivel/db/repos";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ForbiddenError } from "../orders/errors.ts";
+import { acceptedOrder, ownerActor, purchasingOrder } from "../orders/test-support/flow.ts";
+import { createWorld, newFile, type World } from "../orders/test-support/world.ts";
 import { record as recordPurchase } from "../purchases/index.ts";
-import { acceptedOrder, ownerActor, purchasingOrder } from "../test-support/flow.ts";
-import { createWorld, newFile, type World } from "../test-support/world.ts";
 import { status } from "./index.ts";
 
 let w: World;

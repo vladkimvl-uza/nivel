@@ -2,6 +2,9 @@ import type { OrderEvent } from "@nivel/domain/order";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { build } from "../quotes/build.ts";
 import { send } from "../quotes/send.ts";
+import { dispatch } from "./dispatch.ts";
+import { ForbiddenError, NotFoundError, ValidationError } from "./errors.ts";
+import { configureServices, resetServices } from "./runtime.ts";
 import {
   acceptConsents,
   acceptedOrder,
@@ -10,11 +13,8 @@ import {
   ownerActor,
   SYSTEM,
   sentOrder,
-} from "../test-support/flow.ts";
-import { createWorld, DAY, HOUR, newCustomer, pcLines, type World } from "../test-support/world.ts";
-import { dispatch } from "./dispatch.ts";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors.ts";
-import { configureServices, resetServices } from "./runtime.ts";
+} from "./test-support/flow.ts";
+import { createWorld, DAY, HOUR, newCustomer, pcLines, type World } from "./test-support/world.ts";
 
 let w: World;
 beforeAll(async () => {

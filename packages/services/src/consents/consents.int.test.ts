@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ForbiddenError, ValidationError } from "../orders/errors.ts";
-import { createWorld, newCustomer, type World } from "../test-support/world.ts";
+import { createWorld, newCustomer, type World } from "../orders/test-support/world.ts";
 import { consentsRequiredForAccept, record, verifyAcceptConsents } from "./index.ts";
 
 let w: World;

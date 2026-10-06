@@ -3,7 +3,7 @@ import { catalog, ops } from "@nivel/db/repos";
 import type { ProductId } from "@nivel/domain/catalog";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ValidationError } from "../orders/errors.ts";
-import { createWorld, HOUR, PC_COMPONENTS_SUM, pcLines, type World } from "../test-support/world.ts";
+import { createWorld, HOUR, PC_COMPONENTS_SUM, pcLines, type World } from "../orders/test-support/world.ts";
 import { computeQuoteFor } from "./compute.ts";
 
 let w: World;

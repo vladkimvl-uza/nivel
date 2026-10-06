@@ -1,7 +1,7 @@
 import { MAX_BUDGET_SUM } from "@nivel/domain/fee";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
-import { createWorld, type World } from "../test-support/world.ts";
+import { createWorld, type World } from "../orders/test-support/world.ts";
 import { budgetBandOf, convert, create } from "./index.ts";
 
 let w: World;

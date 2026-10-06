@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { record as recordConsent } from "../consents/index.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
-import { customerActor, ownerActor, purchasingOrder, type TestOrder } from "../test-support/flow.ts";
-import { createWorld, newFile, type World } from "../test-support/world.ts";
+import { customerActor, ownerActor, purchasingOrder, type TestOrder } from "../orders/test-support/flow.ts";
+import { createWorld, newFile, type World } from "../orders/test-support/world.ts";
 import { type RecordPurchaseInput, record } from "./index.ts";
 
 let w: World;
@@ -209,7 +209,7 @@ describe("purchases.record", () => {
   });
 
   it("is refused by the automaton before the purchase has started, and nothing stays written", async () => {
-    const { acceptedOrder } = await import("../test-support/flow.ts");
+    const { acceptedOrder } = await import("../orders/test-support/flow.ts");
     const o = await acceptedOrder(w);
     const r = await record(await input(o, "cpu"), owner(), w.admin);
     expect(r).toMatchObject({ ok: false });

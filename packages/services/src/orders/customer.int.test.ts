@@ -1,10 +1,10 @@
 // The customer sees only his own orders. The site role reads the views of ALL customers (DATA-MAP 2), so the service
 // puts the customer of the checked session into every query; a request for the order of another customer is "not found".
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { acceptedOrder, paidOrder, sentOrder, type TestOrder } from "../test-support/flow.ts";
-import { createWorld, PC_COMPONENTS_SUM, type World } from "../test-support/world.ts";
 import { getCustomerOrder, listCustomerOrders } from "./customer.ts";
 import { NotFoundError, ValidationError } from "./errors.ts";
+import { acceptedOrder, paidOrder, sentOrder, type TestOrder } from "./test-support/flow.ts";
+import { createWorld, PC_COMPONENTS_SUM, type World } from "./test-support/world.ts";
 
 let w: World;
 let mine: TestOrder;
@@ -53,7 +53,7 @@ describe.each([
   });
 
   it("never shows a draft quote to the customer", async () => {
-    const draft = await (await import("../test-support/flow.ts")).draftOrder(w);
+    const draft = await (await import("./test-support/flow.ts")).draftOrder(w);
     const view = await getCustomerOrder({ customerId: draft.customerId, orderId: draft.orderId }, rt());
     expect(view.quote).toBeNull();
   });

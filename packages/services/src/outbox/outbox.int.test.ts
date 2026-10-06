@@ -1,7 +1,7 @@
 import { ops } from "@nivel/db/repos";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ValidationError } from "../orders/errors.ts";
-import { createWorld, HOUR, type World } from "../test-support/world.ts";
+import { createWorld, HOUR, type World } from "../orders/test-support/world.ts";
 import { enqueue } from "./index.ts";
 
 let w: World;

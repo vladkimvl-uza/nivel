@@ -2,7 +2,6 @@ import { sales } from "@nivel/db/repos";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { dispatch } from "../orders/dispatch.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
-import { confirm, expect as expectPayment } from "../payments/index.ts";
 import {
   customerActor,
   ownerActor,
@@ -10,8 +9,9 @@ import {
   purchasingOrder,
   SYSTEM,
   type TestOrder,
-} from "../test-support/flow.ts";
-import { createWorld, DAY, PC_COMPONENTS_SUM, type World } from "../test-support/world.ts";
+} from "../orders/test-support/flow.ts";
+import { createWorld, DAY, PC_COMPONENTS_SUM, type World } from "../orders/test-support/world.ts";
+import { confirm, expect as expectPayment } from "../payments/index.ts";
 import { accept, generate, object, resolveObjection, send } from "./index.ts";
 
 let w: World;
@@ -55,7 +55,7 @@ describe("reports.generate", () => {
   });
 
   it("is made while the purchases run or are closed, not before the money came or after the report went out", async () => {
-    const { acceptedOrder } = await import("../test-support/flow.ts");
+    const { acceptedOrder } = await import("../orders/test-support/flow.ts");
     const early = await acceptedOrder(w);
     await expect(generate({ orderId: early.orderId }, owner(), w.admin)).rejects.toMatchObject({
       issues: [{ code: "order_status" }],

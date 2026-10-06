@@ -11,16 +11,8 @@ import { record as recordPurchase } from "../purchases/index.ts";
 import { build } from "../quotes/build.ts";
 import { send as sendQuote } from "../quotes/send.ts";
 import { accept as acceptReport, generate as generateReport, send as sendReport } from "../reports/index.ts";
-import {
-  createWorld,
-  DAY,
-  newFile,
-  PC_CATALOG,
-  PC_COMPONENTS_SUM,
-  pcLines,
-  type World,
-} from "../test-support/world.ts";
 import { dispatch } from "./dispatch.ts";
+import { createWorld, DAY, newFile, PC_CATALOG, PC_COMPONENTS_SUM, pcLines, type World } from "./test-support/world.ts";
 
 let w: World;
 beforeAll(async () => {

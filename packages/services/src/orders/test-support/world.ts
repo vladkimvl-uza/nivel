@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { categories, createDb, type Db, marketPrices, vendors } from "@nivel/db";
 import { catalog, content, ops, sales } from "@nivel/db/repos";
 import type { BuildLine, CategoryCode, ProductId } from "@nivel/domain/catalog";
-import { createRuntime, type DbRole, type Runtime } from "../orders/runtime.ts";
+import { createRuntime, type DbRole, type Runtime } from "../runtime.ts";
 
 /** Monday 12 October 2026, 10:00 in Tashkent. */
 export const T0 = new Date("2026-10-12T10:00:00+05:00");

@@ -1,7 +1,7 @@
 import { MAX_BUDGET_SUM } from "@nivel/domain/fee";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ValidationError } from "../orders/errors.ts";
-import { createWorld, newCustomer, PC_COMPONENTS_SUM, pcLines, type World } from "../test-support/world.ts";
+import { createWorld, newCustomer, PC_COMPONENTS_SUM, pcLines, type World } from "../orders/test-support/world.ts";
 import { save } from "./index.ts";
 
 let w: World;

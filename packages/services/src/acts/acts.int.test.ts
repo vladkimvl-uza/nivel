@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { dispatch } from "../orders/dispatch.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
-import { customerActor, ownerActor, purchasingOrder, settledOrder } from "../test-support/flow.ts";
-import { createWorld, type World } from "../test-support/world.ts";
+import { customerActor, ownerActor, purchasingOrder, settledOrder } from "../orders/test-support/flow.ts";
+import { createWorld, type World } from "../orders/test-support/world.ts";
 import { generate, sign } from "./index.ts";
 
 let w: World;

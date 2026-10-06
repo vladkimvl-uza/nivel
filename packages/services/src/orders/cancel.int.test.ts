@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { confirm, voidPayment } from "../payments/index.ts";
+import { cancel } from "./cancel-order.ts";
+import { dispatch } from "./dispatch.ts";
+import { ForbiddenError, NotFoundError, ValidationError } from "./errors.ts";
 import {
   acceptedOrder,
   customerActor,
@@ -8,11 +11,8 @@ import {
   paidOrder,
   purchasedOrder,
   sentOrder,
-} from "../test-support/flow.ts";
-import { createWorld, PC_COMPONENTS_SUM, type World } from "../test-support/world.ts";
-import { cancel } from "./cancel-order.ts";
-import { dispatch } from "./dispatch.ts";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors.ts";
+} from "./test-support/flow.ts";
+import { createWorld, PC_COMPONENTS_SUM, type World } from "./test-support/world.ts";
 
 let w: World;
 beforeAll(async () => {

@@ -1,15 +1,15 @@
 // Steps of the life of an order for the integration tests, built from the scenarios themselves: every test file that
 // needs an order "in the status X" walks the same road the product does (not part of the public API).
 
-import { record } from "../consents/index.ts";
-import { convert, create as createLead } from "../leads/index.ts";
-import { dispatch } from "../orders/dispatch.ts";
-import { confirm, expect as expectPayment } from "../payments/index.ts";
-import { record as recordPurchase } from "../purchases/index.ts";
-import { type BuiltQuote, build } from "../quotes/build.ts";
-import type { ManualLine } from "../quotes/compute.ts";
-import { send } from "../quotes/send.ts";
-import { accept as acceptReport, generate as generateReport, send as sendReport } from "../reports/index.ts";
+import { record } from "../../consents/index.ts";
+import { convert, create as createLead } from "../../leads/index.ts";
+import { confirm, expect as expectPayment } from "../../payments/index.ts";
+import { record as recordPurchase } from "../../purchases/index.ts";
+import { type BuiltQuote, build } from "../../quotes/build.ts";
+import type { ManualLine } from "../../quotes/compute.ts";
+import { send } from "../../quotes/send.ts";
+import { accept as acceptReport, generate as generateReport, send as sendReport } from "../../reports/index.ts";
+import { dispatch } from "../dispatch.ts";
 import { newCustomer, newFile, PC_CATALOG, pcLines, type World } from "./world.ts";
 
 export interface TestOrder {
