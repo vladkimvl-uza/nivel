@@ -58,9 +58,9 @@ describe("checkNamespace", () => {
 
   it("compares ICU placeholders including their types", () => {
     const names = checkNamespace("s", { a: "Salom {name}" }, { a: "Привет" }, { a: meta() }).join("\n");
-    expect(names).toContain('key "a" placeholders differ');
+    expect(names).toContain('key "a" placeholders differ: uz {name:argument} vs ru {}');
     const types = checkNamespace("s", { a: "{n, number} ta" }, { a: "{n} шт." }, { a: meta() }).join("\n");
-    expect(types).toContain('key "a" placeholders differ');
+    expect(types).toContain('key "a" placeholders differ: uz {n:number} vs ru {n:argument}');
   });
 
   it("accepts different plural categories in uz and ru", () => {

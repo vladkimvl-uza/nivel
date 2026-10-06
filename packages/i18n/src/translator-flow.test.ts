@@ -351,12 +351,17 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
 
   it("rejects ICU placeholders that differ from the Russian source", () => {
     const { report } = run((wb) => wb.set("site", "hello", "uz", "Salom, {ism}!"));
-    expect(report.errors).toEqual(["row 5: site:hello placeholders differ from ru: ru {name}, uz {ism}"]);
+    expect(report.errors).toEqual(["row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {ism:argument}"]);
+  });
+
+  it("shows the types when only the type of a placeholder differs", () => {
+    const { report } = run((wb) => wb.set("site", "hello", "uz", "Hi {name, number}"));
+    expect(report.errors).toEqual(["row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {name:number}"]);
   });
 
   it("rejects a placeholder that was dropped", () => {
     const { report } = run((wb) => wb.set("site", "hello", "uz", "Salom!"));
-    expect(report.errors).toEqual(["row 5: site:hello placeholders differ from ru: ru {name}, uz {}"]);
+    expect(report.errors).toEqual(["row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {}"]);
   });
 
   it("rejects text longer than the limit from meta and accepts text exactly at it", () => {

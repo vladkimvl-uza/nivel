@@ -4,7 +4,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { type GlossaryTerm, glossaryProblems, parseGlossary } from "./glossary.ts";
-import { checkIcuSyntax, placeholderSignature, placeholders } from "./icu.ts";
+import { checkIcuSyntax, placeholderSignature } from "./icu.ts";
 import { flattenMessages, type MessageTree, type MetaEntry } from "./messages-check.ts";
 import { checkUzString } from "./uz-apostrophes.ts";
 import { readXlsx, type SheetData, writeXlsx, type XlsxCell, type XlsxSheet } from "./xlsx.ts";
@@ -100,7 +100,7 @@ const GUIDE_LINES = [
   "",
   "1. Править нужно только колонку uz (перевод) и, когда текст проверен носителем, колонку status. Остальные колонки справочные: правки в них при импорте игнорируются.",
   "2. Колонка ru — исходный русский текст, колонка context — где и как показывается текст, колонка maxLen — предельная длина в знаках. Длиннее нельзя: импорт откажет.",
-  "3. Части в фигурных скобках — часть программы: {name}, {count, plural, one {...} other {...}}. Имена и ключевые слова внутри скобок (name, count, plural, one, other) не переводятся и не меняются; слова внутри ветвей {...} переводятся.",
+  "3. Части в фигурных скобках — часть программы: {name}, {count, plural, one {...} other {...}}. Имена и ключевые слова внутри скобок (name, count, plural, one, other) не переводятся и не меняются; слова внутри ветвей {...} переводятся. Тип части тоже должен совпадать с русским: {count} и {count, plural, ...} импорт считает разными (в сообщении об ошибке тип стоит после двоеточия).",
   "4. Знаки узбекского: oʻ и gʻ пишутся со знаком ʻ (U+02BB); тутук и прочие апострофы между буквами — ʼ (U+02BC). Обычный апостроф ' (U+0027) и ’ (U+2019) внутри слов импорт не примет.",
   "5. Цены только в сумах: «12 500 000 soʻm». Знак доллара и USD недопустимы.",
   "6. Термины — по листу Glossary; обращение к клиенту — Siz. Варианты вне глоссария (например, «tezkor xotira» вместо «operativ xotira») импорт отклонит.",
@@ -333,7 +333,7 @@ export function planImport(
         else if (ruRepo !== undefined && checkIcuSyntax(ruRepo) === null) {
           if (placeholderSignature(text).join() !== placeholderSignature(ruRepo).join()) {
             plan.errors.push(
-              `${where} placeholders differ from ru: ru {${placeholders(ruRepo)}}, uz {${placeholders(text)}}`,
+              `${where} placeholders differ from ru: ru {${placeholderSignature(ruRepo).join(", ")}}, uz {${placeholderSignature(text).join(", ")}}`,
             );
           }
         }
