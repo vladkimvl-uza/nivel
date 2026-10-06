@@ -171,4 +171,31 @@ describe("photos from a phone through the real sharp", () => {
     const r = await sanitizeImage(big, { fallback: createSharpSanitizer(sharp) });
     expect(r.ok).toBe(false);
   });
+
+  it("refuses a small AVIF that holds more than 6 megapixels before decoding it (it took 900 MB at 49)", async (ctx) => {
+    const sharp = needSharp(ctx);
+    const wide = await sharp({ create: { width: 3200, height: 2000, channels: 3, background: "#808080" } })
+      .avif({ quality: 1, effort: 0 })
+      .toBuffer();
+    expect(wide.length).toBeLessThan(50 * 1024);
+    const before = process.memoryUsage().rss;
+    const r = await sanitizeImage(wide, { fallback: createSharpSanitizer(sharp) });
+    expect(r.ok).toBe(false);
+    expect(r.ok ? "" : r.error).toContain("мегапикселей");
+    // Refused at the header: nothing like the 100 MB that decoding six megapixels takes was held.
+    expect(process.memoryUsage().rss - before).toBeLessThan(60 * 1024 * 1024);
+  });
+
+  it("a turned JPEG of more than 12 megapixels is kept by the lossless cleaner, with the turn tag and nothing else", async (ctx) => {
+    const sharp = needSharp(ctx);
+    const base = await sharp({ create: { width: 4160, height: 3120, channels: 3, background: "#808080" } })
+      .jpeg({ quality: 20 })
+      .withExif({ IFD0: { Make: "SECRET-MAKE" } })
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    const { result, data } = await uploaded(sharp, base);
+    expect(result.removed).not.toContain("reencoded");
+    expect(data.toString("latin1")).not.toContain("SECRET-MAKE");
+    expect((await sharp(data).metadata()).orientation).toBe(6);
+  });
 });

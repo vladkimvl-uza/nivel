@@ -190,10 +190,20 @@ describe("sanitizeImage: JPEG", () => {
   });
 
   it("keeps the colour profile (needed to show the colours right) and drops other APP2 data", async () => {
-    const icc = segment(0xe2, [...ascii("ICC_PROFILE"), 0, 1, 1, ...ascii("PROFILEBYTES")]);
+    // A profile as a camera writes it: the size in its header is its size, the signature `acsp` is at byte 36.
+    const profile = Buffer.alloc(128);
+    profile.writeUInt32BE(profile.length, 0);
+    profile.write("acsp", 36, "latin1");
+    profile.write("PROFILEBYTES", 100, "latin1");
+    const icc = segment(0xe2, [...ascii("ICC_PROFILE"), 0, 1, 1, ...profile]);
     const r = await sanitizeImage(jpegWith(JFIF, icc));
     if (!r.ok) throw new Error(r.error);
     expect(r.data.toString("latin1")).toContain("PROFILEBYTES");
+    const other = await sanitizeImage(
+      jpegWith(JFIF, segment(0xe2, [...ascii("ICC_PROFILE"), 0, 1, 1, ...ascii("NOT-A-PROFILE")])),
+    );
+    if (!other.ok) throw new Error(other.error);
+    expect(other.data.toString("latin1")).not.toContain("NOT-A-PROFILE");
   });
 
   it("is idempotent: cleaning a clean file changes nothing", async () => {

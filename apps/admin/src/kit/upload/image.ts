@@ -2,6 +2,8 @@
 // IPTC; the owner's customers must not receive that and the site must never publish it (ARCHITECTURE 6.1, 10.2).
 // This file removes it without decoding the picture: the container is read segment by segment (JPEG), chunk by chunk
 // (PNG, WebP) and everything that is not needed to show the picture is left out; the pixel data is copied byte for byte.
+// What stays is decided by a list of what is allowed (tables, frame headers, a colour profile that is a profile and
+// nothing more), never by a list of what is known to be bad: a marker or a chunk that this file does not know is dropped.
 //
 // sharp (catalog, `allowBuilds`) re-encodes: it reads the HEIF family (an iPhone HEIC when the build of libvips has the
 // HEVC codec, an AVIF always), applies the EXIF turn to the pixels and writes a JPEG with no metadata at all.
@@ -88,21 +90,24 @@ function readSegments(buf: Buffer): { segments: Segment[]; scanStart: number } |
   return null;
 }
 
+/** Between scans only these stay: the tables (DHT, DAC, DQT, DRI), the number of lines (DNL) and the next scan (SOS). */
+const SCAN_KEEP = new Set([0xc4, 0xcc, 0xdb, 0xdd, 0xdc, 0xda]);
+
 /**
  * The picture data from the first scan to the end-of-image marker. Entropy-coded data never holds FF followed by
  * anything but 00 or RSTn, so the first real marker after a scan is read as such; the tables between scans are kept
- * (they may hold the bytes FF D9), comments and APPn between scans are dropped. Whatever follows the end-of-image
+ * (they may hold the bytes FF D9), every other segment between scans (APPn, comments, JPGn, reserved markers) is dropped. Whatever follows the end-of-image
  * marker (the video of a Motion Photo, a second JPEG with its own EXIF, a gain map) is cut off. A file with no end
  * marker is kept to its last byte, but a marker that cannot be read (a length that is zero or runs past the end, a
  * marker cut off at the end) ends the picture there: what follows is not understood, so it is not kept (it may be a
  * metadata block with a length that no reader would accept but a lenient one would). Null when the file holds more
  * metadata segments between scans than any picture does.
  */
-function readScanData(buf: Buffer, start: number): { data: Buffer; trailer: boolean; dropped: boolean } | null {
+function readScanData(buf: Buffer, start: number): { data: Buffer; trailer: boolean; dropped: Set<string> } | null {
   // One buffer, written once: the result is never longer than the input (plus the closing marker).
   const out = Buffer.allocUnsafe(buf.length + 2);
   let written = 0;
-  let dropped = false;
+  const dropped = new Set<string>();
   let droppedCount = 0;
   let pos = start;
   let chunkStart = start;
@@ -147,13 +152,12 @@ function readScanData(buf: Buffer, start: number): { data: Buffer; trailer: bool
     const length = buf.readUInt16BE(m + 1);
     if (length < 2 || m + 1 + length > buf.length) return closeAt(pos);
     const end = m + 1 + length;
-    const isMetadata = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
-    if (isMetadata) {
+    if (!SCAN_KEEP.has(marker)) {
       droppedCount += 1;
       if (droppedCount > MAX_DROPPED_BETWEEN_SCANS) return null;
       flush(pos);
       chunkStart = end;
-      dropped = true;
+      dropped.add(marker >= 0xe0 && marker <= 0xef ? "app" : marker === 0xfe ? "comment" : "other");
     }
     pos = end;
   }
@@ -214,6 +218,28 @@ function orientationOnlyExif(orientation: number): Buffer {
   return Buffer.concat([head, payload]);
 }
 
+/** A colour profile that is one: the size in its header is its size, and the signature of the format is in place. */
+function isPlausibleIccProfile(profile: Buffer): boolean {
+  return (
+    profile.length >= 128 && profile.readUInt32BE(0) === profile.length && profile.toString("latin1", 36, 40) === "acsp"
+  );
+}
+
+/** Frame headers (SOF0..SOF15 but DHT, JPG, DAC) and the tables that a decoder needs before the first scan. */
+const isFrameHeader = (marker: number) =>
+  marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+const HEADER_TABLES = new Set([0xc4, 0xcc, 0xdb, 0xdd]);
+
+/** The 14 bytes of the JFIF header with no thumbnail; null when the segment is not a JFIF header. */
+function jfifHeader(payload: Buffer): { bytes: Buffer; hadThumbnail: boolean } | null {
+  if (!startsWith(payload, "JFIF\0") || payload.length < 14) return null;
+  const body = Buffer.from(payload.subarray(0, 14));
+  const hadThumbnail = payload.length > 14 || (body[12] ?? 0) !== 0 || (body[13] ?? 0) !== 0;
+  body[12] = 0;
+  body[13] = 0;
+  return { bytes: Buffer.concat([Buffer.from([0xff, 0xe0, 0, 16]), body]), hadThumbnail };
+}
+
 function cleanJpeg(input: Buffer): SanitizeResult {
   const parsed = readSegments(input);
   if (!parsed) return fail(CORRUPT);
@@ -222,43 +248,53 @@ function cleanJpeg(input: Buffer): SanitizeResult {
   let orientation: number | null = null;
   let afterJfif = 0;
 
+  // Allow-list: what is kept is named here; every other segment (a marker this file does not know, an APPn that is not
+  // one of the three below, anything with a payload of an unexpected shape) is dropped.
   for (const s of parsed.segments) {
     const drop = (name: string) => void removed.add(name);
-    switch (s.marker) {
-      case 0xe0:
-        if (startsWith(s.payload, "JFIF\0")) {
-          kept.push(s.bytes);
-          if (afterJfif === 0) afterJfif = kept.length;
-        } else drop("thumbnail");
-        break;
-      case 0xe1:
-        if (startsWith(s.payload, "Exif\0\0")) {
-          orientation ??= orientationOfTiff(s.payload.subarray(6));
-          drop("exif");
-        } else if (
-          startsWith(s.payload, "http://ns.adobe.com/xap/") ||
-          startsWith(s.payload, "http://ns.adobe.com/xmp/")
-        )
-          drop("xmp");
-        else drop("app1");
-        break;
-      case 0xe2:
-        if (startsWith(s.payload, "ICC_PROFILE\0")) kept.push(s.bytes);
-        else drop(startsWith(s.payload, "MPF\0") ? "mpf" : "app2");
-        break;
-      case 0xed:
-        drop("iptc");
-        break;
-      case 0xee:
-        // Adobe colour transform: without it a CMYK file shows wrong colours.
-        kept.push(s.bytes);
-        break;
-      case 0xfe:
-        drop("comment");
-        break;
-      default:
-        if (s.marker >= 0xe3 && s.marker <= 0xef) drop("app");
-        else kept.push(s.bytes);
+    const marker = s.marker;
+    if (isFrameHeader(marker) || HEADER_TABLES.has(marker)) {
+      kept.push(s.bytes);
+    } else if (marker === 0xe0) {
+      // JFIF: the header only (14 bytes), never what follows it (a thumbnail or anything else).
+      const jfif = jfifHeader(s.payload);
+      if (jfif) {
+        kept.push(jfif.bytes);
+        if (afterJfif === 0) afterJfif = kept.length;
+        if (jfif.hadThumbnail) drop("thumbnail");
+      } else drop(startsWith(s.payload, "JFXX\0") ? "thumbnail" : "app");
+    } else if (marker === 0xe1) {
+      if (startsWith(s.payload, "Exif\0\0")) {
+        orientation ??= orientationOfTiff(s.payload.subarray(6));
+        drop("exif");
+      } else if (
+        startsWith(s.payload, "http://ns.adobe.com/xap/") ||
+        startsWith(s.payload, "http://ns.adobe.com/xmp/")
+      ) {
+        drop("xmp");
+      } else drop("app1");
+    } else if (marker === 0xe2) {
+      // ICC: a profile that fits in one segment and is a profile (what a camera writes); the pieces of a long one and
+      // anything that only carries the name are dropped, the colours are then read as sRGB.
+      const isIcc =
+        startsWith(s.payload, "ICC_PROFILE\0") &&
+        s.payload[12] === 1 &&
+        s.payload[13] === 1 &&
+        isPlausibleIccProfile(s.payload.subarray(14));
+      if (isIcc) kept.push(s.bytes);
+      else drop(startsWith(s.payload, "MPF\0") ? "mpf" : "app2");
+    } else if (marker === 0xed) {
+      drop("iptc");
+    } else if (marker === 0xee) {
+      // Adobe colour transform, exactly its 12 bytes: without it a CMYK file shows wrong colours.
+      if (startsWith(s.payload, "Adobe") && s.payload.length === 12) kept.push(s.bytes);
+      else drop("app");
+    } else if (marker === 0xfe) {
+      drop("comment");
+    } else if (marker >= 0xe3 && marker <= 0xef) {
+      drop("app");
+    } else {
+      drop("other");
     }
   }
 
@@ -266,7 +302,7 @@ function cleanJpeg(input: Buffer): SanitizeResult {
   const scan = readScanData(input, parsed.scanStart);
   if (!scan) return fail(CORRUPT);
   if (scan.trailer) removed.add("trailer");
-  if (scan.dropped) removed.add("app");
+  for (const name of scan.dropped) removed.add(name);
   const data = Buffer.concat([Buffer.from([0xff, 0xd8]), ...kept, scan.data]);
   return { ok: true, data, mime: "image/jpeg", ext: "jpg", removed: [...removed] };
 }
@@ -321,33 +357,98 @@ function cleanPng(input: Buffer): SanitizeResult {
 
 // ---- WebP ---------------------------------------------------------------------------------------------------------
 
+interface RiffChunk {
+  type: string;
+  payload: Buffer;
+}
+
+/** The chunks of a RIFF body from `from` to `limit`; null when the sizes do not fit (or there are too many). */
+function readRiffChunks(buf: Buffer, from: number, limit: number): RiffChunk[] | null {
+  const chunks: RiffChunk[] = [];
+  let pos = from;
+  while (pos < limit) {
+    if (chunks.length >= MAX_CHUNKS) return null;
+    if (pos + 8 > limit) return null;
+    const size = buf.readUInt32LE(pos + 4);
+    const end = pos + 8 + size + (size % 2);
+    if (end > limit) return null;
+    chunks.push({ type: buf.toString("latin1", pos, pos + 4), payload: buf.subarray(pos + 8, pos + 8 + size) });
+    pos = end;
+  }
+  return chunks;
+}
+
+/** A chunk written afresh: its own padding byte is zero, whatever the file had there. */
+function riffChunk(type: string, payload: Buffer): Buffer {
+  const head = Buffer.alloc(8);
+  head.write(type, 0, "latin1");
+  head.writeUInt32LE(payload.length, 4);
+  return Buffer.concat([head, payload, Buffer.alloc(payload.length % 2)]);
+}
+
+/** The type of a dropped chunk for the journal: four letters, or "other" for anything that is not plain text. */
+const chunkName = (type: string) => (/^[A-Za-z0-9 ]{4}$/.test(type) ? type.trim().toLowerCase() : "other");
+
+/** Chunks that show the picture: lossy and lossless frames, the alpha plane, the colour profile, the animation. */
+const WEBP_KEEP = new Set(["VP8 ", "VP8L", "VP8X", "ALPH", "ICCP", "ANIM", "ANMF"]);
+/** Inside an animation frame only the picture of the frame. */
+const WEBP_FRAME_KEEP = new Set(["VP8 ", "VP8L", "ALPH"]);
+const WEBP_FLAG_ICC = 0x20;
+const WEBP_FLAG_EXIF = 0x08;
+const WEBP_FLAG_XMP = 0x04;
+/** The flags that exist: ICC, alpha, EXIF, XMP, animation (bit 0 and the two high bits are reserved). */
+const WEBP_FLAGS_MASK = 0x3e;
+
 function cleanWebp(input: Buffer): SanitizeResult {
   if (input.length < 20) return fail(CORRUPT);
   const riffSize = input.readUInt32LE(4);
   if (riffSize + 8 > input.length) return fail(CORRUPT);
-  const chunks: Buffer[] = [];
+  const chunks = readRiffChunks(input, 12, riffSize + 8);
+  if (!chunks) return fail(CORRUPT);
+  const kept: Buffer[] = [];
   const removed = new Set<string>();
-  let pos = 12;
-  const limit = riffSize + 8;
-  let count = 0;
-  while (pos < limit) {
-    count += 1;
-    if (count > MAX_CHUNKS) return fail(CORRUPT);
-    if (pos + 8 > limit) return fail(CORRUPT);
-    const type = input.subarray(pos, pos + 4).toString("latin1");
-    const size = input.readUInt32LE(pos + 4);
-    const end = pos + 8 + size + (size % 2);
-    if (end > limit) return fail(CORRUPT);
-    if (type === "EXIF" || type === "XMP ") removed.add(type.trim().toLowerCase());
-    else {
-      const chunk = Buffer.from(input.subarray(pos, end));
-      if (type === "VP8X" && size >= 1) chunk[8] = (chunk[8] ?? 0) & ~(0x08 | 0x04);
-      chunks.push(chunk);
+  let headerAt = -1;
+  let dropIccFlag = false;
+  for (const { type, payload } of chunks) {
+    if (!WEBP_KEEP.has(type)) {
+      removed.add(chunkName(type));
+    } else if (type === "VP8X") {
+      // Ten bytes: the flags (without EXIF and XMP), three reserved bytes (zero), the size of the canvas.
+      if (payload.length < 10) return fail(CORRUPT);
+      const head = Buffer.alloc(10);
+      head[0] = (payload[0] ?? 0) & WEBP_FLAGS_MASK & ~(WEBP_FLAG_EXIF | WEBP_FLAG_XMP);
+      payload.copy(head, 4, 4, 10);
+      headerAt = kept.push(riffChunk(type, head)) - 1;
+    } else if (type === "ICCP") {
+      if (isPlausibleIccProfile(payload)) kept.push(riffChunk(type, payload));
+      else {
+        removed.add("iccp");
+        dropIccFlag = true;
+      }
+    } else if (type === "ANIM") {
+      kept.push(riffChunk(type, payload.subarray(0, 6)));
+    } else if (type === "ANMF") {
+      // The position, size and time of the frame (16 bytes, reserved bits clear) and the picture of the frame.
+      const nested = payload.length >= 16 ? readRiffChunks(payload, 16, payload.length) : null;
+      if (!nested) return fail(CORRUPT);
+      const head = Buffer.from(payload.subarray(0, 16));
+      head[15] = (head[15] ?? 0) & 0x03;
+      const frame: Buffer[] = [head];
+      for (const inner of nested) {
+        if (WEBP_FRAME_KEEP.has(inner.type)) frame.push(riffChunk(inner.type, inner.payload));
+        else removed.add(chunkName(inner.type));
+      }
+      kept.push(riffChunk(type, Buffer.concat(frame)));
+    } else {
+      kept.push(riffChunk(type, payload));
     }
-    pos = end;
   }
-  if (chunks.length === 0) return fail(CORRUPT);
-  const body = Buffer.concat([Buffer.from("WEBP", "latin1"), ...chunks]);
+  if (kept.length === 0) return fail(CORRUPT);
+  if (dropIccFlag && headerAt >= 0) {
+    const header = kept[headerAt];
+    if (header) header[8] = (header[8] ?? 0) & ~WEBP_FLAG_ICC;
+  }
+  const body = Buffer.concat([Buffer.from("WEBP", "latin1"), ...kept]);
   const head = Buffer.alloc(8);
   head.write("RIFF", 0, "latin1");
   head.writeUInt32LE(body.length, 4);
@@ -365,9 +466,30 @@ export interface SharpPipeline {
 }
 export type SharpFactory = (input: Buffer, options: { limitInputPixels: number }) => SharpPipeline;
 
-/** A phone camera makes up to 48 megapixels; more is refused before it is decoded (a picture is held whole in memory). */
-const MAX_INPUT_PIXELS = 50_000_000;
+/**
+ * What sharp may decode, in pixels: the picture is held whole in memory and the admin container has 384 MB. Measured
+ * here (sharp.cache(false), the pipeline of this file, maximum resident set above the 54 MB of the bare process): a
+ * progressive 4:4:4 JPEG of 12 megapixels takes about 110 MB, an AVIF of 6 megapixels about 115 MB and of 12 about 220 MB
+ * (a file of 1.6 KB can hold 49 megapixels and then took 870 MB). More than the limit is refused before decoding. A JPEG
+ * above the limit is not lost: the lossless cleaner keeps it, with a tag of the turn only (`sanitizeImage`). A HEIF
+ * above its limit has no other way and is refused with a message.
+ */
+export const MAX_JPEG_PIXELS = 12_000_000;
+export const MAX_HEIF_PIXELS = 6_000_000;
 const JPEG_QUALITY = 90;
+const TOO_MANY_PIXELS =
+  "Снимок слишком большой для обработки на сервере (не более 6 мегапикселей). Отправьте его как JPEG или уменьшите размер.";
+
+/** One sharp job at a time in the whole process, however many uploads are being read: memory is the limit, not time. */
+let sharpTail: Promise<void> = Promise.resolve();
+function exclusively<T>(job: () => Promise<T>): Promise<T> {
+  const run = sharpTail.then(job, job);
+  sharpTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 /** Brands of the ISO base media file (`ftyp`) that sharp reads as images; HEVC ones need a codec the prebuilt libvips lacks. */
 const HEIF_BRANDS = new Set([
@@ -397,7 +519,8 @@ function heifBrand(input: Buffer): string | null {
  * sharp turns the picture the right way up (`rotate()` reads the orientation) and writes a JPEG with no metadata: EXIF,
  * XMP and IPTC are not carried over unless asked for, and a profile other than sRGB is converted to sRGB and dropped. It
  * takes a JPEG and the HEIF family only (GIF, TIFF, SVG and the rest are refused though sharp could read them), and
- * always writes a JPEG: the output format is set, never the format of the input.
+ * always writes a JPEG: the output format is set, never the format of the input. One picture at a time, and not above
+ * the pixel limits (`MAX_JPEG_PIXELS`, `MAX_HEIF_PIXELS`).
  */
 export function createSharpSanitizer(sharp: SharpFactory): FallbackSanitizer {
   return async (input) => {
@@ -405,14 +528,17 @@ export function createSharpSanitizer(sharp: SharpFactory): FallbackSanitizer {
     const brand = heifBrand(input);
     if (!isJpeg && !brand) return fail(UNSUPPORTED);
     try {
-      const { data, info } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
-        .rotate()
-        .flatten({ background: { r: 255, g: 255, b: 255 } })
-        .jpeg({ quality: JPEG_QUALITY })
-        .toBuffer({ resolveWithObject: true });
+      const { data, info } = await exclusively(() =>
+        sharp(input, { limitInputPixels: isJpeg ? MAX_JPEG_PIXELS : MAX_HEIF_PIXELS })
+          .rotate()
+          .flatten({ background: { r: 255, g: 255, b: 255 } })
+          .jpeg({ quality: JPEG_QUALITY })
+          .toBuffer({ resolveWithObject: true }),
+      );
       if (info.format !== "jpeg") return fail(UNSUPPORTED);
       return { ok: true, data, mime: "image/jpeg", ext: "jpg", removed: ["reencoded"] };
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && /pixel limit/i.test(error.message)) return fail(TOO_MANY_PIXELS);
       return fail(brand && brand !== "avif" && brand !== "avis" ? HEIC_HELP : "Файл не удалось прочитать как снимок.");
     }
   };
