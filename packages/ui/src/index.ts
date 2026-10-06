@@ -10,6 +10,7 @@
 // The page carries `<html data-theme="night">` (`defaultTheme`); there is no switch, and components never know it.
 export { fontFaceCss, fontFaces, fontFile, fontLicenses, legacyFontFiles, requiredGlyphs } from "./fonts/catalog.ts";
 export { formatAmount, formatBp, MINUS, NBSP } from "./format/format.ts";
+export { escapeXml, type LogoSvgKind, type LogoSvgOptions, logoSvg } from "./logo/svg.ts";
 export { type BadgeKind, badgeKinds } from "./primitives/kinds.ts";
 export { compositeOver, contrastRatio, parseColor, relativeLuminance } from "./themes/contrast.ts";
 export { defaultTheme, type Theme, themes } from "./themes/ids.ts";

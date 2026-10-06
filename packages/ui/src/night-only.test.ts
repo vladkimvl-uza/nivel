@@ -50,9 +50,16 @@ describe("night only: the package has no way to switch themes", () => {
 
   it("has no localStorage, event nv-theme, provider, hook, toggle or init script", () => {
     const banned =
-      /localStorage|sessionStorage|nv-theme|ThemeProvider|useTheme|ThemeToggle|ThemeInitScript|themeInitScript|THEME_EVENT|theme-shift|themeByLocalTime|resolveTheme|CustomEvent/;
+      /localStorage|nv-theme|ThemeProvider|useTheme|ThemeToggle|ThemeInitScript|themeInitScript|THEME_EVENT|theme-shift|themeByLocalTime|resolveTheme|CustomEvent/;
     const hits = [...files].filter(([, text]) => banned.test(text)).map(([f]) => f);
     expect(hits).toEqual([]);
+  });
+
+  // The intro plays once per session (R-17): that is the one use of sessionStorage, in one file, never for a theme.
+  it("uses sessionStorage only to remember that the intro has played, in logo/intro-session.ts", () => {
+    const users = [...files].filter(([, text]) => /sessionStorage/.test(text)).map(([f]) => f);
+    expect(users).toEqual(["src/logo/intro-session.ts"]);
+    expect(files.get("src/logo/intro-session.ts")).not.toMatch(/theme|data-theme/i);
   });
 
   it("has no day-only roles or classes: --logo-day, --lamp-opacity, --dur-theme, nv-seg2, nv-tod", () => {
