@@ -6,7 +6,11 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./catalog": "./src/catalog/index.ts"
+    "./catalog": "./src/catalog/index.ts",
+    "./leads": "./src/leads/index.ts",
+    "./orders": "./src/orders/index.ts",
+    "./payments": "./src/payments/index.ts",
+    "./purchases": "./src/purchases/index.ts"
   },
   "dependencies": {
     "@nivel/domain": "workspace:*",

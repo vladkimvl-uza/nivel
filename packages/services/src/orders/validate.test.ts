@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+import { ValidationError } from "./errors.ts";
+import {
+  asDate,
+  assertInstant,
+  assertTasks,
+  assertText,
+  assertUuid,
+  assertWholeSum,
+  isCalendarDate,
+  isUuid,
+} from "./validate.ts";
+
+const uuid = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+
+describe("validate", () => {
+  it("knows an id from anything else, and never lets text into a query as an id", () => {
+    expect(isUuid(uuid)).toBe(true);
+    for (const bad of ["", "x", "NV-2026-0001", `${uuid}'; --`, 7, null, undefined, uuid.slice(1)]) {
+      expect(isUuid(bad)).toBe(false);
+    }
+    expect(isUuid(uuid.toUpperCase())).toBe(true);
+    expect(assertUuid(uuid, "id")).toBe(uuid);
+    expect(() => assertUuid("x", "orderId")).toThrow(/orderId must be an id/);
+  });
+
+  it("checks a whole sum with its bounds named in the message", () => {
+    expect(assertWholeSum(0, "x")).toBe(0);
+    expect(assertWholeSum(1_000_000_000_000, "x")).toBe(1_000_000_000_000);
+    for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "5", null, 1_000_000_000_001]) {
+      expect(() => assertWholeSum(bad, "amount")).toThrow(ValidationError);
+    }
+    expect(() => assertWholeSum(0, "amount", 1)).toThrow(/from 1 to/);
+    expect(assertWholeSum(5, "x", 1, 5)).toBe(5);
+    expect(() => assertWholeSum(6, "x", 1, 5)).toThrow(ValidationError);
+  });
+
+  it("checks a text: not blank, not longer than the limit, trimmed", () => {
+    expect(assertText("  ok  ", "t", 10)).toBe("ok");
+    for (const bad of ["", "   ", "x".repeat(11), 5, null])
+      expect(() => assertText(bad, "t", 10)).toThrow(ValidationError);
+  });
+
+  it("knows a date of the calendar from a text that only looks like one", () => {
+    for (const ok of ["2026-02-28", "2028-02-29", "2026-12-31", "2026-04-30"]) expect(isCalendarDate(ok)).toBe(true);
+    for (const bad of [
+      "2026-02-31",
+      "2026-02-30",
+      "2026-04-31",
+      "2027-02-29",
+      "2026-13-01",
+      "2026-00-10",
+      "2026-01-00",
+      "2026-1-1",
+      "26-01-01",
+      "2026-01-01T00:00:00Z",
+      "",
+      20260101,
+      null,
+      undefined,
+    ]) {
+      expect(isCalendarDate(bad)).toBe(false);
+    }
+  });
+
+  it("checks an instant", () => {
+    const d = new Date("2026-10-12T00:00:00Z");
+    expect(assertInstant(d, "at")).toBe(d);
+    for (const bad of [new Date("x"), "2026-10-12", 0, null])
+      expect(() => assertInstant(bad, "at")).toThrow(ValidationError);
+  });
+
+  it("reads the timestamps of a raw query, which drizzle hands over as text", () => {
+    expect(asDate(null)).toBeNull();
+    expect(asDate(undefined)).toBeNull();
+    const d = new Date("2026-10-13T05:00:00Z");
+    expect(asDate(d)).toBe(d);
+    expect(asDate("2026-10-13 05:00:00+00")).toEqual(d);
+    expect(asDate("2026-10-13 10:00:00.5+05")).toEqual(new Date("2026-10-13T05:00:00.500Z"));
+    expect(() => asDate("yesterday")).toThrow(/not a date/);
+  });
+
+  it("takes one or two different known tasks and nothing else", () => {
+    expect(assertTasks(["gaming"])).toEqual(["gaming"]);
+    expect(assertTasks([])).toEqual([]);
+    expect(assertTasks(["office", "design3d"])).toEqual(["office", "design3d"]);
+    for (const bad of [
+      undefined,
+      null,
+      5,
+      "gaming",
+      {},
+      ["x"],
+      ["gaming", "gaming"],
+      ["gaming", "office", "streaming"],
+      [1],
+      [null],
+    ]) {
+      expect(() => assertTasks(bad)).toThrow(ValidationError);
+    }
+  });
+});
