@@ -1,4 +1,4 @@
-// Shared fixtures for the order automaton tests (not part of the public API; excluded from coverage reports).
+// Shared fixtures for the order automaton tests (not part of the public API). Not excluded from the coverage report: the coverage of WP-02 is quoted without this file.
 import { createWorkCalendar } from "../calendar/index.ts";
 import type { CancelPoint, CancelSettlement } from "../cancel/types.ts";
 import type { FeeSettings } from "../fee/types.ts";

@@ -54,25 +54,27 @@ export function transition(
 }
 
 // ARCHITECTURE 4.9, projection for the customer (CONCEPT 5.9).
-const CUSTOMER_STATUS = new Map<OrderStatus, CustomerStatus>([
-  ["estimate_draft", "submitted"],
-  ["estimate_sent", "submitted"],
-  ["estimate_expired", "submitted"],
-  ["accepted", "estimate_confirmed"],
-  ["purchasing", "purchasing"],
-  ["report_due", "purchasing"],
-  ["report_sent", "receipts_summary"],
-  ["settled", "receipts_summary"],
-  ["assembling", "assembly_test"],
-  ["testing", "assembly_test"],
-  ["ready", "ready"],
-  ["delivering", "ready"],
-  ["handed_over", "handed_over"],
-  ["closed", "handed_over"],
-  ["podbor_delivered", "handed_over"],
-  ["cancelling", "cancelled"],
-  ["cancelled", "cancelled"],
-]);
+const PROJECTION = {
+  estimate_draft: "submitted",
+  estimate_sent: "submitted",
+  estimate_expired: "submitted",
+  accepted: "estimate_confirmed",
+  purchasing: "purchasing",
+  report_due: "purchasing",
+  report_sent: "receipts_summary",
+  settled: "receipts_summary",
+  assembling: "assembly_test",
+  testing: "assembly_test",
+  ready: "ready",
+  delivering: "ready",
+  handed_over: "handed_over",
+  closed: "handed_over",
+  podbor_delivered: "handed_over",
+  cancelling: "cancelled",
+  cancelled: "cancelled",
+} satisfies Record<OrderStatus, CustomerStatus>;
+/** A Map built from the object: the compiler demands every status, and keys such as "constructor" are never found. */
+const CUSTOMER_STATUS = new Map<string, CustomerStatus>(Object.entries(PROJECTION));
 
 export function customerStatus(s: OrderStatus): CustomerStatus {
   const out = CUSTOMER_STATUS.get(s);

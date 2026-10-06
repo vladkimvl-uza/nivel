@@ -2,7 +2,7 @@
 // A rule says who may send which event in which status, what must hold (guard) and what follows (effects).
 // Flags (feePrepaid, fundsReceived, meeting, report.accepted) are set by the caller from the event type; the
 // guards read them from the snapshot, so a repeated event is rejected instead of being applied twice.
-import { addMonthsTashkent } from "../calendar/tashkent.ts";
+import { addMonthsTashkent, DAY_MS } from "../calendar/tashkent.ts";
 import type { CancelPoint } from "../cancel/types.ts";
 import type { FeeSettings } from "../fee/types.ts";
 import type { Sum } from "../money/types.ts";
@@ -43,14 +43,23 @@ export const FIRST_ORDER_MEETING_FROM = 15_000_000;
 /** Consents at ACCEPT: personal data processing and transfer of data to suppliers; plus non-returnable goods. */
 const BASE_CONSENTS = 2;
 const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
+// Terms of the table of transitions (ARCHITECTURE 4.9); the warranty case terms live in warranty/index.ts.
+const REPORT_TARGET_HOURS = 24;
+const REPORT_DEADLINE_HOURS = 48;
+const OBJECTION_WORKING_DAYS = 3;
+const REFUND_WORKING_DAYS = 5;
+const WARRANTY_MONTHS = 12;
+const AFTERCARE_DAYS = [7, 30] as const;
 
 const asSum = (n: number): Sum => n as Sum;
 const blank = (v: unknown): boolean => typeof v !== "string" || v.trim() === "";
 const after = (from: Date, ms: number): Date => new Date(from.getTime() + ms);
 const offersPublished = (o: OrderSnapshot): boolean => o.offer.uz === "published" && o.offer.ru === "published";
+/** A real instant: a Date whose time is a number (JSON round trips turn dates into strings, bad input into NaN). */
+const isValidDate = (d: unknown): d is Date => d instanceof Date && !Number.isNaN(d.getTime());
+/** Fail closed: an estimate without a usable validUntil is treated as expired, never as valid for ever. */
 const expired = (o: OrderSnapshot, now: Date): boolean =>
-  o.quote?.validUntil !== undefined && now.getTime() > o.quote.validUntil.getTime();
+  !isValidDate(o.quote?.validUntil) || now.getTime() > o.quote.validUntil.getTime();
 const notify = (to: "customer" | "owner_topic", templateKey: string): Effect => ({ kind: "notify", to, templateKey });
 const expectPayment = (
   paymentKind: Extract<Effect, { kind: "expect_payment" }>["paymentKind"],
@@ -82,6 +91,8 @@ export const RULES: readonly Rule[] = [
     guard: ({ o, e, now }) => {
       const q = o.quote;
       if (q === undefined || q.id !== e.quoteId) return "invalid_transition";
+      // The quote calculation sets validUntil (24 h, 72 h for furniture only); without it the expiry job has no term.
+      if (!isValidDate(q.validUntil)) return "invalid_transition";
       if (e.manuallyChecked !== true || !q.manuallyChecked) return "manual_check_missing";
       if (q.compatVerdict === "block") return "compat_block";
       const eligible = q.eligibility.mode === "full_cycle" || q.eligibility.mode === "free_window_only";
@@ -89,16 +100,12 @@ export const RULES: readonly Rule[] = [
       if (expired(o, now)) return "estimate_expired";
       return undefined;
     },
-    effects: ({ o, now, s }) => [
+    effects: ({ o }) => [
       // A stub offer is allowed in an estimate (R-25) but the PDF then carries the "not an offer" watermark.
       { kind: "render_pdf", doc: "quote", watermarkDraft: !offersPublished(o) },
       notify("customer", "order.estimate_sent"),
-      {
-        kind: "schedule",
-        job: "estimate_expiry",
-        // validUntil is set by the quote calculation (24 h, 72 h for furniture only); without it the shorter term.
-        at: o.quote?.validUntil ?? after(now, s.shelfLifeHours.components * HOUR_MS),
-      },
+      // The guard has checked that validUntil is a valid date.
+      { kind: "schedule", job: "estimate_expiry", at: o.quote?.validUntil as Date },
     ],
   }),
   rule({
@@ -106,7 +113,7 @@ export const RULES: readonly Rule[] = [
     event: "EXPIRE",
     to: "estimate_expired",
     actors: ["system"],
-    guard: ({ o, now }) => (expired(o, now) ? undefined : "invalid_transition"),
+    guard: ({ o, now }) => (o.quote !== undefined && expired(o, now) ? undefined : "invalid_transition"),
     effects: () => [notify("customer", "order.estimate_expired")],
   }),
   rule({
@@ -156,6 +163,8 @@ export const RULES: readonly Rule[] = [
     actors: ["owner"],
     guard: ({ o, e }) => {
       if (o.quote === undefined || o.flags.fundsReceived) return "invalid_transition";
+      // receivedAt feeds the calendar in the effects, so a bad value is rejected here, not thrown there.
+      if (!isValidDate(e.receivedAt)) return "payments_incomplete";
       const named = Array.isArray(e.paymentIds) && e.paymentIds.some((id) => !blank(id));
       // money.fundsReceived is the confirmed sum of purchase_funds payments (bank_transfer_ip only, checked in services).
       return named && o.money.fundsReceived >= o.quote.purchaseLimit ? undefined : "payments_incomplete";
@@ -177,7 +186,7 @@ export const RULES: readonly Rule[] = [
     actors: ["owner"],
     guard: ({ o, now }) => {
       if (!o.flags.feePrepaid || !o.flags.fundsReceived) return "payments_incomplete";
-      if (o.purchaseNotBefore === undefined || now.getTime() < o.purchaseNotBefore.getTime()) {
+      if (!isValidDate(o.purchaseNotBefore) || !(now.getTime() >= o.purchaseNotBefore.getTime())) {
         return "purchase_too_early";
       }
       if (o.firstOrderOfCustomer && o.grandTotal >= FIRST_ORDER_MEETING_FROM && !o.flags.firstOrderMeetingDone) {
@@ -208,12 +217,12 @@ export const RULES: readonly Rule[] = [
     actors: ["owner"],
     guard: ({ o }) => (o.purchasesComplete ? undefined : "purchases_incomplete"),
     effects: ({ now }) => {
-      const target = after(now, 24 * HOUR_MS);
+      const target = after(now, REPORT_TARGET_HOURS * HOUR_MS);
       return [
         { kind: "set", field: "reportDueAt", at: target },
         // Target +24 h, hard deadline +48 h (CONCEPT: the report is due in 24-48 hours).
         { kind: "schedule", job: "report_due", at: target },
-        { kind: "schedule", job: "report_due", at: after(now, 48 * HOUR_MS) },
+        { kind: "schedule", job: "report_due", at: after(now, REPORT_DEADLINE_HOURS * HOUR_MS) },
       ];
     },
   }),
@@ -224,8 +233,8 @@ export const RULES: readonly Rule[] = [
     actors: ["owner"],
     guard: ({ o }) => (o.purchasesComplete ? undefined : "purchases_incomplete"),
     effects: ({ o, now, cal }) => {
-      const objectionUntil = cal.addWorkingDays(now, 3);
-      const refundDueAt = cal.addWorkingDays(now, 5);
+      const objectionUntil = cal.addWorkingDays(now, OBJECTION_WORKING_DAYS);
+      const refundDueAt = cal.addWorkingDays(now, REFUND_WORKING_DAYS);
       const remainder = o.money.fundsReceived - o.money.receiptsTotal - o.money.refunded;
       return [
         { kind: "render_pdf", doc: "commission_report", watermarkDraft: false },
@@ -322,12 +331,11 @@ export const RULES: readonly Rule[] = [
       return blank(e.finalPaymentId) ? "final_payment_missing" : undefined;
     },
     effects: ({ o, now }) => {
-      const warrantyUntil = addMonthsTashkent(now, 12);
+      const warrantyUntil = addMonthsTashkent(now, WARRANTY_MONTHS);
       return [
         { kind: "set", field: "warrantyUntil", at: warrantyUntil },
         { kind: "schedule", job: "warranty_end", at: warrantyUntil },
-        { kind: "schedule", job: "aftercare", at: after(now, 7 * DAY_MS) },
-        { kind: "schedule", job: "aftercare", at: after(now, 30 * DAY_MS) },
+        ...AFTERCARE_DAYS.map((days): Effect => ({ kind: "schedule", job: "aftercare", at: after(now, days * DAY_MS) })),
         { kind: "ledger", fund: "warranty", amount: warrantyReserve(o.money.receiptsTotal) },
         notify("customer", "order.handed_over"),
       ];

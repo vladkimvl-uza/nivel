@@ -1,3 +1,4 @@
+import { DAY_MS } from "../calendar/tashkent.ts";
 import type { WorkCalendar } from "../order/types.ts";
 import type {
   ClientFault,
@@ -10,7 +11,12 @@ import type {
 
 export type * from "./types.ts";
 
-const DAY_MS = 86_400_000;
+// Terms of a warranty case, in working days (WD) or calendar days (CD); see warrantyDeadlines.
+const REPLY_WD = 1;
+const DIAGNOSIS_WD = 2;
+const LOANER_CD = 3;
+const FIX_WORK_WD = 10;
+const FIX_PARTS_CD = 20;
 const CLIENT_FAULTS: readonly ClientFault[] = ["impact", "liquid", "overclocking", "third_party_replacement"];
 
 /** The automaton as data (ARCHITECTURE 4.10): "status|event type" -> next status. A Map: no prototype keys. */
@@ -49,11 +55,11 @@ export function warrantyTransition(status: WarrantyStatus, e: WarrantyEvent): Wa
 export function warrantyDeadlines(openedAt: Date, cal: WorkCalendar): WarrantyDeadlines {
   if (Number.isNaN(openedAt.getTime())) throw new RangeError("warrantyDeadlines: invalid Date");
   return {
-    reply: cal.addWorkingDays(openedAt, 1),
-    diagnosis: cal.addWorkingDays(openedAt, 2),
-    loaner: new Date(openedAt.getTime() + 3 * DAY_MS),
-    fixWork: cal.addWorkingDays(openedAt, 10),
-    fixParts: new Date(openedAt.getTime() + 20 * DAY_MS),
+    reply: cal.addWorkingDays(openedAt, REPLY_WD),
+    diagnosis: cal.addWorkingDays(openedAt, DIAGNOSIS_WD),
+    loaner: new Date(openedAt.getTime() + LOANER_CD * DAY_MS),
+    fixWork: cal.addWorkingDays(openedAt, FIX_WORK_WD),
+    fixParts: new Date(openedAt.getTime() + FIX_PARTS_CD * DAY_MS),
   };
 }
 
