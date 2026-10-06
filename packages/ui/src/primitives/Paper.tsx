@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cx } from "./cx.ts";
 
 /**
- * The surface of a document (estimate, receipt report, passport): always paper, by day and at night, with square
+ * The surface of a document (estimate, receipt report, passport): always paper, also on the night page, with square
  * corners and a paper shadow. The estimate, sum table, stamps and plaques are drawn for this surface.
  */
 export function Paper({

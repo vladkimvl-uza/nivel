@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compositeOver, contrastRatio, parseColor, relativeLuminance } from "./themes/contrast.ts";
 import { type ThemeTokens, themeTokens } from "./themes/tokens.ts";
 
-type Role = Exclude<
-  keyof ThemeTokens,
-  "docShadow" | "cardShadow" | "lampSpot" | "themeColor"
->;
+type Role = Exclude<keyof ThemeTokens, "docShadow" | "cardShadow" | "lampSpot" | "themeColor">;
 
 /** Text on its background; a translucent background is first laid over `under` (what the visitor actually sees). */
 interface Pair {

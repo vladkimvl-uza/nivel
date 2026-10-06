@@ -72,7 +72,9 @@ describe("night only: the package has no way to switch themes", () => {
     const readme = readFileSync(join(PKG, "README.md"), "utf8");
     expect(readme).toMatch(/ночь/i);
     expect(readme).not.toMatch(/Ночь и день|две темы|день\b/i);
-    expect(readme).not.toMatch(/ThemeProvider|ThemeToggle|ThemeInitScript|themeInitScript|localStorage|nv-theme|\?theme=/);
+    expect(readme).not.toMatch(
+      /ThemeProvider|ThemeToggle|ThemeInitScript|themeInitScript|localStorage|nv-theme|\?theme=/,
+    );
     expect(readme).not.toMatch(/Заявка интегратору/);
     expect(readme).not.toMatch(/createRequire/);
   });

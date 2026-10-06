@@ -1,16 +1,10 @@
-/// <reference types="node" />
-// Rendering helpers for component tests. `react-dom` is not a dependency of @nivel/ui (the package is React-agnostic
-// about the renderer), so the server renderer is taken from apps/web, which has it. Request to the integrator: add
-// `react-dom` (catalog) to devDependencies of @nivel/ui, then replace the createRequire below with a plain import.
-import { createRequire } from "node:module";
+// Rendering helpers for component tests.
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
-const fromWeb = createRequire(new URL("../../../../apps/web/package.json", import.meta.url));
-const server = fromWeb("react-dom/server") as { renderToStaticMarkup(element: ReactNode): string };
-
-/** HTML of a server render (no effects, `useSyncExternalStore` returns the server snapshot). */
+/** HTML of a server render (no effects). */
 export function render(element: ReactNode): string {
-  return server.renderToStaticMarkup(element);
+  return renderToStaticMarkup(element);
 }
 
 type Props = Record<string, unknown> & { children?: ReactNode };

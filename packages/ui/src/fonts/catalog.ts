@@ -1,4 +1,4 @@
-// The font set of the "Night and day" design system (docs/design/day-night/DESIGN_SYSTEM.md 2.3). Nothing else is
+// The font set of the night design system (docs/design/day-night/DESIGN_SYSTEM.md 2.3). Nothing else is
 // allowed: a new face is added here together with a measurement of the font budget (260 KB of woff2).
 
 export type FontRole = "display" | "text" | "condensed" | "mono";
