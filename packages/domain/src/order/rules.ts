@@ -60,6 +60,14 @@ const isValidDate = (d: unknown): d is Date => d instanceof Date && !Number.isNa
 /** Fail closed: an estimate without a usable validUntil is treated as expired, never as valid for ever. */
 const expired = (o: OrderSnapshot, now: Date): boolean =>
   !isValidDate(o.quote?.validUntil) || now.getTime() > o.quote.validUntil.getTime();
+/** Delivery + whole days; a broken setting is a bug that must fail loudly, never become an invalid date. */
+function podborCreditUntil(delivered: Date, days: number): Date {
+  const until = after(delivered, days * DAY_MS);
+  if (!Number.isInteger(days) || days < 0 || !isValidDate(until)) {
+    throw new RangeError(`transition: invalid podborCreditDays ${String(days)}`);
+  }
+  return until;
+}
 const notify = (to: "customer" | "owner_topic", templateKey: string): Effect => ({ kind: "notify", to, templateKey });
 const expectPayment = (
   paymentKind: Extract<Effect, { kind: "expect_payment" }>["paymentKind"],
@@ -365,8 +373,9 @@ export const RULES: readonly Rule[] = [
       return blank(e.paymentId) ? "payments_incomplete" : undefined;
     },
     effects: ({ now, s }) => [
-      // The Podbor fee is credited when the customer orders within podborCreditDays; the aftercare job watches the term.
-      { kind: "schedule", job: "aftercare", at: after(now, s.podborCreditDays * DAY_MS) },
+      // The Podbor fee is credited when the customer orders within podborCreditDays. This is a stored term
+      // (orders.podbor_credit_until), not a job: an aftercare job is a post-sale task and must not be confused with it.
+      { kind: "set", field: "podborCreditUntil", at: podborCreditUntil(now, s.podborCreditDays) },
       notify("customer", "order.podbor_delivered"),
     ],
   }),

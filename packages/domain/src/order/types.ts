@@ -114,7 +114,13 @@ export type Effect =
   | { kind: "ledger"; fund: "warranty" | "tax_risk"; amount: Sum }
   | {
       kind: "set";
-      field: "purchaseNotBefore" | "warrantyUntil" | "reportDueAt" | "objectionUntil" | "refundDueAt";
+      field:
+        | "purchaseNotBefore"
+        | "warrantyUntil"
+        | "reportDueAt"
+        | "objectionUntil"
+        | "refundDueAt"
+        | "podborCreditUntil";
       at: Date;
     };
 export type GuardError =

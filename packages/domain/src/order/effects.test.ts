@@ -275,11 +275,16 @@ describe("effects of settlement, assembly and handover", () => {
 });
 
 describe("effects of PODBOR_DELIVERED", () => {
-  it("credits the fee within podborCreditDays (aftercare job watches the term)", () => {
+  it("sets podborCreditUntil = delivery + podborCreditDays (WP-00, ADR-007 item 2)", () => {
     expect(effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner")).toEqual([
-      { kind: "schedule", job: "aftercare", at: at(NOW.getTime() + 30 * DAY) },
+      { kind: "set", field: "podborCreditUntil", at: at(NOW.getTime() + 30 * DAY) },
       { kind: "notify", to: "customer", templateKey: "order.podbor_delivered" },
     ]);
+  });
+
+  it("emits no aftercare job: the credit term must not look like an after-sale task", () => {
+    const effects = effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner");
+    expect(effects.filter((e) => e.kind === "schedule")).toEqual([]);
   });
 
   it("the credit term comes from the settings", () => {
@@ -291,8 +296,34 @@ describe("effects of PODBOR_DELIVERED", () => {
       NOW,
       settings,
     );
-    expect(effects[0]).toEqual({ kind: "schedule", job: "aftercare", at: at(NOW.getTime() + 14 * DAY) });
+    expect(effects[0]).toEqual({ kind: "set", field: "podborCreditUntil", at: at(NOW.getTime() + 14 * DAY) });
   });
+
+  it("a zero-day term ends at the moment of delivery", () => {
+    const effects = effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner", NOW, {
+      ...SETTINGS,
+      podborCreditDays: 0,
+    });
+    expect(effects[0]).toEqual({ kind: "set", field: "podborCreditUntil", at: at(NOW.getTime()) });
+  });
+
+  it("counts from the delivery instant, not from the clock of another event", () => {
+    const later = tk("2026-11-30T23:30:00");
+    const effects = effectsOf({ status: "estimate_sent", kind: "podbor" }, EVENTS.PODBOR_DELIVERED, "owner", later);
+    expect(effects[0]).toEqual({ kind: "set", field: "podborCreditUntil", at: tk("2026-12-30T23:30:00") });
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 1e12])(
+    "refuses a broken podborCreditDays %s instead of emitting an invalid date",
+    (days) => {
+      expect(() =>
+        transition(order({ status: "estimate_sent", kind: "podbor" }), EVENTS.PODBOR_DELIVERED, "owner", NOW, CAL, {
+          ...SETTINGS,
+          podborCreditDays: days,
+        }),
+      ).toThrow(RangeError);
+    },
+  );
 });
 
 describe("effects of cancellation", () => {
