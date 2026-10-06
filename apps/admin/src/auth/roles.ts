@@ -17,6 +17,7 @@ export const PERMISSIONS = {
   "settings.money.write": ["owner"],
   "settings.calendar.read": ["owner", "assistant", "accountant"],
   "settings.calendar.write": ["owner"],
+  "settings.flags.read": ["owner"],
   "settings.flags.write": ["owner"],
   "journal.read": ["owner", "accountant"],
   // The catalog feeds prices and the fee: the assistant looks, the owner changes (ARCHITECTURE 6.1: the assistant's

@@ -577,6 +577,7 @@ export function defineResource<T extends z.ZodType>(def: ResourceDef<T>): Resour
 }
 
 function selectValues(root: FieldNode, field: string): string[] | null {
+  if (root.kind === "variant" && field === root.discriminator) return (root.options ?? []).map((o) => o.value);
   const node = allFields(root).find((f) => f.key === field);
   return node?.options ? node.options.map((o) => o.value) : null;
 }

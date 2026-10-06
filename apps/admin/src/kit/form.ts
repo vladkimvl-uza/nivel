@@ -322,7 +322,8 @@ function describeIssue(issue: IssueLike): string {
   switch (issue.code) {
     case "invalid_type": {
       if (/received (undefined|null)/.test(issue.message)) return "Обязательное поле.";
-      if (issue.expected === "number" || issue.expected === "int") return "Нужно число.";
+      if (issue.expected === "int") return "Нужно целое число.";
+      if (issue.expected === "number") return "Нужно число.";
       if (issue.expected === "boolean") return "Выберите «да» или «нет».";
       if (issue.expected === "array") return "Нужен список.";
       return "Недопустимое значение.";
