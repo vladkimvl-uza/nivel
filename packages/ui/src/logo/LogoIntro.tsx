@@ -1,8 +1,11 @@
+"use client";
+
 import { useEffect, useRef, useState } from "react";
 import { cx } from "../primitives/cx.ts";
 import { logoScene } from "../themes/logo-motion.ts";
 import { defaultWhenIdle, type IntroDeps, type IntroPhase, startIntro } from "./intro-controller.ts";
 import { introSession, prefersReducedMotion } from "./intro-session.ts";
+import { constrainedNetwork, watchReducedMotion, watchVisible } from "./intro-watch.ts";
 import { LogoLockup } from "./Logo.tsx";
 
 export interface LogoIntroProps {
@@ -29,6 +32,10 @@ export interface LogoIntroProps {
  * JavaScript, under reduced motion and on a repeat visit sees, and what stays under the first frame. After the browser
  * is idle the 3D core is loaded by import() (it carries three; this entry never imports it statically), and the intro
  * plays once per session, without sound. With `prefers-reduced-motion` there are no requests to three at all.
+ *
+ * Client component: it uses hooks. A Server Component may render it with plain props (`label`, `mode`, `className`,
+ * `introWindowMs`); `onDone`, `onError` and `deps` are functions and cannot cross from the server (wrap it in your own
+ * client component for them).
  *
  * Put it in a box with a size: the component fills its parent and keeps the lockup at 62 % of the width (80 % below 700 px).
  */
@@ -67,6 +74,9 @@ export function LogoIntro({
         now: () => performance.now(),
         session: introSession,
         reducedMotion: () => prefersReducedMotion(),
+        constrained: () => constrainedNetwork(),
+        watchVisible: (target, cb) => watchVisible(target, cb),
+        watchReducedMotion: (cb) => watchReducedMotion(cb),
         ...latest.current.deps,
       },
     );
@@ -76,7 +86,8 @@ export function LogoIntro({
   return (
     <div className={cx("nv-logo-intro", className)} data-state={phase} style={{ backgroundImage: logoScene.stage }}>
       <LogoLockup className="nv-logo-intro__still" label={label} />
-      {/* an empty canvas has no content for assistive technology; the name of the logo is on the still lockup */}
+      {/* an empty canvas has no content for assistive technology; the name of the logo is on the still lockup, which
+          stays in the accessibility tree while the canvas plays (it is see-through, not hidden) */}
       <canvas ref={canvasRef} className="nv-logo-intro__canvas" />
       <span ref={captionRef} className="nv-logo-intro__caption" aria-hidden="true">
         {"±0.000"}

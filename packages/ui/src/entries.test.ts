@@ -147,6 +147,33 @@ describe("entries of @nivel/ui", () => {
     expect(removed.filter((n) => n in react)).toEqual([]);
   });
 
+  // Next 16 builds a component that uses hooks without the directive into an error as soon as a Server Component
+  // imports the barrel `@nivel/ui/react`; vitest renders without the RSC transform and does not see it.
+  it('every .tsx file of the package that calls React hooks starts with the "use client" directive', () => {
+    const hooks =
+      /\buse(?:State|Effect|LayoutEffect|Ref|Memo|Callback|Reducer|Context|Id|Transition|SyncExternalStore)\b/;
+    const found: string[] = [];
+    const bad: string[] = [];
+    const scan = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const file = join(dir, e.name);
+        if (e.isDirectory()) scan(file);
+        else if (e.name.endsWith(".tsx")) {
+          const text = readFileSync(file, "utf8");
+          const name = relative(SRC, file).replaceAll("\\", "/");
+          const client = /^\s*["']use client["'];?/.test(text);
+          if (hooks.test(text)) found.push(name);
+          if (hooks.test(text) && !client) bad.push(name);
+          if (!hooks.test(text) && client)
+            bad.push(`${name} (a directive without hooks makes a primitive client-only)`);
+        }
+      }
+    };
+    scan(SRC);
+    expect(found).toContain("logo/LogoIntro.tsx"); // the scan finds the one component with hooks
+    expect(bad).toEqual([]);
+  });
+
   it("every source file of the package is reachable from one of the three entries (no orphan public code)", () => {
     const reach = new Set([
       ...graph(join(SRC, "index.ts")).files,

@@ -29,6 +29,13 @@ export interface LogoMotion {
    * intro is still on time. The first frame drawn is at `at`.
    */
   play(at?: number): void;
+  /**
+   * Stops the frames and keeps the time, while nobody sees the canvas (outside the viewport, a hidden tab). Does
+   * nothing when the clock is not running.
+   */
+  pause(): void;
+  /** Goes on from the paused time, without a jump; does nothing when the clock was not paused by `pause()`. */
+  resume(): void;
   /** Draws the frame at time `t` at once and stops the clock (clips, tests); the caption follows. */
   seek(t: number): FrameInfo;
   /** The clock of the animation, seconds (0 before the first frame; it stops where the intro ends). */
@@ -95,6 +102,7 @@ export function createLogoMotion(
   let observer: ResizeObserver | null = null;
   let disposed = false;
   let playing = false;
+  let paused = false;
   let raf = 0;
   let t0: number | null = null;
   let last = 0;
@@ -172,10 +180,22 @@ export function createLogoMotion(
   function play(at = 0) {
     if (disposed || !scene || mode === "static") return;
     stop();
+    paused = false;
     tNow = Math.max(0, at);
     t0 = null;
     playing = true;
     raf = deps.requestFrame(tick);
+  }
+
+  function pause() {
+    if (!playing) return;
+    stop();
+    paused = true;
+  }
+
+  function resume() {
+    if (!paused) return;
+    play(tNow); // starts the clock at the time it stopped at; `play` clears the pause
   }
 
   const nextFrame = () => new Promise<void>((resolve) => deps.requestFrame(() => resolve()));
@@ -187,6 +207,14 @@ export function createLogoMotion(
     scene = createLogoScene(renderer, { lite, environment });
     canvas.addEventListener("webglcontextlost", onContextLost, { once: true });
     resize();
+    // cold start: compile every program and draw once off screen, so that the first visible frame is t = 0
+    await scene.compile();
+    if (disposed) return release();
+    draw(mode === "static" ? INTRO_DURATION : tNow);
+    await nextFrame();
+    if (disposed) return release();
+    // The observer comes only now: its first notification would draw a frame while the programs are still linking
+    // (three then waits for the link on the main thread, and the parallel compile is lost).
     if (typeof ResizeObserver !== "undefined") {
       observer = new ResizeObserver(() => {
         resize();
@@ -194,12 +222,6 @@ export function createLogoMotion(
       });
       observer.observe(canvas);
     }
-    // cold start: compile every program and draw once off screen, so that the first visible frame is t = 0
-    await scene.compile();
-    if (disposed) return release();
-    draw(mode === "static" ? INTRO_DURATION : tNow);
-    await nextFrame();
-    if (disposed) return release();
     if (mode === "static") return finish();
     if (autoplay) play(tNow);
   })();
@@ -216,10 +238,13 @@ export function createLogoMotion(
       return draw(tNow) ?? { caption: { alpha: 0, x: 0, y: 0, fontPx: 0 } };
     },
     play,
+    pause,
+    resume,
     time: () => tNow,
     resize,
     dispose() {
       disposed = true;
+      paused = false;
       if (scene) release();
     },
     duration: INTRO_DURATION,

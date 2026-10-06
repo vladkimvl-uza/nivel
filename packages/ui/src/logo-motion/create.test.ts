@@ -380,3 +380,125 @@ describe("browserDeps (the defaults of the browser)", () => {
     }
   });
 });
+
+describe("createLogoMotion: the resize observer waits for the warm-up", () => {
+  /** A ResizeObserver that the test fires by hand; it records when it was created. */
+  function stubObserver() {
+    const made: { fire(): void; disconnect: ReturnType<typeof vi.fn> }[] = [];
+    class FakeResizeObserver {
+      private cb: () => void;
+      disconnect = vi.fn();
+      constructor(cb: () => void) {
+        this.cb = cb;
+        made.push({ fire: () => this.cb(), disconnect: this.disconnect });
+      }
+      observe() {}
+    }
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+    return made;
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is not connected while the programs compile: no frame is drawn before they are ready", async () => {
+    const made = stubObserver();
+    let finishCompile: () => void = () => {};
+    const h = harness();
+    h.renderer.compileAsync.mockImplementation(() => new Promise<void>((ok) => (finishCompile = ok)));
+    const m = createLogoMotion(h.canvas, { mode: "intro" }, h.deps);
+    await h.flush();
+    expect(made).toHaveLength(0);
+    expect(h.renderer.render).not.toHaveBeenCalled();
+    finishCompile();
+    await h.flush();
+    expect(h.renderer.render).toHaveBeenCalledTimes(1); // the warm-up frame
+    h.frame(0);
+    await m.ready;
+    expect(made).toHaveLength(1);
+    m.dispose();
+    expect(made[0]?.disconnect).toHaveBeenCalled();
+  });
+
+  it("once connected, a change of size sets the size again and redraws a clock that is not running", async () => {
+    const made = stubObserver();
+    const h = harness();
+    const m = createLogoMotion(h.canvas, { mode: "static" }, h.deps);
+    await h.settle(m);
+    const sizes = h.renderer.setSize.mock.calls.length;
+    const draws = h.renderer.render.mock.calls.length;
+    made[0]?.fire();
+    expect(h.renderer.setSize.mock.calls.length).toBe(sizes + 1);
+    expect(h.renderer.render.mock.calls.length).toBe(draws + 1);
+    m.dispose();
+  });
+});
+
+describe("createLogoMotion: pause and resume (a loop that nobody sees stops)", () => {
+  it("pause stops the frames and keeps the time; resume goes on from the same time, without a jump", async () => {
+    const h = harness();
+    const m = createLogoMotion(h.canvas, { mode: "hero" }, h.deps);
+    await h.settle(m);
+    h.run(0, 5000);
+    const at = m.time();
+    expect(at).toBeGreaterThan(INTRO_DURATION);
+    m.pause();
+    expect(h.queue.size).toBe(0);
+    const draws = h.renderer.render.mock.calls.length;
+    h.frame(9000);
+    expect(h.renderer.render.mock.calls.length).toBe(draws);
+    expect(m.time()).toBe(at);
+    m.resume();
+    h.frame(60_000); // the first frame after the pause is the paused time, whatever the wall clock says
+    expect(m.time()).toBeCloseTo(at, 6);
+    h.run(60_016, 60_500);
+    expect(m.time()).toBeCloseTo(at + 0.5, 3);
+    m.dispose();
+  });
+
+  it("pause twice and resume twice are harmless; resume without a pause starts nothing new", async () => {
+    const h = harness();
+    const m = createLogoMotion(h.canvas, { mode: "hero" }, h.deps);
+    await h.settle(m);
+    h.run(0, 400);
+    m.resume();
+    expect(h.queue.size).toBe(1); // still the one loop, not two
+    m.pause();
+    m.pause();
+    expect(h.queue.size).toBe(0);
+    m.resume();
+    m.resume();
+    expect(h.queue.size).toBe(1);
+    m.dispose();
+  });
+
+  it("a clock that was not running (autoplay off, finished intro) is not started by resume", async () => {
+    const h = harness();
+    const m = createLogoMotion(h.canvas, { mode: "intro", autoplay: false }, h.deps);
+    await h.settle(m);
+    m.pause();
+    m.resume();
+    expect(h.queue.size).toBe(0);
+    m.dispose();
+    const done = harness();
+    const m2 = createLogoMotion(done.canvas, { mode: "intro" }, done.deps);
+    await done.settle(m2);
+    done.run(0, 4400);
+    m2.pause();
+    m2.resume();
+    expect(done.queue.size).toBe(0);
+  });
+
+  it("an explicit play() after a pause plays; dispose clears a pause", async () => {
+    const h = harness();
+    const m = createLogoMotion(h.canvas, { mode: "hero", autoplay: false }, h.deps);
+    await h.settle(m);
+    m.play(0);
+    h.run(0, 200);
+    m.pause();
+    m.play(1);
+    expect(h.queue.size).toBe(1);
+    m.pause();
+    m.dispose();
+    m.resume();
+    expect(h.queue.size).toBe(0);
+  });
+});
