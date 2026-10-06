@@ -14,7 +14,6 @@ import { RoundStamp, Stamp, StampInkDefs } from "../primitives/Stamp.tsx";
 import { SumsTable } from "../primitives/SumsTable.tsx";
 import { parseCss } from "../test-support/css.ts";
 import { render } from "../test-support/render.ts";
-import { ThemeToggleView } from "../theming/ThemeToggle.tsx";
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const themesCss = read("../themes/themes.css");
@@ -61,7 +60,7 @@ describe("stylesheets use roles, not colors", () => {
     }
   });
 
-  it("never switch by theme name: the same rules serve both themes", () => {
+  it("never switch by theme name: the rules serve the page through roles, so a second theme needs no rule", () => {
     expect(own).not.toMatch(/data-theme/);
     expect(own).not.toMatch(/prefers-color-scheme/);
   });
@@ -95,7 +94,6 @@ describe("classes used by the components exist in the stylesheets", () => {
       ...badgeKinds.map((kind) => h(Badge, { kind, label: "l" })),
       h(Paper, { tilt: "left", badge: h(Badge, { kind: "sample", label: "s" }) }, "x"),
       h(Paper, { tilt: "right" }, "x"),
-      h(ThemeToggleView, { theme: "day", onSelect: () => {}, labels: { group: "g", day: "d", night: "n" } }),
     ]
       .map((el) => render(el))
       .join("\n");
@@ -158,19 +156,13 @@ describe("form fields", () => {
 });
 
 describe("motion", () => {
-  it("fades only colors during the switch, for html.theme-shift", () => {
-    const shift = rules.find((r) => /html\.theme-shift/.test(r.selector) && !r.at);
-    const transition = shift?.decls.find(([k]) => k === "--nv-shift")?.[1] ?? "";
-    expect(shift?.decls.find(([k]) => k === "transition")?.[1]).toBe("var(--nv-shift) !important");
-    for (const prop of ["background-color", "color", "border-color", "fill", "stroke", "box-shadow", "opacity"]) {
-      expect(transition, prop).toContain(`${prop} var(--dur-theme) var(--ease-io)`);
-    }
-    expect(transition).not.toMatch(/transform|width|height|top|left/);
+  it("has no mode-switch fade: no theme-shift class, no --dur-theme, no !important transition", () => {
+    expect(own).not.toMatch(/theme-shift|--dur-theme|--nv-shift/);
+    expect(own).not.toMatch(/!important/);
   });
 
   it("is instant under prefers-reduced-motion", () => {
     const reduced = rules.filter((r) => /prefers-reduced-motion:\s*reduce/.test(r.at));
-    expect(reduced.some((r) => /theme-shift/.test(r.selector))).toBe(true);
     expect(reduced.some((r) => /nv-stamp--press/.test(r.selector))).toBe(true);
   });
 
@@ -183,7 +175,7 @@ describe("motion", () => {
 });
 
 describe("documents", () => {
-  it("are square paper in both modes: no radius, doc colors, the paper shadow", () => {
+  it("are square paper on the night page: no radius, doc colors, the paper shadow", () => {
     const paper = rules.find((r) => r.selector === ".nv-paper");
     const d = Object.fromEntries(paper?.decls ?? []);
     expect(d.background).toBe("var(--doc)");
@@ -217,11 +209,17 @@ describe("documents", () => {
     expect(Object.fromEntries(onPaper?.decls ?? []).color).toBe("var(--stamp)");
   });
 
-  it("show the lamp spot only through the --lamp-opacity role", () => {
+  it("show the lamp spot always (night only): the spot role, no opacity role, no fade", () => {
     const r = rules.find((x) => /\.nv-lamp::before/.test(x.selector));
     const d = Object.fromEntries(r?.decls ?? []);
     expect(d.background).toBe("var(--lamp-spot)");
-    expect(d.opacity).toBe("var(--lamp-opacity)");
+    expect(d.opacity).toBeUndefined();
+    expect(d.transition).toBeUndefined();
+    expect(own).not.toMatch(/--lamp-opacity/);
+  });
+
+  it("have no day/night segment (the mode toggle is gone)", () => {
+    expect(own).not.toMatch(/nv-seg2|nv-tod/);
   });
 });
 

@@ -44,22 +44,20 @@ function graph(entry: string) {
 describe("entries of @nivel/ui", () => {
   // The worker and the PDF renderer take brand colors and TTF names from the core entry; they run on plain Node,
   // which strips types from .ts but cannot load .tsx. A regression here shows only at the start of the worker.
-  it("the core entry (index.ts) loads in plain Node and gives tokens, fonts and theme logic", () => {
+  it("the core entry (index.ts) loads in plain Node and gives tokens, fonts and the night theme", () => {
     const url = pathToFileURL(join(SRC, "index.ts")).href;
     const run = inPlainNode(
       `const ui = await import(${JSON.stringify(url)});` +
         "console.log(JSON.stringify({" +
         "def: ui.defaultTheme, themes: ui.themes, ink: typeof ui.brand, fonts: ui.fontFaces.length," +
-        "ttf: ui.fontFile(ui.fontFaces[0], 'ttf'), night: ui.themeByLocalTime(new Date(2026, 9, 6, 23))," +
-        "script: ui.themeInitScript().slice(0, 12), amount: ui.formatAmount(1234567), scene: typeof ui.sceneLight }));",
+        "ttf: ui.fontFile(ui.fontFaces[0], 'ttf'), amount: ui.formatAmount(1234567), scene: typeof ui.sceneLight }));",
     );
     expect(run.stderr).toBe("");
     expect(run.status).toBe(0);
     const out = JSON.parse(run.stdout) as Record<string, unknown>;
-    expect(out).toMatchObject({ def: "day", themes: ["day", "night"], ink: "object", night: "night", scene: "object" });
+    expect(out).toMatchObject({ def: "night", themes: ["night"], ink: "object", scene: "object" });
     expect(out.fonts).toBeGreaterThanOrEqual(9);
     expect(String(out.ttf)).toMatch(/\.ttf$/);
-    expect(out.script).toBe("(function(){");
     expect(String(out.amount)).toContain("567");
   });
 
@@ -70,7 +68,7 @@ describe("entries of @nivel/ui", () => {
     expect(files).toContain("themes/tokens.ts");
   });
 
-  it("the react entry (react.ts) has the primitives and the theme components, the core entry has none of them", async () => {
+  it("the react entry (react.ts) has the primitives, the core entry has none of them", async () => {
     const core = await import("./index.ts");
     const react = await import("./react.ts");
     const components = [
@@ -88,14 +86,15 @@ describe("entries of @nivel/ui", () => {
       "SumsTable",
       "Tag",
       "TextField",
-      "ThemeInitScript",
-      "ThemeProvider",
-      "ThemeToggle",
-      "ThemeToggleView",
-      "useTheme",
     ];
     expect(components.filter((n) => !(n in react))).toEqual([]);
     expect(components.filter((n) => n in core)).toEqual([]);
+  });
+
+  it("the react entry has no theme components: no provider, hook, toggle or init script", async () => {
+    const react = await import("./react.ts");
+    const removed = ["ThemeInitScript", "ThemeProvider", "ThemeToggle", "ThemeToggleView", "useTheme"];
+    expect(removed.filter((n) => n in react)).toEqual([]);
   });
 
   it("every source file of the package is reachable from one of the two entries (no orphan public code)", () => {

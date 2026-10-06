@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { compositeOver, contrastRatio, parseColor, relativeLuminance } from "./themes/contrast.ts";
 import { type ThemeTokens, themeTokens } from "./themes/tokens.ts";
-import { themes } from "./theming/ids.ts";
 
 type Role = Exclude<
   keyof ThemeTokens,
-  "docShadow" | "cardShadow" | "lampSpot" | "lampOpacity" | "logoDay" | "logoNight" | "themeColor"
+  "docShadow" | "cardShadow" | "lampSpot" | "themeColor"
 >;
 
 /** Text on its background; a translucent background is first laid over `under` (what the visitor actually sees). */
@@ -21,7 +20,7 @@ interface Pair {
 // used for the mark, fills and large type (3.6:1), see DESIGN_SYSTEM 2.1.
 // Two pairs are absent on purpose, found by this test: `accentInk` on `doc` is 2.4:1 at night (light orange on
 // light paper), so inside a document a tag takes the stamp ink (`stamp` on `doc` is in the list); `stamp` on `doc2`
-// is 4.1:1 by day and 4.3:1 at night, so stamps are never put on the `doc2` band (the prototype does not use it).
+// is 4.3:1 at night, so stamps are never put on the `doc2` band (the prototype does not use it).
 const TEXT_PAIRS: Pair[] = [
   { fg: "ink", bg: "bg", note: "body text on the page" },
   { fg: "ink", bg: "bg2", note: "body text on the alternate band" },
@@ -55,38 +54,34 @@ const TEXT_PAIRS: Pair[] = [
   { fg: "minus", bg: "doc2", note: "refund line on the paper band" },
 ];
 
-describe("contrast of token pairs (WCAG 2.2 AA, >= 4.5:1) in both themes", () => {
-  for (const theme of themes) {
-    describe(theme, () => {
-      for (const pair of TEXT_PAIRS) {
-        const label = `${pair.fg} on ${pair.bg}${pair.under ? ` over ${pair.under}` : ""} (${pair.note})`;
-        it(label, () => {
-          const t = themeTokens[theme];
-          const under = parseColor(t[pair.under ?? pair.bg]);
-          const bg = compositeOver(parseColor(t[pair.bg]), under);
-          const fg = compositeOver(parseColor(t[pair.fg]), bg);
-          expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(4.5);
-        });
-      }
+describe("contrast of token pairs (WCAG 2.2 AA, >= 4.5:1) in the night theme and on its paper", () => {
+  const t = themeTokens.night;
 
-      it("accent for fills and the focus ring reaches 3:1 against the page and cards (WCAG 1.4.11)", () => {
-        const t = themeTokens[theme];
-        for (const bg of ["bg", "bg2", "surface"] as const) {
-          expect(contrastRatio(parseColor(t.accent), parseColor(t[bg])), bg).toBeGreaterThanOrEqual(3);
-        }
-      });
+  for (const pair of TEXT_PAIRS) {
+    const label = `${pair.fg} on ${pair.bg}${pair.under ? ` over ${pair.under}` : ""} (${pair.note})`;
+    it(label, () => {
+      const under = parseColor(t[pair.under ?? pair.bg]);
+      const bg = compositeOver(parseColor(t[pair.bg]), under);
+      const fg = compositeOver(parseColor(t[pair.fg]), bg);
+      expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(4.5);
     });
   }
 
-  it("matches the values stated in DESIGN_SYSTEM 2.1 (accent-ink 5.5:1 on paper, night accent 6.1:1)", () => {
-    const d = themeTokens.day;
-    const n = themeTokens.night;
-    expect(contrastRatio(parseColor(d.accentInk), parseColor(d.bg))).toBeGreaterThanOrEqual(5.4);
-    expect(contrastRatio(parseColor(d.ink), parseColor(d.bg))).toBeGreaterThanOrEqual(14.5);
-    expect(contrastRatio(parseColor(n.accentInk), parseColor(n.bg))).toBeGreaterThanOrEqual(6);
-    expect(contrastRatio(parseColor(n.ink), parseColor(n.bg))).toBeGreaterThanOrEqual(16);
-    expect(contrastRatio(parseColor(d.ink2), parseColor(d.bg))).toBeGreaterThanOrEqual(6);
-    expect(contrastRatio(parseColor(n.ink2), parseColor(n.bg))).toBeGreaterThanOrEqual(6);
+  it("accent for fills and the focus ring reaches 3:1 against the page and cards (WCAG 1.4.11)", () => {
+    for (const bg of ["bg", "bg2", "surface"] as const) {
+      expect(contrastRatio(parseColor(t.accent), parseColor(t[bg])), bg).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("covers every text color of the paper (docInk, docInk2, stamp, minus) on both paper tones that carry them", () => {
+    const covered = new Set(TEXT_PAIRS.filter((p) => p.bg === "doc" || p.bg === "doc2").map((p) => p.fg));
+    for (const role of ["docInk", "docInk2", "stamp", "minus"] as const) expect(covered.has(role), role).toBe(true);
+  });
+
+  it("matches the values stated in DESIGN_SYSTEM 2.1 (night accent 6.1:1, text 16:1)", () => {
+    expect(contrastRatio(parseColor(t.accentInk), parseColor(t.bg))).toBeGreaterThanOrEqual(6);
+    expect(contrastRatio(parseColor(t.ink), parseColor(t.bg))).toBeGreaterThanOrEqual(16);
+    expect(contrastRatio(parseColor(t.ink2), parseColor(t.bg))).toBeGreaterThanOrEqual(6);
   });
 });
 
