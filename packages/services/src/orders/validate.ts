@@ -1,4 +1,5 @@
 // Small checks of input that every scenario shares. They throw ValidationError (4xx for the caller), never TypeError.
+import type { Task } from "@nivel/domain/compat";
 import { ValidationError } from "./errors.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -53,6 +54,27 @@ export function isCalendarDate(value: unknown): value is string {
   const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const d = new Date(Date.UTC(year, month - 1, day));
   return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+
+const TASKS: readonly Task[] = ["gaming", "streaming", "design3d", "programming", "office"];
+/** A build is for one or two tasks (ARCHITECTURE 7.1: two tasks - the stricter requirement of each category). */
+const MAX_TASKS = 2;
+
+/** The tasks of a build: a short list of known tasks without repeats. Anything else is the caller's mistake, not a TypeError. */
+export function assertTasks(value: unknown, path = "tasks"): Task[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_TASKS ||
+    value.some((t) => typeof t !== "string" || !TASKS.includes(t as Task)) ||
+    new Set(value).size !== value.length
+  ) {
+    throw ValidationError.of(
+      path,
+      "tasks_invalid",
+      `${path} must be a list of at most ${MAX_TASKS} different tasks of ${TASKS.join(", ")}`,
+    );
+  }
+  return [...value] as Task[];
 }
 
 export interface JsonLimits {

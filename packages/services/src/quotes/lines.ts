@@ -62,6 +62,14 @@ export function normalizeBuildLines(
       });
       continue;
     }
+    if (line.customerOwned !== undefined && typeof line.customerOwned !== "boolean") {
+      issues.push({
+        path: `lines.${i}.customerOwned`,
+        code: "customer_owned_invalid",
+        message: "customerOwned must be true or false",
+      });
+      continue;
+    }
     if (!lookup.get(line.productId)) {
       issues.push({
         path: `lines.${i}.productId`,

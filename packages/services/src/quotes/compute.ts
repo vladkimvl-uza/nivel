@@ -10,6 +10,7 @@ import { computeQuote, type FeeSettings, type QuoteLineInput, type QuoteTotals }
 import { sum } from "@nivel/domain/money";
 import { ValidationError, type ValidationIssue } from "../orders/errors.ts";
 import { loadFeeSettings } from "../orders/settings.ts";
+import { assertTasks } from "../orders/validate.ts";
 import { loadCatalogFor } from "./catalog.ts";
 import { normalizeBuildLines } from "./lines.ts";
 import type { CompatVerdict } from "./stored.ts";
@@ -125,6 +126,7 @@ function checkManualLines(manual: readonly ManualLine[]): ManualLine[] {
 }
 
 export async function computeQuoteFor(ex: Executor, input: ComputeInput): Promise<ComputedQuote> {
+  const tasks = input.tasks === undefined ? [] : assertTasks(input.tasks);
   const manual = checkManualLines(input.manualLines ?? []);
   // Before the catalog is read for them: a value that is not a list, or a list of thousands, is not looked up at all.
   if (!Array.isArray(input.lines))
@@ -258,7 +260,7 @@ export async function computeQuoteFor(ex: Executor, input: ComputeInput): Promis
       compat = checkCompatibility(
         normalized.map((l) => ({ productId: l.productId, qty: l.qty, customerOwned: l.customerOwned })),
         view.lookup,
-        { tasks: [...(input.tasks ?? [])], settings: view.compat },
+        { tasks, settings: view.compat },
       );
     } catch (e) {
       if (e instanceof RangeError) throw ValidationError.of("lines", "build_invalid", e.message);

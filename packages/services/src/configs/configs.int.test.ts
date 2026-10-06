@@ -110,6 +110,62 @@ describe("configs.save", () => {
     ).rejects.toMatchObject({ issues: [{ path: "prefs", code: "json_invalid" }] });
   });
 
+  it("checks the tasks before anything is calculated or kept: a short list of known tasks, never a TypeError", async () => {
+    const bad: unknown[] = [
+      ["x"],
+      5,
+      "gaming",
+      null,
+      { 0: "gaming" },
+      ["gaming", "gaming"],
+      ["gaming", "office", "streaming"],
+      [{ a: 1 }],
+      Array.from({ length: 1000 }, () => "gaming"),
+      Array.from({ length: 200_000 }, () => "x"),
+    ];
+    for (const tasks of bad) {
+      for (const kind of ["pc", "setup"] as const) {
+        await expect(
+          save({ kind, lines: pcLines(w), tasks: tasks as never, createdVia: "web" }, w.web),
+        ).rejects.toMatchObject({ name: "ValidationError", issues: [{ path: "tasks", code: "tasks_invalid" }] });
+      }
+    }
+    const ok = await save({ kind: "pc", lines: pcLines(w), tasks: ["gaming", "office"], createdVia: "web" }, w.web);
+    expect((await row(ok.id)).prefs).toMatchObject({ tasks: ["gaming", "office"] });
+  });
+
+  it("keeps the flag of the customer's own part as a true boolean and refuses any other value", async () => {
+    for (const customerOwned of ["yes", 1, { big: "x".repeat(20_000) }, null]) {
+      const lines = [{ productId: w.products.ram.id, qty: 1, customerOwned: customerOwned as never }];
+      await expect(save({ kind: "pc", lines, createdVia: "web" }, w.web)).rejects.toMatchObject({
+        name: "ValidationError",
+        issues: [{ path: "lines.0.customerOwned", code: "customer_owned_invalid" }],
+      });
+    }
+    const r = await save(
+      {
+        kind: "pc",
+        lines: [
+          { productId: w.products.ram.id, qty: 1, customerOwned: true },
+          { productId: w.products.cpu.id, qty: 1, customerOwned: false },
+        ],
+        createdVia: "web",
+      },
+      w.web,
+    );
+    expect((await row(r.id)).items).toEqual([
+      { productId: w.products.ram.id, qty: 1, customerOwned: true },
+      { productId: w.products.cpu.id, qty: 1, customerOwned: false },
+    ]);
+  });
+
+  it("applies the limit of the free JSON to the preferences as they are kept, with the budget and the tasks merged in", async () => {
+    const nearly = { note: "x".repeat(16_384 - 25) };
+    await expect(
+      save({ kind: "pc", lines: pcLines(w), createdVia: "web", prefs: nearly, tasks: ["gaming", "office"] }, w.web),
+    ).rejects.toMatchObject({ issues: [{ path: "prefs", code: "json_too_large" }] });
+  });
+
   it("keeps the budget the client named within the limit of the money rules", async () => {
     const ok = await save({ kind: "pc", lines: pcLines(w), createdVia: "web", budgetSum: MAX_BUDGET_SUM }, w.web);
     expect((await row(ok.id)).prefs).toMatchObject({ budgetSum: MAX_BUDGET_SUM });

@@ -10,7 +10,7 @@ import { ValidationError } from "../orders/errors.ts";
 import { freeWindowAvailable } from "../orders/load.ts";
 import { can, type Runtime, runtimeOf } from "../orders/runtime.ts";
 import { loadFeeSettings } from "../orders/settings.ts";
-import { assertJsonObject, assertUuid } from "../orders/validate.ts";
+import { assertJsonObject, assertTasks, assertUuid } from "../orders/validate.ts";
 import { computeQuoteFor } from "../quotes/compute.ts";
 import { serializeTotals } from "../quotes/stored.ts";
 
@@ -68,6 +68,7 @@ export async function save(input: SaveConfigInput, rt?: Runtime): Promise<SavedC
       `budgetSum must be a whole number of sums from 0 to ${MAX_BUDGET_SUM}`,
     );
   }
+  const tasks = input.tasks === undefined ? undefined : assertTasks(input.tasks);
   if (input.room !== undefined) assertJsonObject(input.room, "room", FREE_JSON);
   if (input.prefs !== undefined) assertJsonObject(input.prefs, "prefs", FREE_JSON);
   const customerId = input.customerId === undefined ? undefined : assertUuid(input.customerId, "customerId");
@@ -76,7 +77,7 @@ export async function save(input: SaveConfigInput, rt?: Runtime): Promise<SavedC
   const settings = await loadFeeSettings(r.db);
   const computed = await computeQuoteFor(r.db, {
     lines: input.lines,
-    ...(input.tasks === undefined ? {} : { tasks: input.tasks }),
+    ...(tasks === undefined ? {} : { tasks }),
     kind: input.kind,
     // The site cannot read the load of the workshop: it promises no free window.
     freeWindowAvailable: can(r, "orders.read") ? await freeWindowAvailable(r.db, settings) : false,
@@ -99,10 +100,11 @@ export async function save(input: SaveConfigInput, rt?: Runtime): Promise<SavedC
       throw ValidationError.of("parentId", "parent_unknown", "the configuration it was changed from does not exist");
   }
 
+  // computeQuoteFor has refused any customerOwned that is not a boolean, so what is kept is a flag and nothing else.
   const items: BuildLine[] = input.lines.map((l) => ({
     productId: l.productId,
     qty: l.qty,
-    ...(l.customerOwned === undefined ? {} : { customerOwned: l.customerOwned }),
+    ...(l.customerOwned === undefined ? {} : { customerOwned: l.customerOwned === true }),
   }));
   const compat = computed.compat
     ? {
@@ -115,8 +117,10 @@ export async function save(input: SaveConfigInput, rt?: Runtime): Promise<SavedC
   const prefs = {
     ...(input.prefs ?? {}),
     ...(input.budgetSum === undefined ? {} : { budgetSum: input.budgetSum }),
-    ...(input.tasks === undefined ? {} : { tasks: input.tasks }),
+    ...(tasks === undefined ? {} : { tasks }),
   };
+  // The limit is on what is kept, not only on what was sent: the budget and the tasks are merged in above.
+  assertJsonObject(prefs, "prefs", FREE_JSON);
 
   const t = computed.totals;
   const saved = await insertWithCode(r, {
