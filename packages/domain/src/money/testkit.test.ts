@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createGen, createRng, forAll, readRepoFile } from "./testkit.ts";
+import { createGen, createRng, forAll, repoFile } from "./testkit.ts";
 
 describe("testkit", () => {
   it("the generator is reproducible by seed and stays in range", () => {
@@ -27,15 +27,12 @@ describe("testkit", () => {
     ).toThrow("property failed (seed 15938, run 2): boom");
   });
 
-  it("readRepoFile finds the repository root from a test path, with Windows separators too", () => {
-    const here = expect.getState().testPath;
-    expect(readRepoFile(here, "packages/domain/package.json")).toContain("@nivel/domain");
-    const win = (here ?? "").replaceAll("/", "\\");
-    expect(readRepoFile(win, "packages/domain/package.json")).toContain("@nivel/domain");
+  it("repoFile gives the text of documents and fixtures", () => {
+    expect(repoFile("docs/DECISIONS.md")).toContain("Р-8");
+    expect(JSON.parse(repoFile("fixtures/money-cases.json")).version).toBe(1);
   });
 
-  it("readRepoFile refuses paths outside the domain package", () => {
-    expect(() => readRepoFile("/tmp/x.test.ts", "a")).toThrow(/Cannot locate the repository root/);
-    expect(() => readRepoFile(undefined, "a")).toThrow(/Cannot locate the repository root/);
+  it("repoFile refuses files the tests were not given", () => {
+    expect(() => repoFile("docs/README.md")).toThrow(/not available to tests/);
   });
 });

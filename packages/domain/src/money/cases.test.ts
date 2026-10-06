@@ -15,7 +15,7 @@ import {
   sum,
   validatePayment,
 } from "./index.ts";
-import { readRepoFile } from "./testkit.ts";
+import { repoFile } from "./testkit.ts";
 
 interface Cases {
   version: number;
@@ -53,9 +53,7 @@ interface Cases {
   }[];
 }
 
-const cases = JSON.parse(
-  readRepoFile(expect.getState().testPath, "packages/testing/fixtures/money-cases.json"),
-) as Cases;
+const cases = JSON.parse(repoFile("fixtures/money-cases.json")) as Cases;
 
 const D = DEFAULT_FEE_SETTINGS;
 const toLines = (c: Cases["fee"][number]): QuoteLineInput[] =>

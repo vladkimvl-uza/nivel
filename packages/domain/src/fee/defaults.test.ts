@@ -1,11 +1,11 @@
 // ARCHITECTURE 4.1: defaults of the domain match the owner's documents, and a test compares them.
 import { describe, expect, it } from "vitest";
-import { readRepoFile } from "../money/testkit.ts";
+import { repoFile } from "../money/testkit.ts";
 import { TAX_RISK_RESERVE_BP, WARRANTY_RESERVE } from "../reserve/index.ts";
 import { DEFAULT_THRESHOLD_SETTINGS } from "../threshold/index.ts";
 import { DEFAULT_FEE_SETTINGS as D } from "./index.ts";
 
-const doc = (file: string): string => readRepoFile(expect.getState().testPath, `docs/${file}`).replace(/\s+/g, " ");
+const doc = (file: string): string => repoFile(`docs/${file}`).replace(/\s+/g, " ");
 const decisions = doc("DECISIONS.md");
 const concept = doc("CONCEPT.md");
 const architecture = doc("ARCHITECTURE.md");

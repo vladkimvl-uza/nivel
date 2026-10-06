@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 // Test helper: seeded property runner. fast-check 4.10.2 is in the pnpm catalog but is not a dependency of
 // @nivel/domain yet (integrator request); this runner has the same shape so the properties port one-to-one.
 
@@ -45,10 +43,16 @@ export function forAll(body: (g: Gen, run: number) => void, opts: { runs?: numbe
   }
 }
 
-/** Reads a file relative to the repository root, found from the absolute path of the running test file. */
-export function readRepoFile(testPath: string | undefined, relative: string): string {
-  const p = (testPath ?? "").replaceAll("\\", "/");
-  const at = p.lastIndexOf("/packages/domain/");
-  if (at < 0) throw new Error(`Cannot locate the repository root from ${String(testPath)}`);
-  return readFileSync(`${p.slice(0, at)}/${relative}`, "utf8");
+/** Repository files the tests compare the code with: the owner documents and the shared money cases (read at transform time). */
+const repoFiles = import.meta.glob(
+  ["../../../../docs/{DECISIONS,CONCEPT,ARCHITECTURE}.md", "../../../testing/fixtures/money-cases.json"],
+  { eager: true, query: "?raw", import: "default" },
+);
+
+/** Text of a repository file by its path tail, e.g. "docs/DECISIONS.md" or "fixtures/money-cases.json". */
+export function repoFile(tail: string): string {
+  const key = Object.keys(repoFiles).find((k) => k.endsWith(`/${tail}`));
+  const text = key === undefined ? undefined : repoFiles[key];
+  if (text === undefined) throw new Error(`Repository file is not available to tests: ${tail}`);
+  return text;
 }
