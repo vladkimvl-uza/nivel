@@ -11,6 +11,12 @@ const WORKING_DAYS_TO_PAY = 5;
 function floorShare(fee: Sum, bpScaled: bigint): Sum {
   return sum(Number((BigInt(fee) * bpScaled) / 100_000_000n));
 }
+/** A whole sum that must not be negative: a reversal (storno) is never an input of a settlement. */
+function nonNegative(name: string, value: Sum): Sum {
+  const v = sum(value);
+  if (v < 0) throw new RangeError(`${name} must not be negative, got ${v}`);
+  return v;
+}
 const scaled = (rate: Bp): bigint => BigInt(rate) * 10_000n;
 
 /** Fee earned by the stage price list (CONCEPT 2.5): shares of finished stages, rounded down to a whole sum. */
@@ -50,13 +56,27 @@ const PARTS_GO_TO: Record<CancelPoint, CancelSettlement["partsGoTo"]> = {
  * and is never taken from the purchase funds; the funds remainder is returned in five working days.
  */
 export function settleCancellation(i: CancelInput, s: FeeSettings, now: Date, cal: WorkCalendar): CancelSettlement {
-  const fee = sum(i.fee);
-  const feePaid = sum(i.feePaid);
-  const fundsToRefund = sum(sum(i.fundsReceived) - sum(i.receiptsTotal) + sum(i.shopRefunds) - sum(i.documentedLosses));
+  const fee = nonNegative("fee", i.fee);
+  const feePaid = nonNegative("feePaid", i.feePaid);
+  const fundsReceived = nonNegative("fundsReceived", i.fundsReceived);
+  const receiptsTotal = nonNegative("receiptsTotal", i.receiptsTotal);
+  const shopRefunds = nonNegative("shopRefunds", i.shopRefunds);
+  const documentedLosses = nonNegative("documentedLosses", i.documentedLosses);
+  if (shopRefunds > receiptsTotal) {
+    throw new RangeError("Shop refunds exceed the receipts they refund");
+  }
+  const afterReceipts = sum(fundsReceived - receiptsTotal + shopRefunds);
+  if (afterReceipts < 0) {
+    throw new RangeError("Receipts exceed the money received: the client's money would be exceeded");
+  }
+  const fundsToRefund = sum(afterReceipts - documentedLosses);
   if (fundsToRefund < 0) {
     throw new RangeError("Documented losses exceed the remaining funds: the client's money would be exceeded");
   }
   const feeEarned = earnedFee({ ...i, fee }, s);
+  if (feeEarned > fee) {
+    throw new RangeError("Earned fee exceeds the fee: check the stage shares in the settings");
+  }
   return {
     feeEarned,
     feeToRefund: sum(Math.max(feePaid - feeEarned, 0)),

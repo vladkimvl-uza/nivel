@@ -186,6 +186,76 @@ describe("settleCancellation: funds and deadline", () => {
     ).toThrow(RangeError);
   });
 
+  it("rejects negative amounts: a reversal must not raise the refund above what was paid", () => {
+    const fields = ["fee", "feePaid", "fundsReceived", "receiptsTotal", "shopRefunds", "documentedLosses"] as const;
+    for (const field of fields) {
+      expect(() => settle(input("after_accept_before_purchase", { [field]: S(-1) })), field).toThrow(RangeError);
+    }
+    // the case from the review: losses of -5 000 000 would turn 10 300 000 received into 15 300 000 to refund
+    expect(() => settle(input("before_accept", { fee: S(1_000_000), documentedLosses: S(-5_000_000) }))).toThrow(
+      RangeError,
+    );
+    expect(() => settle(input("after_accept_before_purchase", { fee: S(-1_000_000) }))).toThrow(RangeError);
+  });
+
+  it("rejects shop refunds above the receipts they refund", () => {
+    expect(() =>
+      settle(input("after_purchase_before_assembly", { receiptsTotal: S(0), shopRefunds: S(5_000_000) })),
+    ).toThrow(/shop refunds/i);
+    expect(
+      settle(input("after_purchase_before_assembly", { receiptsTotal: S(5_000_000), shopRefunds: S(5_000_000) }))
+        .fundsToRefund,
+    ).toBe(10_300_000);
+  });
+
+  it("names the real cause: receipts above the money received, or losses above the remainder", () => {
+    expect(() => settle(input("after_purchase_before_assembly", { receiptsTotal: S(10_300_001) }))).toThrow(
+      /receipts/i,
+    );
+    expect(() =>
+      settle(input("after_purchase_before_assembly", { receiptsTotal: S(10_000_000), documentedLosses: S(300_001) })),
+    ).toThrow(/losses/i);
+    // the boundary: everything spent or lost, nothing left to refund
+    expect(
+      settle(input("after_purchase_before_assembly", { receiptsTotal: S(10_000_000), documentedLosses: S(300_000) }))
+        .fundsToRefund,
+    ).toBe(0);
+  });
+
+  it("never refunds more than was received", () => {
+    forAll((g) => {
+      const fundsReceived = g.int(0, 50_000_000);
+      const receiptsTotal = g.int(0, 60_000_000);
+      const shopRefunds = g.int(0, 60_000_000);
+      const documentedLosses = g.int(0, 60_000_000);
+      const i = input("after_purchase_before_assembly", {
+        fundsReceived: S(fundsReceived),
+        receiptsTotal: S(receiptsTotal),
+        shopRefunds: S(shopRefunds),
+        documentedLosses: S(documentedLosses),
+      });
+      const valid = shopRefunds <= receiptsTotal && fundsReceived - receiptsTotal + shopRefunds - documentedLosses >= 0;
+      if (!valid) {
+        expect(() => settle(i)).toThrow(RangeError);
+        return;
+      }
+      const r = settle(i);
+      expect(r.fundsToRefund).toBeGreaterThanOrEqual(0);
+      expect(r.fundsToRefund).toBeLessThanOrEqual(fundsReceived);
+    });
+  });
+
+  it("refuses stage shares that earn more than the fee", () => {
+    const greedy: FeeSettings = {
+      ...D,
+      stageSharesBp: { selection: bp(2000), purchase: bp(3000), assembly: bp(7000), handover: bp(0) },
+    };
+    expect(() => settle(input("during_assembly", { assemblyDoneBp: bp(10_000) }), greedy)).toThrow(/exceeds the fee/);
+    expect(settle(input("during_assembly", { assemblyDoneBp: bp(5000) }), greedy).feeEarned).toBeLessThanOrEqual(
+      1_000_000,
+    );
+  });
+
   it("is due in five working days by the calendar", () => {
     const cal = fakeCalendar();
     const r = settleCancellation(input("before_accept"), D, NOW, cal);
