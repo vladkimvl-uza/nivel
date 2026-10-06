@@ -39,6 +39,8 @@ export default defineConfig({
           setupFiles: ["packages/testing/src/setup-unit.ts", "packages/testing/src/setup-int.ts"],
           testTimeout: 30_000,
           hookTimeout: 60_000,
+          // Each worker gets its own copy of the database in the shared tmpfs cluster (256 MB): 15 copies overflowed it.
+          maxWorkers: 4,
         },
       },
     ],

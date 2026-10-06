@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./health": "./src/health.ts",
+    "./repos": "./src/repos/index.ts",
     "./schema": "./src/schema/index.ts"
   },
   "dependencies": {
@@ -22,6 +23,8 @@
   "scripts": {
     "generate": "node ../../tools/dev-run.mjs migrator -- drizzle-kit generate",
     "migrate": "node ../../tools/dev-run.mjs migrator -- drizzle-kit migrate",
-    "generate:custom": "node ../../tools/dev-run.mjs migrator -- drizzle-kit generate --custom"
+    "generate:custom": "node ../../tools/dev-run.mjs migrator -- drizzle-kit generate --custom",
+    "seed": "node ../../tools/dev-run.mjs migrator -- node seed/cli.ts seed",
+    "reset": "node ../../tools/dev-run.mjs migrator -- node seed/cli.ts reset"
   }
 }

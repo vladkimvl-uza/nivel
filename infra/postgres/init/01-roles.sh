@@ -35,6 +35,15 @@ GRANT CONNECT ON DATABASE nivel TO nivel_web, nivel_admin, nivel_bot, nivel_work
 REVOKE ALL ON DATABASE nivel_umami FROM PUBLIC;
 -- the test harness creates nivel_s<slot>_*_test databases owned by nivel_migrator
 ALTER ROLE nivel_migrator CREATEDB;
+-- application roles never hold a lock or an idle transaction for long (ops.next_number locks the counter row)
+ALTER ROLE nivel_web SET lock_timeout = '5s';
+ALTER ROLE nivel_admin SET lock_timeout = '5s';
+ALTER ROLE nivel_bot SET lock_timeout = '5s';
+ALTER ROLE nivel_worker SET lock_timeout = '5s';
+ALTER ROLE nivel_web SET idle_in_transaction_session_timeout = '60s';
+ALTER ROLE nivel_admin SET idle_in_transaction_session_timeout = '60s';
+ALTER ROLE nivel_bot SET idle_in_transaction_session_timeout = '60s';
+ALTER ROLE nivel_worker SET idle_in_transaction_session_timeout = '60s';
 SQL
 
 echo "01-roles.sh: roles and databases created"
