@@ -5,10 +5,12 @@ import { record } from "../consents/index.ts";
 import { convert, create as createLead } from "../leads/index.ts";
 import { dispatch } from "../orders/dispatch.ts";
 import { confirm, expect as expectPayment } from "../payments/index.ts";
+import { record as recordPurchase } from "../purchases/index.ts";
 import { type BuiltQuote, build } from "../quotes/build.ts";
 import type { ManualLine } from "../quotes/compute.ts";
 import { send } from "../quotes/send.ts";
-import { newCustomer, pcLines, type World } from "./world.ts";
+import { accept as acceptReport, generate as generateReport, send as sendReport } from "../reports/index.ts";
+import { newCustomer, newFile, PC_CATALOG, pcLines, type World } from "./world.ts";
 
 export interface TestOrder {
   orderId: string;
@@ -122,6 +124,64 @@ export async function purchasingOrder(
   w.clock.set(new Date("2026-10-13T10:00:00+05:00"));
   const r = await dispatch(o.orderId, { type: "START_PURCHASE" }, ownerActor(w), w.admin);
   if (!r.ok) throw new Error(`the purchase did not start: ${r.error}`);
+  return o;
+}
+
+let receipt = 5000;
+
+/** Every position of the quote is bought at its price, each with a fiscal receipt and a photo; the purchase is closed. */
+export async function purchasedOrder(w: World): Promise<Awaited<ReturnType<typeof purchasingOrder>>> {
+  const o = await purchasingOrder(w);
+  for (const p of PC_CATALOG) {
+    const { rows } = await w.db.$client.query(
+      "select id from sales.quote_lines where quote_id = $1 and product_id = $2",
+      [o.quoteId, w.products[p.key].id],
+    );
+    receipt += 1;
+    const r = await recordPurchase(
+      {
+        orderId: o.orderId,
+        vendorId: w.vendorId,
+        quoteLineId: rows[0].id,
+        productId: w.products[p.key].id,
+        qty: 1,
+        amountSum: p.price,
+        paidVia: "bank_transfer",
+        receiptKind: "fiscal",
+        receiptNo: `CH-${receipt}`,
+        receiptFileIds: [await newFile(w)],
+      },
+      ownerActor(w),
+      w.admin,
+    );
+    if (!r.ok) throw new Error(`the purchase of ${p.key} was refused: ${r.error}`);
+  }
+  const done = await dispatch(o.orderId, { type: "PURCHASE_DONE" }, ownerActor(w), w.admin);
+  if (!done.ok) throw new Error(`the purchases were not closed: ${done.error}`);
+  return o;
+}
+
+/** The report is sent and accepted by the customer, the remainder is returned: the order is settled with the customer. */
+export async function settledOrder(w: World): Promise<Awaited<ReturnType<typeof purchasingOrder>>> {
+  const o = await purchasedOrder(w);
+  const report = await generateReport({ orderId: o.orderId }, ownerActor(w), w.admin);
+  const sent = await sendReport({ orderId: o.orderId, reportId: report.reportId }, ownerActor(w), w.admin);
+  if (!sent.ok) throw new Error(`the report was not sent: ${sent.error}`);
+  const accepted = await acceptReport({ orderId: o.orderId }, customerActor(o), w.bot);
+  if (!accepted.ok) throw new Error(`the report was not accepted: ${accepted.error}`);
+  const refund = (
+    await w.db.$client.query("select id from sales.payments where order_id = $1 and kind = 'remainder_refund'", [
+      o.orderId,
+    ])
+  ).rows[0];
+  await confirm({ paymentId: refund.id, bankDocNo: `PP-${refund.id.slice(-8)}` }, ownerActor(w), w.admin);
+  const settled = await dispatch(
+    o.orderId,
+    { type: "REMAINDER_SETTLED", refundPaymentId: refund.id },
+    ownerActor(w),
+    w.admin,
+  );
+  if (!settled.ok) throw new Error(`the remainder was not settled: ${settled.error}`);
   return o;
 }
 

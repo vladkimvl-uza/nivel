@@ -188,15 +188,13 @@ export async function record(
       throw e;
     }
     if (input.receiptFileIds.length > 0) {
-      await tx
-        .insert(purchaseFiles)
-        .values(
-          input.receiptFileIds.map((fileId) => ({
-            purchaseId: purchaseId as string,
-            fileId,
-            kind: "receipt" as const,
-          })),
-        );
+      await tx.insert(purchaseFiles).values(
+        input.receiptFileIds.map((fileId) => ({
+          purchaseId: purchaseId as string,
+          fileId,
+          kind: "receipt" as const,
+        })),
+      );
     }
     const dispatched = await dispatchInTx(r, tx, orderId, { type: "PURCHASE_RECORDED", purchaseId }, actor);
     if (dispatched.ok) {

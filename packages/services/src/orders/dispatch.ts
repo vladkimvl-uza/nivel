@@ -45,6 +45,8 @@ export interface DispatchHooks {
    * SEND_ESTIMATE). Runs inside the transaction, after the lock and the check for a repeat, before the snapshot.
    */
   before?: (tx: Executor, order: OrderRow) => Promise<void>;
+  /** Writes that follow the event in the same transaction (the report is stamped as sent). `order` is the one before the event. */
+  after?: (tx: Executor, info: { order: OrderRow; status: OrderStatus; now: Date }) => Promise<void>;
 }
 
 /** Answers that mean "the database refused the same way the automaton would have". */
@@ -289,6 +291,7 @@ export async function dispatchInTx(
       actorId: actor.id,
     });
   }
+  await hooks.after?.(tx, { order, status: applied.to, now });
   return { ok: true, status: applied.to };
 }
 
