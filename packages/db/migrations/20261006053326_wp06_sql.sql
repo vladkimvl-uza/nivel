@@ -286,6 +286,16 @@ ALTER TABLE sales.order_transitions
 -- The only writer of orders.status. Runs as the migrator; callers need EXECUTE only.
 -- One call = one transaction step: status, sales.order_events and ops.audit_log. The service adds ops.outbox rows
 -- in the same transaction (ARCHITECTURE 4.13).
+-- What the function checks itself, in this order (the second line of defence after packages/domain):
+--   1. the input: an event with a type, an actor kind from the list, an actor id (a NULL would pass every test below);
+--   2. who may call: the site only as the customer, the worker only as the system, the bot never as the system;
+--   3. who may send the event (sales.order_transitions.actors, table 4.9);
+--   4. the bot acting as the owner or the assistant: the actor id must be the Telegram id of an active account of
+--      that role in ops.admin_users (the bot's word alone is not enough: the credentials of nivel_bot may leak);
+--   5. which order fields the actor may write with this event: a whitelist of the pair (actor, event);
+--   6. the order exists, the expected status holds, the edge is in the graph;
+--   7. a customer writes a field once: a value the order already has stays;
+--   8. the flags that open money steps follow the confirmed payments.
 CREATE FUNCTION sales.apply_transition(
   p_order_id uuid,
   p_event jsonb,
@@ -302,23 +312,28 @@ DECLARE
   v_type text := p_event ->> 'type';
   v_seq integer;
   v_key text;
+  v_row jsonb;
   v_allowed text[] := ARRAY[
     'fee_prepaid', 'funds_received', 'funds_received_at', 'purchase_not_before', 'first_order_meeting_done',
     'current_quote_id', 'offer_version_uz_id', 'offer_version_ru_id', 'accepted_at', 'report_due_at',
     'objection_until', 'refund_due_at', 'handed_over_at', 'warranty_until', 'podbor_credit_until',
     'cancel', 'documented_losses_sum'];
-  -- Fields each kind of actor may write together with its event. The money fields (flags that open purchases,
-  -- the deadlines of refunds, the documented losses of the closing check) belong to the owner only.
+  -- Fields this actor may write together with this event (see below).
   v_actor_keys text[];
   v_event_actors text[];
   v_net numeric;
   v_limit numeric;
 BEGIN
-  IF v_type IS NULL THEN
+  -- Missing input first. Every test below is `<>` or `NOT IN`: against a NULL it is unknown, not true, so a missing
+  -- actor would pass them all and fail only at the NOT NULL columns of the journal.
+  IF p_event IS NULL OR v_type IS NULL THEN
     RAISE EXCEPTION 'invalid_event: the event has no type' USING ERRCODE = 'invalid_parameter_value';
   END IF;
-  IF p_actor_kind NOT IN ('system', 'customer', 'owner', 'assistant') THEN
-    RAISE EXCEPTION 'invalid_actor: %', p_actor_kind USING ERRCODE = 'invalid_parameter_value';
+  IF p_actor_kind IS NULL OR p_actor_kind NOT IN ('system', 'customer', 'owner', 'assistant') THEN
+    RAISE EXCEPTION 'invalid_actor: %', coalesce(p_actor_kind, 'no actor kind') USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  IF p_actor_id IS NULL OR p_actor_id ~ '^\s*$' THEN
+    RAISE EXCEPTION 'invalid_actor: the % has no id', p_actor_kind USING ERRCODE = 'invalid_parameter_value';
   END IF;
   -- Who may call at all: the public site acts for customers, the worker for the system, the bot never for the system.
   IF (session_user = 'nivel_web' AND p_actor_kind <> 'customer')
@@ -333,10 +348,29 @@ BEGIN
     RAISE EXCEPTION 'actor_not_allowed: % cannot send % (allowed: %)', p_actor_kind, v_type, v_event_actors
       USING ERRCODE = 'insufficient_privilege';
   END IF;
-  v_actor_keys := CASE p_actor_kind
-    WHEN 'owner' THEN v_allowed
-    WHEN 'customer' THEN ARRAY['accepted_at', 'offer_version_uz_id', 'offer_version_ru_id', 'handed_over_at', 'warranty_until']
-    WHEN 'system' THEN ARRAY['report_due_at', 'objection_until', 'refund_due_at']
+  -- The bot lives in the group of the owner and acts for the owner and the assistant. Whoever holds its credentials
+  -- could name any actor, so the id it names must be the Telegram id of an active account of that role. The id is
+  -- text and telegram_user_id is a bigint: the column is cast to text and the two texts are compared. The id is never
+  -- cast to a number, so '+123', ' 123', '0123' and '123.0' are not the account 123, and a text that is no number is
+  -- a plain refusal, not a cast error.
+  IF session_user = 'nivel_bot' AND p_actor_kind IN ('owner', 'assistant') AND NOT EXISTS (
+       SELECT 1 FROM ops.admin_users a
+        WHERE a.telegram_user_id::text = p_actor_id AND a.role = p_actor_kind AND a.active) THEN
+    RAISE EXCEPTION 'actor_not_allowed: % is not the Telegram id of an active % account', p_actor_id, p_actor_kind
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  -- Fields an actor may write together with an event: a whitelist of the pair (actor, event), not of the actor
+  -- alone. The owner writes any of them; the customer only what its event owns (the acceptance time and the offer
+  -- versions with ACCEPT, the handover time and the warranty with HANDOVER); the system the deadlines it sets; the
+  -- assistant none. The money fields (flags that open purchases, the deadlines of refunds, the documented losses of
+  -- the closing check) belong to the owner only.
+  v_actor_keys := CASE
+    WHEN p_actor_kind = 'owner' THEN v_allowed
+    WHEN p_actor_kind = 'customer' AND v_type = 'ACCEPT'
+      THEN ARRAY['accepted_at', 'offer_version_uz_id', 'offer_version_ru_id']
+    WHEN p_actor_kind = 'customer' AND v_type = 'HANDOVER'
+      THEN ARRAY['handed_over_at', 'warranty_until']
+    WHEN p_actor_kind = 'system' THEN ARRAY['report_due_at', 'objection_until', 'refund_due_at']
     ELSE ARRAY[]::text[]
   END;
   FOR v_key IN SELECT jsonb_object_keys(coalesce(p_changes, '{}'::jsonb)) LOOP
@@ -349,7 +383,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  SELECT o.status INTO v_from FROM sales.orders o WHERE o.id = p_order_id FOR UPDATE;
+  SELECT o.status, to_jsonb(o) INTO v_from, v_row FROM sales.orders o WHERE o.id = p_order_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'order_not_found: %', p_order_id USING ERRCODE = 'no_data_found';
   END IF;
@@ -359,6 +393,18 @@ BEGIN
   SELECT t.to_status INTO v_to FROM sales.order_transitions t WHERE t.from_status = v_from AND t.event_type = v_type;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'invalid_transition: % is not allowed from %', v_type, v_from USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- A customer writes a field once: a value the order already has is the record of what happened first (who
+  -- accepted, when it was handed over) and stays, even if the new value is the same. The row is locked, so the value
+  -- cannot change between this test and the UPDATE below. A JSON null is a column without a value.
+  IF p_actor_kind = 'customer' THEN
+    FOR v_key IN SELECT jsonb_object_keys(coalesce(p_changes, '{}'::jsonb)) LOOP
+      IF jsonb_typeof(v_row -> v_key) IS DISTINCT FROM 'null' THEN
+        RAISE EXCEPTION 'change_not_allowed: the order field % already has a value, the customer may not write it again', v_key
+          USING ERRCODE = 'insufficient_privilege';
+      END IF;
+    END LOOP;
   END IF;
 
   -- The flags that open the next money step follow the confirmed payments (the same sums the closing check uses).
