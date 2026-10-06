@@ -43,7 +43,13 @@ export async function draftOrder(
     ownerActor(w),
     w.admin,
   );
-  return { orderId: order.orderId, customerId: lead.customerId, number: order.number, quoteId: quote.quoteId, quote };
+  return {
+    orderId: order.orderId,
+    customerId: lead.customerId as string,
+    number: order.number,
+    quoteId: quote.quoteId,
+    quote,
+  };
 }
 
 /** The estimate is checked by the owner and sent. */

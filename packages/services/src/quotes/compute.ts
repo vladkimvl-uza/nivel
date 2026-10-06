@@ -5,7 +5,7 @@
 import { CategoryCodeSchema } from "@nivel/contracts/catalog";
 import type { Executor } from "@nivel/db/repos";
 import type { BuildLine, CategoryCode, FeeGroup } from "@nivel/domain/catalog";
-import { type CompatResult, checkCompatibility, MAX_LINE_QTY, type Task } from "@nivel/domain/compat";
+import { type CompatResult, checkCompatibility, MAX_LINE_QTY, MAX_LINES, type Task } from "@nivel/domain/compat";
 import { computeQuote, type FeeSettings, type QuoteLineInput, type QuoteTotals } from "@nivel/domain/fee";
 import { sum } from "@nivel/domain/money";
 import { ValidationError, type ValidationIssue } from "../orders/errors.ts";
@@ -126,6 +126,16 @@ function checkManualLines(manual: readonly ManualLine[]): ManualLine[] {
 
 export async function computeQuoteFor(ex: Executor, input: ComputeInput): Promise<ComputedQuote> {
   const manual = checkManualLines(input.manualLines ?? []);
+  // Before the catalog is read for them: a value that is not a list, or a list of thousands, is not looked up at all.
+  if (!Array.isArray(input.lines))
+    throw ValidationError.of("lines", "not_a_list", "The lines of a build must be a list");
+  if (input.lines.length > MAX_LINES) {
+    throw ValidationError.of(
+      "lines",
+      "too_many_lines",
+      `A build holds at most ${MAX_LINES} lines, got ${input.lines.length}`,
+    );
+  }
   const view = await loadCatalogFor(
     ex,
     input.lines.map((l) => l?.productId),

@@ -97,6 +97,13 @@ export async function record(input: RecordConsentInput, rt?: Runtime): Promise<{
       if (e.code === "consent_mismatch") {
         throw ValidationError.of("customerId", "consent_mismatch", "the consent names another customer than the order");
       }
+      if (e.code === "foreign_key_violation") {
+        throw ValidationError.of(
+          "customerId",
+          "reference_unknown",
+          "the customer or the order of the consent does not exist",
+        );
+      }
       if (e.code === "actor_not_allowed" || e.code === "permission_denied") {
         throw new ForbiddenError(`this process may not record the consent ${input.kind}`);
       }

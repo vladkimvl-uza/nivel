@@ -82,14 +82,56 @@ describe("leads.create", () => {
     expect(b.leadId).not.toBe(a.leadId);
   });
 
-  it("takes a lead from the site role, which can neither read phones nor numbers other than L-", async () => {
+  it("takes a lead from the site role, which can neither read phones nor numbers other than L-, and gives it no customer id", async () => {
     const r = await create(
       { channel: "web", scope: "setup", lang: "ru", customer: { phoneE164: "+998901112233", displayName: "Dilnoza" } },
       w.web,
     );
     expect(r.number).toMatch(/^L-2026-/);
-    const again = create({ channel: "web", scope: "setup", customer: { phoneE164: "+998901112233" } }, w.web);
-    await expect(again).rejects.toMatchObject({ issues: [{ code: "customer_exists" }] });
+    expect(r).not.toHaveProperty("customerId");
+    const row = await w.db.$client.query(
+      "select l.customer_id, c.phone_e164, c.display_name from sales.leads l left join sales.customers c on c.id = l.customer_id where l.id = $1",
+      [r.leadId],
+    );
+    expect(row.rows[0]).toEqual({
+      customer_id: expect.any(String),
+      phone_e164: "+998901112233",
+      display_name: "Dilnoza",
+    });
+  });
+
+  it("answers the site the same whether the phone is already a customer or not: the lead is taken, the contact is kept for the owner", async () => {
+    const first = await create(
+      { channel: "web", scope: "pc", customer: { phoneE164: "+998901112244", displayName: "Aziz" } },
+      w.web,
+    );
+    const again = await create(
+      { channel: "web", scope: "setup", comment: "Second try", customer: { phoneE164: "+998901112244" } },
+      w.web,
+    );
+    expect(Object.keys(again).sort()).toEqual(Object.keys(first).sort());
+    expect(again.number).toMatch(/^L-2026-\d{4}$/);
+    const row = (await w.db.$client.query("select customer_id, comment from sales.leads where id = $1", [again.leadId]))
+      .rows[0];
+    expect(row.customer_id).toBeNull();
+    expect(row.comment).toContain("+998901112244");
+    expect(row.comment).toContain("Second try");
+    // The owner is told about it like about any lead.
+    expect(await outboxOf(again.leadId)).toHaveLength(1);
+    // The lead without a customer cannot become an order until the owner links it.
+    await expect(convert({ leadId: again.leadId }, owner(), w.admin)).rejects.toMatchObject({
+      issues: [{ code: "lead_without_customer" }],
+    });
+  });
+
+  it("does not take a Telegram id from the site: it cannot know whose it is", async () => {
+    const bot = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
+    const stolen = (
+      await w.db.$client.query("select telegram_user_id from sales.customers where id = $1", [bot.customerId])
+    ).rows[0].telegram_user_id;
+    await expect(
+      create({ channel: "web", scope: "pc", customer: { telegramUserId: Number(stolen) } }, w.web),
+    ).rejects.toMatchObject({ issues: [{ path: "customer.telegramUserId", code: "telegram_id_not_allowed" }] });
   });
 
   it("finds the customer of the same phone for the roles that may read it", async () => {
@@ -100,7 +142,7 @@ describe("leads.create", () => {
 
   it("attaches the lead to a customer that exists and refuses one that does not", async () => {
     const a = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
-    const b = await create({ channel: "admin", scope: "pc", customerId: a.customerId }, w.admin);
+    const b = await create({ channel: "admin", scope: "pc", customerId: a.customerId as string }, w.admin);
     expect(b.customerId).toBe(a.customerId);
     await expect(
       create({ channel: "admin", scope: "pc", customerId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" }, w.admin),
@@ -134,6 +176,51 @@ describe("leads.create", () => {
         w.bot,
       ),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("refuses a day that is not in the calendar and a configuration that does not exist, with a validation error", async () => {
+    for (const wantedBy of ["2026-02-31", "2026-04-31", "2027-02-29"]) {
+      await expect(
+        create({ channel: "bot", scope: "pc", wantedBy, customer: { telegramUserId: newTelegram() } }, w.bot),
+      ).rejects.toMatchObject({ name: "ValidationError", issues: [{ path: "wantedBy", code: "date_invalid" }] });
+    }
+    await expect(
+      create(
+        {
+          channel: "bot",
+          scope: "pc",
+          configurationId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+          customer: { telegramUserId: newTelegram() },
+        },
+        w.bot,
+      ),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      issues: [{ path: "configurationId", code: "configuration_unknown" }],
+    });
+  });
+
+  it("limits the free texts of the lead, which go to the owner in a message", async () => {
+    const base = { channel: "bot", scope: "pc" } as const;
+    await expect(
+      create({ ...base, district: "x".repeat(81), customer: { telegramUserId: newTelegram() } }, w.bot),
+    ).rejects.toMatchObject({ issues: [{ path: "district", code: "text_invalid" }] });
+    await expect(
+      create({ ...base, customer: { telegramUserId: newTelegram(), displayName: "x".repeat(121) } }, w.bot),
+    ).rejects.toMatchObject({ issues: [{ path: "customer.displayName", code: "text_invalid" }] });
+    await expect(
+      create({ ...base, utm: { source: "x".repeat(201) }, customer: { telegramUserId: newTelegram() } }, w.bot),
+    ).rejects.toMatchObject({ issues: [{ path: "utm", code: "utm_invalid" }] });
+    await expect(
+      create(
+        {
+          ...base,
+          utm: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`k${i}`, "v"])),
+          customer: { telegramUserId: newTelegram() },
+        },
+        w.bot,
+      ),
+    ).rejects.toMatchObject({ issues: [{ path: "utm", code: "utm_invalid" }] });
   });
 
   it("writes nothing when a part of it fails: the number is not burnt, there is no customer without a lead", async () => {
@@ -216,7 +303,7 @@ describe("leads.convert", () => {
   it("is for the owner and the assistant, not for the customer or the system", async () => {
     const lead = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
     await expect(
-      convert({ leadId: lead.leadId }, { kind: "customer", id: lead.customerId }, w.admin),
+      convert({ leadId: lead.leadId }, { kind: "customer", id: lead.customerId as string }, w.admin),
     ).rejects.toBeInstanceOf(ForbiddenError);
     await expect(convert({ leadId: lead.leadId }, { kind: "system", id: "system" }, w.admin)).rejects.toBeInstanceOf(
       ForbiddenError,

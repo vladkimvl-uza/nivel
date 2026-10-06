@@ -72,10 +72,13 @@ export async function generate(
   requireStaff(actor, "drawing an act");
   requireCapability(r, "acts.write");
   const orderId = assertUuid(input.orderId, "orderId");
-  if (!(input.kind in ACT_STATUSES))
+  if (typeof input.kind !== "string" || !Object.hasOwn(ACT_STATUSES, input.kind))
     throw ValidationError.of("kind", "kind_unknown", `the act kind ${String(input.kind)} does not exist`);
   if (input.kind === "material_acceptance" && (input.lines === undefined || input.lines.length === 0)) {
     throw ValidationError.of("lines", "lines_required", "the act of acceptance lists the materials of the customer");
+  }
+  if (input.lines !== undefined && !Array.isArray(input.lines)) {
+    throw ValidationError.of("lines", "not_a_list", "the lines of an act must be a list");
   }
   const lineIssues = checkLines(input.lines ?? []);
   if (lineIssues.length > 0) throw new ValidationError(lineIssues);

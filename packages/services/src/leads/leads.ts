@@ -7,14 +7,19 @@ import { type ActorRef, auditActor, requireStaff } from "../orders/actor.ts";
 import { NotFoundError, ValidationError, type ValidationIssue } from "../orders/errors.ts";
 import { lockBy } from "../orders/lock.ts";
 import { type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
-import { assertUuid } from "../orders/validate.ts";
+import { assertUuid, isCalendarDate } from "../orders/validate.ts";
 import { OUTBOX_TEMPLATE } from "../outbox/contract.ts";
 
 const CHANNELS = ["web", "bot", "tma", "admin", "ai"] as const;
 const SCOPES = ["pc", "pc_periph", "setup", "podbor"] as const;
 const LEAD_KIND = { pc: "pc", pc_periph: "pc", setup: "setup", podbor: "podbor" } as const;
 const E164 = /^\+[1-9][0-9]{7,14}$/;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_DISTRICT = 80;
+const MAX_NAME = 120;
+const MAX_USERNAME = 64;
+const MAX_UTM_KEYS = 20;
+const MAX_UTM_KEY = 40;
+const MAX_UTM_VALUE = 200;
 
 export interface NewCustomerInput {
   displayName?: string;
@@ -49,7 +54,7 @@ export function budgetBandOf(sum: number | undefined): string | null {
   return "gte_35m";
 }
 
-function validate(input: CreateLeadInput): ValidationIssue[] {
+function validate(input: CreateLeadInput, rt: Runtime): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const bad = (path: string, code: string, message: string) => issues.push({ path, code, message });
   if (!CHANNELS.includes(input.channel))
@@ -63,11 +68,31 @@ function validate(input: CreateLeadInput): ValidationIssue[] {
   ) {
     bad("budgetSum", "sum_invalid", `budgetSum must be a whole number of sums from 0 to ${MAX_BUDGET_SUM}`);
   }
-  if (
-    input.wantedBy !== undefined &&
-    (!ISO_DATE.test(input.wantedBy) || Number.isNaN(Date.parse(`${input.wantedBy}T00:00:00Z`)))
-  ) {
+  if (input.wantedBy !== undefined && !isCalendarDate(input.wantedBy)) {
     bad("wantedBy", "date_invalid", "wantedBy must be a date like 2026-11-02");
+  }
+  const short = (path: string, value: unknown, max: number) => {
+    if (value !== undefined && (typeof value !== "string" || value.trim() === "" || value.length > max)) {
+      bad(path, "text_invalid", `${path} must be a text of 1 to ${max} characters`);
+    }
+  };
+  short("district", input.district, MAX_DISTRICT);
+  if (input.utm !== undefined) {
+    const entries = input.utm !== null && typeof input.utm === "object" ? Object.entries(input.utm) : null;
+    if (
+      entries === null ||
+      Array.isArray(input.utm) ||
+      entries.length > MAX_UTM_KEYS ||
+      entries.some(
+        ([k, v]) => k.length === 0 || k.length > MAX_UTM_KEY || typeof v !== "string" || v.length > MAX_UTM_VALUE,
+      )
+    ) {
+      bad(
+        "utm",
+        "utm_invalid",
+        `utm must be at most ${MAX_UTM_KEYS} texts with keys up to ${MAX_UTM_KEY} and values up to ${MAX_UTM_VALUE} characters`,
+      );
+    }
   }
   if (input.comment !== undefined && (typeof input.comment !== "string" || input.comment.length > 2000)) {
     bad("comment", "text_invalid", "comment must be a text of at most 2000 characters");
@@ -77,6 +102,14 @@ function validate(input: CreateLeadInput): ValidationIssue[] {
   }
   const c = input.customer;
   if (c !== undefined) {
+    short("customer.displayName", c.displayName, MAX_NAME);
+    short("customer.telegramUsername", c.telegramUsername, MAX_USERNAME);
+    short("customer.district", c.district, MAX_DISTRICT);
+    if (rt.role === "web" && c.telegramUserId !== undefined) {
+      // The site cannot tell whose Telegram id this is (only the bot and the verified initData can): taking it would
+      // attach the lead to a stranger's record or occupy the id of the real owner.
+      bad("customer.telegramUserId", "telegram_id_not_allowed", "the site does not take a Telegram id");
+    }
     if (c.phoneE164 !== undefined && !E164.test(c.phoneE164)) {
       bad("customer.phoneE164", "phone_invalid", "phone must be in the international form +998901234567");
     }
@@ -87,7 +120,11 @@ function validate(input: CreateLeadInput): ValidationIssue[] {
   return issues;
 }
 
-async function resolveCustomer(rt: Runtime, ex: Executor, input: CreateLeadInput): Promise<string> {
+/**
+ * The customer of the lead, or null when the site could not link one (see below). The site never learns which of the two
+ * happened: whether a phone is already a customer is personal data, and the answer is the same either way.
+ */
+async function resolveCustomer(rt: Runtime, ex: Executor, input: CreateLeadInput): Promise<string | null> {
   if (input.customerId !== undefined) {
     const id = assertUuid(input.customerId, "customerId");
     // Only the columns the site may read: a SELECT of the phone fails for that role.
@@ -112,45 +149,67 @@ async function resolveCustomer(rt: Runtime, ex: Executor, input: CreateLeadInput
     });
     if (found) return found.id;
   }
+  const row = {
+    displayName: c.displayName ?? null,
+    phoneE164: c.phoneE164 ?? null,
+    telegramUserId: c.telegramUserId ?? null,
+    telegramUsername: c.telegramUsername ?? null,
+    lang: input.lang ?? "uz",
+    district: c.district ?? input.district ?? null,
+    age18Confirmed: c.age18Confirmed ?? false,
+  } as const;
+  if (rt.role !== "web") return sales.createCustomer(ex, row);
   try {
-    return await sales.createCustomer(ex, {
-      displayName: c.displayName ?? null,
-      phoneE164: c.phoneE164 ?? null,
-      telegramUserId: c.telegramUserId ?? null,
-      telegramUsername: c.telegramUsername ?? null,
-      lang: input.lang ?? "uz",
-      district: c.district ?? input.district ?? null,
-      age18Confirmed: c.age18Confirmed ?? false,
-    });
+    // The site cannot read phones, so it cannot look for the customer first: the unique index answers instead. A failed
+    // INSERT aborts a transaction, so it runs in a savepoint and the lead of the site goes on without a customer.
+    return await ex.transaction((sp) => sales.createCustomer(sp, row));
   } catch (e) {
-    // The site cannot read phones, so it cannot look for the customer first: the unique index answers instead.
-    if (e instanceof DbRuleError && e.code === "unique_violation") {
-      throw ValidationError.of(
-        "customer",
-        "customer_exists",
-        "a customer with this phone or Telegram id already exists",
-      );
-    }
+    if (e instanceof DbRuleError && e.code === "unique_violation") return null;
     throw e;
   }
 }
 
-/** Opens a lead of a person who wrote on the site or in the bot. Returns the number the person is told. */
+/** The contact of a lead that the site could not link to a customer travels in the comment, for the owner to merge by hand. */
+function unlinkedComment(input: CreateLeadInput): string {
+  const c = input.customer;
+  const who = [c?.displayName, c?.phoneE164, c?.telegramUsername].filter((x) => x !== undefined).join(", ");
+  return `[contact, not linked to a customer: ${who}]${
+    input.comment
+      ? `
+${input.comment}`
+      : ""
+  }`;
+}
+
+/**
+ * Opens a lead of a person who wrote on the site or in the bot. Returns the number the person is told. The id of the
+ * customer is for the bot and the staff only: the site gets none, so that it cannot be used to find out who is a customer.
+ */
 export async function create(
   input: CreateLeadInput,
   rt?: Runtime,
-): Promise<{ leadId: string; number: string; customerId: string }> {
+): Promise<{ leadId: string; number: string; customerId?: string }> {
   const r = runtimeOf(rt);
-  const issues = validate(input);
+  const issues = validate(input, r);
   if (issues.length > 0) throw new ValidationError(issues);
   const now = r.now();
   return r.db.transaction(async (tx) => {
     const customerId = await resolveCustomer(r, tx, input);
+    let configurationId: string | null = null;
+    if (input.configurationId !== undefined) {
+      configurationId = assertUuid(input.configurationId, "configurationId");
+      const known = await tx.query.configurations.findFirst({
+        columns: { id: true },
+        where: (t, { eq }) => eq(t.id, configurationId as string),
+      });
+      if (!known) {
+        throw ValidationError.of("configurationId", "configuration_unknown", "the saved configuration does not exist");
+      }
+    }
     const budgetBand = budgetBandOf(input.budgetSum);
     const lead = await sales.createLead(tx, {
       customerId,
-      configurationId:
-        input.configurationId === undefined ? null : assertUuid(input.configurationId, "configurationId"),
+      configurationId,
       channel: input.channel,
       utm: input.utm ?? null,
       lang: input.lang ?? "uz",
@@ -158,7 +217,7 @@ export async function create(
       wantedBy: input.wantedBy ?? null,
       scope: input.scope,
       budgetBand,
-      comment: input.comment ?? null,
+      comment: customerId === null ? unlinkedComment(input) : (input.comment ?? null),
       now,
     });
     await ops.enqueueOutbox(tx, {
@@ -176,7 +235,11 @@ export async function create(
         },
       },
     });
-    return { leadId: lead.id, number: lead.number, customerId };
+    return {
+      leadId: lead.id,
+      number: lead.number,
+      ...(customerId === null || r.role === "web" ? {} : { customerId }),
+    };
   });
 }
 

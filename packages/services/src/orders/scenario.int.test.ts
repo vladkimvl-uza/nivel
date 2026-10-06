@@ -47,7 +47,7 @@ describe("the whole life of an order", () => {
     const order = await convert({ leadId: lead.leadId }, owner, w.admin);
     expect(order.number).toMatch(/^NV-2026-\d{4}$/);
     const orderId = order.orderId;
-    const customer = { kind: "customer" as const, id: lead.customerId };
+    const customer = { kind: "customer" as const, id: lead.customerId as string };
 
     const status = async () =>
       (await sql<{ status: string }>("select status from sales.orders where id = $1", [orderId]))[0]?.status;
@@ -108,19 +108,25 @@ describe("the whole life of an order", () => {
     const consents = [
       (
         await recordConsent(
-          { kind: "pd_processing", customerId: lead.customerId, granted: true, channel: "bot" },
+          { kind: "pd_processing", customerId: lead.customerId as string, granted: true, channel: "bot" },
           w.bot,
         )
       ).id,
       (
         await recordConsent(
-          { kind: "supplier_data_transfer", customerId: lead.customerId, orderId, granted: true, channel: "bot" },
+          {
+            kind: "supplier_data_transfer",
+            customerId: lead.customerId as string,
+            orderId,
+            granted: true,
+            channel: "bot",
+          },
           w.bot,
         )
       ).id,
       (
         await recordConsent(
-          { kind: "non_returnable", customerId: lead.customerId, orderId, granted: true, channel: "bot" },
+          { kind: "non_returnable", customerId: lead.customerId as string, orderId, granted: true, channel: "bot" },
           w.bot,
         )
       ).id,

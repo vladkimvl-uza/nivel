@@ -10,7 +10,7 @@ import { ValidationError } from "../orders/errors.ts";
 import { freeWindowAvailable } from "../orders/load.ts";
 import { can, type Runtime, runtimeOf } from "../orders/runtime.ts";
 import { loadFeeSettings } from "../orders/settings.ts";
-import { assertUuid } from "../orders/validate.ts";
+import { assertJsonObject, assertUuid } from "../orders/validate.ts";
 import { computeQuoteFor } from "../quotes/compute.ts";
 import { serializeTotals } from "../quotes/stored.ts";
 
@@ -18,6 +18,8 @@ export const ENGINE_VERSION = "domain-2026-10";
 const SOURCES = ["web", "tma", "bot", "ai", "admin", "idea"] as const;
 const KINDS = ["pc", "setup"] as const;
 const CODE_ATTEMPTS = 3;
+/** A saved configuration is never changed or deleted by the application, and the site writes it: the free JSON is small. */
+const FREE_JSON = { maxBytes: 16_384, maxDepth: 5 } as const;
 
 export interface SaveConfigInput {
   kind: (typeof KINDS)[number];
@@ -66,6 +68,8 @@ export async function save(input: SaveConfigInput, rt?: Runtime): Promise<SavedC
       `budgetSum must be a whole number of sums from 0 to ${MAX_BUDGET_SUM}`,
     );
   }
+  if (input.room !== undefined) assertJsonObject(input.room, "room", FREE_JSON);
+  if (input.prefs !== undefined) assertJsonObject(input.prefs, "prefs", FREE_JSON);
   const customerId = input.customerId === undefined ? undefined : assertUuid(input.customerId, "customerId");
   const parentId = input.parentId === undefined ? undefined : assertUuid(input.parentId, "parentId");
 

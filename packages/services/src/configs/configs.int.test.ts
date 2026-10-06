@@ -80,6 +80,36 @@ describe("configs.save", () => {
     });
   });
 
+  it("refuses lines that are not a list, or a line that is not an object, with a validation error, never a TypeError", async () => {
+    for (const lines of [undefined, null, "cpu", { length: 3 }, 7]) {
+      await expect(save({ kind: "pc", lines: lines as never, createdVia: "web" }, w.web)).rejects.toMatchObject({
+        name: "ValidationError",
+        issues: [{ path: "lines", code: "not_a_list" }],
+      });
+    }
+    await expect(save({ kind: "pc", lines: [null as never], createdVia: "web" }, w.web)).rejects.toMatchObject({
+      name: "ValidationError",
+    });
+  });
+
+  it("limits the free JSON of the room and the preferences, which are kept for good", async () => {
+    const big = { note: "x".repeat(20_000) };
+    await expect(save({ kind: "pc", lines: pcLines(w), createdVia: "web", room: big }, w.web)).rejects.toMatchObject({
+      issues: [{ path: "room", code: "json_too_large" }],
+    });
+    await expect(save({ kind: "pc", lines: pcLines(w), createdVia: "web", prefs: big }, w.web)).rejects.toMatchObject({
+      issues: [{ path: "prefs", code: "json_too_large" }],
+    });
+    let deep: Record<string, unknown> = { v: 1 };
+    for (let i = 0; i < 8; i++) deep = { n: deep };
+    await expect(save({ kind: "pc", lines: pcLines(w), createdVia: "web", room: deep }, w.web)).rejects.toMatchObject({
+      issues: [{ path: "room", code: "json_too_deep" }],
+    });
+    await expect(
+      save({ kind: "pc", lines: pcLines(w), createdVia: "web", prefs: [1] as never }, w.web),
+    ).rejects.toMatchObject({ issues: [{ path: "prefs", code: "json_invalid" }] });
+  });
+
   it("keeps the budget the client named within the limit of the money rules", async () => {
     const ok = await save({ kind: "pc", lines: pcLines(w), createdVia: "web", budgetSum: MAX_BUDGET_SUM }, w.web);
     expect((await row(ok.id)).prefs).toMatchObject({ budgetSum: MAX_BUDGET_SUM });

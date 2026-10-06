@@ -11,11 +11,12 @@ afterAll(async () => {
   await w.close();
 });
 
+let orderSeq = 0;
 async function newOrder(): Promise<{ orderId: string; customerId: string }> {
   const customerId = await newCustomer(w);
   const { rows } = await w.db.$client.query(
     "insert into sales.orders (number, customer_id, kind) values ($1, $2, 'pc') returning id",
-    [`NV-2998-${String(Math.floor(Math.random() * 9000) + 1000)}`, customerId],
+    [`NV-2998-${String(++orderSeq).padStart(4, "0")}`, customerId],
   );
   return { orderId: rows[0].id as string, customerId };
 }
@@ -28,6 +29,17 @@ describe("consentsRequiredForAccept", () => {
 });
 
 describe("consents.record", () => {
+  it("refuses a customer or an order that does not exist with a validation error, not with an error of the database", async () => {
+    const unknown = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+    await expect(
+      record({ kind: "pd_processing", customerId: unknown, granted: true, channel: "bot" }, w.bot),
+    ).rejects.toMatchObject({ name: "ValidationError", issues: [{ code: "reference_unknown" }] });
+    const { customerId } = await newOrder();
+    await expect(
+      record({ kind: "non_returnable", customerId, orderId: unknown, granted: true, channel: "bot" }, w.bot),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it("writes a consent of the customer for the order and returns its id", async () => {
     const { orderId, customerId } = await newOrder();
     const r = await record({ kind: "non_returnable", customerId, orderId, granted: true, channel: "bot" }, w.bot);

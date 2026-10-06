@@ -48,6 +48,19 @@ describe("acts.generate", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
+  it("refuses a kind that is a key of every object (constructor, toString) and lines that are not a list", async () => {
+    const o = await settledOrder(w);
+    for (const kind of ["constructor", "toString", "__proto__", "hasOwnProperty", "gift"]) {
+      await expect(generate({ orderId: o.orderId, kind: kind as never }, owner(), w.admin)).rejects.toMatchObject({
+        name: "ValidationError",
+        issues: [{ path: "kind", code: "kind_unknown" }],
+      });
+    }
+    await expect(
+      generate({ orderId: o.orderId, kind: "handover", lines: "x" as never }, owner(), w.admin),
+    ).rejects.toMatchObject({ name: "ValidationError", issues: [{ path: "lines", code: "not_a_list" }] });
+  });
+
   it("is drawn in the status the act belongs to", async () => {
     const o = await purchasingOrder(w);
     for (const kind of ["material_acceptance", "handover", "customer_parts"] as const) {

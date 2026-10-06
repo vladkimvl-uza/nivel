@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "./errors.ts";
-import { asDate, assertInstant, assertText, assertUuid, assertWholeSum, isUuid } from "./validate.ts";
+import { asDate, assertInstant, assertText, assertUuid, assertWholeSum, isCalendarDate, isUuid } from "./validate.ts";
 
 const uuid = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
 
@@ -30,6 +30,28 @@ describe("validate", () => {
     expect(assertText("  ok  ", "t", 10)).toBe("ok");
     for (const bad of ["", "   ", "x".repeat(11), 5, null])
       expect(() => assertText(bad, "t", 10)).toThrow(ValidationError);
+  });
+
+  it("knows a date of the calendar from a text that only looks like one", () => {
+    for (const ok of ["2026-02-28", "2028-02-29", "2026-12-31", "2026-04-30"]) expect(isCalendarDate(ok)).toBe(true);
+    for (const bad of [
+      "2026-02-31",
+      "2026-02-30",
+      "2026-04-31",
+      "2027-02-29",
+      "2026-13-01",
+      "2026-00-10",
+      "2026-01-00",
+      "2026-1-1",
+      "26-01-01",
+      "2026-01-01T00:00:00Z",
+      "",
+      20260101,
+      null,
+      undefined,
+    ]) {
+      expect(isCalendarDate(bad)).toBe(false);
+    }
   });
 
   it("checks an instant", () => {

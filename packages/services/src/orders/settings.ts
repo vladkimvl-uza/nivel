@@ -8,6 +8,7 @@ import { DEFAULT_FEE_SETTINGS, type FeeSettings, type FeeStage } from "@nivel/do
 import { type Bp, bp, type Sum, sum } from "@nivel/domain/money";
 import { DEFAULT_THRESHOLD_SETTINGS, type ThresholdSettings } from "@nivel/domain/threshold";
 import { ConfigError } from "./errors.ts";
+import { isCalendarDate } from "./validate.ts";
 
 type Raw = Record<string, unknown>;
 
@@ -40,10 +41,9 @@ function text(raw: Raw, key: string, path: string): string {
   return v;
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 function isoDate(raw: Raw, key: string, path: string): string {
   const v = text(raw, key, path);
-  if (!ISO_DATE.test(v) || Number.isNaN(Date.parse(`${v}T00:00:00Z`))) {
+  if (!isCalendarDate(v)) {
     throw new ConfigError(`setting ${path}.${key} must be a date like 2026-10-05`);
   }
   return v;
@@ -108,7 +108,7 @@ export function parseCalendarSettings(value: unknown): WorkCalendar {
   const path = CALENDAR_SETTINGS_KEY;
   const raw = record(value, path);
   const holidays = raw.holidays;
-  if (!Array.isArray(holidays) || holidays.some((h) => typeof h !== "string" || !ISO_DATE.test(h))) {
+  if (!Array.isArray(holidays) || holidays.some((h) => typeof h !== "string" || !isCalendarDate(h))) {
     throw new ConfigError(`setting ${path}.holidays must be a list of dates like 2026-10-13`);
   }
   try {
