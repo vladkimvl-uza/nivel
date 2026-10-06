@@ -25,6 +25,7 @@ export interface LoginState {
 
 const MESSAGES = {
   invalid: "Неверный e-mail, пароль или код.",
+  locked: `Слишком много неудачных попыток. Повторите через ${AUTH_POLICY.lockMinutes} минут.`,
 } as const;
 
 const TASHKENT_TIME = new Intl.DateTimeFormat("ru-RU", {
@@ -86,10 +87,12 @@ export async function changePasswordAction(_previous: AccountState, data: FormDa
     const result = await getRuntime().auth.changePassword(user.id, {
       current: text(data, "current"),
       next,
+      ipHash: (await requestInfo()).ipHash,
       ...(token ? { keepToken: token } : {}),
     });
     if (result.ok) return { ok: true, message: "Пароль изменён. Остальные сеансы завершены." };
     if (result.reason === "policy") return { ok: false, message: result.problems.join(" ") };
+    if (result.reason === "locked") return { ok: false, message: MESSAGES.locked };
     return { ok: false, message: "Текущий пароль неверный." };
   } catch (error) {
     const denied = forbiddenMessage(error);
@@ -105,6 +108,7 @@ export async function bindTelegramAction(_previous: AccountState, data: FormData
       telegram: text(data, "telegram"),
       password: text(data, "password"),
       code: text(data, "code"),
+      ipHash: (await requestInfo()).ipHash,
     });
     revalidatePath("/account");
     if (result.ok) {
@@ -119,6 +123,7 @@ export async function bindTelegramAction(_previous: AccountState, data: FormData
     const messages = {
       taken: "Этот Telegram-номер уже привязан к другой учётной записи.",
       invalid: "Пароль или код неверные. Код нужен новый: дождитесь, пока в приложении сменятся цифры.",
+      locked: MESSAGES.locked,
       format:
         "Нужен числовой Telegram id (только цифры). Его показывает бот @userinfobot или команда /id в нашем боте.",
     } as const;
@@ -136,8 +141,11 @@ export async function regenerateCodesAction(_previous: AccountState, data: FormD
     const result = await getRuntime().auth.regenerateRecoveryCodes(user.id, {
       password: text(data, "password"),
       code: text(data, "code"),
+      ipHash: (await requestInfo()).ipHash,
     });
-    if (!result.ok) return { ok: false, message: "Пароль или код неверные." };
+    if (!result.ok) {
+      return { ok: false, message: result.reason === "locked" ? MESSAGES.locked : "Пароль или код неверные." };
+    }
     return {
       ok: true,
       message: `Новые коды восстановления (${AUTH_POLICY.recoveryCodeCount}). Старые больше не действуют. Сохраните эти коды: больше они не покажутся.`,

@@ -16,6 +16,8 @@ interface Harness {
   clock: { now: Date; advance(ms: number): void };
   user: { id: string; secret: Uint8Array; recoveryCodes: string[] };
   codeNow(): string;
+  /** How many passwords the hasher was asked to check. */
+  verifyCount(): number;
 }
 
 async function setup(role: "owner" | "assistant" = "owner"): Promise<Harness> {
@@ -27,9 +29,17 @@ async function setup(role: "owner" | "assistant" = "owner"): Promise<Harness> {
     },
   };
   store.now = () => clock.now;
+  const base = createNodeArgon2Hasher({ memoryKiB: 64, passes: 1 });
+  let verifies = 0;
   const service = createAuthService({
     store,
-    hasher: createNodeArgon2Hasher({ memoryKiB: 64, passes: 1 }),
+    hasher: {
+      hash: (password) => base.hash(password),
+      verify: (hash, password) => {
+        verifies += 1;
+        return base.verify(hash, password);
+      },
+    },
     dataKey: randomBytes(32),
     now: () => clock.now,
     issuer: "Nivel admin",
@@ -48,6 +58,7 @@ async function setup(role: "owner" | "assistant" = "owner"): Promise<Harness> {
     clock,
     user: { id: created.id, secret, recoveryCodes: created.recoveryCodes },
     codeNow: () => generateTotp(secret, clock.now),
+    verifyCount: () => verifies,
   };
 }
 
@@ -511,5 +522,114 @@ describe("people (owner)", () => {
       reason: "last_owner",
     });
     expect(await h.service.setActive("no-such-id", false, ownerUser)).toEqual({ ok: false, reason: "not_found" });
+  });
+});
+
+describe("the lock covers the checks inside a live session (bind Telegram, recovery codes, password)", () => {
+  const bindWith = (h: Harness, over: Partial<{ password: string; code: string }> = {}) =>
+    h.service.bindTelegram(h.user.id, {
+      telegram: "123456789",
+      password: over.password ?? PASSWORD,
+      code: over.code ?? h.codeNow(),
+      ipHash: "iphash",
+    });
+
+  async function lockedByBinding(h: Harness) {
+    for (let i = 0; i < AUTH_POLICY.lockAfterFailures; i += 1) {
+      expect(await bindWith(h, { code: "000000" })).toEqual({
+        ok: false,
+        reason: expect.stringMatching(/invalid|locked/),
+      });
+    }
+  }
+
+  it("refuses the sixth try without checking anything, even with the right password and code", async () => {
+    const h = await setup();
+    await lockedByBinding(h);
+    expect(h.store.accounts.get(h.user.id)?.lockedUntil).not.toBeNull();
+    const before = h.verifyCount();
+    h.clock.advance(31_000);
+    expect(await bindWith(h)).toEqual({ ok: false, reason: "locked" });
+    expect(await h.service.regenerateRecoveryCodes(h.user.id, { password: PASSWORD, code: h.codeNow() })).toEqual({
+      ok: false,
+      reason: "locked",
+    });
+    expect(h.verifyCount()).toBe(before);
+    expect(h.store.accounts.get(h.user.id)?.telegramUserId).toBeNull();
+  });
+
+  it("lets 20 simultaneous tries check no more than five passwords", async () => {
+    const h = await setup();
+    const results = await Promise.all(Array.from({ length: 20 }, () => bindWith(h, { code: "000000" })));
+    expect(results.every((r) => !r.ok)).toBe(true);
+    expect(h.verifyCount()).toBeLessThanOrEqual(AUTH_POLICY.lockAfterFailures);
+  });
+
+  it("ends the sessions of the account when the lock falls, so that a stolen one does not outlive it", async () => {
+    const h = await setup();
+    const session = await attempt(h);
+    if (!session.ok) throw new Error("expected success");
+    await lockedByBinding(h);
+    expect(await h.service.authenticate(session.token)).toBeNull();
+  });
+
+  it("journals every failure and the lock, with the address hash and without secrets", async () => {
+    const h = await setup();
+    await lockedByBinding(h);
+    const failed = h.store.audit.filter((a) => a.action === "auth.reverify_failed");
+    expect(failed).toHaveLength(AUTH_POLICY.lockAfterFailures);
+    expect(failed[0]).toMatchObject({ actor: `admin:${h.user.id}`, ipHash: "iphash", after: { reason: "wrong_code" } });
+    expect(h.store.audit.map((a) => a.action)).toContain("auth.locked");
+    expect(JSON.stringify(h.store.audit)).not.toContain(PASSWORD);
+  });
+
+  it("starts the series again from one after the lock has run out", async () => {
+    const h = await setup();
+    await lockedByBinding(h);
+    h.clock.advance(AUTH_POLICY.lockMinutes * MS_PER_MINUTE + 1000);
+    expect(await bindWith(h, { code: "000000" })).toEqual({ ok: false, reason: "invalid" });
+    const account = h.store.accounts.get(h.user.id);
+    expect(account?.failedLogins).toBe(1);
+    expect(account?.lockedUntil).toBeNull();
+  });
+
+  it("clears the count after a right answer, and records the address in the journal of the change", async () => {
+    const h = await setup();
+    await bindWith(h, { code: "000000" });
+    await bindWith(h, { password: WRONG });
+    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(2);
+    h.clock.advance(31_000);
+    expect(await bindWith(h)).toEqual({ ok: true, telegramUserId: 123456789 });
+    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(0);
+    expect(h.store.audit.find((a) => a.action === "auth.telegram_bound")?.ipHash).toBe("iphash");
+  });
+
+  it("locks the change of the password too: no unlimited guessing of the current one", async () => {
+    const h = await setup();
+    const change = (current: string, ipHash = "iphash") =>
+      h.service.changePassword(h.user.id, { current, next: "a-brand-new-long-password", ipHash });
+    for (let i = 0; i < AUTH_POLICY.lockAfterFailures; i += 1) await change(WRONG);
+    const before = h.verifyCount();
+    expect(await change(PASSWORD)).toEqual({ ok: false, reason: "locked" });
+    expect(h.verifyCount()).toBe(before);
+    expect(h.store.audit.filter((a) => a.action === "auth.reverify_failed")).toHaveLength(
+      AUTH_POLICY.lockAfterFailures,
+    );
+  });
+
+  it("lets 20 simultaneous password changes check no more than five current passwords", async () => {
+    const h = await setup();
+    await Promise.all(
+      Array.from({ length: 20 }, () =>
+        h.service.changePassword(h.user.id, { current: WRONG, next: "a-brand-new-long-password" }),
+      ),
+    );
+    expect(h.verifyCount()).toBeLessThanOrEqual(AUTH_POLICY.lockAfterFailures);
+  });
+
+  it("does not count a refused new password as a failure of the current one", async () => {
+    const h = await setup();
+    await h.service.changePassword(h.user.id, { current: PASSWORD, next: "short" });
+    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(0);
   });
 });

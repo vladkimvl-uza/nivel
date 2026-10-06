@@ -56,14 +56,8 @@ export interface AuthStore {
   findByEmail(email: string): Promise<AdminAccount | null>;
   findById(id: string): Promise<AdminAccount | null>;
   createAccount(a: NewAccount): Promise<void>;
-  /** Counts a failure; locks the account for `lockMinutes` once `lockAfter` failures are reached. */
-  recordFailure(
-    id: string,
-    rule: { lockAfter: number; lockMinutes: number },
-    now: Date,
-  ): Promise<{ failedLogins: number; lockedUntil: Date | null }>;
   /**
-   * Takes one sign-in attempt before the password is checked, in one statement: an account that is locked (the lock has
+   * Takes one attempt (a sign-in, or a sensitive change inside a session) before the password is checked, in one statement: an account that is locked (the lock has
    * not run out) gives nothing; otherwise the count goes up by one (from zero after a lock that has run out) and the
    * account is locked when the count reaches `lockAfter`. Concurrent requests therefore cannot check more passwords
    * than the rule allows. A right sign-in then clears the claim with `resetFailures`.

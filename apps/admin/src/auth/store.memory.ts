@@ -41,13 +41,6 @@ export class MemoryAuthStore implements AuthStore {
     });
   }
 
-  async recordFailure(id: string, rule: { lockAfter: number; lockMinutes: number }, now: Date) {
-    const a = this.mustGet(id);
-    a.failedLogins += 1;
-    if (a.failedLogins >= rule.lockAfter) a.lockedUntil = new Date(now.getTime() + rule.lockMinutes * 60_000);
-    return { failedLogins: a.failedLogins, lockedUntil: a.lockedUntil };
-  }
-
   async claimAttempt(id: string, rule: { lockAfter: number; lockMinutes: number }, now: Date) {
     const a = this.mustGet(id);
     if (a.lockedUntil && a.lockedUntil > now) return { claimed: false as const, lockedUntil: a.lockedUntil };

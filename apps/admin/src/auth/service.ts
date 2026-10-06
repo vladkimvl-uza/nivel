@@ -77,20 +77,24 @@ export interface AuthService {
   provisionUser(input: ProvisionInput): Promise<ProvisionResult>;
   changePassword(
     userId: string,
-    input: { current: string; next: string; keepToken?: string },
-  ): Promise<{ ok: true } | { ok: false; reason: "invalid" } | { ok: false; reason: "policy"; problems: string[] }>;
+    input: { current: string; next: string; keepToken?: string; ipHash?: string | null },
+  ): Promise<
+    { ok: true } | { ok: false; reason: "invalid" | "locked" } | { ok: false; reason: "policy"; problems: string[] }
+  >;
   /**
    * The Telegram id is what the bot trusts to say "this is the owner": changing it asks for the password and a code of
    * the app, as issuing recovery codes does. An empty `telegram` unbinds.
    */
   bindTelegram(
     userId: string,
-    input: { telegram: string; password: string; code: string },
-  ): Promise<{ ok: true; telegramUserId: number | null } | { ok: false; reason: "format" | "taken" | "invalid" }>;
+    input: { telegram: string; password: string; code: string; ipHash?: string | null },
+  ): Promise<
+    { ok: true; telegramUserId: number | null } | { ok: false; reason: "format" | "taken" | "invalid" | "locked" }
+  >;
   regenerateRecoveryCodes(
     userId: string,
-    input: { password: string; code: string },
-  ): Promise<{ ok: true; recoveryCodes: string[] } | { ok: false; reason: "invalid" }>;
+    input: { password: string; code: string; ipHash?: string | null },
+  ): Promise<{ ok: true; recoveryCodes: string[] } | { ok: false; reason: "invalid" | "locked" }>;
   setActive(
     id: string,
     active: boolean,
@@ -134,36 +138,45 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   });
 
   /**
-   * Journals the failure of an attempt that was claimed before it was checked (`claimAttempt`), and answers with the
-   * lock when this attempt was the last allowed one.
+   * Journals the failure of an attempt that was claimed before it was checked (`claimAttempt`). The date until which the
+   * account is locked when this attempt was the last allowed one, otherwise null.
    */
+  async function journalFailure(
+    account: AdminAccount,
+    action: "auth.login_failed" | "auth.reverify_failed",
+    reason: string,
+    ipHash: string | null,
+    state: { failedLogins: number; lockedUntil: Date | null },
+  ): Promise<Date | null> {
+    const at = now();
+    await audit({
+      actor: actorOf(account),
+      action,
+      entity: "ops.admin_users",
+      entityId: account.id,
+      after: { reason, failedLogins: state.failedLogins },
+      ipHash,
+    });
+    if (!state.lockedUntil || state.lockedUntil <= at) return null;
+    await audit({
+      actor: actorOf(account),
+      action: "auth.locked",
+      entity: "ops.admin_users",
+      entityId: account.id,
+      after: { until: state.lockedUntil.toISOString() },
+      ipHash,
+    });
+    return state.lockedUntil;
+  }
+
   async function fail(
     account: AdminAccount,
     reason: string,
     ipHash: string | null,
     state: { failedLogins: number; lockedUntil: Date | null },
   ): Promise<LoginResult> {
-    const at = now();
-    await audit({
-      actor: actorOf(account),
-      action: "auth.login_failed",
-      entity: "ops.admin_users",
-      entityId: account.id,
-      after: { reason, failedLogins: state.failedLogins },
-      ipHash,
-    });
-    if (state.lockedUntil && state.lockedUntil > at) {
-      await audit({
-        actor: actorOf(account),
-        action: "auth.locked",
-        entity: "ops.admin_users",
-        entityId: account.id,
-        after: { until: state.lockedUntil.toISOString() },
-        ipHash,
-      });
-      return { ok: false, reason: "locked", lockedUntil: state.lockedUntil };
-    }
-    return INVALID;
+    const lockedUntil = await journalFailure(account, "auth.login_failed", reason, ipHash, state);
+    return lockedUntil ? { ok: false, reason: "locked", lockedUntil } : INVALID;
   }
 
   /**
@@ -205,22 +218,60 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   }
 
   /**
-   * A sensitive change inside a live session asks again for the password and a code of a new period of the app (not a
-   * recovery code). A wrong answer counts toward the lock like a wrong sign-in does. The account when both are right.
+   * The attempt of a sensitive change inside a live session, taken the way a sign-in takes it: before anything is
+   * checked, in one statement of the database. A stolen session then cannot guess the password or the code without
+   * limit, and requests that arrive together cannot check more than the rule allows. A locked account gives nothing.
+   * When the lock falls, the sessions of the account end (a stolen one does not outlive it).
    */
-  async function reverify(userId: string, input: { password: string; code: string }): Promise<AdminAccount | null> {
+  async function takeAttempt(
+    userId: string,
+    ipHash: string | null,
+  ): Promise<
+    | {
+        ok: true;
+        account: AdminAccount;
+        failed(reason: string): Promise<"invalid" | "locked">;
+        passed(): Promise<void>;
+      }
+    | { ok: false; reason: "invalid" | "locked" }
+  > {
     const account = await store.findById(userId);
-    if (!account?.active) return null;
-    if (!(await hasher.verify(account.passwordHash, input.password))) {
-      await store.recordFailure(account.id, lockRule, now());
-      return null;
+    if (!account?.active) return { ok: false, reason: "invalid" };
+    const at = now();
+    const claim = await store.claimAttempt(account.id, lockRule, at);
+    if (!claim.claimed) {
+      return { ok: false, reason: claim.lockedUntil && claim.lockedUntil > at ? "locked" : "invalid" };
     }
-    const factor = await checkSecondFactor(account, input.code, false);
-    if (!factor.ok) {
-      await store.recordFailure(account.id, lockRule, now());
-      return null;
+    return {
+      ok: true,
+      account,
+      async failed(reason) {
+        const lockedUntil = await journalFailure(account, "auth.reverify_failed", reason, ipHash, claim);
+        if (!lockedUntil) return "invalid";
+        await store.deleteSessionsOf(account.id);
+        return "locked";
+      },
+      passed: () => store.resetFailures(account.id),
+    };
+  }
+
+  /**
+   * A sensitive change inside a live session asks again for the password and a code of a new period of the app (not a
+   * recovery code). The account when both are right.
+   */
+  async function reverify(
+    userId: string,
+    input: { password: string; code: string; ipHash?: string | null },
+  ): Promise<{ ok: true; account: AdminAccount } | { ok: false; reason: "invalid" | "locked" }> {
+    const taken = await takeAttempt(userId, input.ipHash ?? null);
+    if (!taken.ok) return taken;
+    if (!(await hasher.verify(taken.account.passwordHash, input.password))) {
+      return { ok: false, reason: await taken.failed("wrong_password") };
     }
-    return account;
+    const factor = await checkSecondFactor(taken.account, input.code, false);
+    if (!factor.ok) return { ok: false, reason: await taken.failed(factor.reason) };
+    await taken.passed();
+    return { ok: true, account: taken.account };
   }
 
   return {
@@ -371,8 +422,14 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     },
 
     async changePassword(userId, input) {
-      const account = await store.findById(userId);
-      if (!account || !(await hasher.verify(account.passwordHash, input.current))) return INVALID;
+      const taken = await takeAttempt(userId, input.ipHash ?? null);
+      if (!taken.ok) return taken;
+      const { account } = taken;
+      if (!(await hasher.verify(account.passwordHash, input.current))) {
+        return { ok: false, reason: await taken.failed("wrong_password") };
+      }
+      // The current password is right: this series ends, whatever the answer about the new one is.
+      await taken.passed();
       const problems = checkPasswordPolicy(input.next, { email: account.email });
       if (input.next === input.current) problems.push("Новый пароль совпадает со старым.");
       if (problems.length > 0) return { ok: false, reason: "policy", problems };
@@ -383,6 +440,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         action: "auth.password_changed",
         entity: "ops.admin_users",
         entityId: userId,
+        ipHash: input.ipHash ?? null,
       });
       return { ok: true };
     },
@@ -395,8 +453,9 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         value = Number(raw);
         if (!Number.isSafeInteger(value)) return { ok: false, reason: "format" };
       }
-      const account = await reverify(userId, input);
-      if (!account) return INVALID;
+      const checked = await reverify(userId, input);
+      if (!checked.ok) return checked;
+      const { account } = checked;
       const before = account.telegramUserId;
       const result = await store.setTelegramUserId(userId, value);
       if (result === "taken") return { ok: false, reason: "taken" };
@@ -407,13 +466,15 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         entityId: userId,
         before: { telegramUserId: before },
         after: { telegramUserId: value },
+        ipHash: input.ipHash ?? null,
       });
       return { ok: true, telegramUserId: value };
     },
 
     async regenerateRecoveryCodes(userId, input) {
-      const account = await reverify(userId, input);
-      if (!account) return INVALID;
+      const checked = await reverify(userId, input);
+      if (!checked.ok) return checked;
+      const { account } = checked;
       const fresh = await store.findById(userId);
       const bundle = fresh?.totpSecretEnc ? openSecret(fresh.totpSecretEnc, dataKey, userId) : null;
       if (!fresh?.totpSecretEnc || !bundle) return INVALID;
@@ -426,6 +487,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         action: "auth.recovery_regenerated",
         entity: "ops.admin_users",
         entityId: userId,
+        ipHash: input.ipHash ?? null,
       });
       return { ok: true, recoveryCodes: codes };
     },
