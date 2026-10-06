@@ -124,6 +124,35 @@ describe("PSU_WATTAGE boundaries (block 28, 3.4)", () => {
     const r = run(pcBuild({ drop: ["cpu", "gpu"] }));
     expect(r.checkedRules).not.toContain("PSU_WATTAGE");
   });
+  it("without a PSU yet the unknown inputs of the estimate still make the build incomplete", () => {
+    const r = run(
+      pcBuild({ drop: ["psu", "cooler"], cpu: { maxPowerW: null }, gpu: { tgpW: null, vendorRecommendedPsuW: null } }),
+    );
+    expect(r.checkedRules).toContain("PSU_WATTAGE");
+    expect(r.verdict).toBe("incomplete");
+    expect(r.missingData).toEqual(
+      expect.arrayContaining([
+        { productId: "cpu", field: "maxPowerW" },
+        { productId: "gpu", field: "tgpW" },
+        { productId: "gpu", field: "vendorRecommendedPsuW" },
+      ]),
+    );
+    expect(
+      r.issues.filter((i) => i.ruleId === "PSU_WATTAGE").every((i) => i.messageKey === "compat.missing_data"),
+    ).toBe(true);
+  });
+  it("without a PSU and with known inputs the rule finds nothing", () => {
+    const r = run(pcBuild({ drop: ["psu"] }));
+    expect(r.checkedRules).toContain("PSU_WATTAGE");
+    expect(r.issues.filter((i) => i.ruleId === "PSU_WATTAGE")).toEqual([]);
+    expect(r.verdict).toBe("ok");
+  });
+  it("a PSU of exactly the recommended wattage can still warn about headroom (contract quirk, pinned)", () => {
+    const gpu = { tgpW: 200, vendorRecommendedPsuW: 0 };
+    const r = run(withPsu(550, gpu, { maxPowerW: 150 }));
+    expect(r.power).toMatchObject({ peakW: 410, recommendedPsuW: 550 });
+    expect(psu(withPsu(550, gpu, { maxPowerW: 150 }))).toEqual(["compat.psu_low_headroom"]);
+  });
   it("still blocks on a lower bound when some inputs are unknown, and lists the unknowns", () => {
     const r = run(pcBuild({ psu: { watts: 100 }, gpu: { tgpW: null } }));
     const found = r.issues.filter((i) => i.ruleId === "PSU_WATTAGE");

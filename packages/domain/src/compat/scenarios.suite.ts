@@ -552,8 +552,27 @@ export const PC_SCENARIOS: Record<
         field: "vendorRecommendedPsuW",
       },
       { name: "case fans", parts: pcBuild({ case: { fansIncluded: null } }), product: "case", field: "fansIncluded" },
+      // the PSU is usually chosen last: the unknown inputs of the estimate are reported before it is in the build
+      {
+        name: "card TGP, no PSU yet",
+        parts: pcBuild({ drop: ["psu", "cooler"], gpu: { tgpW: null } }),
+        product: "gpu",
+        field: "tgpW",
+      },
+      {
+        name: "card vendor recommendation, no PSU yet",
+        parts: pcBuild({ drop: ["psu", "cooler"], gpu: { vendorRecommendedPsuW: null } }),
+        product: "gpu",
+        field: "vendorRecommendedPsuW",
+      },
+      {
+        name: "processor power, no PSU yet",
+        parts: pcBuild({ drop: ["psu", "cooler"], cpu: { maxPowerW: null } }),
+        product: "cpu",
+        field: "maxPowerW",
+      },
     ],
-    notApplicable: { parts: pcBuild({ drop: ["psu"] }) },
+    notApplicable: { parts: pcBuild({ drop: ["cpu", "gpu"] }) },
   },
   PSU_GPU_CONNECTORS: {
     ok: { parts: pcBuild() },

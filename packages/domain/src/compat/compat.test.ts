@@ -60,9 +60,15 @@ describe("checkCompatibility: result shape", () => {
   it("a partial build checks only the rules that have both parts (a configurator step by step)", () => {
     const r = run([makeProduct("cpu", "cpu"), makeProduct("mb", "mb")]);
     expect(r.checkedRules).toEqual(
-      ["CPU_MB_SOCKET", "CPU_MB_CHIPSET", "CPU_MB_BIOS", "CPU_NO_VIDEO", "FAN_HEADERS", "ARGB_HEADERS"].sort(
-        (a, b) => contractOrder.indexOf(a as RuleId) - contractOrder.indexOf(b as RuleId),
-      ),
+      [
+        "CPU_MB_SOCKET",
+        "CPU_MB_CHIPSET",
+        "CPU_MB_BIOS",
+        "CPU_NO_VIDEO",
+        "PSU_WATTAGE", // no PSU yet: only the unknown inputs of the estimate are reported
+        "FAN_HEADERS",
+        "ARGB_HEADERS",
+      ].sort((a, b) => contractOrder.indexOf(a as RuleId) - contractOrder.indexOf(b as RuleId)),
     );
     expect(r.verdict).toBe("block"); // no integrated graphics and no video card yet
   });

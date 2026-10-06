@@ -66,7 +66,10 @@ export function checkSetup(plan: SetupPlan, catalog: CatalogLookup, s: CompatSet
   };
 }
 
-/** Peak power and recommended PSU (block 28, 3.4); with a PSU in the build also its rating and headroom. */
+/**
+ * Peak power and recommended PSU (block 28, 3.4); with a PSU in the build also its rating and headroom. Unknown (null)
+ * spec values count as 0: the result is then a lower bound; `checkCompatibility` reports the gaps (`missingData`).
+ */
 export function estimatePower(lines: BuildLine[], catalog: CatalogLookup, s: CompatSettings): PowerEstimate {
   const { build } = resolveBuild(lines, catalog);
   return computePower(build, s).estimate;
