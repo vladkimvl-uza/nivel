@@ -18,25 +18,6 @@ export interface FilterDef {
   options?: { value: string; label: string }[];
 }
 
-export interface FieldGroup {
-  title: string;
-  /** Field keys (top level or the first segment of a path) shown in the group. */
-  fields: string[];
-}
-
-export interface FileFieldDef {
-  field: string;
-  accept: string;
-  /** `environment`: the rear camera of a phone, for photos of receipts and parts. */
-  capture?: "environment" | "user";
-}
-
-export interface ReferenceDef {
-  field: string;
-  resource: string;
-  labelField: string;
-}
-
 export interface ListDef<V> {
   columns: (keyof V & string)[];
   filters?: FilterDef[];
@@ -44,7 +25,6 @@ export interface ListDef<V> {
 }
 
 export interface FormDef<V> {
-  groups?: FieldGroup[];
   /** Never shown and never taken from a submitted form (they change by their own acts: status, owner of a record). */
   hidden?: string[];
   /** Values of hidden fields for a new record. */
@@ -65,6 +45,9 @@ export interface CsvDef<V> {
   key?: (value: V) => string;
 }
 
+// Not in R0, so not in the types either (a definition that names them must fail to compile, not be ignored): groups of
+// fields, file fields and references with search. The first package that needs one adds it together with its screen;
+// the phone upload of files is `kit/upload` and does not go through a resource.
 export interface ResourceDef<T extends z.ZodType> {
   name: string;
   title: string;
@@ -74,10 +57,8 @@ export interface ResourceDef<T extends z.ZodType> {
   store: ResourceStore<z.infer<T>>;
   list: ListDef<z.infer<T>>;
   form?: FormDef<z.infer<T>>;
-  /** Rendered as uz / ru tabs; uz is required to publish. */
+  /** Rendered as two blocks, uz and ru, side by side; uz is required to publish. */
   localized?: (keyof z.infer<T> & string)[];
-  files?: FileFieldDef[];
-  references?: ReferenceDef[];
   status?: StatusDef<z.infer<T>>;
   csv?: CsvDef<z.infer<T>>;
   /** Russian captions by key or dotted path. */
@@ -335,7 +316,7 @@ export function defineResource<T extends z.ZodType>(def: ResourceDef<T>): Resour
       else value[key] = stored[key];
     }
     const parsed = def.schema.safeParse(value);
-    const errors = parsed.success ? {} : formatIssues(parsed.error.issues as never);
+    const errors = parsed.success ? {} : formatIssues(parsed.error.issues);
     return { value, errors: { ...errors, ...read.problems }, ...(parsed.success ? { data: parsed.data as V } : {}) };
   }
 
@@ -453,7 +434,7 @@ export function defineResource<T extends z.ZodType>(def: ResourceDef<T>): Resour
       const sortRaw = query.sort ?? "";
       const sortField = sortRaw.replace(/^-/, "");
       const fallbackSort = def.list.defaultSort ?? def.list.columns[0] ?? "";
-      const sort = def.list.columns.includes(sortField as never)
+      const sort = (def.list.columns as readonly string[]).includes(sortField)
         ? { field: sortField, dir: sortRaw.startsWith("-") ? ("desc" as const) : ("asc" as const) }
         : {
             field: fallbackSort.replace(/^-/, ""),
@@ -528,7 +509,7 @@ export function defineResource<T extends z.ZodType>(def: ResourceDef<T>): Resour
       const candidate = { ...(stored.value as Record<string, unknown>), [statusField]: status };
       const parsed = def.schema.safeParse(candidate);
       if (!parsed.success) {
-        const all = formatIssues(parsed.error.issues as never);
+        const all = formatIssues(parsed.error.issues);
         return { ok: false, errors: statusField in all ? { [statusField]: all[statusField] as string } : all };
       }
       const blocked = publishErrors(parsed.data as V, status);

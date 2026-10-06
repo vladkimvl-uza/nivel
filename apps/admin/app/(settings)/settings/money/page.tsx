@@ -21,11 +21,11 @@ const ruDate = (iso: string) => iso.split("-").reverse().join(".");
 export default async function MoneySettingsPage() {
   const user = await requireUser(["settings.money.read"]);
   const { settings } = getRuntime();
-  // A scale whose day has come is put into force before it is shown.
-  await settings.promoteDue();
-  const fee = await settings.loadFee(user);
-  const threshold = await settings.loadThreshold(user);
   const writable = can(user.role, "settings.money.write");
+  // A scale whose day has come is put into force before it is shown, when the person may change money settings: a
+  // screen opened for reading changes nothing. (A daily job of the worker should do this; see the branch description.)
+  if (writable) await settings.promoteDue();
+  const [fee, threshold] = await Promise.all([settings.loadFee(user), settings.loadThreshold(user)]);
   const live = FeeSettingsSchema.safeParse(fee.value);
   const next = fee.next ? FeeSettingsSchema.safeParse(fee.next.value) : null;
   const { version: _version, ...feeValues } = live.success ? live.data : ({} as Record<string, unknown>);

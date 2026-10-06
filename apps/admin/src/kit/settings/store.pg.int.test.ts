@@ -147,6 +147,18 @@ describe("settings on PostgreSQL", () => {
     expect((await s.loadFlags(owner))["feature.ai"]).toEqual({ value: false, version: 2 });
   });
 
+  it("saving the calendar again as it is reads as no change, although jsonb stores the keys in its own order", async () => {
+    const same = { tz: "Asia/Tashkent", workdays: [1, 2, 3, 4, 5, 6], from: "10:00", to: "19:00", holidays: [] };
+    expect(await service().saveCalendar(owner, same, { expectedVersion: 1 })).toEqual({
+      ok: false,
+      errors: { "": "Ничего не изменилось." },
+    });
+    const { rows } = await db.$client.query<{ n: string }>(
+      "select count(*)::text as n from ops.audit_log where action = 'setting.set' and entity_id = 'calendar.work'",
+    );
+    expect(rows[0]?.n).toBe("0");
+  });
+
   it("when the site is down the calendar is saved and one retry job is left in the outbox", async () => {
     webUp = false;
     const calendar = {

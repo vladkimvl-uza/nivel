@@ -196,6 +196,36 @@ describe("fee settings with a version and an effective date", () => {
     expect(store.data.get("money.fee_settings")?.version).toBe(1);
   });
 
+  it("a calendar saved again unchanged is not a change, whatever order the database returns its keys in", async () => {
+    const { service, store, calls } = setup();
+    // PostgreSQL jsonb keeps keys sorted by length and bytes, not in the order the schema lists them.
+    store.data.set("calendar.work", {
+      value: { to: "19:00", tz: "Asia/Tashkent", from: "10:00", holidays: [], workdays: [1, 2, 3, 4, 5, 6] },
+      version: 1,
+    });
+    const same = { tz: "Asia/Tashkent", workdays: [1, 2, 3, 4, 5, 6], from: "10:00", to: "19:00", holidays: [] };
+    expect(await service.saveCalendar(user("owner"), same, { expectedVersion: 1 })).toEqual({
+      ok: false,
+      errors: { "": "Ничего не изменилось." },
+    });
+    expect(store.data.get("calendar.work")?.version).toBe(1);
+    expect(calls).toEqual([]);
+    // The order of a list is a change: the days are a set, the holidays are as the owner wrote them.
+    expect(await service.saveCalendar(user("owner"), { ...same, to: "18:00" }, { expectedVersion: 1 })).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it("reads the four flags together", async () => {
+    const { service } = setup();
+    expect(Object.keys(await service.loadFlags(user("owner"))).sort()).toEqual([
+      "feature.ai",
+      "feature.miniApp",
+      "feature.scene",
+      "feature.setupConfigurator",
+    ]);
+  });
+
   it("returns the errors of invalid input by field, in Russian, and writes nothing", async () => {
     const { service, store } = setup();
     const r = await service.saveFee(

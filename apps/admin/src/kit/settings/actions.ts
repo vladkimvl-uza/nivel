@@ -21,7 +21,7 @@ const ruDate = (iso: string) => iso.split("-").reverse().join(".");
 function afterSave(revalidated: boolean): string {
   return revalidated
     ? ""
-    : " Сайт сейчас не ответил: обновление отправлено в очередь и дойдёт в течение нескольких минут.";
+    : " Сайт сейчас не ответил: запрос на обновление поставлен в очередь на повтор. Пока он не выполнен, сайт может показывать прежние значения.";
 }
 
 export async function saveFeeAction(_previous: FormState, data: FormData): Promise<FormState> {

@@ -42,14 +42,25 @@ export interface CatalogValue {
   mpn?: string;
   color: "black" | "white" | "gray" | "other";
   lighting: "none" | "rgb" | "argb";
-  feeGroup?: "pc" | "mount" | "outside_scale";
-  returnable?: boolean;
+  feeGroup?: "pc" | "mount" | "outside_scale" | undefined;
+  returnable?: boolean | undefined;
   manualOnly: boolean;
-  description?: { uz: string; ru: string };
+  description?: { uz: string; ru: string } | undefined;
   status: "draft" | "verified" | "retired";
   isDemo: boolean;
   spec: Record<string, unknown>;
 }
+
+// Compile-time guards: the form must follow the contract. A field added to ProductBaseSchema has to be taken into
+// `baseShape` (and `CatalogValue`) or named here as left out on purpose; what the schema of a position parses must fit
+// `CatalogValue`, the type the rest of the code reads it as.
+const LEFT_OUT = ["id", "priceClassId", "ladderStep"] as const;
+type Uncovered = Exclude<
+  keyof typeof ProductBaseSchema.shape,
+  keyof typeof baseShape | "category" | (typeof LEFT_OUT)[number]
+>;
+export const BASE_FIELDS_COVERED: [Uncovered] extends [never] ? true : { missing: Uncovered } = true;
+export const PARSED_FITS_VALUE = (parsed: z.infer<typeof CatalogSchema>): CatalogValue => parsed;
 
 const specOf = (v: unknown): Record<string, unknown> =>
   ((v as { spec?: Record<string, unknown> }).spec ?? {}) as Record<string, unknown>;

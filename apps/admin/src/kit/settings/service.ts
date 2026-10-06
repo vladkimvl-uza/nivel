@@ -2,6 +2,7 @@
 // and response hours, feature flags (ARCHITECTURE 6.3). Every change is journaled by the store (ops.setSetting writes
 // the audit row in the same transaction) and ends with a request to the site to drop its cache tag `settings`.
 import { createHmac } from "node:crypto";
+import type { z } from "zod";
 import { type Permission, requirePermission } from "../../auth/roles.ts";
 import type { SessionUser } from "../../auth/service.ts";
 import { formatIssues } from "../form.ts";
@@ -131,7 +132,20 @@ function isStale(error: unknown): boolean {
   return e?.code === "stale_status" || (typeof e?.message === "string" && e.message.startsWith("stale_status"));
 }
 
-const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+/** JSON with the keys of every object sorted: PostgreSQL jsonb returns keys in its own order, the schema in another. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/** Equal as values: the order of keys does not matter, the order of a list does. */
+const same = (a: unknown, b: unknown): boolean => canonical(a) === canonical(b);
 
 // ---- the service ----------------------------------------------------------------------------------------------------
 
@@ -155,9 +169,7 @@ export function createSettingsService(deps: SettingsServiceDeps) {
   /** One simple key: validate, write with the version the screen was opened with, tell the site. */
   async function saveSimple(
     key: string,
-    schema: {
-      safeParse(v: unknown): { success: true; data: unknown } | { success: false; error: { issues: never[] } };
-    },
+    schema: z.ZodType,
     actor: SessionUser,
     raw: unknown,
     opts: { expectedVersion: number; ipHash?: string },
@@ -215,11 +227,11 @@ export function createSettingsService(deps: SettingsServiceDeps) {
 
     async loadFlags(actor: SessionUser) {
       need(actor, "settings.flags.read");
+      const rows = await Promise.all(FEATURE_FLAGS.map((flag) => store.get(flag)));
       const out: Record<string, { value: boolean; version: number }> = {};
-      for (const flag of FEATURE_FLAGS) {
-        const row = await store.get(flag);
-        out[flag] = { value: row?.value === true, version: row?.version ?? 0 };
-      }
+      FEATURE_FLAGS.forEach((flag, i) => {
+        out[flag] = { value: rows[i]?.value === true, version: rows[i]?.version ?? 0 };
+      });
       return out;
     },
 
@@ -241,7 +253,7 @@ export function createSettingsService(deps: SettingsServiceDeps) {
       const effectiveFrom = typeof input.effectiveFrom === "string" ? input.effectiveFrom : "";
       const version = nextVersionName(current.success ? current.data.version : undefined, effectiveFrom);
       const parsed = FeeSettingsSchema.safeParse({ ...input, version });
-      if (!parsed.success) return { ok: false, errors: formatIssues(parsed.error.issues as never) };
+      if (!parsed.success) return { ok: false, errors: formatIssues(parsed.error.issues) };
       const next = parsed.data;
       if (next.effectiveFrom < today) {
         return { ok: false, errors: { effectiveFrom: "Дата вступления не может быть в прошлом." } };
@@ -318,7 +330,7 @@ export function createSettingsService(deps: SettingsServiceDeps) {
       opts: { expectedVersion: number; ipHash?: string },
     ): Promise<SaveOutcome> {
       need(actor, "settings.money.write");
-      return saveSimple(SETTING_KEYS.threshold, ThresholdSettingsSchema as never, actor, raw, opts);
+      return saveSimple(SETTING_KEYS.threshold, ThresholdSettingsSchema, actor, raw, opts);
     },
 
     async saveCalendar(
@@ -327,7 +339,7 @@ export function createSettingsService(deps: SettingsServiceDeps) {
       opts: { expectedVersion: number; ipHash?: string },
     ): Promise<SaveOutcome> {
       need(actor, "settings.calendar.write");
-      return saveSimple(SETTING_KEYS.calendar, CalendarSettingsSchema as never, actor, raw, opts);
+      return saveSimple(SETTING_KEYS.calendar, CalendarSettingsSchema, actor, raw, opts);
     },
 
     /** Switches flags: only those named and only when they change; each is its own key. */

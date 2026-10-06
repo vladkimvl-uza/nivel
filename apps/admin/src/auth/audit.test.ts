@@ -70,4 +70,64 @@ describe("withAudit", () => {
     failing.on = true;
     await expect(withAudit(s, meta, async () => ({ value: 1 }))).rejects.toThrow("journal down");
   });
+
+  describe("in one transaction with the change", () => {
+    /** A sink that has transactions: what the action wrote through `tx` is kept only when the whole block succeeded. */
+    function transactional() {
+      const committed: string[] = [];
+      const entries: AuditEntry[] = [];
+      const failing = { on: false };
+      const s: AuditSink = {
+        async append(e, tx) {
+          if (failing.on) throw new Error("journal down");
+          (tx as { journal: AuditEntry[] } | undefined)?.journal.push(e);
+          if (!tx) entries.push(e);
+        },
+        async atomically(fn) {
+          const tx = { changes: [] as string[], journal: [] as AuditEntry[] };
+          const out = await fn(tx);
+          committed.push(...tx.changes);
+          entries.push(...tx.journal);
+          return out;
+        },
+      };
+      return { s, committed, entries, failing };
+    }
+
+    it("hands the action the transaction, and the entry is written through the same one", async () => {
+      const { s, committed, entries } = transactional();
+      const value = await withAudit(s, meta, async (tx) => {
+        (tx as { changes: string[] }).changes.push("fee v2");
+        return { value: "done", after: { v: 2 } };
+      });
+      expect(value).toBe("done");
+      expect(committed).toEqual(["fee v2"]);
+      expect(entries).toMatchObject([{ action: "settings.save", after: { v: 2 } }]);
+    });
+
+    it("when the journal cannot be written the change is taken back too", async () => {
+      const { s, committed, entries, failing } = transactional();
+      failing.on = true;
+      await expect(
+        withAudit(s, meta, async (tx) => {
+          (tx as { changes: string[] }).changes.push("fee v2");
+          return { value: 1 };
+        }),
+      ).rejects.toThrow("journal down");
+      expect(committed).toEqual([]);
+      expect(entries).toEqual([]);
+    });
+
+    it("when the action fails nothing is committed, and a refusal is still journaled as denied outside the transaction", async () => {
+      const { s, committed, entries } = transactional();
+      await expect(
+        withAudit(s, meta, async (tx) => {
+          (tx as { changes: string[] }).changes.push("half");
+          throw new ForbiddenError("assistant", "settings.money.write");
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      expect(committed).toEqual([]);
+      expect(entries).toMatchObject([{ action: "settings.save.denied" }]);
+    });
+  });
 });
