@@ -4,12 +4,19 @@
 import { type Executor, ops } from "@nivel/db/repos";
 import { ValidationError, type ValidationIssue } from "../orders/errors.ts";
 import { type Runtime, runtimeOf } from "../orders/runtime.ts";
+import { OUTBOX_JOB } from "./contract.ts";
 
 const MAX_PAYLOAD_BYTES = 16_384;
 const MAX_KEY = 200;
 const TARGETS: readonly string[] = ["customer", "owner_topic", "group"];
 /** Sixteen digits in a row (with spaces or dashes): the number of a card. It never travels in a message or a job. */
 const CARD_NUMBER = /(?<![0-9])[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}(?![0-9])/;
+
+/**
+ * Jobs that move money or sign for a person. Only the scenarios queue them, from facts they have checked; this door is
+ * open to the bot and the site, whose payload is not to be trusted with a sum.
+ */
+const RESERVED_JOBS: readonly string[] = [OUTBOX_JOB.LEDGER_APPEND, OUTBOX_JOB.PAYMENT_EXPECT, OUTBOX_JOB.ACT_SIGN];
 
 export type OutboxMessage =
   | { kind: "telegram_message"; payload: { target: string; templateKey: string } & Record<string, unknown> }
@@ -45,6 +52,8 @@ function validate(m: unknown): ValidationIssue[] {
     }
     if (m.kind === "job" && (typeof m.payload.job !== "string" || m.payload.job === "")) {
       bad("payload.job", "job_required", "a job names itself");
+    } else if (m.kind === "job" && RESERVED_JOBS.includes(m.payload.job as string)) {
+      bad("payload.job", "job_reserved", `the job ${String(m.payload.job)} is queued by the scenarios only`);
     }
     const text = JSON.stringify(m.payload);
     if (Buffer.byteLength(text, "utf8") > MAX_PAYLOAD_BYTES) {

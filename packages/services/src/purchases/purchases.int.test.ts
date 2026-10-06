@@ -176,6 +176,21 @@ describe("purchases.record", () => {
     });
   });
 
+  it("does not take the same ESF line twice, but one ESF document may cover several lines", async () => {
+    const o = await purchasingOrder(w);
+    const esf = async (key: "cpu" | "ssd") => {
+      const { receiptNo: _r, ...rest } = await input(o, key);
+      return { ...rest, receiptKind: "esf" as const, esfStatus: "pending" as const, esfNo: "ESF-MULTI-1" };
+    };
+    expect((await record(await esf("cpu"), owner(), w.admin)).ok).toBe(true);
+    await expect(
+      record({ ...(await esf("cpu")), receiptFileIds: [await newFile(w)] }, owner(), w.admin),
+    ).rejects.toMatchObject({
+      issues: [{ path: "esfNo", code: "purchase_duplicate" }],
+    });
+    expect((await record(await esf("ssd"), owner(), w.admin)).ok).toBe(true);
+  });
+
   it("refuses a line that is not a line of the current quote of the order, an unknown shop and an unknown photo", async () => {
     const o = await purchasingOrder(w);
     const other = await purchasingOrder(w);

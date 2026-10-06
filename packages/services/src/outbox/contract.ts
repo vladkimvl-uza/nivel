@@ -2,6 +2,13 @@
 // A message `telegram_message` carries { target, templateKey, params?, orderId?, orderNumber?, customerId?, lang?,
 // telegramUserId? (customer only), topicId? (owner topic, when the order has one) }; a `job` carries { job, ... }.
 // Jobs that change a status do not exist: the worker applies events with `orders.dispatch` as the system.
+//
+// The jobs payment.expect, ledger.append and act.sign are written by the bot and the site roles (they have no right to
+// the tables themselves), so their payload is a hint, not a fact. Whoever runs them must take every sum and every
+// signature from the database and the domain, never from the payload: payment.expect from the quote of the order
+// (amounts fixed by the quote), ledger.append through warrantyReserveContribution / taxReserveContribution from the
+// receipts of the order, act.sign only for the customer of the order with the evidence that the payload names.
+// outbox.enqueue refuses these three names; only the scenarios queue them.
 
 /** Names of the jobs the services queue besides the scheduled ones of the domain (estimate_expiry, report_due, ...). */
 export const OUTBOX_JOB = {

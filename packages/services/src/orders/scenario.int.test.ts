@@ -235,7 +235,11 @@ describe("the whole life of an order", () => {
       w.admin,
     );
     await refused({ type: "MATERIALS_ACCEPTED", actId: materialsAct.actId }, owner, "act_missing"); // not signed
-    await signAct({ actId: materialsAct.actId, via: "tg_button", evidence: { messageId: 100 } }, customer, w.admin);
+    await signAct(
+      { actId: materialsAct.actId, via: "tg_button", evidence: { messageId: 100, telegramUserId: 7_400_000_001 } },
+      customer,
+      w.admin,
+    );
     expect(await dispatch(orderId, { type: "MATERIALS_ACCEPTED", actId: materialsAct.actId }, owner, w.admin)).toEqual({
       ok: true,
       status: "assembling",
@@ -268,7 +272,11 @@ describe("the whole life of an order", () => {
     await refused(handover, owner, "final_payment_missing"); // the 70 % have not been paid
     await confirm({ paymentId: finalPayment?.id as string, fiscalReceiptNo: "FR-2026-0002" }, owner, w.admin);
     // The customer presses "Qabul qildim": an event of the customer through the bot.
-    await signAct({ actId: handoverAct.actId, via: "tg_button" }, customer, w.admin);
+    await signAct(
+      { actId: handoverAct.actId, via: "tg_button", evidence: { messageId: 101, telegramUserId: 7_400_000_001 } },
+      customer,
+      w.admin,
+    );
     expect(await dispatch(orderId, handover, customer, w.bot)).toEqual({ ok: true, status: "handed_over" });
     await again(handover, customer, w.bot);
     const delivered = (

@@ -155,6 +155,31 @@ export async function record(
       }
     }
 
+    if (input.receiptKind === "esf" && input.esfNo?.trim()) {
+      // One ESF document may cover several lines, so the same line of the same document is the repeat.
+      const esfNo = input.esfNo.trim();
+      const quoteLineId = input.quoteLineId;
+      const again = await tx.query.purchases.findFirst({
+        columns: { id: true },
+        where: (t, { and, eq, isNull }) =>
+          and(
+            eq(t.orderId, orderId),
+            eq(t.vendorId, input.vendorId),
+            eq(t.esfNo, esfNo),
+            quoteLineId === undefined ? isNull(t.quoteLineId) : eq(t.quoteLineId, quoteLineId),
+            eq(t.amountSum, input.amountSum),
+            isNull(t.refundOf),
+          ),
+      });
+      if (again) {
+        throw ValidationError.of(
+          "esfNo",
+          "purchase_duplicate",
+          "this line of this ESF is already recorded for the order",
+        );
+      }
+    }
+
     try {
       purchaseId = await sales.recordPurchase(tx, {
         orderId,

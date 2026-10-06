@@ -9,7 +9,7 @@ import { dsl } from "../orders/dsl.ts";
 import { ForbiddenError, NotFoundError, ValidationError, type ValidationIssue } from "../orders/errors.ts";
 import { lockBy } from "../orders/lock.ts";
 import { can, type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
-import { assertUuid } from "../orders/validate.ts";
+import { assertUuid, isUuid } from "../orders/validate.ts";
 import { OUTBOX_JOB } from "../outbox/contract.ts";
 
 export type ActKind = "material_acceptance" | "customer_parts" | "handover";
@@ -120,6 +120,34 @@ export async function generate(
   });
 }
 
+const positiveInt = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+
+/**
+ * What a signature rests on (ARCHITECTURE 7.2): the file of the paper act, the message of the button with the Telegram id
+ * of the person who pressed it, the session of the site. A signature without it proves nothing.
+ */
+function checkEvidence(via: SignedVia, given: Record<string, unknown> | undefined): Record<string, unknown> {
+  const e = given ?? {};
+  const need = (path: string, ok: boolean, what: string) => {
+    if (!ok) throw ValidationError.of(`evidence.${path}`, "evidence_required", `the signature needs ${what}`);
+  };
+  if (via === "paper_photo") {
+    need("fileId", isUuid(e.fileId), "the id of the registered file of the paper act (evidence.fileId)");
+    return { fileId: e.fileId };
+  }
+  if (via === "tg_button") {
+    need("messageId", positiveInt(e.messageId), "the id of the message with the button (evidence.messageId)");
+    need("telegramUserId", positiveInt(e.telegramUserId), "the Telegram id of the person (evidence.telegramUserId)");
+    return { messageId: e.messageId, telegramUserId: e.telegramUserId };
+  }
+  need(
+    "sessionId",
+    typeof e.sessionId === "string" && e.sessionId.trim() !== "" && e.sessionId.length <= 200,
+    "the session of the site (evidence.sessionId)",
+  );
+  return { sessionId: e.sessionId };
+}
+
 /**
  * The customer signs by the button, the owner records the paper act. Only the admin role writes acts: the bot, which reads
  * them, leaves the signature in the outbox for the admin side; the site cannot read acts at all.
@@ -153,6 +181,11 @@ export async function sign(
   if (!allowed.includes(input.via)) {
     throw ValidationError.of("via", "via_not_allowed", `the ${actor.kind} cannot sign an act by ${input.via}`);
   }
+  if (actor.kind === "owner" && !can(r, "acts.write")) {
+    // The bot cannot tell that the person is the owner (it would carry only a name); the admin panel knows the owner.
+    throw new ForbiddenError("the owner records a paper act in the admin panel, not through the bot");
+  }
+  const evidence = checkEvidence(input.via, input.evidence);
   const now = r.now();
   return r.db.transaction(async (tx) => {
     const act = await tx.query.acts.findFirst({ where: (t, { eq }) => eq(t.id, actId) });
@@ -160,6 +193,9 @@ export async function sign(
     const order = await sales.getOrder(tx, act.orderId);
     if (!order || (actor.kind === "customer" && order.customerId !== actor.id)) throw new NotFoundError("act");
     if (act.signedAt !== null) throw ValidationError.of("actId", "act_already_signed", "the act is already signed");
+    if (input.via === "paper_photo" && !(await ops.getFile(tx, evidence.fileId as string))) {
+      throw ValidationError.of("evidence.fileId", "file_unknown", "the file of the paper act is not registered");
+    }
 
     if (!can(r, "acts.write")) {
       await ops.enqueueOutbox(tx, {
@@ -173,7 +209,7 @@ export async function sign(
           via: input.via,
           signedAt: now.toISOString(),
           actor: auditActor(actor),
-          ...(input.evidence ? { evidence: input.evidence } : {}),
+          evidence,
         },
       });
       return { signed: false, queued: true };
@@ -183,7 +219,7 @@ export async function sign(
     // Written once: the condition is in the UPDATE itself, so two presses cannot both win.
     const rows = await tx
       .update(acts)
-      .set({ signedAt: now, signedVia: input.via, evidence: input.evidence ?? null })
+      .set({ signedAt: now, signedVia: input.via, evidence })
       .where(and(eq(acts.id, actId), isNull(acts.signedAt)))
       .returning({ id: acts.id });
     if (rows.length === 0) throw ValidationError.of("actId", "act_already_signed", "the act is already signed");

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { dispatch } from "../orders/dispatch.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
 import { customerActor, ownerActor, purchasingOrder, settledOrder } from "../orders/test-support/flow.ts";
-import { createWorld, type World } from "../orders/test-support/world.ts";
+import { createWorld, newFile, type World } from "../orders/test-support/world.ts";
 import { generate, sign } from "./index.ts";
 
 let w: World;
@@ -16,6 +16,7 @@ beforeEach(() => w.clock.set(new Date("2026-10-13T10:00:00+05:00")));
 
 const owner = () => ownerActor(w);
 const actRow = async (id: string) => (await w.db.$client.query("select * from sales.acts where id = $1", [id])).rows[0];
+const tg = { messageId: 4711, telegramUserId: 7100000001 };
 const materials = [{ title: "Case Fractal North (customer's own)", qty: 1, serial: "FN-001" }];
 
 describe("acts.generate", () => {
@@ -104,30 +105,29 @@ describe("acts.sign", () => {
 
   it("the customer signs by the button: the time, the way and the evidence are written once", async () => {
     const { o, actId } = await actOf();
-    const r = await sign(
-      { actId, via: "tg_button", evidence: { messageId: 4711, telegramUserId: 7100000001 } },
-      customerActor(o),
-      w.admin,
-    );
+    const r = await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.admin);
     expect(r).toEqual({ signed: true, queued: false });
     const row = await actRow(actId);
     expect(row.signed_via).toBe("tg_button");
     expect(row.signed_at).toEqual(w.clock.now());
     expect(row.evidence).toEqual({ messageId: 4711, telegramUserId: 7100000001 });
-    await expect(sign({ actId, via: "tg_button" }, customerActor(o), w.admin)).rejects.toMatchObject({
+    await expect(sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.admin)).rejects.toMatchObject({
       issues: [{ code: "act_already_signed" }],
     });
   });
 
   it("the owner records the paper act by its photo; the ways are not interchangeable", async () => {
     const { o, actId } = await actOf();
-    await expect(sign({ actId, via: "tg_button" }, owner(), w.admin)).rejects.toMatchObject({
+    await expect(sign({ actId, via: "tg_button", evidence: tg }, owner(), w.admin)).rejects.toMatchObject({
       issues: [{ code: "via_not_allowed" }],
     });
-    await expect(sign({ actId, via: "paper_photo" }, customerActor(o), w.admin)).rejects.toMatchObject({
+    await expect(
+      sign({ actId, via: "paper_photo", evidence: { fileId: await newFile(w) } }, customerActor(o), w.admin),
+    ).rejects.toMatchObject({
       issues: [{ code: "via_not_allowed" }],
     });
-    expect(await sign({ actId, via: "paper_photo", evidence: { fileId: "f1" } }, owner(), w.admin)).toEqual({
+    const fileId = await newFile(w);
+    expect(await sign({ actId, via: "paper_photo", evidence: { fileId } }, owner(), w.admin)).toEqual({
       signed: true,
       queued: false,
     });
@@ -136,23 +136,27 @@ describe("acts.sign", () => {
   it("another customer cannot sign it: not found", async () => {
     const { actId } = await actOf();
     const stranger = await settledOrder(w);
-    await expect(sign({ actId, via: "tg_button" }, customerActor(stranger), w.admin)).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
     await expect(
-      sign({ actId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", via: "tg_button" }, customerActor(stranger), w.admin),
+      sign({ actId, via: "tg_button", evidence: tg }, customerActor(stranger), w.admin),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      sign(
+        { actId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", via: "tg_button", evidence: tg },
+        customerActor(stranger),
+        w.admin,
+      ),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("the bot cannot write acts: the signature goes to the outbox for the admin side, and the act stays as it is", async () => {
     const { o, actId } = await actOf();
-    const r = await sign({ actId, via: "tg_button", evidence: { messageId: 1 } }, customerActor(o), w.bot);
+    const r = await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.bot);
     expect(r).toEqual({ signed: false, queued: true });
     expect((await actRow(actId)).signed_at).toBeNull();
     const job = await w.db.$client.query("select payload from ops.outbox where dedupe_key = $1", [`act:${actId}:sign`]);
     expect(job.rows[0].payload).toMatchObject({ job: "act.sign", actId, via: "tg_button", orderId: o.orderId });
     // The same press again does not queue it twice.
-    await sign({ actId, via: "tg_button", evidence: { messageId: 1 } }, customerActor(o), w.bot);
+    await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.bot);
     expect(
       (
         await w.db.$client.query("select count(*)::int as n from ops.outbox where dedupe_key = $1", [
@@ -162,9 +166,59 @@ describe("acts.sign", () => {
     ).toBe(1);
   });
 
+  it("takes a signature only with its evidence: the file of the paper act, the message of the button, the session of the site", async () => {
+    const { o, actId } = await actOf();
+    const evidenceError = (path: string) => ({
+      name: "ValidationError",
+      issues: [{ path, code: "evidence_required" }],
+    });
+    await expect(sign({ actId, via: "paper_photo" }, owner(), w.admin)).rejects.toMatchObject(
+      evidenceError("evidence.fileId"),
+    );
+    await expect(
+      sign({ actId, via: "paper_photo", evidence: { fileId: "f1" } }, owner(), w.admin),
+    ).rejects.toMatchObject(evidenceError("evidence.fileId"));
+    // A well-formed id of a file that is not registered.
+    await expect(
+      sign(
+        { actId, via: "paper_photo", evidence: { fileId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" } },
+        owner(),
+        w.admin,
+      ),
+    ).rejects.toMatchObject({ issues: [{ path: "evidence.fileId", code: "file_unknown" }] });
+    await expect(sign({ actId, via: "tg_button" }, customerActor(o), w.admin)).rejects.toMatchObject(
+      evidenceError("evidence.messageId"),
+    );
+    await expect(
+      sign({ actId, via: "tg_button", evidence: { messageId: 1 } }, customerActor(o), w.admin),
+    ).rejects.toMatchObject(evidenceError("evidence.telegramUserId"));
+    await expect(
+      sign({ actId, via: "tg_button", evidence: { messageId: 0, telegramUserId: 5 } }, customerActor(o), w.admin),
+    ).rejects.toMatchObject(evidenceError("evidence.messageId"));
+    await expect(sign({ actId, via: "site_button" }, customerActor(o), w.admin)).rejects.toMatchObject(
+      evidenceError("evidence.sessionId"),
+    );
+    expect((await actRow(actId)).signed_at).toBeNull();
+    expect(
+      await sign({ actId, via: "site_button", evidence: { sessionId: "sess-1" } }, customerActor(o), w.admin),
+    ).toEqual({ signed: true, queued: false });
+  });
+
+  it("the bot does not carry the word of the owner: the paper act is recorded in the admin panel, where the owner is known", async () => {
+    const { actId } = await actOf();
+    const fileId = await newFile(w);
+    await expect(sign({ actId, via: "paper_photo", evidence: { fileId } }, owner(), w.bot)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    const queued = await w.db.$client.query("select 1 from ops.outbox where dedupe_key = $1", [`act:${actId}:sign`]);
+    expect(queued.rowCount).toBe(0);
+  });
+
   it("the site cannot read acts and so cannot sign them", async () => {
     const { o, actId } = await actOf();
-    await expect(sign({ actId, via: "site_button" }, customerActor(o), w.web)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(
+      sign({ actId, via: "site_button", evidence: { sessionId: "s1" } }, customerActor(o), w.web),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("refuses an unknown way and evidence that is not an object", async () => {
@@ -193,12 +247,12 @@ describe("MATERIALS_ACCEPTED needs the signed act of the order", () => {
       owner(),
       w.admin,
     );
-    await sign({ actId: foreign.actId, via: "tg_button" }, customerActor(other), w.admin);
+    await sign({ actId: foreign.actId, via: "tg_button", evidence: tg }, customerActor(other), w.admin);
     const run = (id: string) => dispatch(o.orderId, { type: "MATERIALS_ACCEPTED", actId: id }, owner(), w.admin);
     expect(await run(actId)).toEqual({ ok: false, error: "act_missing" }); // not signed
     expect(await run(foreign.actId)).toEqual({ ok: false, error: "act_missing" }); // another order
     expect(await run("not-a-uuid")).toEqual({ ok: false, error: "act_missing" });
-    await sign({ actId, via: "tg_button" }, customerActor(o), w.admin);
+    await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.admin);
     expect(await run(actId)).toEqual({ ok: true, status: "assembling" });
   });
 });

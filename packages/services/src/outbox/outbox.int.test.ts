@@ -113,6 +113,18 @@ describe("outbox.enqueue", () => {
     await expect(bad(null)).rejects.toBeInstanceOf(ValidationError);
   });
 
+  it("does not let the public side queue the jobs that move money or sign: those come only from the scenarios", async () => {
+    for (const job of ["ledger.append", "payment.expect", "act.sign"]) {
+      await expect(
+        enqueue({ kind: "job", payload: { job, fund: "warranty", amountSum: 1_000_000_000 } }, {}, w.bot),
+      ).rejects.toMatchObject({ name: "ValidationError", issues: [{ path: "payload.job", code: "job_reserved" }] });
+    }
+    // A job that only reads or renders is still taken.
+    expect((await enqueue({ kind: "job", payload: { job: "pdf.render", doc: "quote" } }, {}, w.bot)).duplicate).toBe(
+      false,
+    );
+  });
+
   it("refuses a key, a priority, a time and a payload that are out of bounds", async () => {
     await expect(enqueue(message({ dedupeKey: "k".repeat(201) }), {}, w.bot)).rejects.toBeInstanceOf(ValidationError);
     await expect(enqueue(message({ dedupeKey: "" }), {}, w.bot)).rejects.toBeInstanceOf(ValidationError);
