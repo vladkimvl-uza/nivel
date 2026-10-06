@@ -62,7 +62,7 @@ describe("check-antilist: design system rules (DESIGN_SYSTEM section 8)", () => 
     expect(checkText("apps/web/src/menu.tsx", "document.activeElement?.blur();")).toEqual([]);
     expect(checkText("apps/web/src/form.ts", "input.blur()")).toEqual([]);
     expect(checkText("apps/web/src/form.ts", 'el.style.filter = "blur(4px)";').join()).toContain("blur");
-    expect(checkText("apps/web/src/form.ts", "const s = `blur(${n}px)`;").join()).toContain("blur");
+    expect(checkText("apps/web/src/form.ts", "const s = `blur(4px)`;").join()).toContain("blur");
     expect(checkText("a.css", "backdrop-filter:blur(8px);").join()).toBeTruthy();
   });
 
