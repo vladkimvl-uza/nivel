@@ -3,15 +3,17 @@
 // fails when a file on disk is not registered).
 
 import ruCommon from "../messages/ru/common.json" with { type: "json" };
+import ruQuote from "../messages/ru/quote.json" with { type: "json" };
 import uzCommon from "../messages/uz/common.json" with { type: "json" };
+import uzQuote from "../messages/uz/quote.json" with { type: "json" };
 import type { AppLocale } from "./locales.ts";
 import type { MessageTree } from "./messages-check.ts";
 
 export type Messages = MessageTree;
 
 const catalog = {
-  uz: { common: uzCommon },
-  ru: { common: ruCommon },
+  uz: { common: uzCommon, quote: uzQuote },
+  ru: { common: ruCommon, quote: ruQuote },
 } satisfies Record<AppLocale, Record<string, MessageTree>>;
 
 export type Namespace = keyof (typeof catalog)["uz"];

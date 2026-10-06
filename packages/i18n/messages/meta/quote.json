@@ -1,0 +1,17 @@
+{
+  "quote.empty": {
+    "context": "warning under the estimate: the estimate has no lines (computeQuote: quote.empty)",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "quote.reserve_high": {
+    "context": "warning under the estimate: memory and SSD are 25 % or more of the purchase, the price-growth reserve is 5 % instead of 3 % (computeQuote: quote.reserve_high, parameter shareBp is not shown)",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "quote.free_window_unavailable": {
+    "context": "warning under the estimate of 4.5 to 6.7 mln soʻm: the free selection window is not available, only paid selection (computeQuote: quote.free_window_unavailable)",
+    "maxLen": 160,
+    "status": "draft"
+  }
+}
