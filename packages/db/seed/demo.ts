@@ -2,17 +2,23 @@
 // showcase builds and two demo "ideas". Refuses to run when APP_MODE=production (ARCHITECTURE 3.1).
 import type pg from "pg";
 import { DEMO_PRODUCTS, DEMO_VENDORS } from "./demo-data.ts";
+import { readAppMode, UnknownAppMode } from "./mode.ts";
 
 export class DemoSeedRefused extends Error {
-  constructor(mode: string) {
-    super(`demo seed refused: APP_MODE=${mode}; demo data never goes to production`);
+  constructor(reason: string) {
+    super(`demo seed refused: ${reason}; demo data never goes to production`);
     this.name = "DemoSeedRefused";
   }
 }
 
-/** Throws when the environment is production. An empty or unknown mode counts as development. */
+/** Throws in production, and for a mode that is not one of the three (an unset mode is development). */
 export function assertDemoAllowed(env: Record<string, string | undefined> = process.env): void {
-  if (env.APP_MODE === "production") throw new DemoSeedRefused("production");
+  try {
+    if (readAppMode(env) === "production") throw new DemoSeedRefused("APP_MODE=production");
+  } catch (e) {
+    if (e instanceof UnknownAppMode) throw new DemoSeedRefused(e.message);
+    throw e;
+  }
 }
 
 /** Date of the prices of block 28 (table 1.2). */

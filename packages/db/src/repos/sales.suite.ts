@@ -320,7 +320,7 @@ describe("a whole order, from the request to the close (database level)", () => 
     });
 
     // assembly, tests, handover with the 70 % fee by QR
-    for (const type of ["MATERIALS_ACCEPTED", "ASSEMBLED", "TESTS_PASSED", "DISPATCH"]) {
+    for (const type of ["MATERIALS_ACCEPTED", "ASSEMBLED", "TESTS_PASSED", "DISPATCH"] as const) {
       await applyTransition(owner, { orderId: o.orderId, event: { type }, actor });
     }
     const finalId = await expectPayment(owner, {

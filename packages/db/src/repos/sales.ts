@@ -1,6 +1,8 @@
 // Repositories of the sales schema: customers, leads, configurations, orders and their journal, quotes, payments,
 // purchases, reserves (ARCHITECTURE 3.3, 3.4, 4.13). Rules the database enforces surface as DbRuleError.
 import { randomBytes } from "node:crypto";
+import { type Sum, sum } from "@nivel/domain/money";
+import type { Actor, OrderEvent, OrderStatus } from "@nivel/domain/order";
 import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { legalDocuments } from "../schema/content.ts";
 import {
@@ -146,10 +148,10 @@ export async function getOrderByNumber(db: Executor, number: string): Promise<Or
 export interface TransitionInput {
   orderId: string;
   /** An OrderEvent of packages/domain (its `type` selects the edge of the status graph). */
-  event: { type: string } & Record<string, unknown>;
-  actor: { kind: "system" | "customer" | "owner" | "assistant"; id: string };
+  event: { type: OrderEvent["type"] } & Record<string, unknown>;
+  actor: { kind: Actor; id: string };
   /** Status the caller read; a different current status raises stale_status (retry after a fresh read). */
-  expectedFrom?: string;
+  expectedFrom?: OrderStatus;
   guardSnapshot?: Record<string, unknown>;
   /** Order columns to set together with the status (snake_case names, whitelisted by the function). */
   changes?: Record<string, unknown>;
@@ -162,9 +164,9 @@ export interface TransitionInput {
 export async function applyTransition(
   db: Executor,
   i: TransitionInput,
-): Promise<{ seq: number; from: string; to: string }> {
+): Promise<{ seq: number; from: OrderStatus; to: OrderStatus }> {
   const { rows } = await guarded(() =>
-    db.execute<{ out_seq: number; out_from: string; out_to: string }>(sql`
+    db.execute<{ out_seq: number; out_from: OrderStatus; out_to: OrderStatus }>(sql`
       select * from sales.apply_transition(
         ${i.orderId}::uuid, ${JSON.stringify(i.event)}::jsonb, ${i.actor.kind}, ${i.actor.id},
         ${i.expectedFrom ?? null}, ${i.guardSnapshot ? JSON.stringify(i.guardSnapshot) : null}::jsonb,
@@ -406,12 +408,12 @@ export async function listPurchases(db: Executor, orderId: string): Promise<Purc
 // ---- the money of an order as the order automaton sees it ---------------------------------------------------------
 export interface OrderMoney {
   /** Confirmed purchase_funds + purchase_topup, reversals included. */
-  fundsReceived: number;
+  fundsReceived: Sum;
   /** Sum of purchases, returns to shops included (negative rows). */
-  receiptsTotal: number;
+  receiptsTotal: Sum;
   /** Confirmed remainder_refund + funds_refund. */
-  refunded: number;
-  documentedLosses: number;
+  refunded: Sum;
+  documentedLosses: Sum;
   hasLimitOverrunConsent: boolean;
 }
 
@@ -427,10 +429,11 @@ export async function orderMoney(db: Executor, orderId: string): Promise<OrderMo
       coalesce((select documented_losses_sum from sales.orders where id = ${orderId}::uuid), 0)::text as losses`);
   const r = rows[0];
   return {
-    fundsReceived: Number(r?.funds ?? 0),
-    receiptsTotal: Number(r?.spent ?? 0),
-    refunded: Number(r?.refunded ?? 0),
-    documentedLosses: Number(r?.losses ?? 0),
+    // sum() throws RangeError for anything beyond a safe integer: a bigint column is never silently rounded.
+    fundsReceived: sum(Number(r?.funds ?? 0)),
+    receiptsTotal: sum(Number(r?.spent ?? 0)),
+    refunded: sum(Number(r?.refunded ?? 0)),
+    documentedLosses: sum(Number(r?.losses ?? 0)),
     hasLimitOverrunConsent: await consentGranted(db, orderId, "limit_overrun"),
   };
 }

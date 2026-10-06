@@ -1,6 +1,7 @@
 // WP-06: the rule seed. Categories, ladders, price classes, the 32 base builds of block 28 (they are selection
 // rules, not prices), the first rule set and the money settings. No demo data here: this layer may run in production.
 import type pg from "pg";
+import { readAppMode } from "./mode.ts";
 
 type Loc = { uz: string; ru: string };
 const l = (uz: string, ru: string): Loc => ({ uz, ru });
@@ -873,15 +874,28 @@ export interface RulesSeedResult {
   baseBuildItems: number;
 }
 
-/** Idempotent: safe to run again, existing rows are updated by their natural key. Run inside the caller's transaction. */
-export async function seedRules(client: pg.Client): Promise<RulesSeedResult> {
+/**
+ * Idempotent: safe to run again. In development (and the tests) the existing rows are brought back to the values of
+ * the code by their natural key. In staging and production only what is missing is added: the ladders and the 32
+ * templates are edited by the owner in the admin (ARCHITECTURE 6.3) and a run of the seed must not reset them.
+ * Run inside the caller's transaction.
+ */
+export async function seedRules(
+  client: pg.Client,
+  env: Record<string, string | undefined> = process.env,
+): Promise<RulesSeedResult> {
+  const refresh = readAppMode(env) === "development";
   for (const [i, c] of CATEGORY_LIST.entries()) {
     await client.query(
       `insert into catalog.categories (code, category_group, name, fee_group_default, freshness_days, returnable_default, sort)
        values ($1, $2, $3, $4, $5, $6, $7)
-       on conflict (code) do update set category_group = excluded.category_group, name = excluded.name,
+       on conflict (code) do ${
+         refresh
+           ? `update set category_group = excluded.category_group, name = excluded.name,
          fee_group_default = excluded.fee_group_default, freshness_days = excluded.freshness_days,
-         returnable_default = excluded.returnable_default, sort = excluded.sort`,
+         returnable_default = excluded.returnable_default, sort = excluded.sort`
+           : "nothing"
+       }`,
       [c.code, c.group, JSON.stringify(c.name), c.feeGroup, c.freshnessDays, c.returnable, i + 1],
     );
   }
@@ -892,17 +906,22 @@ export async function seedRules(client: pg.Client): Promise<RulesSeedResult> {
     await client.query(
       `insert into catalog.price_classes (category_code, key, name, ladder_code, step, manual_only)
        values ($1, $2, $3, $4, $5, $6)
-       on conflict (key) do update set name = excluded.name, ladder_code = excluded.ladder_code, step = excluded.step,
-         manual_only = excluded.manual_only`,
+       on conflict (key) do ${
+         refresh
+           ? `update set name = excluded.name, ladder_code = excluded.ladder_code, step = excluded.step,
+         manual_only = excluded.manual_only`
+           : "nothing"
+       }`,
       [c.category, c.key, JSON.stringify(c.name), c.ladder ?? null, c.step ?? null, c.manualOnly ?? false],
     );
   }
   for (const code of LADDERS) {
+    // An empty ladder is filled in every mode; a ladder that has steps is the owner's once the seed does not refresh.
     await client.query(
       `update catalog.ladders set steps = coalesce((
          select array_agg(pc.id order by pc.step) from catalog.price_classes pc where pc.key = any($2)), '{}')
-       where code = $1`,
-      [code, ladderKeys(code)],
+       where code = $1 and ($3 or cardinality(steps) = 0)`,
+      [code, ladderKeys(code), refresh],
     );
   }
 
@@ -912,13 +931,20 @@ export async function seedRules(client: pg.Client): Promise<RulesSeedResult> {
     const { rows } = await client.query<{ id: string }>(
       `insert into catalog.base_builds (task, tier, style, variant, status, redirect_task, explain)
        values ($1, $2, $3, $4, $5, $6, $7)
-       on conflict (task, tier, style, variant) do update set status = excluded.status,
-         redirect_task = excluded.redirect_task, explain = excluded.explain
+       on conflict (task, tier, style, variant) do ${
+         refresh
+           ? "update set status = excluded.status, redirect_task = excluded.redirect_task, explain = excluded.explain"
+           : "nothing"
+       }
        returning id`,
       [b.task, b.tier, b.style, b.variant, b.status, b.redirectTask, b.explain ? JSON.stringify(b.explain) : null],
     );
+    // Without refresh a template that exists is left as the owner has it: no row comes back and its parts stay.
     const id = rows[0]?.id;
-    if (!id) throw new Error("base build was not written");
+    if (!id) {
+      if (refresh) throw new Error("base build was not written");
+      continue;
+    }
     await client.query("delete from catalog.base_build_items where base_build_id = $1", [id]);
     for (const [position, [classKey, qty]] of b.rows.entries()) {
       const category = PRICE_CLASSES.find((c) => c.key === classKey)?.category;

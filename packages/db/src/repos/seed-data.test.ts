@@ -339,18 +339,39 @@ describe("demo prices", () => {
 });
 
 describe("guards", () => {
-  it("refuses the demo seed in production only", () => {
+  it("refuses the demo seed in production and for a mode nobody knows", () => {
     expect(() => seed.assertDemoAllowed({ APP_MODE: "production" })).toThrow(/production/);
     expect(() => seed.assertDemoAllowed({ APP_MODE: "development" })).not.toThrow();
     expect(() => seed.assertDemoAllowed({ APP_MODE: "staging" })).not.toThrow();
+    // Unset or empty is development, as in packages/config; anything else is not a mode of the project.
     expect(() => seed.assertDemoAllowed({})).not.toThrow();
+    expect(() => seed.assertDemoAllowed({ APP_MODE: "" })).not.toThrow();
+    for (const mode of ["Production", "prod", "PRODUCTION", " production", "live", "test"]) {
+      expect(() => seed.assertDemoAllowed({ APP_MODE: mode }), mode).toThrow(/APP_MODE/);
+    }
   });
-  it("refuses a reset in production and on a host that is not local", () => {
-    const local = "postgres://u:p@127.0.0.1:54339/x_test";
+  it("refuses a reset in production, for an unknown mode and on a host that is not local", () => {
+    const local = "postgres://u:p@127.0.0.1:54339/nivel_s3_w1_test";
     expect(() => seed.assertResetAllowed(local, {})).not.toThrow();
     expect(() => seed.assertResetAllowed(local, { APP_MODE: "production" })).toThrow(/production/);
+    expect(() => seed.assertResetAllowed(local, { APP_MODE: "Production" })).toThrow(/APP_MODE/);
+    expect(() => seed.assertResetAllowed(local, { APP_MODE: "prod" })).toThrow(/APP_MODE/);
     expect(() => seed.assertResetAllowed("postgres://u:p@db.example.com:5432/nivel", {})).toThrow(/not local/);
     expect(() => seed.assertResetAllowed("not a url", {})).toThrow(/not a URL/);
+  });
+  it("resets only the cluster of this project: the dev database nivel or a throwaway *_test database", () => {
+    const ok = (url: string) => expect(() => seed.assertResetAllowed(url, {}), url).not.toThrow();
+    const no = (url: string, re: RegExp) => expect(() => seed.assertResetAllowed(url, {}), url).toThrow(re);
+    ok("postgres://u:p@127.0.0.1:54329/nivel");
+    ok("postgres://u:p@localhost:54339/nivel_s0_template_test");
+    // Other projects on this machine and tunnels to a real database look local as well.
+    no("postgres://u:p@127.0.0.1:5433/nivel", /port/);
+    no("postgres://u:p@127.0.0.1:5432/nivel", /port/);
+    no("postgres://u:p@127.0.0.1/nivel", /port/);
+    no("postgres://u:p@127.0.0.1:54329/gas_platform", /database/);
+    no("postgres://u:p@127.0.0.1:54329/nivel_s1_w1_test", /database/);
+    no("postgres://u:p@127.0.0.1:54339/nivel", /database/);
+    no("postgres://u:p@127.0.0.1:54339/postgres", /database/);
   });
 });
 

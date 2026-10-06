@@ -7,7 +7,7 @@ import { connectAs, one, pgError } from "./testkit.ts";
 // WP-06 acceptance: migrations from scratch on a test database; `db:reset` raises the database with the demo layer.
 const SEED_PATH = "../../seed/index.ts";
 interface SeedModule {
-  seedRules(client: pg.Client): Promise<Record<string, number>>;
+  seedRules(client: pg.Client, env?: Record<string, string | undefined>): Promise<Record<string, number>>;
   seedDemo(client: pg.Client, env: Record<string, string | undefined>): Promise<Record<string, number | boolean>>;
   seedAll(
     url: string,
@@ -95,6 +95,45 @@ describe("rule seed", () => {
       await c.query("rollback");
     }
   });
+
+  it.each(["production", "staging"])(
+    "in %s adds only what is missing and keeps what the owner edited in the admin",
+    async (mode) => {
+      await c.query("begin");
+      try {
+        await seed.seedRules(c, { APP_MODE: "development" });
+        await c.query("update catalog.categories set freshness_days = 99 where code = (select min(code) from catalog.categories)");
+        await c.query("update catalog.base_builds set status = 'not_offered', redirect_task = 'gaming' where id = (select min(id::text)::uuid from catalog.base_builds where status = 'offered')");
+        await c.query("delete from catalog.base_build_items where base_build_id in (select id from catalog.base_builds where status = 'offered' and task = 'office' and tier = 'T1' and variant = 'base')");
+        await c.query("update catalog.price_classes set step = step + 100 where key = 'gpu.rtx5050'");
+        await c.query("update catalog.ladders set steps = '{}' where code = 'gpu'");
+        const edited = [
+          await count("catalog.categories where freshness_days = 99"),
+          await count("catalog.base_builds where status = 'not_offered' and redirect_task = 'gaming'"),
+          await count("catalog.base_build_items"),
+        ];
+        await seed.seedRules(c, { APP_MODE: mode });
+        // Edits stay; an empty ladder (new in the code) is filled; nothing the owner changed is reset.
+        expect(await count("catalog.categories where freshness_days = 99")).toBe(edited[0]);
+        expect(await count("catalog.base_builds where status = 'not_offered' and redirect_task = 'gaming'")).toBe(edited[1]);
+        expect(await count("catalog.base_build_items")).toBe(edited[2]);
+        expect(await count("catalog.price_classes where key = 'gpu.rtx5050' and step >= 100")).toBe(1);
+        expect(await count("catalog.ladders where code = 'gpu' and cardinality(steps) > 0")).toBe(1);
+        // A missing row is added.
+        await c.query("delete from catalog.base_build_items");
+        await c.query("delete from catalog.base_builds");
+        await seed.seedRules(c, { APP_MODE: mode });
+        expect(await count("catalog.base_builds")).toBe(42);
+        expect(await count("catalog.base_build_items")).toBeGreaterThan(0);
+        // Development brings everything back to the code.
+        await seed.seedRules(c, { APP_MODE: "development" });
+        expect(await count("catalog.categories where freshness_days = 99")).toBe(0);
+        expect(await count("catalog.price_classes where key = 'gpu.rtx5050' and step >= 100")).toBe(0);
+      } finally {
+        await c.query("rollback");
+      }
+    },
+  );
 
   it("orders each ladder by step and writes the primary classes into ladders.steps", async () => {
     await c.query("begin");
