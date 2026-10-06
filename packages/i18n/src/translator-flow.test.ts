@@ -585,3 +585,33 @@ describe("import: broken input files", () => {
     );
   });
 });
+
+describe("import: edge rows", () => {
+  it("rejects a row that has text but no namespace or key", () => {
+    const root = newRoot();
+    const wb = open(exportTranslations(root));
+    wb.sheet.rows.push(["", "orphan", "", 10, "x", "y", "draft", null]);
+    wb.sheet.rows.push(["site", "", "", 10, "x", "y", "draft", null]);
+    const report = importTranslations(root, wb.save());
+    expect(report.errors).toEqual(["row 6: namespace and key are required", "row 7: namespace and key are required"]);
+  });
+
+  it("ignores a status for a key that has no meta entry and says so", () => {
+    const root = makeRoot({ lone: { uz: { a: "Matn" }, ru: { a: "Текст" }, meta: {} } });
+    const wb = open(exportTranslations(root));
+    wb.set("lone", "a", "status", "reviewed");
+    const report = importTranslations(root, wb.save());
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toEqual(["row 2: lone:a has no meta entry; status ignored"]);
+    expect(report.changes).toEqual([]);
+  });
+
+  it("reports a text that already sits where a nested key would have to go", () => {
+    const root = makeRoot({ clash: { uz: { b: "Matn" }, ru: { b: { c: "Вложенный" } }, meta: {} } });
+    const wb = open(exportTranslations(root));
+    wb.set("clash", "b.c", "uz", "Ichki");
+    const report = importTranslations(root, wb.save());
+    expect(report.ok).toBe(false);
+    expect(report.errors).toContain("row 2: clash:b.c cannot be placed: a text already sits on its path in uz");
+  });
+});
