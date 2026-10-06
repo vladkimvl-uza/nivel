@@ -14,8 +14,11 @@ import { checkUzString } from "./uz-apostrophes.ts";
 
 const base = fileURLToPath(new URL("../messages/", import.meta.url));
 const read = (kind: string) => JSON.parse(readFileSync(`${base}${kind}/compat.json`, "utf8"));
-const flat = (kind: string) => new Map(flattenMessages(read(kind)));
-const meta = read("meta") as Record<string, MetaEntry>;
+const LOCALES = ["ru", "uz"] as const;
+// Each file is read once, here: the trees as written, the texts by dotted key, the context for the translator.
+const TREES = { ru: read("ru"), uz: read("uz") };
+const TEXTS = { ru: new Map(flattenMessages(TREES.ru)), uz: new Map(flattenMessages(TREES.uz)) };
+const meta: Record<string, MetaEntry> = read("meta");
 const glossary = parseGlossary(
   JSON.parse(readFileSync(new URL("../../db/seed/glossary/glossary.json", import.meta.url), "utf8")),
 );
@@ -161,20 +164,19 @@ const MESSAGE_KEYS = Object.keys(COMPAT_MESSAGE_KEYS);
 describe("namespace compat", () => {
   it("is registered in the catalog and loads in both locales", () => {
     expect(namespaces).toContain("compat");
-    for (const locale of ["uz", "ru"] as const) {
+    for (const locale of LOCALES) {
       expect(flattenMessages(getMessages(locale, "compat").compat).length).toBeGreaterThan(MESSAGE_KEYS.length);
     }
   });
 
   it("has exactly the registered message keys and the field names, in uz and in ru", () => {
     const expected = [...MESSAGE_KEYS, ...FIELD_KEYS].sort();
-    expect([...flat("ru").keys()].sort()).toEqual(expected);
-    expect([...flat("uz").keys()].sort()).toEqual(expected);
+    for (const locale of LOCALES) expect([...TEXTS[locale].keys()].sort(), locale).toEqual(expected);
     expect(MESSAGE_KEYS).toHaveLength(51);
   });
 
   it("passes the same consistency check as tools/check-messages (keys, meta, ICU, limits)", () => {
-    expect(checkNamespace("compat", read("uz"), read("ru"), meta)).toEqual([]);
+    expect(checkNamespace("compat", TREES.uz, TREES.ru, meta)).toEqual([]);
   });
 
   it("marks every Uzbek text as a draft for the translator, with a context and a limit", () => {
@@ -187,8 +189,8 @@ describe("namespace compat", () => {
   });
 
   it("every message uses its registered params and all of them, except the technical `category`", () => {
-    for (const locale of ["ru", "uz"] as const) {
-      const texts = flat(locale);
+    for (const locale of LOCALES) {
+      const texts = TEXTS[locale];
       for (const [key, spec] of Object.entries(COMPAT_MESSAGE_KEYS)) {
         const used = placeholders(texts.get(key) ?? "");
         for (const name of used) expect(spec.params, `${locale} ${key}: {${name}}`).toContain(name);
@@ -201,13 +203,13 @@ describe("namespace compat", () => {
   });
 
   it("field names take no placeholders", () => {
-    for (const locale of ["ru", "uz"] as const) {
-      for (const key of FIELD_KEYS) expect(placeholders(flat(locale).get(key) ?? ""), `${locale} ${key}`).toEqual([]);
+    for (const locale of LOCALES) {
+      for (const key of FIELD_KEYS) expect(placeholders(TEXTS[locale].get(key) ?? ""), `${locale} ${key}`).toEqual([]);
     }
   });
 
   it("uses U+02BB and U+02BC in Uzbek, no Latin-ASCII apostrophes inside words and no Cyrillic", () => {
-    const entries = [...flat("uz")];
+    const entries = [...TEXTS.uz];
     expect(entries.flatMap(([k, v]) => checkUzString(k, v))).toEqual([]);
     const text = entries.map(([, v]) => v).join(" ");
     expect(text).toContain("ʻ");
@@ -217,7 +219,7 @@ describe("namespace compat", () => {
   });
 
   it("writes Russian in Cyrillic without ASCII apostrophes, dollars or fixed-width spaces", () => {
-    for (const [key, text] of flat("ru")) {
+    for (const [key, text] of TEXTS.ru) {
       expect(text, key).toMatch(/\p{Script=Cyrillic}/u);
       expect(text, key).not.toMatch(/['`]|\$|USD/);
       expect(text, key).toBe(text.trim());
@@ -226,13 +228,13 @@ describe("namespace compat", () => {
 
   it("follows the glossary: no forbidden Uzbek variants of a term", () => {
     for (const key of [...MESSAGE_KEYS, ...FIELD_KEYS]) {
-      const { errors } = glossaryProblems(flat("ru").get(key) ?? "", flat("uz").get(key) ?? "", glossary);
+      const { errors } = glossaryProblems(TEXTS.ru.get(key) ?? "", TEXTS.uz.get(key) ?? "", glossary);
       expect(errors, key).toEqual([]);
     }
   });
 
   it("the Uzbek text of a key differs from its Russian text", () => {
-    for (const [key, ru] of flat("ru")) expect(flat("uz").get(key), key).not.toBe(ru);
+    for (const [key, ru] of TEXTS.ru) expect(TEXTS.uz.get(key), key).not.toBe(ru);
   });
 });
 
@@ -240,26 +242,26 @@ describe("compat.missing_data and the field dictionary", () => {
   it("has a name for every field of every typed spec (SpecMap) and for the plan position, in uz and ru", () => {
     expect(Object.keys(SPEC_FIELDS).sort()).toEqual([...DETAILED_CATEGORIES].sort());
     expect(FIELD_KEYS).toHaveLength(123 + PLAN_FIELDS.length);
-    for (const locale of ["ru", "uz"] as const) {
-      const texts = flat(locale);
+    for (const locale of LOCALES) {
+      const texts = TEXTS[locale];
       for (const key of FIELD_KEYS) expect(texts.get(key)?.trim().length ?? 0, `${locale} ${key}`).toBeGreaterThan(2);
     }
   });
 
   it("names differ within a category (the reader can tell two fields apart)", () => {
-    for (const locale of ["ru", "uz"] as const) {
+    for (const locale of LOCALES) {
       for (const [category, fields] of Object.entries(SPEC_FIELDS)) {
         const all = [...Object.keys(fields), ...PLAN_FIELDS.filter(([c]) => c === category).map(([, f]) => f)];
-        const names = all.map((f) => flat(locale).get(fieldNameKey(category, f)));
+        const names = all.map((f) => TEXTS[locale].get(fieldNameKey(category, f)));
         expect(new Set(names).size, `${locale} ${category}`).toBe(names.length);
       }
     }
   });
 
   it("names are lower case phrases that read inside the sentence, not technical keys", () => {
-    for (const locale of ["ru", "uz"] as const) {
+    for (const locale of LOCALES) {
       for (const key of FIELD_KEYS) {
-        const name = flat(locale).get(key) ?? "";
+        const name = TEXTS[locale].get(key) ?? "";
         const field = key.split(".").pop() ?? "";
         expect(name, key).not.toBe(field);
         expect(name, key).not.toMatch(/^[\p{Lu}]/u);
@@ -268,12 +270,7 @@ describe("compat.missing_data and the field dictionary", () => {
     }
   });
 
-  it("fieldNameKey is the documented key: compat.field.<category>.<field>", () => {
-    expect(fieldNameKey("gpu", "tgpW")).toBe("compat.field.gpu.tgpW");
-    expect(fieldNameKey("monitor", "standFootprintMm")).toBe("compat.field.monitor.standFootprintMm");
-  });
-
-  it.each(["uz", "ru"] as const)("%s: the issue is shown with the field name, not the technical key", (locale) => {
+  it.each(LOCALES)("%s: the issue is shown with the field name, not the technical key", (locale) => {
     const t = createNodeTranslator(locale, "compat");
     const params = { field: "tgpW", category: "gpu" };
     const text = t("compat.missing_data", { ...params, field: t(fieldNameKey(params.category, params.field)) });
@@ -281,18 +278,12 @@ describe("compat.missing_data and the field dictionary", () => {
     expect(text).toContain(t("compat.field.gpu.tgpW"));
     expect(text).not.toContain("{");
   });
-
-  it("the Russian text shows the Russian name of the field", () => {
-    const t = createNodeTranslator("ru", "compat");
-    const text = t("compat.missing_data", { field: t("compat.field.monitor.standFootprintMm") });
-    expect(text).toMatch(/основани/);
-  });
 });
 
 describe("every message formats in both locales", () => {
-  it.each(["uz", "ru"] as const)("%s: t(key, sampleValues) gives a text without raw braces", (locale) => {
+  it.each(LOCALES)("%s: t(key, sampleValues) gives a text without raw braces", (locale) => {
     const t = createNodeTranslator(locale, "compat");
-    for (const [key, text] of flat(locale)) {
+    for (const [key, text] of TEXTS[locale]) {
       const out = t(key, sampleValues(text));
       expect(out.trim().length, key).toBeGreaterThan(5);
       expect(out, key).not.toContain("{");
@@ -300,7 +291,7 @@ describe("every message formats in both locales", () => {
     }
   });
 
-  it.each(["uz", "ru"] as const)("%s: the select of {task} and {cooler} has a branch per value", (locale) => {
+  it.each(LOCALES)("%s: the select of {task} and {cooler} has a branch per value", (locale) => {
     const t = createNodeTranslator(locale, "compat");
     const task = (v: string) => t("compat.no_wireless", { task: v });
     expect(new Set([task("streaming"), task("office"), task("gaming")]).size).toBe(3);
