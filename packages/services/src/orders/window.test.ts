@@ -3,7 +3,13 @@ import { windowOf } from "./dispatch.ts";
 import { eventDigest, eventIdentity } from "./keys.ts";
 
 const owner = { kind: "owner" as const, id: "o-1" };
-const row = (seq: number, event: Record<string, unknown>, from: string, to: string, actor = owner) => ({
+const row = (
+  seq: number,
+  event: Record<string, unknown>,
+  from: string,
+  to: string,
+  actor: { kind: "owner" | "customer"; id: string } = owner,
+) => ({
   seq,
   actorKind: actor.kind,
   actorId: actor.id,
