@@ -55,7 +55,11 @@ describe("logo.css of the intro stage", () => {
   it("keeps the canvas invisible until the 3D plays, and hides the still lockup only while it plays", () => {
     expect(declOf(".nv-logo-intro__canvas").opacity).toBe("0");
     expect(declOf('.nv-logo-intro[data-state="playing"] .nv-logo-intro__canvas').opacity).toBe("1");
-    expect(declOf('.nv-logo-intro[data-state="playing"] .nv-logo-intro__still').visibility).toBe("hidden");
+    // opacity, not visibility: visibility:hidden would take the name of the logo out of the accessibility tree
+    const still = declOf('.nv-logo-intro[data-state="playing"] .nv-logo-intro__still');
+    expect(still.opacity).toBe("0");
+    expect(still.visibility).toBeUndefined();
+    expect(css).not.toMatch(/nv-logo-intro__still[^{]*{[^}]*(visibility|display)s*:s*(hidden|none)/);
     expect(css).not.toMatch(/data-state="done"|data-state="still"/);
   });
 

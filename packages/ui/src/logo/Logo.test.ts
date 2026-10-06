@@ -51,6 +51,17 @@ describe("LogoMark and LogoLockup (SSR)", () => {
     expect(html).not.toContain("aria-label");
   });
 
+  it("an empty or blank label makes the picture decorative, as in the string core (never role=img without a name)", () => {
+    for (const label of ["", "   "]) {
+      for (const el of [h(LogoMark, { label }), h(LogoLockup, { label })]) {
+        const html = render(el);
+        expect(html, JSON.stringify(label)).toContain('aria-hidden="true"');
+        expect(html).not.toContain("role=");
+        expect(html).not.toContain("aria-label");
+      }
+    }
+  });
+
   it("accept undefined optional props (exactOptionalPropertyTypes)", () => {
     const none: string | undefined = undefined as string | undefined;
     const w: number | undefined = undefined as number | undefined;

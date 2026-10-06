@@ -34,21 +34,29 @@ export function clampLoaderSize(size: number | undefined): number {
 const shapePaths = (shapes: readonly LogoShape[]): ReactNode[] =>
   shapes.map((s) => <path key={s.d} className={cx(s.role === "ink" ? "nv-logo__ink" : "nv-logo__accent")} d={s.d} />);
 
-/** Name of the picture, or `undefined` when it is decorative (hidden from assistive technology). */
-const nameOf = ({ label, decorative }: LogoProps): string | undefined => (decorative ? undefined : (label ?? "Nivel"));
+/**
+ * Name of the picture, or `undefined` when it is decorative (hidden from assistive technology). An empty or blank
+ * label is decorative, the same rule as `logoSvg`: a nameless `role="img"` is never rendered.
+ */
+const nameOf = ({ label, decorative }: LogoProps): string | undefined => {
+  if (decorative) return undefined;
+  const name = label ?? "Nivel";
+  return name.trim() === "" ? undefined : name;
+};
 
 /** The level mark (nivel-1) without the word, in the night colors of the tokens (`--ink`, `--accent`). */
 export function LogoMark(props: LogoProps) {
-  const { width, className, decorative } = props;
+  const { width, className } = props;
+  const name = nameOf(props);
   return (
     <svg
       className={cx("nv-logo", "nv-logo--mark", className)}
       viewBox={markViewBox}
       {...(width === undefined ? {} : { width, height: width })}
-      role={decorative ? undefined : "img"}
-      aria-label={nameOf(props)}
-      aria-hidden={decorative ? true : undefined}
-      focusable={decorative ? "false" : undefined}
+      role={name === undefined ? undefined : "img"}
+      aria-label={name}
+      aria-hidden={name === undefined ? true : undefined}
+      focusable={name === undefined ? "false" : undefined}
     >
       {shapePaths(markShapes)}
     </svg>
@@ -57,7 +65,8 @@ export function LogoMark(props: LogoProps) {
 
 /** Mark and word "nivel" in one box, as nivel-1-lockup-inverse.svg; the height follows the width. */
 export function LogoLockup(props: LogoProps) {
-  const { width, className, decorative } = props;
+  const { width, className } = props;
+  const name = nameOf(props);
   const height =
     width === undefined ? undefined : Math.round((width * lockupSize.height * 100) / lockupSize.width) / 100;
   return (
@@ -65,10 +74,10 @@ export function LogoLockup(props: LogoProps) {
       className={cx("nv-logo", "nv-logo--lockup", className)}
       viewBox={lockupViewBox}
       {...(width === undefined ? {} : { width, height })}
-      role={decorative ? undefined : "img"}
-      aria-label={nameOf(props)}
-      aria-hidden={decorative ? true : undefined}
-      focusable={decorative ? "false" : undefined}
+      role={name === undefined ? undefined : "img"}
+      aria-label={name}
+      aria-hidden={name === undefined ? true : undefined}
+      focusable={name === undefined ? "false" : undefined}
     >
       <g transform={lockupMarkTransform}>{shapePaths(markShapes)}</g>
       <g transform={lockupWordTransform}>{shapePaths(wordShapes)}</g>

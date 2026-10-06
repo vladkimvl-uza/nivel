@@ -19,7 +19,7 @@ export interface LogoSvgOptions {
   readonly ink?: string;
   /** Color of the orange triangle and the dot; default is the night accent. */
   readonly accent?: string;
-  /** Accessible name. An empty string makes the picture decorative (`aria-hidden`). Default "Nivel". */
+  /** Accessible name. An empty or blank string makes the picture decorative (`aria-hidden`). Default "Nivel". */
   readonly label?: string;
   /** Pixel width; the height follows the viewBox. Omitted: the SVG takes the size of its box. */
   readonly width?: number;
@@ -43,7 +43,7 @@ export function logoSvg(options: LogoSvgOptions = {}): string {
     ? `<g transform="${lockupMarkTransform}">${paths(markShapes, ink, accent)}</g>` +
       `<g transform="${lockupWordTransform}">${paths(wordShapes, ink, accent)}</g>`
     : paths(markShapes, ink, accent);
-  const a11y = label === "" ? 'aria-hidden="true"' : `role="img" aria-label="${escapeXml(label)}"`;
+  const a11y = label.trim() === "" ? 'aria-hidden="true"' : `role="img" aria-label="${escapeXml(label)}"`;
   const size = width === undefined ? "" : ` width="${width}"`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"${size} ${a11y}>${body}</svg>`;
 }

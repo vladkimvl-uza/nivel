@@ -207,11 +207,14 @@
   transform-origin: 100% 100%;
 }
 
-/* While the 3D plays, the canvas covers the still lockup (no fade: the intro starts from the empty plate). */
+/*
+ * While the 3D plays, the canvas covers the still lockup (no fade: the intro starts from the empty plate). The lockup
+ * is made see-through, not `visibility:hidden`: it carries the name of the logo, which must stay in the accessibility tree.
+ */
 .nv-logo-intro[data-state="playing"] .nv-logo-intro__canvas {
   opacity: 1;
 }
 
 .nv-logo-intro[data-state="playing"] .nv-logo-intro__still {
-  visibility: hidden;
+  opacity: 0;
 }

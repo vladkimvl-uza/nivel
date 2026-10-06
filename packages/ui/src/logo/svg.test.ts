@@ -74,6 +74,12 @@ describe("logoSvg (plain string for worker, PDF and bot)", () => {
     expect(svg).not.toContain("aria-label");
   });
 
+  it("a blank label (spaces only) is decorative too, the same rule as LogoMark and LogoLockup", () => {
+    const svg = logoSvg({ label: "   " });
+    expect(svg).toContain('aria-hidden="true"');
+    expect(svg).not.toContain("role=");
+  });
+
   it("escapes markup in the label and in colors", () => {
     const svg = logoSvg({ label: `A "B" <i> & 'c'`, ink: '"><script>' });
     expect(svg).not.toContain("<script>");
