@@ -1,0 +1,87 @@
+/* Base of the "Night and day" design system. Colors come only from the roles of themes.css. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: var(--head);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+/* Hidden from the eye, read by screen readers. */
+.nv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Figures, dates, sums: mono with tabular digits, never wrapped. */
+.nv-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The switch of the mode: only colors, only for the second that html.theme-shift is present (set by ThemeProvider). */
+html.theme-shift,
+html.theme-shift *,
+html.theme-shift *::before,
+html.theme-shift *::after {
+  --nv-shift:
+    background-color var(--dur-theme) var(--ease-io),
+    color var(--dur-theme) var(--ease-io),
+    border-color var(--dur-theme) var(--ease-io),
+    fill var(--dur-theme) var(--ease-io),
+    stroke var(--dur-theme) var(--ease-io),
+    box-shadow var(--dur-theme) var(--ease-io),
+    opacity var(--dur-theme) var(--ease-io);
+  /* biome-ignore lint/complexity/noImportantStyles: must beat the own transitions of every component */
+  transition: var(--nv-shift) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-shift,
+  html.theme-shift *,
+  html.theme-shift *::before,
+  html.theme-shift *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the own transitions of every component */
+    transition: none !important;
+  }
+}

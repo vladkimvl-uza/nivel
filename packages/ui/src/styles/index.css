@@ -1,0 +1,5 @@
+/* Whole design system: import this one file from the app stylesheet. */
+@import "../themes/themes.css";
+@import "./fonts.css";
+@import "./base.css";
+@import "./primitives.css";

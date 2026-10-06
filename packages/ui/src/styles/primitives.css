@@ -1,0 +1,522 @@
+/*
+ * Primitives of the "Night and day" design system (DESIGN_SYSTEM section 3). Every color is a role from themes.css:
+ * the same rules serve both modes. Document pieces (.nv-est, .nv-sums, stamps) are drawn for paper (.nv-paper).
+ */
+
+/* ---------- mark ---------- */
+.nv-mk {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* ---------- button ---------- */
+.nv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: var(--r1);
+  border: 1px solid var(--btn-bg);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  text-decoration: none;
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-2),
+    color var(--dur-2),
+    border-color var(--dur-2);
+}
+
+.nv-btn:hover {
+  background: var(--btn-hover);
+}
+
+.nv-btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+
+.nv-btn--ghost:hover {
+  background: transparent;
+  border-color: var(--ink);
+}
+
+.nv-btn--sm {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 15px;
+  gap: 10px;
+}
+
+.nv-btn:disabled {
+  background: transparent;
+  color: var(--ink-3);
+  border-color: var(--line-2);
+  cursor: not-allowed;
+}
+
+/* ---------- form fields ---------- */
+.nv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nv-field__label {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.nv-field__control {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--ink-2);
+  border-radius: var(--r1);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  transition: border-color var(--dur-1);
+}
+
+.nv-field__control:hover {
+  border-color: var(--ink);
+}
+
+.nv-field__control::placeholder {
+  color: var(--ink-2);
+}
+
+.nv-field__hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.nv-field__error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--accent-ink);
+}
+
+.nv-field--invalid .nv-field__control {
+  border-color: var(--accent-ink);
+}
+
+/* select: a native control with a chevron drawn from two borders */
+.nv-select {
+  position: relative;
+  display: block;
+}
+
+.nv-select .nv-field__control {
+  appearance: none;
+  padding-right: 40px;
+}
+
+.nv-select::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -6px;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* ---------- day/night segment ---------- */
+.nv-seg2 {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r1);
+}
+
+.nv-seg2 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 36px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 1px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.nv-seg2 button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.nv-tod svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---------- money ---------- */
+.nv-money {
+  font-size: inherit;
+}
+
+/* ---------- paper (documents) ---------- */
+.nv-paper {
+  position: relative;
+  padding: clamp(18px, 2.4vw, 30px);
+  border: 1px solid var(--doc-line);
+  border-radius: 0;
+  background: var(--doc);
+  color: var(--doc-ink);
+  box-shadow: var(--doc-shadow);
+  font-size: 14.5px;
+}
+
+@media (min-width: 961px) {
+  .nv-paper--tilt-left {
+    transform: rotate(-0.5deg);
+  }
+
+  .nv-paper--tilt-right {
+    transform: rotate(0.4deg);
+  }
+}
+
+@media (max-width: 520px) {
+  .nv-paper {
+    padding: 16px 14px;
+  }
+
+  .nv-est__i {
+    display: none;
+  }
+}
+
+/* night: a warm spot behind documents, a lamp over the desk; it does not touch text or frames */
+.nv-lamp {
+  position: relative;
+  isolation: isolate;
+}
+
+.nv-lamp::before {
+  content: "";
+  position: absolute;
+  inset: -12% -8% -10%;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--lamp-spot);
+  opacity: var(--lamp-opacity);
+  transition: opacity var(--dur-theme) var(--ease-io);
+}
+
+/* ---------- estimate table ---------- */
+.nv-est {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.nv-est th {
+  padding: 0 8px 7px 0;
+  border-bottom: 1.5px solid var(--doc-ink);
+  color: var(--doc-ink-2);
+  font: 500 10px / 1.2 var(--mono);
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.nv-est td {
+  padding: 7px 8px 7px 0;
+  border-bottom: 1px solid var(--doc-line);
+  vertical-align: baseline;
+  line-height: 1.3;
+}
+
+.nv-est td small {
+  display: block;
+  color: var(--doc-ink-2);
+  font-size: 12px;
+}
+
+.nv-est .nv-est__name {
+  overflow-wrap: anywhere;
+}
+
+.nv-est .nv-est__i {
+  width: 26px;
+  font: 500 11px var(--mono);
+  color: var(--doc-ink-2);
+}
+
+.nv-est .nv-est__amount {
+  padding-right: 0;
+  padding-left: 10px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.nv-est__row {
+  break-inside: avoid;
+}
+
+.nv-est__row--refund td,
+.nv-est__row--refund td small {
+  color: var(--minus);
+  font-weight: 500;
+}
+
+/* ---------- table of sums ---------- */
+.nv-sums {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  color: var(--doc-ink);
+}
+
+.nv-sums__row th {
+  overflow-wrap: anywhere;
+}
+
+.nv-sums th,
+.nv-sums td {
+  padding: 7px 8px 7px 0;
+  border-bottom: 1px solid var(--doc-line);
+  vertical-align: baseline;
+  line-height: 1.3;
+  font-weight: 400;
+  text-align: left;
+}
+
+.nv-sums td {
+  padding-right: 0;
+  padding-left: 10px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.nv-sums .nv-sums__row--subtotal th,
+.nv-sums .nv-sums__row--subtotal td,
+.nv-sums .nv-sums__row--refund th,
+.nv-sums .nv-sums__row--refund td,
+.nv-sums .nv-sums__row--total th,
+.nv-sums .nv-sums__row--total td {
+  padding-top: 9px;
+  border-bottom: 0;
+  font-size: 14px;
+}
+
+.nv-sums .nv-sums__row--subtotal th,
+.nv-sums .nv-sums__row--subtotal td {
+  border-top: 1.5px solid var(--doc-ink);
+}
+
+.nv-sums .nv-sums__row--refund th,
+.nv-sums .nv-sums__row--refund td {
+  color: var(--minus);
+  font-weight: 500;
+}
+
+.nv-sums .nv-sums__row--total th,
+.nv-sums .nv-sums__row--total td {
+  border-top: 3px double var(--doc-ink);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* ---------- stamps: printed with the #ink filter, no blur, no glow ---------- */
+.nv-ink-defs {
+  position: absolute;
+}
+
+.nv-stamp-r {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  border: 3px solid currentColor;
+  color: var(--stamp);
+  filter: url(#ink);
+}
+
+.nv-stamp-r > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 16px 7px;
+  border: 1.2px solid currentColor;
+}
+
+.nv-stamp-r b {
+  font: 700 30px / 1 var(--cond);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nv-stamp-r em {
+  margin-top: 5px;
+  font: 500 12px / 1.2 var(--mono);
+  font-style: normal;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.nv-sstamp {
+  display: inline-block;
+  padding: 4px 7px 3px;
+  border: 2px solid currentColor;
+  color: var(--accent-ink);
+  text-align: center;
+  filter: url(#ink);
+}
+
+/* the ink of paper is for paper; on the page (the steps sit on --surface) the stamp takes --accent-ink (4.5:1 and more) */
+.nv-paper .nv-sstamp {
+  color: var(--stamp);
+}
+
+.nv-sstamp b {
+  display: block;
+  font: 700 13px / 1 var(--cond);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nv-sstamp i {
+  display: block;
+  margin-top: 3px;
+  font: 500 10.5px / 1 var(--mono);
+  font-style: normal;
+}
+
+.nv-stamp--tilt-left {
+  transform: rotate(-7deg);
+}
+
+.nv-stamp--tilt-right {
+  transform: rotate(5deg);
+}
+
+.nv-rstamp {
+  display: block;
+  width: 128px;
+  height: 128px;
+  color: var(--stamp);
+  filter: url(#ink);
+  transform: rotate(-12deg);
+}
+
+.nv-rstamp__ring {
+  font: 700 13.5px var(--cond);
+  letter-spacing: 0.16em;
+}
+
+.nv-rstamp__date {
+  font: 500 10px var(--mono);
+}
+
+/* the imprint: from 1.6x and transparent to full size */
+@keyframes nv-stamp-press {
+  from {
+    opacity: 0;
+    scale: 1.6;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.nv-stamp--press {
+  animation: nv-stamp-press 450ms var(--ease-stamp) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nv-stamp--press {
+    animation: none;
+  }
+}
+
+/* ---------- tag and plaques ---------- */
+.nv-tag,
+.nv-badge {
+  display: inline-block;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  border-radius: var(--r1);
+  font: 400 11.5px / 1.3 var(--mono);
+  white-space: nowrap;
+}
+
+.nv-tag,
+.nv-badge--demo {
+  color: var(--accent-ink);
+}
+
+.nv-badge--draft {
+  color: var(--ink-2);
+  border-style: dashed;
+}
+
+.nv-badge--visualization {
+  color: var(--ink-2);
+  border-color: var(--line-2);
+  background: var(--chip-bg);
+}
+
+.nv-badge--sample {
+  padding: 5px 8px;
+  border-color: var(--doc-ink);
+  border-radius: 0;
+  background: var(--doc-ink);
+  color: var(--doc);
+  font: 500 10.5px / 1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* on paper the accent orange is unreadable at night (2.4:1): tags take the ink of the stamp */
+.nv-paper .nv-tag,
+.nv-paper .nv-badge--demo {
+  color: var(--stamp);
+}
+
+.nv-paper .nv-badge--draft,
+.nv-paper .nv-badge--visualization {
+  color: var(--doc-ink-2);
+  border-color: var(--doc-line);
+  background: transparent;
+}
+
+.nv-paper > .nv-badge--sample {
+  position: absolute;
+  right: 16px;
+  top: -12px;
+}

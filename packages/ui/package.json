@@ -5,13 +5,19 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./react": "./src/react.ts",
+    "./styles.css": "./src/styles/index.css",
+    "./themes.css": "./src/themes/themes.css",
+    "./fonts/*": "./fonts/*",
+    "./package.json": "./package.json"
   },
   "peerDependencies": {
     "react": "catalog:"
   },
   "devDependencies": {
     "react": "catalog:",
+    "react-dom": "catalog:",
     "@types/react": "catalog:"
   }
 }

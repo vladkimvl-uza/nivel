@@ -42,8 +42,8 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["packages/*/src/**/*.ts"],
-      exclude: ["**/*.test.ts", "**/types.ts"],
+      include: ["packages/*/src/**/*.{ts,tsx}"],
+      exclude: ["**/*.test.{ts,tsx}", "**/types.ts", "**/testkit.ts", "**/*.suite.ts", "**/test-support/**"],
     },
   },
 });

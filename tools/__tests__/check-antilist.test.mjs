@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { checkAntilist, checkText } from "../check-antilist.mjs";
+import { ROOT } from "../lib/env.mjs";
 
 const dirs = [];
 afterAll(() => {
@@ -36,5 +37,53 @@ describe("check-antilist", () => {
     mkdirSync(join(root, "apps", "web"), { recursive: true });
     writeFileSync(join(root, "apps", "web", "bad.css"), "body { font-family: 'Inter'; color: #0c1230; }\n");
     expect(checkAntilist(root).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("check-antilist: design system rules (DESIGN_SYSTEM section 8)", () => {
+  it("forbids Manrope as a font (it is allowed only as outlines inside the logo SVG)", () => {
+    expect(checkText("a.css", "font-family: Manrope, sans-serif;").join()).toContain('forbidden font "Manrope"');
+    expect(checkText("a.tsx", 'import { Manrope } from "next/font/google";').join()).toContain("Manrope");
+    expect(checkText("a.css", "font-family: var(--sans);")).toEqual([]);
+    expect(checkText("a.css", 'font-family: "Fira Sans", "IBM Plex Mono", "Brygada 1918", "Noto Sans Mono";')).toEqual(
+      [],
+    );
+  });
+
+  it("forbids blur: filter blur(), SVG Gaussian blur, drop-shadow with a color", () => {
+    expect(checkText("a.css", "filter: blur(4px);").join()).toContain("blur");
+    expect(checkText("a.css", "filter: url(#ink);")).toEqual([]);
+    expect(checkText("a.tsx", "<feGaussianBlur stdDeviation={3} />").join()).toContain("blur");
+    expect(checkText("a.css", "filter: drop-shadow(0 0 8px var(--accent));").join()).toContain("drop-shadow");
+  });
+
+  it("does not take the DOM method element.blur() or a local function for the blur filter", () => {
+    expect(checkText("apps/web/src/menu.tsx", "buttonRef.current?.blur();")).toEqual([]);
+    expect(checkText("apps/web/src/menu.tsx", "document.activeElement?.blur();")).toEqual([]);
+    expect(checkText("apps/web/src/form.ts", "input.blur()")).toEqual([]);
+    expect(checkText("apps/web/src/form.ts", 'el.style.filter = "blur(4px)";').join()).toContain("blur");
+    expect(checkText("apps/web/src/form.ts", "const s = `blur(4px)`;").join()).toContain("blur");
+    expect(checkText("a.css", "backdrop-filter:blur(8px);").join()).toBeTruthy();
+  });
+
+  it("forbids a colored text-shadow (a glow) but allows a gray one", () => {
+    expect(checkText("a.css", "text-shadow: 0 0 12px rgba(240, 106, 48, 0.8);").join()).toContain("glow");
+    expect(checkText("packages/ui/src/themes/x.css", "text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);")).toEqual([]);
+    expect(checkText("a.css", "text-shadow: 0 0 6px var(--accent);").join()).toContain("glow");
+  });
+
+  it("forbids cold colors (blue channel above red) in theme files: warm night, no blue", () => {
+    const file = "packages/ui/src/themes/tokens.ts";
+    expect(checkText(file, 'bg: "#2A3F6B",').join()).toContain("cold color #2A3F6B");
+    expect(checkText(file, "--x: #00f;").join()).toContain("cold color #00f");
+    expect(checkText("packages/ui/src/themes/themes.css", "--x: rgba(10, 20, 200, 0.5);").join()).toContain(
+      "cold color",
+    );
+    expect(checkText(file, 'bg: "#121110", ink: "#F1EFEA", accent: "#F06A30",')).toEqual([]);
+    expect(checkText(file, "--line: rgba(29,29,27,.14);")).toEqual([]);
+  });
+
+  it("is clean on this repository: day and night themes, fonts catalog and primitives pass", () => {
+    expect(checkAntilist(ROOT)).toEqual([]);
   });
 });

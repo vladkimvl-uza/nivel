@@ -859,18 +859,16 @@ export declare function chooseSceneMode(env: { reducedMotion: boolean; saveData:
 - `static` (5 кадров ≈ 630 КБ): `prefers-reduced-motion`, `saveData`, 2g/3g, `deviceMemory ≤ 2`, переключатель «Без анимации» (cookie). `sequence` — если замер на реальном Android покажет рывки.
 - Медиа отдаёт Caddy из тома `media` с Range (206) и `immutable` для имён с хэшем. Каждый кадр подписан «visualizatsiya / визуализация».
 
-### 5.7. Дизайн-токены и выбор направления
+### 5.7. Дизайн-токены и тема
 
-- Слой 1 — примитивы палитры nivel-1 (`--nv-asphalt #1D1D1B`, `--nv-signal #D9501A`, `--nv-signal-dark #F06A30`, `--nv-paper #F1EFEA`) и файлы тем из макетов:
-  - `themes/b-pasport.css` — бумага `#F1EFEA`, лист `#F8F7F3`, линейка `#CBC6BB`, сигнал `#D9501A`, текст сигнала `#B5441A`, крафт `#C9A878`; Fira Sans Extra Condensed, Fira Sans, IBM Plex Mono;
-  - `themes/a-masterskaya.css` — бумага, песок `#D8CBB6`, орех `#6E4B2F`, текст сигнала `#B4481A`; Brygada 1918, Roboto Flex, IBM Plex Mono;
-  - `themes/v-noch.css` — ночь `#121110`, поверхность `#1A1816`, текст `#F1EFEA`, приглушённый `#A39C90`, лампа `#E2A867`, акцент `#F06A30`; Roboto Flex, Fira Sans, IBM Plex Mono.
-- Слой 2 — семантические токены, единые для всех тем: `--nv-bg`, `--nv-surface`, `--nv-surface-2`, `--nv-sheet`, `--nv-fg`, `--nv-fg-muted`, `--nv-line`, `--nv-accent`, `--nv-accent-ink` (текст, контраст ≥ 4,5:1), `--nv-on-accent`, `--nv-stamp`, `--nv-font-display`, `--nv-font-text`, `--nv-font-mono`, `--nv-radius` (0–2 px), шкала отступов, `--nv-gutter` (16 px на телефоне), `--nv-maxw`, `--nv-header-h`, `--nv-motion-fast`, `--nv-motion-base`.
+- Тема одна — ночная «Ночная съёмка» (Р-18 от 06.10.2026, ADR-006): `<html data-theme="night">`; переключателя, выбора по времени и настройки темы в админке нет. Админка использует те же токены.
+- Слой 1 — примитивы палитры nivel-1 (`--nv-asphalt #1D1D1B`, `--nv-signal #D9501A`, `--nv-signal-dark #F06A30`, `--nv-paper #F1EFEA`) и токены ночи из `docs/design/day-night/DESIGN_SYSTEM.md`. Источник в коде — `packages/ui/src/themes/tokens.ts`; `themes.css` генерируется из него (только переменные).
+- Слой 2 — семантические токены: `--nv-bg`, `--nv-surface`, `--nv-surface-2`, `--nv-sheet`, `--nv-fg`, `--nv-fg-muted`, `--nv-line`, `--nv-accent`, `--nv-accent-ink` (текст, контраст ≥ 4,5:1), `--nv-on-accent`, `--nv-stamp`, `--nv-font-display`, `--nv-font-text`, `--nv-font-mono`, `--nv-radius` (0–2 px), шкала отступов, `--nv-gutter` (16 px на телефоне), `--nv-maxw`, `--nv-header-h`, `--nv-motion-fast`, `--nv-motion-base`.
+- Документальные блоки из Б (смета со штампами, паспорт сборки) — «бумага» `.nv-paper` внутри ночной страницы и в PDF; цвета бумаги тоже в `tokens.ts`.
 - Tailwind 4: `@theme inline { --color-bg: var(--nv-bg); ... }`; компоненты используют только семантику (`bg-bg text-fg border-line`).
-- Выбор темы во время работы: `<html data-theme="b|a|v">` из `ops.settings.site.theme` (по умолчанию `b`, Р-18); владелец переключает в админке без выпуска, сайт перевыпускает тег `settings`. CSS трёх тем — только переменные (≈ 2 КБ на тему).
-- Шрифты — свои woff2 (OFL) через `next/font/local` с `preload: false`; `@font-face` грузится браузером только для использованных начертаний, а `<link rel="preload">` выводится лишь для основного текстового шрифта выбранной темы. Подмножества latin, latin-ext, cyrillic; тест проверяет глифы U+02BB и U+02BC в каждом файле. Manrope — только в SVG логотипа.
-- Компоненты, специфичные для направления (штампы и бирки Б, фактуры А, свет В), — `packages/ui/src/direction/<b|a|v>/` и строятся только для выбранного.
-- `tools/check-antilist.mjs`: шрифты Geist, Inter, Onest, Source Serif 4; цвета анти-списка брифа; `backdrop-filter`; цветные свечения (`box-shadow` с цветным размытием); сырые HEX и `rgb()` вне файлов тем. Тест контраста пар токенов (WCAG 2.2 AA) для каждой темы.
+- Пакет `@nivel/ui`: вход `.` — ядро без React (токены, шрифты, форматирование; грузится в чистом Node для worker и PDF), вход `./react` — примитивы и компоненты, `./styles.css`, `./themes.css`, `./fonts/*`.
+- Шрифты — свои woff2 (OFL) через `next/font/local`; предзагружается одно начертание (Fira Sans 400), остальные `preload: false`, `display: "swap"` (спайк в ADR-006). Подмножества latin, latin-ext, cyrillic; тест проверяет глифы U+02BB и U+02BC в каждом файле. Manrope — только в SVG логотипа.
+- `tools/check-antilist.mjs`: шрифты Geist, Inter, Onest, Source Serif 4 и Manrope вне логотипа; цвета анти-списка брифа; размытие (`filter: blur`, `backdrop-filter`); цветные свечения (`box-shadow` с цветным размытием); сырые HEX и `rgb()` вне файлов тем. Тест контраста пар токенов (WCAG 2.2 AA).
 
 ### 5.8. Производительность на Android среднего уровня
 
