@@ -5,7 +5,7 @@ import { CONSENT_KINDS } from "@nivel/db";
 import { DbRuleError, type Executor, guarded, ops } from "@nivel/db/repos";
 import { ForbiddenError, ValidationError } from "../orders/errors.ts";
 import { type Runtime, requireCapability, runtimeOf } from "../orders/runtime.ts";
-import { assertText, assertUuid } from "../orders/validate.ts";
+import { assertJsonObject, assertText, assertUuid } from "../orders/validate.ts";
 
 export type ConsentKind = (typeof CONSENT_KINDS)[number];
 
@@ -24,6 +24,8 @@ const MONEY_KINDS: readonly ConsentKind[] = [
   "replacement",
   "third_party_payer",
 ];
+
+const EVIDENCE_LIMITS = { maxBytes: 4096, maxDepth: 3 } as const;
 
 export interface RecordConsentInput {
   kind: ConsentKind;
@@ -57,11 +59,10 @@ export async function record(input: RecordConsentInput, rt?: Runtime): Promise<{
   if (orderId === undefined && ORDER_SCOPE.includes(input.kind)) {
     throw ValidationError.of("orderId", "order_required", `the consent ${input.kind} names an order`);
   }
-  if (
-    input.evidence !== undefined &&
-    (input.evidence === null || typeof input.evidence !== "object" || Array.isArray(input.evidence))
-  ) {
-    throw ValidationError.of("evidence", "evidence_invalid", "evidence must be an object");
+  // The journal is append-only for every role, and the site and the bot write to it: what is kept for good stays small.
+  if (input.evidence !== undefined) assertJsonObject(input.evidence, "evidence", EVIDENCE_LIMITS);
+  if (input.lang !== undefined && input.lang !== "uz" && input.lang !== "ru") {
+    throw ValidationError.of("lang", "lang_invalid", "lang must be uz or ru");
   }
   if (MONEY_KINDS.includes(input.kind)) requireCapability(r, "consents.money");
 

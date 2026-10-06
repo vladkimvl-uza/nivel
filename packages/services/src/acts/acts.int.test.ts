@@ -16,7 +16,16 @@ beforeEach(() => w.clock.set(new Date("2026-10-13T10:00:00+05:00")));
 
 const owner = () => ownerActor(w);
 const actRow = async (id: string) => (await w.db.$client.query("select * from sales.acts where id = $1", [id])).rows[0];
-const tg = { messageId: 4711, telegramUserId: 7100000001 };
+/** What the button of the customer carries when somebody else presses it: the shape is right, the person is not. */
+const tg = { messageId: 4711, telegramUserId: 7_100_000_001 };
+/** The press of the customer of the order: the Telegram id the database knows for him. */
+const tgOf = async (o: { customerId: string }, messageId = 4711) => ({
+  messageId,
+  telegramUserId: Number(
+    (await w.db.$client.query("select telegram_user_id from sales.customers where id = $1", [o.customerId])).rows[0]
+      .telegram_user_id,
+  ),
+});
 const materials = [{ title: "Case Fractal North (customer's own)", qty: 1, serial: "FN-001" }];
 
 describe("acts.generate", () => {
@@ -47,6 +56,20 @@ describe("acts.generate", () => {
     await expect(
       generate({ orderId: o.orderId, kind: "material_acceptance", lines: [{ title: "x", qty: 0 }] }, owner(), w.admin),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("refuses lines that are null or not a list for every kind with a validation error, never a TypeError", async () => {
+    const o = await settledOrder(w);
+    for (const kind of ["material_acceptance", "customer_parts", "handover"] as const) {
+      for (const lines of [null, "x", 5, { length: 2 }]) {
+        await expect(
+          generate({ orderId: o.orderId, kind, lines: lines as never }, owner(), w.admin),
+        ).rejects.toMatchObject({
+          name: "ValidationError",
+          issues: [{ path: "lines", code: "not_a_list" }],
+        });
+      }
+    }
   });
 
   it("refuses a kind that is a key of every object (constructor, toString) and lines that are not a list", async () => {
@@ -105,13 +128,14 @@ describe("acts.sign", () => {
 
   it("the customer signs by the button: the time, the way and the evidence are written once", async () => {
     const { o, actId } = await actOf();
-    const r = await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.admin);
+    const evidence = await tgOf(o);
+    const r = await sign({ actId, via: "tg_button", evidence }, customerActor(o), w.admin);
     expect(r).toEqual({ signed: true, queued: false });
     const row = await actRow(actId);
     expect(row.signed_via).toBe("tg_button");
     expect(row.signed_at).toEqual(w.clock.now());
-    expect(row.evidence).toEqual({ messageId: 4711, telegramUserId: 7100000001 });
-    await expect(sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.admin)).rejects.toMatchObject({
+    expect(row.evidence).toEqual(evidence);
+    await expect(sign({ actId, via: "tg_button", evidence }, customerActor(o), w.admin)).rejects.toMatchObject({
       issues: [{ code: "act_already_signed" }],
     });
   });
@@ -122,11 +146,15 @@ describe("acts.sign", () => {
       issues: [{ code: "via_not_allowed" }],
     });
     await expect(
-      sign({ actId, via: "paper_photo", evidence: { fileId: await newFile(w) } }, customerActor(o), w.admin),
+      sign(
+        { actId, via: "paper_photo", evidence: { fileId: await newFile(w, { kind: "act_photo" }) } },
+        customerActor(o),
+        w.admin,
+      ),
     ).rejects.toMatchObject({
       issues: [{ code: "via_not_allowed" }],
     });
-    const fileId = await newFile(w);
+    const fileId = await newFile(w, { kind: "act_photo" });
     expect(await sign({ actId, via: "paper_photo", evidence: { fileId } }, owner(), w.admin)).toEqual({
       signed: true,
       queued: false,
@@ -150,13 +178,14 @@ describe("acts.sign", () => {
 
   it("the bot cannot write acts: the signature goes to the outbox for the admin side, and the act stays as it is", async () => {
     const { o, actId } = await actOf();
-    const r = await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.bot);
+    const evidence = await tgOf(o);
+    const r = await sign({ actId, via: "tg_button", evidence }, customerActor(o), w.bot);
     expect(r).toEqual({ signed: false, queued: true });
     expect((await actRow(actId)).signed_at).toBeNull();
     const job = await w.db.$client.query("select payload from ops.outbox where dedupe_key = $1", [`act:${actId}:sign`]);
     expect(job.rows[0].payload).toMatchObject({ job: "act.sign", actId, via: "tg_button", orderId: o.orderId });
     // The same press again does not queue it twice.
-    await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.bot);
+    await sign({ actId, via: "tg_button", evidence }, customerActor(o), w.bot);
     expect(
       (
         await w.db.$client.query("select count(*)::int as n from ops.outbox where dedupe_key = $1", [
@@ -195,18 +224,50 @@ describe("acts.sign", () => {
     await expect(
       sign({ actId, via: "tg_button", evidence: { messageId: 0, telegramUserId: 5 } }, customerActor(o), w.admin),
     ).rejects.toMatchObject(evidenceError("evidence.messageId"));
-    await expect(sign({ actId, via: "site_button" }, customerActor(o), w.admin)).rejects.toMatchObject(
-      evidenceError("evidence.sessionId"),
-    );
     expect((await actRow(actId)).signed_at).toBeNull();
-    expect(
-      await sign({ actId, via: "site_button", evidence: { sessionId: "sess-1" } }, customerActor(o), w.admin),
-    ).toEqual({ signed: true, queued: false });
+  });
+
+  it("takes the press only from the person the order belongs to: the Telegram id of the evidence must be the customer's", async () => {
+    const { o, actId } = await actOf();
+    const stranger = await settledOrder(w);
+    const mismatch = {
+      name: "ValidationError",
+      issues: [{ path: "evidence.telegramUserId", code: "evidence_mismatch" }],
+    };
+    for (const rt of [w.admin, w.bot]) {
+      await expect(
+        sign({ actId, via: "tg_button", evidence: await tgOf(stranger) }, customerActor(o), rt),
+      ).rejects.toMatchObject(mismatch);
+      await expect(
+        sign({ actId, via: "tg_button", evidence: { messageId: 1, telegramUserId: 1 } }, customerActor(o), rt),
+      ).rejects.toMatchObject(mismatch);
+    }
+    // Nothing was signed and nothing was queued for the admin side.
+    expect((await actRow(actId)).signed_at).toBeNull();
+    const queued = await w.db.$client.query("select 1 from ops.outbox where dedupe_key = $1", [`act:${actId}:sign`]);
+    expect(queued.rowCount).toBe(0);
+    // A customer without a Telegram id cannot be matched by a press of a button at all.
+    await w.db.$client.query("update sales.customers set telegram_user_id = null where id = $1", [o.customerId]);
+    await expect(sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.admin)).rejects.toMatchObject(
+      mismatch,
+    );
+  });
+
+  it("does not take the button of the site until the session of the customer can be checked, and a photo that is not of an act", async () => {
+    const { o, actId } = await actOf();
+    await expect(
+      sign({ actId, via: "site_button", evidence: { sessionId: "sess-1" } }, customerActor(o), w.admin),
+    ).rejects.toMatchObject({ issues: [{ path: "via", code: "via_not_allowed" }] });
+    const receipt = await newFile(w); // a receipt_photo: registered, but not the paper act
+    await expect(
+      sign({ actId, via: "paper_photo", evidence: { fileId: receipt } }, owner(), w.admin),
+    ).rejects.toMatchObject({ issues: [{ path: "evidence.fileId", code: "file_kind_invalid" }] });
+    expect((await actRow(actId)).signed_at).toBeNull();
   });
 
   it("the bot does not carry the word of the owner: the paper act is recorded in the admin panel, where the owner is known", async () => {
     const { actId } = await actOf();
-    const fileId = await newFile(w);
+    const fileId = await newFile(w, { kind: "act_photo" });
     await expect(sign({ actId, via: "paper_photo", evidence: { fileId } }, owner(), w.bot)).rejects.toBeInstanceOf(
       ForbiddenError,
     );
@@ -217,7 +278,7 @@ describe("acts.sign", () => {
   it("the site cannot read acts and so cannot sign them", async () => {
     const { o, actId } = await actOf();
     await expect(
-      sign({ actId, via: "site_button", evidence: { sessionId: "s1" } }, customerActor(o), w.web),
+      sign({ actId, via: "tg_button", evidence: await tgOf(o) }, customerActor(o), w.web),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -247,12 +308,12 @@ describe("MATERIALS_ACCEPTED needs the signed act of the order", () => {
       owner(),
       w.admin,
     );
-    await sign({ actId: foreign.actId, via: "tg_button", evidence: tg }, customerActor(other), w.admin);
+    await sign({ actId: foreign.actId, via: "tg_button", evidence: await tgOf(other) }, customerActor(other), w.admin);
     const run = (id: string) => dispatch(o.orderId, { type: "MATERIALS_ACCEPTED", actId: id }, owner(), w.admin);
     expect(await run(actId)).toEqual({ ok: false, error: "act_missing" }); // not signed
     expect(await run(foreign.actId)).toEqual({ ok: false, error: "act_missing" }); // another order
     expect(await run("not-a-uuid")).toEqual({ ok: false, error: "act_missing" });
-    await sign({ actId, via: "tg_button", evidence: tg }, customerActor(o), w.admin);
+    await sign({ actId, via: "tg_button", evidence: await tgOf(o) }, customerActor(o), w.admin);
     expect(await run(actId)).toEqual({ ok: true, status: "assembling" });
   });
 });

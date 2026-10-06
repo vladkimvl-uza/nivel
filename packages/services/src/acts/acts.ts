@@ -32,8 +32,15 @@ const ACT_DOC = {
   customer_parts: "act_customer_parts",
   handover: "act_handover",
 } as const;
-const CUSTOMER_WAYS: readonly SignedVia[] = ["tg_button", "site_button"];
+/**
+ * The button of the site is not taken yet: nothing here can tell that the session belongs to the customer of the order
+ * (the actor is the word of the caller). It comes back with the checked session of the customer (R2).
+ */
+const CUSTOMER_WAYS: readonly SignedVia[] = ["tg_button"];
+/** The kind in ops.files of the photo of a paper act; a receipt or any other registered file is not one. */
+export const ACT_PHOTO_FILE_KIND = "act_photo";
 const OWNER_WAYS: readonly SignedVia[] = ["paper_photo"];
+const KNOWN_WAYS: readonly SignedVia[] = ["tg_button", "paper_photo", "site_button"];
 
 function checkLines(lines: readonly ActLine[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -74,11 +81,12 @@ export async function generate(
   const orderId = assertUuid(input.orderId, "orderId");
   if (typeof input.kind !== "string" || !Object.hasOwn(ACT_STATUSES, input.kind))
     throw ValidationError.of("kind", "kind_unknown", `the act kind ${String(input.kind)} does not exist`);
-  if (input.kind === "material_acceptance" && (input.lines === undefined || input.lines.length === 0)) {
-    throw ValidationError.of("lines", "lines_required", "the act of acceptance lists the materials of the customer");
-  }
+  // The shape first: null, a string or a number is "not a list", and only a list can be empty.
   if (input.lines !== undefined && !Array.isArray(input.lines)) {
     throw ValidationError.of("lines", "not_a_list", "the lines of an act must be a list");
+  }
+  if (input.kind === "material_acceptance" && (input.lines === undefined || input.lines.length === 0)) {
+    throw ValidationError.of("lines", "lines_required", "the act of acceptance lists the materials of the customer");
   }
   const lineIssues = checkLines(input.lines ?? []);
   if (lineIssues.length > 0) throw new ValidationError(lineIssues);
@@ -140,6 +148,7 @@ function checkEvidence(via: SignedVia, given: Record<string, unknown> | undefine
     need("telegramUserId", positiveInt(e.telegramUserId), "the Telegram id of the person (evidence.telegramUserId)");
     return { messageId: e.messageId, telegramUserId: e.telegramUserId };
   }
+  // site_button: kept for the day the session of the customer can be checked (see CUSTOMER_WAYS).
   need(
     "sessionId",
     typeof e.sessionId === "string" && e.sessionId.trim() !== "" && e.sessionId.length <= 200,
@@ -164,11 +173,11 @@ export async function sign(
   }
   if (!can(r, "orders.read")) throw new ForbiddenError("the site role cannot read acts and so cannot sign them");
   const actId = assertUuid(input.actId, "actId");
-  if (![...CUSTOMER_WAYS, ...OWNER_WAYS].includes(input.via)) {
+  if (!KNOWN_WAYS.includes(input.via)) {
     throw ValidationError.of(
       "via",
       "via_unknown",
-      `the way of signing must be one of tg_button, paper_photo, site_button`,
+      "the way of signing must be one of tg_button, paper_photo, site_button",
     );
   }
   if (
@@ -193,8 +202,32 @@ export async function sign(
     const order = await sales.getOrder(tx, act.orderId);
     if (!order || (actor.kind === "customer" && order.customerId !== actor.id)) throw new NotFoundError("act");
     if (act.signedAt !== null) throw ValidationError.of("actId", "act_already_signed", "the act is already signed");
-    if (input.via === "paper_photo" && !(await ops.getFile(tx, evidence.fileId as string))) {
-      throw ValidationError.of("evidence.fileId", "file_unknown", "the file of the paper act is not registered");
+    if (input.via === "paper_photo") {
+      const file = await ops.getFile(tx, evidence.fileId as string);
+      if (!file)
+        throw ValidationError.of("evidence.fileId", "file_unknown", "the file of the paper act is not registered");
+      if (file.kind !== ACT_PHOTO_FILE_KIND) {
+        throw ValidationError.of(
+          "evidence.fileId",
+          "file_kind_invalid",
+          `the file of the paper act must be registered as ${ACT_PHOTO_FILE_KIND}, not ${file.kind}`,
+        );
+      }
+    }
+    if (input.via === "tg_button") {
+      // The press must be the press of the person the order belongs to: the Telegram id of the evidence is compared
+      // with the one the database holds for the customer of the order, here and again by the admin side that writes it.
+      const customer = await tx.query.customers.findFirst({
+        columns: { telegramUserId: true },
+        where: (t, { eq }) => eq(t.id, order.customerId),
+      });
+      if (customer?.telegramUserId == null || customer.telegramUserId !== evidence.telegramUserId) {
+        throw ValidationError.of(
+          "evidence.telegramUserId",
+          "evidence_mismatch",
+          "the Telegram id of the press is not the Telegram id of the customer of the order",
+        );
+      }
     }
 
     if (!can(r, "acts.write")) {

@@ -129,6 +129,33 @@ describe("consents.record", () => {
   });
 });
 
+describe("consents.record: the free evidence of a journal that is never cleaned", () => {
+  it("limits the size and the depth of the evidence for the site and the bot alike, and the language to uz or ru", async () => {
+    const { customerId } = await newOrder();
+    const ok = { kind: "pd_processing", customerId, granted: true, channel: "site" } as const;
+    let deep: Record<string, unknown> = { v: 1 };
+    for (let i = 0; i < 4; i++) deep = { n: deep };
+    for (const rt of [w.web, w.bot]) {
+      await expect(record({ ...ok, evidence: { blob: "x".repeat(5000) } }, rt)).rejects.toMatchObject({
+        name: "ValidationError",
+        issues: [{ path: "evidence", code: "json_too_large" }],
+      });
+      await expect(record({ ...ok, evidence: deep }, rt)).rejects.toMatchObject({
+        issues: [{ path: "evidence", code: "json_too_deep" }],
+      });
+      await expect(record({ ...ok, evidence: [1] as never }, rt)).rejects.toMatchObject({
+        issues: [{ path: "evidence", code: "json_invalid" }],
+      });
+      await expect(record({ ...ok, lang: "en" as never }, rt)).rejects.toMatchObject({
+        issues: [{ path: "lang", code: "lang_invalid" }],
+      });
+    }
+    const r = await record({ ...ok, lang: "uz", evidence: { ref: "tg:1", n: { a: { b: 1 } } } }, w.web);
+    const { rows } = await w.db.$client.query("select lang, evidence from ops.consents where id = $1", [r.id]);
+    expect(rows[0]).toEqual({ lang: "uz", evidence: { ref: "tg:1", n: { a: { b: 1 } } } });
+  });
+});
+
 describe("verifyAcceptConsents", () => {
   it("accepts the consents named by the event when they are the latest of their kinds", async () => {
     const { orderId, customerId } = await newOrder();

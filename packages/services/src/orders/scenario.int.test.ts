@@ -236,7 +236,7 @@ describe("the whole life of an order", () => {
     );
     await refused({ type: "MATERIALS_ACCEPTED", actId: materialsAct.actId }, owner, "act_missing"); // not signed
     await signAct(
-      { actId: materialsAct.actId, via: "tg_button", evidence: { messageId: 100, telegramUserId: 7_400_000_001 } },
+      { actId: materialsAct.actId, via: "tg_button", evidence: { messageId: 100, telegramUserId: 7_900_000_001 } },
       customer,
       w.admin,
     );
@@ -273,7 +273,7 @@ describe("the whole life of an order", () => {
     await confirm({ paymentId: finalPayment?.id as string, fiscalReceiptNo: "FR-2026-0002" }, owner, w.admin);
     // The customer presses "Qabul qildim": an event of the customer through the bot.
     await signAct(
-      { actId: handoverAct.actId, via: "tg_button", evidence: { messageId: 101, telegramUserId: 7_400_000_001 } },
+      { actId: handoverAct.actId, via: "tg_button", evidence: { messageId: 101, telegramUserId: 7_900_000_001 } },
       customer,
       w.admin,
     );
