@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 // Test helper: seeded property runner. fast-check 4.10.2 is in the pnpm catalog but is not a dependency of
 // @nivel/domain yet (integrator request); this runner has the same shape so the properties port one-to-one.
 
@@ -41,4 +43,12 @@ export function forAll(body: (g: Gen, run: number) => void, opts: { runs?: numbe
       throw new Error(`property failed (seed ${caseSeed}, run ${run}): ${(e as Error).message}`, { cause: e });
     }
   }
+}
+
+/** Reads a file relative to the repository root, found from the absolute path of the running test file. */
+export function readRepoFile(testPath: string | undefined, relative: string): string {
+  const p = (testPath ?? "").replaceAll("\\", "/");
+  const at = p.lastIndexOf("/packages/domain/");
+  if (at < 0) throw new Error(`Cannot locate the repository root from ${String(testPath)}`);
+  return readFileSync(`${p.slice(0, at)}/${relative}`, "utf8");
 }

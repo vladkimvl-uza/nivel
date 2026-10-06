@@ -45,7 +45,7 @@ function pcPart(base: Sum, s: FeeSettings, complexBuild: boolean): FeePart {
 
 /** Fee on the PC scale, no complex build. Used by the budget inversion. */
 function pcScaleFee(base: Sum, s: FeeSettings): Sum {
-  return base === 0 ? sum(0) : pcPart(base, s, false).amount;
+  return pcPart(base, s, false).amount;
 }
 
 /**

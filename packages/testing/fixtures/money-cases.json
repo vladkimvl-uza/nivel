@@ -1,0 +1,1195 @@
+{
+  "version": 1,
+  "about": "Shared money cases for packages/domain and the database (ADR-004, ARCHITECTURE 3.4). Expected values come from CONCEPT 1.2/2.5 and ARCHITECTURE 3.4/4.6/4.7, not from code. All sums are whole sums, rates are basis points. Fee cases use DEFAULT_FEE_SETTINGS version 2026-10-05.",
+  "sections": {
+    "applyBp": "domain and database: floor(base x rateBp / 10000) must equal the floor column",
+    "split": "domain and database: largest-remainder split, ties to the lower index",
+    "fee": "domain; the database checks fee_total = fee_commission_line + fee_works_line = fee_advance + fee_final on quotes",
+    "payments": "domain validatePayment and the payments CHECK (3.4): valid=false must be rejected by both",
+    "cancel": "domain settleCancellation; the database checks the closure invariant on fundsToRefund (3.4)"
+  },
+  "applyBp": [
+    {
+      "base": 19999999,
+      "rateBp": 1500,
+      "floor": 2999999,
+      "half_up": 3000000,
+      "ceil": 3000000
+    },
+    {
+      "base": 1,
+      "rateBp": 1500,
+      "floor": 0,
+      "half_up": 0,
+      "ceil": 1
+    },
+    {
+      "base": 10000000,
+      "rateBp": 1500,
+      "floor": 1500000,
+      "half_up": 1500000,
+      "ceil": 1500000
+    },
+    {
+      "base": 6700007,
+      "rateBp": 1500,
+      "floor": 1005001,
+      "half_up": 1005001,
+      "ceil": 1005002
+    }
+  ],
+  "split": [
+    {
+      "total": 1000000,
+      "sharesBp": [3000, 7000],
+      "parts": [300000, 700000]
+    },
+    {
+      "total": 1000001,
+      "sharesBp": [3000, 7000],
+      "parts": [300000, 700001]
+    },
+    {
+      "total": 3240001,
+      "sharesBp": [5000, 5000],
+      "parts": [1620001, 1620000]
+    },
+    {
+      "total": 100,
+      "sharesBp": [3333, 3333, 3334],
+      "parts": [33, 33, 34]
+    },
+    {
+      "total": 1,
+      "sharesBp": [3000, 7000],
+      "parts": [0, 1]
+    },
+    {
+      "total": 0,
+      "sharesBp": [3000, 7000],
+      "parts": [0, 0]
+    }
+  ],
+  "fee": [
+    {
+      "name": "CONCEPT 1.2: study PC 5 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 5000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 750000,
+      "advance": 225000,
+      "final": 525000,
+      "commissionLine": 375000,
+      "worksLine": 375000
+    },
+    {
+      "name": "CONCEPT 1.2: 1080p gaming 10 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 10000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 1500000,
+      "advance": 450000,
+      "final": 1050000,
+      "commissionLine": 750000,
+      "worksLine": 750000
+    },
+    {
+      "name": "CONCEPT 1.2: 2K gaming 15 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 15000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 2250000,
+      "advance": 675000,
+      "final": 1575000,
+      "commissionLine": 1125000,
+      "worksLine": 1125000
+    },
+    {
+      "name": "CONCEPT 1.2: 2K-4K 25 mln, minimum 3 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 25000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 3000000,
+      "advance": 900000,
+      "final": 2100000,
+      "commissionLine": 1500000,
+      "worksLine": 1500000
+    },
+    {
+      "name": "CONCEPT 1.2: workstation 40 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 40000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 4000000,
+      "advance": 1200000,
+      "final": 2800000,
+      "commissionLine": 2000000,
+      "worksLine": 2000000
+    },
+    {
+      "name": "CONCEPT 1.2: flagship 60 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 60000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 6000000,
+      "advance": 1800000,
+      "final": 4200000,
+      "commissionLine": 3000000,
+      "worksLine": 3000000
+    },
+    {
+      "name": "CONCEPT 1.2: setup PC 17.5 mln + mounting 7.5 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 17500000
+        },
+        {
+          "group": "mount",
+          "amount": 7500000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 3750000,
+      "advance": 1125000,
+      "final": 2625000,
+      "commissionLine": 1875000,
+      "worksLine": 1875000
+    },
+    {
+      "name": "full cycle minimum 6.7 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 6700000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 1005000,
+      "advance": 301500,
+      "final": 703500,
+      "commissionLine": 502500,
+      "worksLine": 502500
+    },
+    {
+      "name": "just below 20 mln: no jump",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 19999999
+        }
+      ],
+      "complexBuild": false,
+      "fee": 2999999,
+      "advance": 900000,
+      "final": 2099999,
+      "commissionLine": 1500000,
+      "worksLine": 1499999
+    },
+    {
+      "name": "exactly 20 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 20000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 3000000,
+      "advance": 900000,
+      "final": 2100000,
+      "commissionLine": 1500000,
+      "worksLine": 1500000
+    },
+    {
+      "name": "average order 29.9 mln",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 29900000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 3000000,
+      "advance": 900000,
+      "final": 2100000,
+      "commissionLine": 1500000,
+      "worksLine": 1500000
+    },
+    {
+      "name": "30 mln plus 10 sum: first sum above the minimum",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 30000010
+        }
+      ],
+      "complexBuild": false,
+      "fee": 3000001,
+      "advance": 900000,
+      "final": 2100001,
+      "commissionLine": 1500001,
+      "worksLine": 1500000
+    },
+    {
+      "name": "complex build 40 mln: 15 % at any budget",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 40000000
+        }
+      ],
+      "complexBuild": true,
+      "fee": 6000000,
+      "advance": 1800000,
+      "final": 4200000,
+      "commissionLine": 3000000,
+      "worksLine": 3000000
+    },
+    {
+      "name": "outside-scale lines carry no fee",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 10000000
+        },
+        {
+          "group": "outside_scale",
+          "amount": 5000000
+        }
+      ],
+      "complexBuild": false,
+      "fee": 1500000,
+      "advance": 450000,
+      "final": 1050000,
+      "commissionLine": 750000,
+      "worksLine": 750000
+    },
+    {
+      "name": "customer-owned lines are not in the base",
+      "lines": [
+        {
+          "group": "pc",
+          "amount": 10000000
+        },
+        {
+          "group": "pc",
+          "amount": 5000000,
+          "customerOwned": true
+        }
+      ],
+      "complexBuild": false,
+      "fee": 1500000,
+      "advance": 450000,
+      "final": 1050000,
+      "commissionLine": 750000,
+      "worksLine": 750000
+    }
+  ],
+  "payments": [
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "merchant_card",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "fee_extra",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": false
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "confirmed",
+      "fiscalReceiptNo": null,
+      "valid": true
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "confirmed",
+      "fiscalReceiptNo": "FM-000123",
+      "valid": true
+    },
+    {
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "void",
+      "fiscalReceiptNo": null,
+      "valid": true
+    }
+  ],
+  "cancel": [
+    {
+      "name": "before accept",
+      "point": "before_accept",
+      "fee": 1000000,
+      "feePaid": 0,
+      "fundsReceived": 10300000,
+      "receiptsTotal": 0,
+      "shopRefunds": 0,
+      "documentedLosses": 0,
+      "expect": {
+        "feeEarned": 0,
+        "feeToRefund": 0,
+        "feeToInvoice": 0,
+        "fundsToRefund": 10300000,
+        "partsGoTo": "none"
+      }
+    },
+    {
+      "name": "after accept, before purchase: 10 % of the fee returns",
+      "point": "after_accept_before_purchase",
+      "fee": 1000000,
+      "feePaid": 300000,
+      "fundsReceived": 10300000,
+      "receiptsTotal": 0,
+      "shopRefunds": 0,
+      "documentedLosses": 0,
+      "expect": {
+        "feeEarned": 200000,
+        "feeToRefund": 100000,
+        "feeToInvoice": 0,
+        "fundsToRefund": 10300000,
+        "partsGoTo": "none"
+      }
+    },
+    {
+      "name": "after purchase: 50 % earned, rest invoiced",
+      "point": "after_purchase_before_assembly",
+      "fee": 1000000,
+      "feePaid": 300000,
+      "fundsReceived": 10300000,
+      "receiptsTotal": 9900000,
+      "shopRefunds": 200000,
+      "documentedLosses": 50000,
+      "expect": {
+        "feeEarned": 500000,
+        "feeToRefund": 0,
+        "feeToInvoice": 200000,
+        "fundsToRefund": 550000,
+        "partsGoTo": "shop_or_client"
+      }
+    },
+    {
+      "name": "during assembly, 50 % done",
+      "point": "during_assembly",
+      "fee": 1000000,
+      "feePaid": 300000,
+      "fundsReceived": 10300000,
+      "receiptsTotal": 10000000,
+      "shopRefunds": 0,
+      "documentedLosses": 0,
+      "assemblyDoneBp": 5000,
+      "expect": {
+        "feeEarned": 675000,
+        "feeToRefund": 0,
+        "feeToInvoice": 375000,
+        "fundsToRefund": 300000,
+        "partsGoTo": "client"
+      }
+    },
+    {
+      "name": "after tests, before handover: 85 % retained",
+      "point": "after_tests_before_handover",
+      "fee": 1000000,
+      "feePaid": 300000,
+      "fundsReceived": 10300000,
+      "receiptsTotal": 10000000,
+      "shopRefunds": 0,
+      "documentedLosses": 0,
+      "expect": {
+        "feeEarned": 850000,
+        "feeToRefund": 0,
+        "feeToInvoice": 550000,
+        "fundsToRefund": 300000,
+        "partsGoTo": "client"
+      }
+    }
+  ]
+}

@@ -144,6 +144,7 @@ describe("computeFee: complex build, groups and exclusions", () => {
 
   it("rejects negative or fractional quantities and unsafe line sums", () => {
     expect(() => computeFee([pcLine(1_000, { qty: -1 })], D, { complexBuild: false })).toThrow(RangeError);
+    expect(() => computeFee([pcLine(-1)], D, { complexBuild: false })).toThrow(RangeError);
     expect(() => computeFee([pcLine(1_000, { qty: 1.5 })], D, { complexBuild: false })).toThrow(RangeError);
     expect(() => computeFee([pcLine(Number.MAX_SAFE_INTEGER, { qty: 2 })], D, { complexBuild: false })).toThrow(
       RangeError,
