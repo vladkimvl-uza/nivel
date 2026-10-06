@@ -86,8 +86,11 @@ describe("AI journal (written by the site role)", () => {
     expect(await purgeExpiredConversations(admin, new Date())).toBeGreaterThanOrEqual(1);
     expect(await listMessages(admin, old)).toEqual([]);
     expect(await listMessages(admin, fresh)).toHaveLength(1);
-    // The 90-day default lies ahead of "now" but behind a date 91 days later.
-    expect(await purgeExpiredConversations(admin, new Date(Date.now() + 91 * 86_400_000))).toBeGreaterThanOrEqual(1);
+    // A date in the future does not reach what has not expired: the function never looks past the database clock.
+    expect(await purgeExpiredConversations(admin, new Date(Date.now() + 91 * 86_400_000))).toBe(0);
+    expect(await listMessages(admin, fresh)).toHaveLength(1);
+    await admin.$client.query("update ai.conversations set purge_after = '2020-01-01' where id = $1", [fresh]);
+    expect(await purgeExpiredConversations(admin)).toBeGreaterThanOrEqual(1);
     expect(await listMessages(admin, fresh)).toEqual([]);
   });
 });

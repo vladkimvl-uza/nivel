@@ -33,6 +33,52 @@ CREATE TRIGGER audit_log_append_only BEFORE UPDATE OR DELETE ON ops.audit_log
 CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON ops.audit_log
   FOR EACH STATEMENT EXECUTE FUNCTION ops.forbid_mutation();
 --> statement-breakpoint
+-- The public processes (site, bot, worker) cannot choose the time of a journal row: the latest consent of a kind
+-- decides, so a row dated in the future would outlive every withdrawal. The migrator and the admin keep their own
+-- time (seed, imports, corrections by reversing rows).
+CREATE FUNCTION ops.stamp_time() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF session_user IN ('nivel_web', 'nivel_bot', 'nivel_worker') THEN
+    NEW.at := clock_timestamp();
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER audit_log_stamp BEFORE INSERT ON ops.audit_log
+  FOR EACH ROW EXECUTE FUNCTION ops.stamp_time();
+--> statement-breakpoint
+-- Consents: server time for the public roles; an order-level consent belongs to the customer of the order; the
+-- site does not record the consents that move money (limit overrun, no receipt, replacement, third-party payer):
+-- the bot and the admin do, after the customer's answer.
+CREATE FUNCTION ops.guard_consent() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
+DECLARE
+  v_customer uuid;
+BEGIN
+  IF session_user IN ('nivel_web', 'nivel_bot', 'nivel_worker') THEN
+    NEW.at := clock_timestamp();
+  END IF;
+  IF session_user = 'nivel_web'
+     AND NEW.kind IN ('limit_overrun', 'no_receipt_purchase', 'replacement', 'third_party_payer') THEN
+    RAISE EXCEPTION 'actor_not_allowed: the site cannot record the consent %', NEW.kind
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.order_id IS NOT NULL THEN
+    SELECT o.customer_id INTO v_customer FROM sales.orders o WHERE o.id = NEW.order_id;
+    IF v_customer IS DISTINCT FROM NEW.customer_id THEN
+      RAISE EXCEPTION 'consent_mismatch: the consent % names another customer than the order %', NEW.kind, NEW.order_id
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER consents_guard BEFORE INSERT ON ops.consents
+  FOR EACH ROW EXECUTE FUNCTION ops.guard_consent();
+--> statement-breakpoint
 CREATE TRIGGER consents_append_only BEFORE UPDATE OR DELETE ON ops.consents
   FOR EACH ROW EXECUTE FUNCTION ops.forbid_mutation();
 --> statement-breakpoint
@@ -48,19 +94,27 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
       ORDER BY c.at DESC, c.id DESC LIMIT 1), false)
 $$;
 --> statement-breakpoint
--- Public numbers: L-2026-0001, NV-2026-0001, G-2026-0001. Gap-free inside the caller's transaction.
+-- Public numbers: L-2026-0001, NV-2026-0001, G-2026-0001. Gap-free inside the caller's transaction. The site and the
+-- bot only open leads: a number of another kind, or of a year far from the current one, would burn a number or add
+-- counter rows. The worker has no use for numbers (the function is not granted to it).
 CREATE FUNCTION ops.next_number(p_kind text, p_year integer) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
   v integer;
+  v_year integer := extract(year FROM now() AT TIME ZONE 'Asia/Tashkent')::integer;
 BEGIN
   IF p_kind NOT IN ('L', 'NV', 'G') THEN
     RAISE EXCEPTION 'unknown_number_kind: %', p_kind USING ERRCODE = 'invalid_parameter_value';
   END IF;
+  IF session_user IN ('nivel_web', 'nivel_bot') AND (p_kind <> 'L' OR p_year NOT BETWEEN v_year - 1 AND v_year + 1) THEN
+    RAISE EXCEPTION 'number_not_allowed: % may only take lead numbers of the current year, not % %', session_user, p_kind, p_year
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
   INSERT INTO ops.number_counters AS c (kind, year, last_value) VALUES (p_kind, p_year, 1)
   ON CONFLICT (kind, year) DO UPDATE SET last_value = c.last_value + 1
   RETURNING c.last_value INTO v;
-  RETURN p_kind || '-' || p_year::text || '-' || lpad(v::text, 4, '0');
+  -- Four digits at least; lpad alone would cut a longer number (the table CHECKs allow four digits or more).
+  RETURN p_kind || '-' || p_year::text || '-' || CASE WHEN v < 10000 THEN lpad(v::text, 4, '0') ELSE v::text END;
 END
 $$;
 --> statement-breakpoint

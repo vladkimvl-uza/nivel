@@ -14,6 +14,9 @@ export type DbRuleCode =
   | "no_current_quote"
   | "actor_not_allowed"
   | "change_not_allowed"
+  | "counters_only_grow"
+  | "number_not_allowed"
+  | "consent_mismatch"
   | "payments_incomplete"
   | "invalid_transition"
   | "stale_status"
@@ -39,6 +42,9 @@ const KEYED: ReadonlySet<string> = new Set<DbRuleCode>([
   "no_current_quote",
   "actor_not_allowed",
   "change_not_allowed",
+  "counters_only_grow",
+  "number_not_allowed",
+  "consent_mismatch",
   "payments_incomplete",
   "invalid_transition",
   "stale_status",

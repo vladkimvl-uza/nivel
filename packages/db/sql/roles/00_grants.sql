@@ -10,7 +10,8 @@ GRANT EXECUTE ON FUNCTION
   catalog.spec_complete(text, jsonb)
 TO nivel_web, nivel_admin, nivel_bot, nivel_worker;
 --> statement-breakpoint
-GRANT EXECUTE ON FUNCTION ops.next_number(text, integer) TO nivel_web, nivel_admin, nivel_bot, nivel_worker;
+-- Lead numbers: the site and the bot; orders and warranty cases: the admin. The worker takes no numbers.
+GRANT EXECUTE ON FUNCTION ops.next_number(text, integer) TO nivel_web, nivel_admin, nivel_bot;
 --> statement-breakpoint
 GRANT EXECUTE ON FUNCTION sales.apply_transition(uuid, jsonb, text, text, text, jsonb, jsonb)
   TO nivel_web, nivel_admin, nivel_bot, nivel_worker;
@@ -46,10 +47,19 @@ GRANT SELECT (id, customer_id, order_id, kind, granted, at) ON ops.consents TO n
 --> statement-breakpoint
 GRANT SELECT (id, dedupe_key, status) ON ops.outbox TO nivel_web;
 --> statement-breakpoint
--- ai.* already has SELECT, INSERT (WP-00); the conversation and the daily counters are updated as the dialogue goes.
-GRANT UPDATE ON ai.conversations TO nivel_web;
+-- ai.* already has SELECT, INSERT (WP-00); the counters of the conversation and of the day are updated as the
+-- dialogue goes. purge_after (the 90-day retention) and the identity columns are not the site's to change; the
+-- counters only grow (trigger ai.guard_*_counters).
+GRANT UPDATE (cost_micro_usd, filter_hits, outcome, lead_id, configuration_id) ON ai.conversations TO nivel_web;
 --> statement-breakpoint
 GRANT INSERT, UPDATE ON ai.usage_daily TO nivel_web;
+--> statement-breakpoint
+-- Partner data (price list links, contacts, prices per vendor) is for the worker and the admin. The public
+-- processes read prices through pricing.fx_rates, pricing.market_prices and the views, which run with the rights of
+-- their owner. WP-00 gave SELECT on every pricing table by default; this takes it back where it does not belong.
+REVOKE SELECT ON
+  pricing.vendors, pricing.offers, pricing.sku_mappings, pricing.price_imports, pricing.price_observations
+FROM nivel_web, nivel_bot;
 --> statement-breakpoint
 GRANT SELECT ON
   sales.v_customer_order_status, sales.v_customer_order_quotes,
@@ -100,3 +110,15 @@ GRANT SELECT ON ai.conversations, ai.messages TO nivel_worker;
 GRANT SELECT, INSERT, UPDATE ON ai.usage_daily TO nivel_worker;
 --> statement-breakpoint
 GRANT SELECT ON bot.subscriptions TO nivel_worker;
+--> statement-breakpoint
+-- Retention of the bot tables (ARCHITECTURE 9): the worker removes old updates and idle sessions. It reads only the
+-- columns the WHERE clause needs; a session's content stays out of reach.
+GRANT USAGE ON SCHEMA bot TO nivel_worker;
+--> statement-breakpoint
+GRANT SELECT (update_id, at) ON bot.processed_updates TO nivel_worker;
+--> statement-breakpoint
+GRANT DELETE ON bot.processed_updates TO nivel_worker;
+--> statement-breakpoint
+GRANT SELECT (key, updated_at) ON bot.sessions TO nivel_worker;
+--> statement-breakpoint
+GRANT DELETE ON bot.sessions TO nivel_worker;

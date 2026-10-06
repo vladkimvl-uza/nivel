@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { connectAs, createOrder, insertPayment, insertPurchase, one, uniq } from "./testkit.ts";
+import { connectAs, createOrder, insertPayment, insertPurchase, one, pgError, uniq } from "./testkit.ts";
 
 // ARCHITECTURE 3.1, 3.3, 3.5, 4.8: views, public numbers, settings versions, consents.
 let c: pg.Client;
@@ -187,14 +187,15 @@ describe("ops.next_number", () => {
     expect(again.n).toBe("G-2033-0001");
   });
 
-  it("hands out unique numbers to concurrent callers and is open to the site role", async () => {
-    const callers = await Promise.all([connectAs("WEB"), connectAs("BOT"), connectAs("WORKER")]);
+  it("hands out unique numbers to concurrent callers of the site and the bot", async () => {
+    const year = new Date().getUTCFullYear();
+    const callers = await Promise.all([connectAs("WEB"), connectAs("BOT"), connectAs("WEB")]);
     try {
       const perCaller = await Promise.all(
         callers.map(async (cl) => {
           const out: string[] = [];
           for (let i = 0; i < 4; i++) {
-            const r = await cl.query<{ n: string }>("select ops.next_number('L', 2034) as n");
+            const r = await cl.query<{ n: string }>("select ops.next_number('L', $1) as n", [year]);
             out.push(r.rows[0]?.n ?? "");
           }
           return out;
@@ -205,6 +206,42 @@ describe("ops.next_number", () => {
     } finally {
       for (const cl of callers) await cl.end();
     }
+  });
+
+  it("gives the public roles only lead numbers of the current year and the worker no numbers at all", async () => {
+    const year = new Date().getUTCFullYear();
+    for (const role of ["WEB", "BOT"] as const) {
+      const cl = await connectAs(role);
+      try {
+        const refused = [
+          ["NV", year],
+          ["G", year],
+          ["L", 2999],
+          ["L", year + 5],
+          ["L", 1999],
+        ] as const;
+        for (const [kind, y] of refused) {
+          const e = await pgError(cl, "select ops.next_number($1, $2)", [kind, y]);
+          expect(e.message, `${role} ${kind} ${y}`).toMatch(/number_not_allowed/);
+        }
+      } finally {
+        await cl.end();
+      }
+    }
+    const w = await connectAs("WORKER");
+    try {
+      expect((await pgError(w, "select ops.next_number('L', $1)", [year])).code).toBe("42501");
+    } finally {
+      await w.end();
+    }
+  });
+
+  it("keeps counting after 9999 instead of cutting the number to four digits", async () => {
+    await admin.query("insert into ops.number_counters (kind, year, last_value) values ('L', 2036, 9998)");
+    const a = await one<{ n: string }>(admin, "select ops.next_number('L', 2036) as n");
+    const b = await one<{ n: string }>(admin, "select ops.next_number('L', 2036) as n");
+    const c = await one<{ n: string }>(admin, "select ops.next_number('L', 2036) as n");
+    expect([a.n, b.n, c.n]).toEqual(["L-2036-9999", "L-2036-10000", "L-2036-10001"]);
   });
 
   it("refuses an unknown kind and the format of a printed number fits the table checks", async () => {

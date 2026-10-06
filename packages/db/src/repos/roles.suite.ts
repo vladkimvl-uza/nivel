@@ -274,3 +274,146 @@ describe("functions", () => {
     for (const r of rows as unknown as { fn: string; public_exec: boolean }[]) expect(r.public_exec, r.fn).toBe(false);
   });
 });
+
+describe("the public roles cannot see partner data", () => {
+  const PARTNER_TABLES = [
+    "pricing.vendors",
+    "pricing.offers",
+    "pricing.sku_mappings",
+    "pricing.price_imports",
+    "pricing.price_observations",
+  ];
+  it.each(PARTNER_TABLES)("keeps %s from the site and the bot", async (table) => {
+    expect((await pgError(web, `select * from ${table}`)).code).toBe(DENIED);
+    expect((await pgError(bot, `select * from ${table}`)).code).toBe(DENIED);
+  });
+
+  it("still gives them the public price data and the worker the partner data", async () => {
+    for (const c of [web, bot]) {
+      await c.query("select 1 from pricing.fx_rates limit 1");
+      await c.query("select 1 from pricing.market_prices limit 1");
+      await c.query("select 1 from pricing.v_market_price_current limit 1");
+    }
+    for (const t of PARTNER_TABLES) await worker.query(`select 1 from ${t} limit 1`);
+  });
+});
+
+describe("the AI counters of the site", () => {
+  it("cannot extend the retention of a conversation or reset the spend counters", async () => {
+    const c = await one<{ id: string }>(
+      web,
+      "insert into ai.conversations (channel, lang, model, cost_micro_usd) values ('web', 'uz', 'm', 500) returning id",
+    );
+    expect((await pgError(web, "update ai.conversations set purge_after = 'infinity' where id = $1", [c.id])).code).toBe(
+      DENIED,
+    );
+    expect((await pgError(web, "update ai.conversations set cost_micro_usd = 0 where id = $1", [c.id])).message).toMatch(
+      /counters_only_grow/,
+    );
+    await web.query("update ai.conversations set cost_micro_usd = cost_micro_usd + 5, filter_hits = 2 where id = $1", [
+      c.id,
+    ]);
+    const day = `2036-01-${String(10 + (uniq() % 15))}`;
+    await web.query("insert into ai.usage_daily (day, model, cost_micro_usd, conversations) values ($1, 'm', 10, 1)", [
+      day,
+    ]);
+    expect(
+      (await pgError(web, "update ai.usage_daily set cost_micro_usd = 0 where day = $1 and model = 'm'", [day])).message,
+    ).toMatch(/counters_only_grow/);
+    expect(
+      (await pgError(web, "update ai.usage_daily set conversations = 0 where day = $1 and model = 'm'", [day])).message,
+    ).toMatch(/counters_only_grow/);
+    await web.query("update ai.usage_daily set cost_micro_usd = cost_micro_usd + 1 where day = $1 and model = 'm'", [
+      day,
+    ]);
+  });
+});
+
+describe("the bot schema and the worker", () => {
+  it("lets the worker read subscriptions and clean the bot tables", async () => {
+    await worker.query("select 1 from bot.subscriptions limit 1");
+    await bot.query("insert into bot.processed_updates (update_id) values ($1)", [uniq() + 6_000_000]);
+    await worker.query("delete from bot.processed_updates where at < now() - interval '7 days'");
+    await worker.query("delete from bot.sessions where updated_at < now() - interval '90 days'");
+    expect((await pgError(worker, "insert into bot.sessions (key, value) values ('w', '{}')")).code).toBe(DENIED);
+  });
+});
+
+describe("journal rows written by the public roles", () => {
+  it.each(["web", "bot", "worker"] as const)("get the server time, not the time the %s gives", async (who) => {
+    const c = { web, bot, worker }[who];
+    const entity = `time-${who}-${uniq()}`;
+    await c.query("insert into ops.audit_log (actor, action, entity, at) values ($1, 'x', $2, '2999-01-01')", [
+      who,
+      entity,
+    ]);
+    const row = await one<{ in_future: boolean }>(
+      migrator,
+      "select at > now() + interval '1 minute' as in_future from ops.audit_log where entity = $1",
+      [entity],
+    );
+    expect(row.in_future).toBe(false);
+  });
+
+  it.each(["web", "bot"] as const)("makes a consent of %s a row of now: it cannot outlive a withdrawal", async (who) => {
+    const c = { web, bot }[who];
+    const o = await createOrder(migrator);
+    await c.query(
+      "insert into ops.consents (customer_id, order_id, kind, granted, at) values ($1, $2, 'non_returnable', true, '2999-01-01')",
+      [o.customerId, o.orderId],
+    );
+    await c.query("insert into ops.consents (customer_id, order_id, kind, granted) values ($1, $2, 'non_returnable', false)", [
+      o.customerId,
+      o.orderId,
+    ]);
+    const latest = await one<{ granted: boolean }>(migrator, "select ops.consent_granted($1, 'non_returnable') as granted", [
+      o.orderId,
+    ]);
+    expect(latest.granted).toBe(false);
+  });
+
+  it("keeps the time the migrator and the admin give (seed, imports, tests)", async () => {
+    const o = await createOrder(migrator);
+    await migrator.query(
+      "insert into ops.consents (customer_id, order_id, kind, granted, at) values ($1, $2, 'non_returnable', true, '2026-01-01')",
+      [o.customerId, o.orderId],
+    );
+    const row = await one<{ at: Date }>(migrator, "select at from ops.consents where order_id = $1", [o.orderId]);
+    expect(row.at.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it.each(["web", "bot"] as const)("refuses a consent of %s for an order of another customer", async (who) => {
+    const c = { web, bot }[who];
+    const other = await createOrder(migrator);
+    const e = await pgError(
+      c,
+      "insert into ops.consents (customer_id, order_id, kind, granted) values ($1, $2, 'non_returnable', true)",
+      [order.customerId, other.orderId],
+    );
+    expect(e.message).toMatch(/consent_mismatch/);
+    const noCustomer = await pgError(
+      c,
+      "insert into ops.consents (subject_ref_hash, order_id, kind, granted) values ('h', $1, 'non_returnable', true)",
+      [other.orderId],
+    );
+    expect(noCustomer.message).toMatch(/consent_mismatch/);
+  });
+
+  it.each(["limit_overrun", "no_receipt_purchase", "replacement", "third_party_payer"])(
+    "does not let the site record the money consent %s (the bot and the admin do)",
+    async (kind) => {
+      const o = await createOrder(migrator);
+      const e = await pgError(
+        web,
+        "insert into ops.consents (customer_id, order_id, kind, granted) values ($1, $2, $3, true)",
+        [o.customerId, o.orderId, kind],
+      );
+      expect(e.message).toMatch(/actor_not_allowed/);
+      await bot.query("insert into ops.consents (customer_id, order_id, kind, granted) values ($1, $2, $3, true)", [
+        o.customerId,
+        o.orderId,
+        kind,
+      ]);
+    },
+  );
+});
