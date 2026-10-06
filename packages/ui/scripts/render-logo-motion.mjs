@@ -7,6 +7,7 @@
 // Usage: pnpm exec node packages/ui/scripts/render-logo-motion.mjs [--out <dir>] [--only 1x1|9x16] [--shots <dir>]
 //                                                                    [--at 0.5,1.2,...] [--profile <dir>]
 //   --shots <dir>   also writes PNG frames at the times of --at (default: every seat and the end) for review
+//   --crf, --tune   x264 quality (default 16) and tune (default grain)
 //   --no-video      only the posters and --shots (a quick look at the frames)
 //   --no-check      do not fail when a gate on the final frame is missed (the numbers are printed anyway)
 //   --profile <dir> user data dir of the browser (default: a new temporary folder, removed at the end)
@@ -46,7 +47,8 @@ const { values } = parseArgs({
     shots: { type: "string" },
     at: { type: "string" },
     profile: { type: "string" },
-    crf: { type: "string", default: "20" },
+    crf: { type: "string", default: "16" },
+    tune: { type: "string", default: "grain" },
     "no-video": { type: "boolean", default: false },
     "no-check": { type: "boolean", default: false },
   },
@@ -118,8 +120,14 @@ window.__ready = true;
 function encoder(file, wavFile) {
   const args = ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(FPS), "-i", "-"];
   if (wavFile) args.push("-i", wavFile);
-  args.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "slow", "-crf", values.crf, "-r", String(FPS));
-  args.push("-profile:v", "high", "-movflags", "+faststart");
+  // RGB frames to BT.709 limited-range yuv420p with error diffusion (the dark lamp pool has few levels, plain rounding
+  // bands it), and the colour tags a player needs to show the orange and the paper as the page does
+  const convert =
+    "scale=flags=accurate_rnd+full_chroma_int+error_diffusion:out_color_matrix=bt709:out_range=tv,format=yuv420p";
+  args.push("-vf", convert, "-c:v", "libx264", "-preset", "slow", "-crf", values.crf, "-r", String(FPS));
+  // `grain` keeps the dither of the dark gradient: without it the encoder smooths the noise out and the lamp pool bands
+  args.push("-tune", values.tune, "-profile:v", "high", "-movflags", "+faststart");
+  args.push("-x264-params", "colorprim=bt709:transfer=iec61966-2-1:colormatrix=bt709");
   if (wavFile) args.push("-c:a", "aac", "-b:a", "160k", "-shortest");
   else args.push("-an");
   args.push(file);

@@ -210,9 +210,14 @@ export function createLogoScene(
   plateTex.repeat.set(1 / 40, 1 / 40); // the UV of ExtrudeGeometry are world units
   const floorTex = own(noiseTexture(128, 236, 255, 11, 4));
   floorTex.repeat.set(26, 8);
-  const plateMat = own(new MeshStandardMaterial({ color: T.plate, roughness: 0.9, metalness: 0, map: plateTex }));
-  const wallMat = own(new MeshStandardMaterial({ color: T.wall, roughness: 0.75, metalness: 0 }));
-  const floorMat = own(new MeshStandardMaterial({ color: T.floor, roughness: 0.7, metalness: 0, map: floorTex }));
+  // dithering: the lamp pool is a very dark smooth gradient, 8 bits band into rings without a screen-space dither
+  const plateMat = own(
+    new MeshStandardMaterial({ color: T.plate, roughness: 0.9, metalness: 0, map: plateTex, dithering: true }),
+  );
+  const wallMat = own(new MeshStandardMaterial({ color: T.wall, roughness: 0.75, metalness: 0, dithering: true }));
+  const floorMat = own(
+    new MeshStandardMaterial({ color: T.floor, roughness: 0.7, metalness: 0, map: floorTex, dithering: true }),
+  );
   own(geometry.plate);
 
   const plate = new Mesh(geometry.plate, [plateMat, wallMat]);

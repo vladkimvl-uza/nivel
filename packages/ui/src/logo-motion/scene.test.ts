@@ -77,6 +77,19 @@ describe("scene: renderer set-up (night only, three 0.186)", () => {
   });
 });
 
+describe("scene: the lamp pool does not band", () => {
+  it("dithers the plate, its pocket walls and the floor of the pockets (8 bits band a dark gradient into rings)", () => {
+    const s = setup();
+    const dithered: MeshStandardMaterial[] = [];
+    s.logo.scene.traverse((o) => {
+      const m = (o as Mesh).material as MeshStandardMaterial | MeshStandardMaterial[] | undefined;
+      for (const x of Array.isArray(m) ? m : m ? [m] : []) if (x.dithering) dithered.push(x);
+    });
+    expect(dithered).toHaveLength(3);
+    expect(new Set(dithered.map((m) => m.color.getHexString())).size).toBe(3);
+  });
+});
+
 describe("scene: frames of the intro", () => {
   it("t = 0: the line is 92 units left of its pocket, the lamp is off, the dot waits above the frame", () => {
     const s = setup();
