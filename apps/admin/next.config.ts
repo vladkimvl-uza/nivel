@@ -8,7 +8,9 @@ const config: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: monorepoRoot,
   turbopack: { root: monorepoRoot },
-  transpilePackages: ["@nivel/config", "@nivel/db"],
+  transpilePackages: ["@nivel/config", "@nivel/db", "@nivel/contracts", "@nivel/domain", "@nivel/ui"],
+  // sharp is a native module: kept out of the bundle, loaded at run time (HEIC photos from phones).
+  serverExternalPackages: ["sharp"],
   poweredByHeader: false,
   reactStrictMode: true,
   agentRules: false,
