@@ -67,6 +67,12 @@ describe("rule seed", () => {
       expect(fee.value).toMatchObject({ pcLowRateBp: 1500, minFullCyclePc: 6_700_000, afterTestsRetainBp: 8500 });
       const flags = await c.query("select key, value from ops.settings where key like 'feature.%' order by key");
       expect(flags.rows.map((x) => x.value)).toEqual([false, false, false, false]);
+      // The reserve of the tax risk runs until the tax authority answers in writing (DECISIONS R-7).
+      const taxRisk = await one<{ value: unknown }>(
+        c,
+        "select value from ops.settings where key = 'money.tax_risk_active'",
+      );
+      expect(taxRisk.value).toBe(true);
     } finally {
       await c.query("rollback");
     }
@@ -91,6 +97,20 @@ describe("rule seed", () => {
       expect(after).toEqual(before);
       const ai = await one<{ value: unknown }>(c, "select value from ops.settings where key = 'feature.ai'");
       expect(ai.value).toBe(999);
+    } finally {
+      await c.query("rollback");
+    }
+  });
+
+  it("does not switch the tax reserve back on once the owner has switched it off", async () => {
+    await c.query("begin");
+    try {
+      await seed.seedRules(c);
+      await c.query("update ops.settings set value = 'false'::jsonb where key = 'money.tax_risk_active'");
+      await seed.seedRules(c, { APP_MODE: "production" });
+      await seed.seedRules(c);
+      const v = await one<{ value: unknown }>(c, "select value from ops.settings where key = 'money.tax_risk_active'");
+      expect(v.value).toBe(false);
     } finally {
       await c.query("rollback");
     }

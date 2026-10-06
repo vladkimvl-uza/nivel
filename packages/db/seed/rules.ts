@@ -857,6 +857,9 @@ export const SETTINGS: Record<string, unknown> = {
     alertsBp: [6000, 7000, 8000, 9000, 10000],
     proportion: "without_registration_day",
   },
+  // The reserve of the tax risk (1 % of the purchase receipts) runs until the tax authority answers in writing
+  // (DECISIONS R-7); the owner switches it off in the admin, and the seed never switches it back on.
+  "money.tax_risk_active": true,
   // Holidays are filled in by the owner; an empty list means Monday to Saturday are all working days.
   "calendar.work": { tz: "Asia/Tashkent", workdays: [1, 2, 3, 4, 5, 6], from: "10:00", to: "19:00", holidays: [] },
   "feature.ai": false,
