@@ -6,7 +6,8 @@ import { parseArgs } from "node:util";
 import { isMain, ROOT } from "./lib/env.mjs";
 import { walk } from "./lib/files.mjs";
 
-export const FORBIDDEN_FONTS = ["Geist Mono", "Geist", "Inter", "Onest", "Source Serif 4"];
+// Manrope is allowed only as outlines inside the logo SVG (no font name there), never as a font (DESIGN_SYSTEM 2.3, 8).
+export const FORBIDDEN_FONTS = ["Geist Mono", "Geist", "Inter", "Onest", "Source Serif 4", "Manrope"];
 export const FORBIDDEN_COLORS = [
   "#0C1230",
   "#111A3E",
@@ -35,6 +36,29 @@ const colorRe = new RegExp(FORBIDDEN_COLORS.map((c) => `${c}(?![0-9a-f])`).join(
 const cssHexRe = /(?<![\w&])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])/i;
 const quotedHexRe = /["'`]#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})["'`]/i;
 const rgbRe = /\b(?:rgba?|hsla?)\(\s*\d/i;
+const anyHexRe = /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])/gi;
+const anyRgbRe = /\brgba?\(\s*(\d+)\s*[, ]\s*(\d+)\s*[, ]\s*(\d+)/gi;
+const glowVarRe = /var\(\s*--(?:accent|signal)/i;
+
+/** Red and blue channels (0-255) of a hex color. */
+function hexRedBlue(hex) {
+  const h = hex.slice(1);
+  if (h.length === 3 || h.length === 4) return [Number.parseInt(h[0] + h[0], 16), Number.parseInt(h[2] + h[2], 16)];
+  return [Number.parseInt(h.slice(0, 2), 16), Number.parseInt(h.slice(4, 6), 16)];
+}
+
+/** Colors in a theme file whose blue channel is above the red one: navy, blue, violet, teal. Night is warm black. */
+function coldColors(line) {
+  const out = [];
+  for (const m of line.matchAll(anyHexRe)) {
+    const [r, b] = hexRedBlue(m[0]);
+    if (b > r) out.push(m[0]);
+  }
+  for (const m of line.matchAll(anyRgbRe)) {
+    if (Number(m[3]) > Number(m[1])) out.push(m[0]);
+  }
+  return out;
+}
 
 /** Checks one file's text; `path` is POSIX and relative to the repo root. */
 export function checkText(path, text) {
@@ -50,8 +74,17 @@ export function checkText(path, text) {
     const c = colorRe.exec(line);
     if (c) out.push(`${at}: anti-list color ${c[0]}`);
     if (/backdrop-filter|backdropFilter/.test(line)) out.push(`${at}: backdrop-filter (glass) is forbidden`);
-    if (/box-shadow|boxShadow/i.test(line) && /(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i.test(line) && !isGray(line)) {
-      out.push(`${at}: colored glow in box-shadow`);
+    else if (/(?<![\w-])blur\(|feGaussianBlur/.test(line))
+      out.push(`${at}: blur is forbidden (no glass, no glow, no haze)`);
+    if (/drop-shadow\(/.test(line)) out.push(`${at}: drop-shadow is forbidden (paper shadows are box-shadow roles)`);
+    if (/box-shadow|boxShadow|text-shadow|textShadow/i.test(line)) {
+      const colored = /(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i.test(line) && !isGray(line);
+      if (colored || glowVarRe.test(line))
+        out.push(`${at}: colored glow in ${/text/i.test(line) ? "text-shadow" : "box-shadow"}`);
+    }
+    if (isTheme) {
+      for (const c of coldColors(line))
+        out.push(`${at}: cold color ${c} in a theme file (blue above red; night is warm black)`);
     }
     if (!isTheme) {
       if ((isCss && cssHexRe.test(line)) || (!isCss && quotedHexRe.test(line))) {
