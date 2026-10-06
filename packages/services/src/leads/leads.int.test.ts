@@ -134,6 +134,28 @@ describe("leads.create", () => {
     ).rejects.toMatchObject({ issues: [{ path: "customer.telegramUserId", code: "telegram_id_not_allowed" }] });
   });
 
+  it("gives one customer to two requests that come at once with the same new Telegram id or phone, for every role that can look", async () => {
+    for (const rt of [w.bot, w.admin]) {
+      const id = newTelegram();
+      const both = await Promise.allSettled([
+        create({ channel: "bot", scope: "pc", customer: { telegramUserId: id } }, rt),
+        create({ channel: "bot", scope: "setup", customer: { telegramUserId: id } }, rt),
+      ]);
+      expect(both.map((x) => x.status)).toEqual(["fulfilled", "fulfilled"]);
+      const [a, b] = both.map((x) => (x as PromiseFulfilledResult<{ customerId?: string }>).value.customerId);
+      expect(a).toBeDefined();
+      expect(a).toBe(b);
+      const phone = `+99890${String(Math.floor(1_000_000 + Math.random() * 8_000_000))}`;
+      const byPhone = await Promise.allSettled([
+        create({ channel: "bot", scope: "pc", customer: { phoneE164: phone } }, rt),
+        create({ channel: "bot", scope: "pc", customer: { phoneE164: phone } }, rt),
+      ]);
+      expect(byPhone.map((x) => x.status)).toEqual(["fulfilled", "fulfilled"]);
+      const [c, d] = byPhone.map((x) => (x as PromiseFulfilledResult<{ customerId?: string }>).value.customerId);
+      expect(c).toBe(d);
+    }
+  });
+
   it("finds the customer of the same phone for the roles that may read it", async () => {
     const a = await create({ channel: "bot", scope: "pc", customer: { phoneE164: "+998907770011" } }, w.bot);
     const b = await create({ channel: "bot", scope: "pc", customer: { phoneE164: "+998907770011" } }, w.bot);
@@ -159,6 +181,27 @@ describe("leads.create", () => {
       await expect(
         create({ channel: "bot", scope: "pc", budgetSum, customer: { telegramUserId: newTelegram() } }, w.bot),
       ).rejects.toMatchObject({ issues: [{ path: "budgetSum", code: "sum_invalid" }] });
+    }
+  });
+
+  it("refuses a customer that is not an object and fields of the wrong type with a validation error, never a TypeError", async () => {
+    const customers: unknown[] = [
+      null,
+      "x",
+      5,
+      [],
+      { phoneE164: ["+998901112233"] },
+      { phoneE164: 998901112233 },
+      { age18Confirmed: "yes" },
+      { telegramUserId: "7" },
+      { displayName: 5 },
+    ];
+    for (const customer of customers) {
+      for (const rt of [w.bot, w.web]) {
+        await expect(create({ channel: "bot", scope: "pc", customer: customer as never }, rt)).rejects.toMatchObject({
+          name: "ValidationError",
+        });
+      }
     }
   });
 

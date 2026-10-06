@@ -101,7 +101,9 @@ function validate(input: CreateLeadInput, rt: Runtime): ValidationIssue[] {
     bad("customer", "customer_missing", "a lead needs a customer or a customer id");
   }
   const c = input.customer;
-  if (c !== undefined) {
+  if (c !== undefined && (c === null || typeof c !== "object" || Array.isArray(c))) {
+    bad("customer", "customer_invalid", "customer must be an object");
+  } else if (c !== undefined) {
     short("customer.displayName", c.displayName, MAX_NAME);
     short("customer.telegramUsername", c.telegramUsername, MAX_USERNAME);
     short("customer.district", c.district, MAX_DISTRICT);
@@ -110,8 +112,11 @@ function validate(input: CreateLeadInput, rt: Runtime): ValidationIssue[] {
       // attach the lead to a stranger's record or occupy the id of the real owner.
       bad("customer.telegramUserId", "telegram_id_not_allowed", "the site does not take a Telegram id");
     }
-    if (c.phoneE164 !== undefined && !E164.test(c.phoneE164)) {
+    if (c.phoneE164 !== undefined && (typeof c.phoneE164 !== "string" || !E164.test(c.phoneE164))) {
       bad("customer.phoneE164", "phone_invalid", "phone must be in the international form +998901234567");
+    }
+    if (c.age18Confirmed !== undefined && typeof c.age18Confirmed !== "boolean") {
+      bad("customer.age18Confirmed", "bool_invalid", "age18Confirmed must be true or false");
     }
     if (c.telegramUserId !== undefined && (!Number.isSafeInteger(c.telegramUserId) || c.telegramUserId <= 0)) {
       bad("customer.telegramUserId", "telegram_id_invalid", "telegramUserId must be a positive whole number");
@@ -138,16 +143,10 @@ async function resolveCustomer(rt: Runtime, ex: Executor, input: CreateLeadInput
   const c = input.customer;
   if (c === undefined)
     throw ValidationError.of("customer", "customer_missing", "a lead needs a customer or a customer id");
-  if (c.telegramUserId !== undefined) {
-    const found = await sales.findCustomerByTelegramId(ex, c.telegramUserId);
-    if (found) return found.id;
-  }
-  if (c.phoneE164 !== undefined && rt.role !== "web") {
-    const found = await ex.query.customers.findFirst({
-      columns: { id: true },
-      where: (t, { eq }) => eq(t.phoneE164, c.phoneE164 as string),
-    });
-    if (found) return found.id;
+  // The site has no Telegram id (refused above) and cannot read phones: it has nothing to look for.
+  if (rt.role !== "web") {
+    const found = await findExisting(ex, c);
+    if (found) return found;
   }
   const row = {
     displayName: c.displayName ?? null,
@@ -158,15 +157,35 @@ async function resolveCustomer(rt: Runtime, ex: Executor, input: CreateLeadInput
     district: c.district ?? input.district ?? null,
     age18Confirmed: c.age18Confirmed ?? false,
   } as const;
-  if (rt.role !== "web") return sales.createCustomer(ex, row);
   try {
-    // The site cannot read phones, so it cannot look for the customer first: the unique index answers instead. A failed
-    // INSERT aborts a transaction, so it runs in a savepoint and the lead of the site goes on without a customer.
+    // The unique indexes are the judge: two requests of one new person look for him at the same moment, both find
+    // nobody, and the second INSERT fails. A failed INSERT aborts a transaction, so it runs in a savepoint.
     return await ex.transaction((sp) => sales.createCustomer(sp, row));
   } catch (e) {
-    if (e instanceof DbRuleError && e.code === "unique_violation") return null;
-    throw e;
+    if (!(e instanceof DbRuleError && e.code === "unique_violation")) throw e;
+    // The site cannot read phones and so cannot tell who won: its lead goes on without a customer.
+    if (rt.role === "web") return null;
+    // The others look again: the winner has committed by now (the loser waited for him on the index).
+    const winner = await findExisting(ex, c);
+    if (winner) return winner;
+    throw ValidationError.of("customer", "customer_exists", "the customer exists but could not be found");
   }
+}
+
+/** The customer of the Telegram id, or else of the phone; only for the roles that may read phones. */
+async function findExisting(ex: Executor, c: NewCustomerInput): Promise<string | null> {
+  if (c.telegramUserId !== undefined) {
+    const found = await sales.findCustomerByTelegramId(ex, c.telegramUserId);
+    if (found) return found.id;
+  }
+  if (c.phoneE164 !== undefined) {
+    const found = await ex.query.customers.findFirst({
+      columns: { id: true },
+      where: (t, { eq }) => eq(t.phoneE164, c.phoneE164 as string),
+    });
+    if (found) return found.id;
+  }
+  return null;
 }
 
 /** The contact of a lead that the site could not link to a customer travels in the comment, for the owner to merge by hand. */
