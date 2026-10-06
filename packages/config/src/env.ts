@@ -7,6 +7,10 @@ const emptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
 const optionalText = z.preprocess(emptyToUndefined, z.string().min(1).optional());
 const pgUrl = z.string().regex(/^postgres(ql)?:\/\/[^\s]+$/, "must be a postgres:// URL");
 const secret = z.string().min(32, "must be at least 32 characters (pnpm env:init generates one)");
+/** AES-256 key: exactly 32 bytes as padded base64 (42 chars + one of 16 final chars + "="), no Buffer needed. */
+const aes256Key = z
+  .string()
+  .regex(/^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/, "must be 32 random bytes in base64 (pnpm env:init generates one)");
 const httpUrl = z.url({ protocol: /^https?$/ });
 const flag = z.preprocess(emptyToUndefined, z.stringbool().default(false));
 
@@ -36,7 +40,7 @@ export const envSchemas = {
     DATABASE_URL_ADMIN: pgUrl,
     PUBLIC_BASE_URL: httpUrl,
     ADMIN_BASE_URL: httpUrl,
-    DATA_ENC_KEY: secret,
+    DATA_ENC_KEY: aes256Key,
     REVALIDATE_HMAC_KEY: secret,
     FILES_DIR: optionalText,
   }),
