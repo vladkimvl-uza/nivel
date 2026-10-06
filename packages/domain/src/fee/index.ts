@@ -132,8 +132,7 @@ export function computeQuote(lines: readonly QuoteLineInput[], s: FeeSettings, c
     const total = lineTotal(l);
     if (l.customerOwned || total === 0) continue;
     if (l.group === "outside_scale") outsideScaleSum = addSums(outsideScaleSum, total);
-    else if (l.group === "pc" || l.group === "mount") componentsSum = addSums(componentsSum, total);
-    else throw new RangeError(`Line ${l.key}: unknown fee group ${String(l.group)}`);
+    else componentsSum = addSums(componentsSum, total); // computeFee above already refused any unknown group
     if (l.purchasedByIp) {
       purchased = addSums(purchased, total);
       if (l.isRamOrSsd) memory = addSums(memory, total);
