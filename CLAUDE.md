@@ -9,6 +9,12 @@
 - Запрещено: `docker system prune`, `docker volume prune`, `docker compose down` без `-p nivel-*`, `docker rm`/`stop` чужих контейнеров, правка `.wslconfig` и настроек Docker Desktop.
 - Свои контейнеры: `nivel-dev-pg` (127.0.0.1:54329, том `nivel-dev-pgdata`), `nivel-test-pg` (127.0.0.1:54339, tmpfs); `mem_limit: 512m` у каждого.
 
+## Браузер
+
+- Владелец работает на этой машине: видимые окна браузера ему мешают. Браузер — только скрытый.
+- Снимки и проверки страниц — Playwright (`headless: true`, по умолчанию) или Edge/Chrome с `--headless=new` **и обязательно** `--user-data-dir=<временная папка в scratchpad>`: без отдельного профиля команда уходит в уже открытый браузер владельца и открывает видимое окно.
+- MCP-сервер `chrome-devtools` из плагина ECC не использовать: он запускает видимый Chrome.
+
 ## Node и pnpm
 
 - Глобальный Node 25.9 не менять. Node 24.21.0 проект получает через `devEngines.runtime` pnpm: запускать всё через `pnpm run …` / `pnpm exec …`. Запасной путь — `fnm exec --using=.node-version pnpm …` (ADR-003).
