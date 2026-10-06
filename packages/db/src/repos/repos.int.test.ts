@@ -5,3 +5,4 @@ import "./sales.suite.ts";
 import "./pricing.suite.ts";
 import "./content.suite.ts";
 import "./ai-bot.suite.ts";
+import "./roles-repos.suite.ts";

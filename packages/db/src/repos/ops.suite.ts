@@ -87,7 +87,7 @@ describe("settings", () => {
 
 describe("audit log", () => {
   it("appends and lists newest first; a journal row cannot be changed", async () => {
-    const id = await appendAudit(db, {
+    await appendAudit(db, {
       actor: "owner:1",
       action: "x.a",
       entity: "demo",
@@ -98,7 +98,7 @@ describe("audit log", () => {
     const rows = await listAudit(db, "demo", "e1");
     expect(rows.map((r) => r.action)).toEqual(["x.b", "x.a"]);
     await expect(
-      guarded(() => db.update(auditLog).set({ action: "z" }).where(eq(auditLog.id, id))),
+      guarded(() => db.update(auditLog).set({ action: "z" }).where(eq(auditLog.id, rows[0]?.id ?? ""))),
     ).rejects.toMatchObject({
       code: "permission_denied",
     });

@@ -80,10 +80,12 @@ export async function setSetting(
 }
 
 // ---- audit log --------------------------------------------------------------------------------------------------
-export async function appendAudit(db: Executor, input: AuditInput): Promise<string> {
-  const [row] = await db.insert(auditLog).values(input).returning({ id: auditLog.id });
-  if (!row) throw new Error("audit row was not written");
-  return row.id;
+/**
+ * Appends a journal row. No RETURNING: the application roles may insert into ops.audit_log but not read it, and
+ * RETURNING needs the SELECT right. The caller does not need the id of an audit row.
+ */
+export async function appendAudit(db: Executor, input: AuditInput): Promise<void> {
+  await db.insert(auditLog).values(input);
 }
 
 export async function listAudit(db: Executor, entity: string, entityId: string, limit = 100) {
