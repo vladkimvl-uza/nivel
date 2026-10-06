@@ -99,6 +99,7 @@
 - `!packages/ui/{package.json,tsconfig.json}`
 - `tools/check-antilist.mjs`
 - `tools/__tests__/check-antilist.test.mjs`
+- `e2e/ui-*.spec.ts` (снимки ночной темы и движения логотипа; добавлено интегратором 06.10.2026)
 
 ## WP-10
 
@@ -106,6 +107,7 @@
 
 - `apps/admin/app/{layout.tsx,(auth),(settings),(journal),(catalog)}/**`
 - `apps/admin/src/{kit,auth,nav}/**`
+- `e2e/admin-*.spec.ts` (вход с TOTP, блокировка, роли; добавлено интегратором 06.10.2026)
 
 ## WP-11
 
