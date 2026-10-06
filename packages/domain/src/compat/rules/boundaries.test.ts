@@ -349,7 +349,7 @@ describe("lighting and fan headers", () => {
   it("counts lit AIO, tower cooler and case against the headers", () => {
     const parts = pcBuild({
       mb: { argb5vHeaders: 1 },
-      drop: ["cooler"],
+      drop: ["cooler", "case"],
       add: [
         makeProduct("aio", "aio", {}, { lighting: "argb" }),
         makeProduct("case", "case2", {}, { lighting: "argb" }),

@@ -9,24 +9,58 @@ export interface Resolution {
   unknown: ProductId[];
 }
 
-/** Groups lines by category. Quantity must be a positive integer: anything else is a caller bug, not "missing data". */
+/** Largest quantity of one product in a build (lines of the same product are summed first). */
+export const MAX_LINE_QTY = 99;
+/** Largest number of lines in a build or a setup plan. */
+export const MAX_LINES = 200;
+
+/**
+ * Groups lines by category. Lines of the same product are merged (quantities summed). Anything outside the limits is a
+ * caller bug, not "missing data": a non-integer or non-positive quantity, a quantity above MAX_LINE_QTY, more than
+ * MAX_LINES lines. The limits keep the work proportional to a small constant: some rules expand a quantity into places
+ * (M.2 slots, monitor stands), and the server recomputes builds that clients send.
+ */
 export function resolveBuild(lines: readonly BuildLine[], catalog: CatalogLookup): Resolution {
-  const byCategory: Partial<Record<CategoryCode, Item[]>> = {};
-  const unknown: ProductId[] = [];
+  if (lines.length > MAX_LINES) {
+    throw new RangeError(`A build holds at most ${MAX_LINES} lines, got ${lines.length}`);
+  }
+  const qtyById = new Map<ProductId, number>();
   for (const line of lines) {
     if (!Number.isSafeInteger(line.qty) || line.qty < 1) {
       throw new RangeError(`Quantity must be a positive integer, got ${String(line.qty)} for ${line.productId}`);
     }
-    const product = catalog.get(line.productId);
+    const qty = (qtyById.get(line.productId) ?? 0) + line.qty;
+    if (qty > MAX_LINE_QTY) {
+      throw new RangeError(`Quantity of ${line.productId} must not exceed ${MAX_LINE_QTY}, got ${qty}`);
+    }
+    qtyById.set(line.productId, qty);
+  }
+  const byCategory: Partial<Record<CategoryCode, Item[]>> = {};
+  const unknown: ProductId[] = [];
+  for (const [productId, qty] of qtyById) {
+    const product = catalog.get(productId);
     if (!product) {
-      if (!unknown.includes(line.productId)) unknown.push(line.productId);
+      unknown.push(productId);
       continue;
     }
     const list = byCategory[product.category];
-    if (list) list.push({ product, qty: line.qty });
-    else byCategory[product.category] = [{ product, qty: line.qty }];
+    if (list) list.push({ product, qty });
+    else byCategory[product.category] = [{ product, qty }];
   }
   return { build: { byCategory }, unknown };
+}
+
+/** Categories of which a PC holds exactly one part (the rules compare against the first one only). */
+const SINGLE_PC_CATEGORIES: readonly CategoryCode[] = ["cpu", "mb", "case", "psu"];
+
+/** A PC has one processor, board, case and PSU; a second part or a quantity above 1 is a caller bug (RangeError). */
+export function assertSinglePcParts(b: ResolvedBuild): void {
+  for (const category of SINGLE_PC_CATEGORIES) {
+    const items = itemsOf(b, category);
+    if (items.length > 1 || (items[0] && items[0].qty > 1)) {
+      throw new RangeError(`A PC build holds one "${category}" part, got ${totalQty(items)}`);
+    }
+  }
 }
 
 export function itemsOf(b: ResolvedBuild, category: CategoryCode): readonly Item[] {

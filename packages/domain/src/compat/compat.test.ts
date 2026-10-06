@@ -8,6 +8,8 @@ import {
   compatApi,
   DEFAULT_COMPAT_SETTINGS,
   estimatePower,
+  MAX_LINE_QTY,
+  MAX_LINES,
   PC_RULES,
 } from "./index.ts";
 import { build, ctx, makeProduct, type Part, pcBuild, pid, settings, setupParts } from "./testkit.ts";
@@ -126,6 +128,61 @@ describe("checkCompatibility: input handling", () => {
     const two = build(...rest, [ram, 2]);
     const merged = checkCompatibility(two.lines, two.catalog, ctx());
     expect(split).toEqual(merged);
+  });
+
+  it("two lines of an incompatible product give the same single finding as one line", () => {
+    const rest = pcBuild({ drop: ["ram"] });
+    const ram = makeProduct("ram", "ram", { type: "DDR4" });
+    const one = build(...rest, ram);
+    const split = checkCompatibility([...one.lines, { productId: ram.id, qty: 1 }], one.catalog, ctx());
+    const merged = checkCompatibility(build(...rest, [ram, 2]).lines, one.catalog, ctx());
+    expect(split.issues.filter((i) => i.messageKey === "compat.mem_type_board")).toHaveLength(1);
+    expect(split).toEqual(merged);
+  });
+
+  it("limits the quantity of a line, the summed quantity of a product and the number of lines (no huge loops)", () => {
+    const b = build(...pcBuild());
+    const nvme = pid("ssd");
+    const started = Date.now();
+    const bad = (lines: BuildLine[]) => () => checkCompatibility(lines, b.catalog, ctx());
+    expect(bad([...b.lines, { productId: nvme, qty: MAX_LINE_QTY + 1 }])).toThrow(RangeError);
+    expect(bad([...b.lines, { productId: nvme, qty: 100_000_000 }])).toThrow(RangeError);
+    expect(bad([...b.lines, { productId: nvme, qty: MAX_LINE_QTY }, { productId: nvme, qty: 1 }])).toThrow(RangeError);
+    const many = Array.from({ length: MAX_LINES + 1 }, (_, i) => ({ productId: pid(`ghost-${i}`), qty: 1 }));
+    expect(bad(many)).toThrow(RangeError);
+    expect(() => estimatePower([{ productId: nvme, qty: 1_000_000_000 }], b.catalog, settings())).toThrow(RangeError);
+    const sb = build(...setupParts());
+    const plan: SetupPlan = {
+      room: { widthMm: 1, depthMm: 1 },
+      lines: [...sb.lines, { productId: pid("monitor"), qty: 1_000_000_000 }],
+    };
+    expect(() => checkSetup(plan, sb.catalog, settings())).toThrow(RangeError);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it("accepts the largest allowed quantity", () => {
+    const b = build(...pcBuild());
+    const lines = b.lines.map((l) => (l.productId === "ssd" ? { ...l, qty: MAX_LINE_QTY } : l));
+    expect(() => checkCompatibility(lines, b.catalog, ctx())).not.toThrow();
+  });
+
+  it("a PC holds one processor, board, case and PSU: more than one is a caller bug (RangeError)", () => {
+    const b = build(...pcBuild());
+    const twin = (id: string, category: "cpu" | "mb" | "case" | "psu") =>
+      build(...pcBuild(), makeProduct(category, `${id}-2`));
+    for (const [id, category] of [
+      ["cpu", "cpu"],
+      ["mb", "mb"],
+      ["case", "case"],
+      ["psu", "psu"],
+    ] as const) {
+      const t = twin(id, category);
+      expect(() => checkCompatibility(t.lines, t.catalog, ctx()), `second ${id}`).toThrow(RangeError);
+      // either order: no silent dependence on which one comes first
+      expect(() => checkCompatibility([...t.lines].reverse(), t.catalog, ctx()), `second ${id}`).toThrow(RangeError);
+    }
+    const two = b.lines.map((l) => (l.productId === "mb" ? { ...l, qty: 2 } : l));
+    expect(() => checkCompatibility(two, b.catalog, ctx())).toThrow(RangeError);
   });
 
   it("customer-owned parts are checked like any other part (they only leave the price)", () => {

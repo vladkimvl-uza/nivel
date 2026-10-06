@@ -165,7 +165,8 @@ function randomParts(seed: number, base: Part[], nullChance: number): Part[] {
   return base.map((part) => {
     const p = Array.isArray(part) ? part[0] : part;
     const changed = { ...p, spec: mutate(p.spec, g, nullChance) } as Product;
-    const qty = g.int(1, 3);
+    // a PC holds one processor, board, case and PSU (more is a RangeError, see compat.test.ts)
+    const qty = (["cpu", "mb", "case", "psu"] as string[]).includes(p.category) ? 1 : g.int(1, 3);
     return [changed, qty] as [Product, number];
   });
 }

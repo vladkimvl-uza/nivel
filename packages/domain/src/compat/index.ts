@@ -16,11 +16,12 @@
 import type { BuildLine, CatalogLookup } from "../catalog/types.ts";
 import { collectMissingData, runRules, verdictOf } from "./engine.ts";
 import { computePower } from "./power.ts";
-import { resolveBuild } from "./resolve.ts";
+import { assertSinglePcParts, resolveBuild } from "./resolve.ts";
 import { PC_RULES, SETUP_RULES } from "./rules/index.ts";
 import type { CompatApi, CompatResult, CompatSettings, PowerEstimate, SetupPlan, Task } from "./types.ts";
 
 export { COMPAT_MESSAGE_KEYS, MESSAGE_KEY_PREFIX, type MessageKeySpec } from "./message-keys.ts";
+export { MAX_LINE_QTY, MAX_LINES } from "./resolve.ts";
 export { MISSING_DATA_KEY, type PcRuleDef, type SetupRuleDef } from "./rule-kit.ts";
 export { DEFAULT_COMPAT_SETTINGS } from "./settings.ts";
 export type * from "./types.ts";
@@ -30,7 +31,8 @@ export { PC_RULES, SETUP_RULES };
  * Checks a PC build against the 28 PC rules (ARCHITECTURE 4.4). Pure: same lines, catalog snapshot and settings give the
  * same result. A rule runs only when the build contains the parts it compares; a missing spec value yields a warn with
  * `compat.missing_data`, an entry in `missingData` and verdict `incomplete`, never `ok`.
- * Throws RangeError for a non-positive or fractional quantity (a caller bug).
+ * Throws RangeError (a caller bug) for a non-positive or fractional quantity, a quantity above MAX_LINE_QTY, more than
+ * MAX_LINES lines, or more than one processor, board, case or PSU. Lines of the same product are merged.
  */
 export function checkCompatibility(
   lines: BuildLine[],
@@ -38,6 +40,7 @@ export function checkCompatibility(
   ctx: { tasks: Task[]; settings: CompatSettings },
 ): CompatResult {
   const { build, unknown } = resolveBuild(lines, catalog);
+  assertSinglePcParts(build);
   const { issues, checkedRules } = runRules(PC_RULES, build, ctx);
   const missingData = collectMissingData(issues, unknown);
   return {
