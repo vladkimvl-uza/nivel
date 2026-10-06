@@ -31,8 +31,7 @@ export interface MessageKeySpec {
 /**
  * Every `messageKey` the rules can return, with the params that go with it. Texts are not here: `packages/i18n`
  * (namespace `compat`: messages/{ru,uz,meta}/compat.json) owns them; t(issue.messageKey, issue.params) works as it is.
- * The first Russian drafts are in packages/testing/fixtures/wp-03/compat-message-keys.json (the request that preceded the texts).
- * A test keeps this table, the rules and that file in step.
+ * Tests keep this table, the rules and the messages in step.
  */
 export const COMPAT_MESSAGE_KEYS: Readonly<Record<string, MessageKeySpec>> = {
   "compat.missing_data": { rule: "*", params: ["field", "category"] },
