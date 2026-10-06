@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="ru" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nivel — Тень на уровне</title>
+<meta name="description" content="Анимация логотипа nivel-1: тени деталей в оснастке складываются в отметку уровня.">
+<script>
+  // Theme before first paint: ?theme= wins, otherwise local time (day 07:00–18:59).
+  (function () {
+    var q = new URLSearchParams(location.search), t = q.get('theme');
+    if (t !== 'day' && t !== 'night') t = 'night';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+  :root{
+    --asphalt:#1D1D1B; --signal:#D9501A; --signal-dark:#F06A30; --paper:#F1EFEA;
+    --mono:ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    --ease-out:cubic-bezier(.2,.7,.2,1);
+    --lockup-k:.6456;   /* lockup width / min(viewport side) — the same as the 3D final frame (34.86 cm of 54 cm) */
+  }
+  :root,[data-theme="day"]{
+    --bg:#F1EFEA; --ink:#1D1D1B; --ink-2:#5E574D; --line:rgba(29,29,27,.16); --line-2:rgba(29,29,27,.3);
+    --chip-bg:rgba(241,239,234,.9); --lk-ink:#1D1D1B; --lk-acc:#D9501A;
+  }
+  [data-theme="night"]{
+    --bg:#121110; --ink:#F1EFEA; --ink-2:#A39C90; --line:#2E2A26; --line-2:#3B3631;
+    --chip-bg:rgba(18,17,16,.86); --lk-ink:#F1EFEA; --lk-acc:#F06A30;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font:14px/1.4 var(--mono);overflow:hidden}
+  #stage{position:fixed;inset:0}
+  #stage canvas{display:block;width:100%;height:100%}
+  body.m-loader #stage{inset:auto;left:50%;top:50%;width:168px;height:168px;margin:-84px 0 0 -84px}
+  /* Poster / static / no-WebGL frame. Sized exactly like the 3D final frame, so the hand-over is a plain cross-fade. */
+  #still{position:fixed;inset:0;display:none;align-items:center;justify-content:center;transition:opacity .6s var(--ease-out)}
+  #still .lk svg{display:block;width:calc(min(100vw, 100vh) * var(--lockup-k));height:auto}
+  #still .lk path[fill="#1D1D1B"]{fill:var(--lk-ink)}
+  #still .lk path[fill="#D9501A"]{fill:var(--lk-acc)}
+  #still .mk{display:none;width:150px;height:150px}
+  body.m-static #stage,body.no-gl #stage{display:none}
+  body.m-static #still,body.no-gl #still,body.poster #still{display:flex}
+  body.poster-out #still{opacity:0}
+  body.m-loader #still .lk{display:none}
+  body.m-loader #still .mk{display:block}
+  /* Loader twin (SVG + CSS, ~2 KB): the same seven pieces and the same «sag and back to level» as the 3D loader.
+     Used before three.js is loaded, without WebGL and with reduced motion (then it does not move). */
+  .mk .ink{fill:#1D1D1B} .mk .acc{fill:#D9501A} .mk .pool{display:none;fill:#F1EFEA}
+  [data-theme="night"] .mk .pool{display:block}
+  .mk .p{animation:nv-sag 1.4s infinite}
+  @keyframes nv-sag{
+    0%,38%{transform:translateY(0);animation-timing-function:cubic-bezier(.37,0,.63,1)}
+    78%{transform:translateY(var(--a));animation-timing-function:cubic-bezier(.55,0,.8,.3)}
+    85%{transform:translateY(calc(var(--a) * -.03));animation-timing-function:ease-out}
+    91%{transform:translateY(calc(var(--a) * .006))}
+    100%{transform:translateY(0)}
+  }
+  @media (prefers-reduced-motion:reduce){.mk .p{animation:none}}
+  /* cross-fade overlay (theme switch, hand-over to the static frame) */
+  #xfade{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;z-index:1;object-fit:fill}
+  body.m-loader #xfade{inset:auto;left:50%;top:50%;width:168px;height:168px;margin:-84px 0 0 -84px}
+  /* control panel: small, quiet */
+  .panel{position:fixed;left:16px;bottom:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+    max-width:calc(100vw - 32px);padding:6px;border:1px solid var(--line);background:var(--chip-bg);border-radius:2px;font-size:12px;z-index:2}
+  .panel button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line-2);border-radius:2px;
+    height:28px;padding:0 9px;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s}
+  .panel button:hover{border-color:var(--ink)}
+  .panel button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .panel .grp{display:flex;gap:2px}
+  .panel .sep{width:1px;height:20px;background:var(--line)}
+  .panel output{color:var(--ink-2);min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  body.no-ui .panel{display:none}
+  @media (max-width:560px){.panel{left:8px;right:8px;bottom:8px;max-width:none}.panel output{display:none}}
+</style>
+</head>
+<body>
+<div id="stage" aria-hidden="true"></div>
+
+<!-- Poster, static frame and no-WebGL fallback. The lockup below is docs/brand/logos-v2/nivel-1-lockup.svg verbatim;
+     the 3D scene parses THIS element with SVGLoader, so geometry has a single source. -->
+<div id="still" role="img" aria-label="Nivel">
+  <span class="lk"><svg id="lockup-src" xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#1D1D1B" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#D9501A" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg></span>
+  <svg class="mk" xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 80 80" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой</title>
+    <ellipse class="pool" cx="32" cy="32" rx="39.7" ry="32"/>
+    <path class="p ink" style="--a:1.9px" d="M8 16h23.2v8H8Z"/><path class="p ink" style="--a:2.9px" d="M30.9 16H60v8H30.9Z"/>
+    <path class="p acc" style="--a:2.4px" d="M8 24L24 24L24 40Z"/><path class="p ink" style="--a:3.2px" d="M24 24L40 24L24 40Z"/>
+    <path class="p ink" style="--a:1.4px" d="M4 40h16.5v8H4Z"/><path class="p ink" style="--a:2.7px" d="M20.2 40h22.1v8H20.2Z"/><path class="p ink" style="--a:1.9px" d="M42.1 40H60v8H42.1Z"/>
+  </svg>
+</div>
+<img id="xfade" alt="" aria-hidden="true">
+
+<div class="panel" role="toolbar" aria-label="Управление анимацией">
+  <button type="button" id="b-replay">Повторить</button>
+  <button type="button" id="b-theme" aria-label="Переключить день и ночь">День</button>
+  <span class="sep"></span>
+  <div class="grp" id="g-mode">
+    <button type="button" data-mode="intro">Заставка</button>
+    <button type="button" data-mode="loop">Повтор</button>
+    <button type="button" data-mode="loader">Загрузка</button>
+    <button type="button" data-mode="static">Статично</button>
+  </div>
+  <span class="sep"></span>
+  <div class="grp" id="g-speed">
+    <button type="button" data-speed="0.5">0.5×</button>
+    <button type="button" data-speed="1">1×</button>
+  </div>
+  <output id="o-time">0.00 с</output>
+</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<script type="module">
+/* =====================================================================================
+   NIVEL · «Тень на уровне» (shadow) — logo motion concept, round 2.
+   Seven parts are held by a brass jig (a steel comb with posts; each part sits on a rod that
+   points exactly at the light). Each part is a slice of the light cone over one region of the
+   nivel-1 mark, so at the final light position its shadow is exactly that region, and every rod
+   shadow shrinks to a point inside the mark. Day: sun through a big window, the jamb shadow
+   uncovers the word. Night: a bar-head desk lamp with a hard-edged pool swings into place.
+   Shadows are analytic (convex hull of projected vertices → per-pixel signed distance).
+   Units: world = centimetres, y up, table plane y = 0. Timeline is a pure function of t.
+   ===================================================================================== */
+
+const Q = new URLSearchParams(location.search);
+const body = document.body;
+const root = document.documentElement;
+const MODES = ['intro', 'loop', 'loader', 'static'];
+const DUR = { intro: 4.0, loop: 16.0, loader: 1.4 };
+const LINK = 1.8;   // loop: bridge from the intro's final pose into the loop
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches && Q.get('motion') !== 'force';
+const reqMode = MODES.includes(Q.get('mode')) ? Q.get('mode') : 'intro';
+const S = {
+  theme: root.getAttribute('data-theme'),
+  req: reqMode,
+  mode: reduced ? 'static' : reqMode,
+  speed: Q.get('speed') === '0.5' ? 0.5 : 1,
+  frozen: Q.has('t') ? Math.max(0, parseFloat(Q.get('t')) || 0) : null,
+  playing: Q.get('autoplay') !== '0',
+  t0: performance.now(),
+  pausedAt: 0,
+};
+if (Q.get('ui') === '0') body.classList.add('no-ui');
+if (!S.playing) S.pausedAt = S.mode === 'intro' ? DUR.intro : 0;   // autoplay=0: intro shows its final frame
+if (S.mode === 'loader') S.t0 = 0;                                  // loader phase follows page time, like the CSS twin
+
+/* ---------- panel ---------- */
+const $ = (s) => document.querySelector(s);
+const oTime = $('#o-time');
+const xf = $('#xfade');
+const App = { dirty: true, ready: false, onTheme: null, onMode: null, snapshot: null };
+function syncPanel() {
+  body.classList.toggle('m-static', S.mode === 'static');
+  body.classList.toggle('m-loader', S.mode === 'loader' || (S.mode === 'static' && S.req === 'loader'));
+  $('#b-theme').textContent = S.theme === 'day' ? 'День' : 'Ночь';
+  document.querySelectorAll('#g-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === S.req)));
+  document.querySelectorAll('#g-speed button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.speed === S.speed)));
+}
+function replay() { S.frozen = null; S.playing = true; S.t0 = performance.now(); App.dirty = true; }
+function writeUrl() {
+  const u = new URL(location.href);
+  u.searchParams.set('theme', S.theme); u.searchParams.set('mode', S.req); u.searchParams.delete('t');
+  history.replaceState(null, '', u);
+}
+// Cross-fade: freeze the current canvas in an <img> above everything and fade it out.
+function fadeFromCanvas() {
+  if (S.frozen != null || !App.snapshot) return;
+  const url = App.snapshot(); if (!url) return;
+  xf.src = url; xf.style.transition = 'none'; xf.style.opacity = '1'; void xf.offsetWidth;
+  xf.style.transition = 'opacity .6s cubic-bezier(.2,.7,.2,1)'; xf.style.opacity = '0';
+}
+$('#b-replay').onclick = () => replay();
+$('#b-theme').onclick = () => {
+  fadeFromCanvas();
+  S.theme = S.theme === 'day' ? 'night' : 'day'; root.setAttribute('data-theme', S.theme);
+  syncPanel(); writeUrl(); App.onTheme && App.onTheme();   // same mode, same time: no restart
+};
+document.querySelectorAll('#g-mode button').forEach((b) => b.onclick = () => {
+  const m = b.dataset.mode;
+  if (m === 'static') fadeFromCanvas();                   // night: lamp pool fades, the inverse lockup stays
+  S.req = S.mode = m; syncPanel(); writeUrl();
+  if (m !== 'static') ensure3D();
+  App.onMode && App.onMode(); replay();
+});
+document.querySelectorAll('#g-speed button').forEach((b) => b.onclick = () => { S.speed = +b.dataset.speed; syncPanel(); replay(); });
+syncPanel();
+
+function currentT(now) {
+  if (S.frozen != null) return S.frozen;
+  if (!S.playing) return S.pausedAt;
+  return (now - S.t0) / 1000 * S.speed;
+}
+
+/* ---------- boot: poster first, nothing waits for 3D ---------- */
+function hasGL() { try { return !!document.createElement('canvas').getContext('webgl2'); } catch (e) { return false; } }
+function noGL() { body.classList.add('no-gl'); window.__nvReady = true; }
+let booting = null;
+function ensure3D() {
+  if (booting) return booting;
+  if (!hasGL()) { noGL(); return null; }
+  booting = main().catch((e) => { console.error(e); noGL(); });
+  return booting;
+}
+if (S.mode === 'static') window.__nvReady = true;           // reduced motion / static: three.js is not even downloaded
+else {
+  if (S.frozen == null && (S.mode === 'loop' || S.mode === 'loader')) body.classList.add('poster');
+  // intro: if the scene is not ready in 1.2 s, show the lockup and skip the intro (the scene then fades in on its final frame)
+  if (S.frozen == null && S.mode === 'intro') setTimeout(() => { if (!App.ready) body.classList.add('poster'); }, 1200);
+  ensure3D();
+}
+
+async function main() {
+const THREE = await import('three');
+const { SVGLoader } = await import('three/addons/loaders/SVGLoader.js');
+const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
+const V3 = THREE.Vector3;
+const D2R = Math.PI / 180;
+
+/* =====================================================================================
+   1. Geometry from the brand SVG (parsed, not redrawn)
+   ===================================================================================== */
+const SCALE = 0.1;                                  // 1 lockup unit = 1 mm
+const svgEl = document.getElementById('lockup-src');
+const vb = svgEl.getAttribute('viewBox').split(/[\s,]+/).map(Number);
+const CX = vb[0] + vb[2] / 2, CY = vb[1] + vb[3] / 2; // lockup composition centre → world origin
+const gMark = svgEl.querySelector('g');
+const tm = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)\s*scale\(([-\d.]+)\)/.exec(gMark.getAttribute('transform'));
+const MT = { tx: +tm[1], ty: +tm[2], s: +tm[3] };     // mark group transform
+
+const parsed = new SVGLoader().parse(svgEl.outerHTML);
+const ptsOf = (shapePath) => {
+  const out = [];
+  for (const sp of shapePath.subPaths) for (const p of sp.getPoints()) {
+    const last = out[out.length - 1];
+    if (!last || Math.hypot(last.x - p.x, last.y - p.y) > 1e-6) out.push(p.clone());
+  }
+  if (out.length > 1 && out[0].distanceTo(out[out.length - 1]) < 1e-6) out.pop();
+  return out;
+};
+const toLocal = (p) => new THREE.Vector2((p.x - MT.tx) / MT.s, (p.y - MT.ty) / MT.s); // lockup → 64-grid
+const lockToWorld = (x, y) => [(x - CX) * SCALE, (y - CY) * SCALE];
+const locToWorld = (x, y) => lockToWorld(x * MT.s + MT.tx, y * MT.s + MT.ty);
+
+const markPaths = parsed.paths.slice(0, 4);
+const wordPath = parsed.paths[4];
+const dotPath = parsed.paths[5];
+const fillOf = (p) => (p.userData.style.fill || '').toUpperCase();
+const rects = [], tris = {};
+for (const p of markPaths) {
+  const pts = ptsOf(p).map(toLocal);
+  if (pts.length === 4) {
+    const xs = pts.map((q) => q.x), ys = pts.map((q) => q.y);
+    rects.push({ x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+  } else if (pts.length === 3) {
+    tris[fillOf(p) === '#D9501A' ? 'orange' : 'dark'] = pts;
+  }
+}
+rects.sort((a, b) => a.y0 - b.y0);
+const [shelf, level] = rects;                       // shelf on top (y 16–24), level line below (y 40–48)
+const byRole = (t) => {
+  const top = t.filter((q) => Math.abs(q.y - Math.min(...t.map((r) => r.y))) < 1e-3).sort((a, b) => a.x - b.x);
+  const bottom = t.find((q) => !top.includes(q));
+  return { tl: top[0], tr: top[1], b: bottom };
+};
+const O = byRole(tris.orange), Dk = byRole(tris.dark);
+const E = 2.0; // overlap in grid units: pieces overlap inside the mark, so the union has no seams
+const rect = (x0, x1, y0, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+const lerp = (a, b, t) => a + (b - a) * t;
+const shelfSeam = lerp(shelf.x0, shelf.x1, 0.44);
+const lvlSeamA = lerp(level.x0, level.x1, 0.29), lvlSeamB = lerp(level.x0, level.x1, 0.68);
+const yOnDarkHyp = (x) => lerp(Dk.tr.y, Dk.b.y, (Dk.tr.x - x) / (Dk.tr.x - Dk.b.x));
+const REGIONS = {
+  sA: { orig: rect(shelf.x0, shelfSeam, shelf.y0, shelf.y1), cast: rect(shelf.x0, shelfSeam + E, shelf.y0, shelf.y1) },
+  sB: { orig: rect(shelfSeam, shelf.x1, shelf.y0, shelf.y1), cast: rect(shelfSeam - E, shelf.x1, shelf.y0, shelf.y1) },
+  tO: { orig: [[O.tl.x, O.tl.y], [O.tr.x, O.tr.y], [O.b.x, O.b.y]],
+        // reaches 4.5 units into the dark triangle (hidden there): its rod stands in that strip, so the rod's shadow
+        // falls on dark, never inside the orange
+        cast: [[O.tl.x + E, O.tl.y - E], [O.tr.x + 4.5, O.tr.y - E], [O.tr.x + 4.5, yOnDarkHyp(O.tr.x + 4.5) - E], [O.b.x, O.b.y], [O.tl.x, O.tl.y]] },
+  tD: { orig: [[Dk.tl.x, Dk.tl.y], [Dk.tr.x, Dk.tr.y], [Dk.b.x, Dk.b.y]],
+        cast: [[Dk.tl.x, Dk.tl.y - E], [Dk.tr.x + E, Dk.tr.y - E], [Dk.b.x, Dk.b.y]] },
+  lA: { orig: rect(level.x0, lvlSeamA, level.y0, level.y1), cast: rect(level.x0, lvlSeamA + E, level.y0, level.y1) },
+  lB: { orig: rect(lvlSeamA, lvlSeamB, level.y0, level.y1), cast: rect(lvlSeamA - E, lvlSeamB + E, level.y0, level.y1) },
+  lC: { orig: rect(lvlSeamB, level.x1, level.y0, level.y1), cast: rect(lvlSeamB - E, level.x1, level.y0, level.y1) },
+};
+
+// The parts. h = height of the lower face over the table at the region centroid (cm), th = thickness,
+// tb/tt = tilt of lower/upper face (deg about x, z), at = where the rod enters (grid units inside the region),
+// zq = depth where the rod ends in its post (level rods end first, shelf rods last: longer rods pass above shorter posts).
+// Heights put every part, rod and post outside the final top view for any aspect from 9:16 to 21:9
+// (checked by __nvCheck), and parts whose cones touch are ≥ 3 cm apart in height.
+const PARTS = [
+  { id: 'sA', h: 47, th: 1.6, tb: [9, -12], tt: [3, -18], mat: 'walnut', at: [13.2, 20], zq: 79 },
+  { id: 'sB', h: 40, th: 2.0, tb: [-8, 12], tt: [-14, 5], mat: 'alu', at: [49, 20], zq: 77.5 },
+  { id: 'tO', h: 43, th: 0.6, tb: [15, 8], tt: [15, 8], mat: 'acrylic', transmit: true, at: [26.2, 29], zq: 76 },
+  { id: 'tD', h: 37, th: 2.4, tb: [-10, -6], tt: [-3, -13], mat: 'graphite', at: [31.5, 27], zq: 74.5 },
+  { id: 'lA', h: 36, th: 2.0, tb: [6, 16], tt: [12, 9], mat: 'oak', at: [10.6, 44], zq: 73 },
+  { id: 'lB', h: 40, th: 1.8, tb: [-16, 4], tt: [-9, -4], mat: 'plaster', at: [31.1, 44], zq: 71.5 },
+  { id: 'lC', h: 43, th: 2.2, tb: [10, -12], tt: [4, -6], mat: 'graphite', at: [52.2, 44], zq: 70 },
+];
+// loader: how far each piece sags (cm) before it snaps back to level
+const SAG = { sA: 0.30, sB: 0.45, tO: 0.38, tD: 0.50, lA: 0.22, lB: 0.42, lC: 0.30 };
+
+/* =====================================================================================
+   2. Light rigs and the timeline
+   ===================================================================================== */
+const MARK_C = (() => { const [x, z] = locToWorld((Math.min(shelf.x0, level.x0) + Math.max(shelf.x1, level.x1)) / 2, (shelf.y0 + level.y1) / 2); return new V3(x, 0, z); })();
+const SUN = { az: 98, el: 35, azStart: 48, elStart: 58 };      // late afternoon, window behind the camera: the sun swings round and lowers
+const sunDir = (az, el) => new V3(Math.cos(el * D2R) * Math.cos(az * D2R), Math.sin(el * D2R), Math.cos(el * D2R) * Math.sin(az * D2R));
+// Window in the wall behind the camera (plane z = +WALL): big glazing to the left of a wall pier (right jamb at x = WIN.jamb),
+// one mullion far left, sill 12 cm over the desk. The jamb shadow uncovers the word as the sun swings.
+const WALL = 110, WIN = { jamb: 44, m0: -96, m1: -90, sill: 12 };
+// Night: architect desk lamp with an oval reflector (hard-edged elliptical pool). Final head position on the same bearing as the sun, 150 cm from the mark.
+const LAMP = (() => {
+  const d = sunDir(SUN.az, SUN.el);
+  const final = MARK_C.clone().addScaledVector(d, 150);
+  return { final, start: final.clone().add(new V3(-30, -6, -14)), ctrl: final.clone().add(new V3(-14, 6, -10)),
+    aim: new V3(0, 0, 0), aimStart: new V3(-38, 0, 6), base: new V3(final.x - 30, 0, final.z + 26), arm: 64,
+    ang: [9.0, 4.2], soft: 0.02, emitter: 0.5 };
+})();
+const lampAt = (k) => { const a = (1 - k) * (1 - k), b = 2 * k * (1 - k), c = k * k;   // quadratic arc, k may overshoot 1
+  return LAMP.start.clone().multiplyScalar(a).addScaledVector(LAMP.ctrl, b).addScaledVector(LAMP.final, c); };
+const aimAt = (k) => LAMP.aimStart.clone().lerp(LAMP.aim, k);
+
+// easing
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+function bezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx, cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const sx = (t) => ((ax * t + bx) * t + cx) * t, sy = (t) => ((ay * t + by) * t + cy) * t, dx = (t) => (3 * ax * t + 2 * bx) * t + cx;
+  return (x) => { if (x <= 0) return 0; if (x >= 1) return 1; let t = x;
+    for (let i = 0; i < 8; i++) { const e = sx(t) - x, d = dx(t); if (Math.abs(e) < 1e-6 || Math.abs(d) < 1e-6) break; t -= e / d; }
+    return sy(clamp01(t)); };
+}
+const easeCam = bezier(0.6, 0.0, 0.25, 1.0);
+const easeOut = bezier(0.2, 0.7, 0.3, 1.0);
+const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+
+// Sun: 98 % of the swing in 1.50 s (Hermite: soft start, arrives still moving), the last 2 % in 0.15 s
+// at constant deceleration — a short, readable touch-down at 1.65 s.
+const SUN_T = [1.5, 1.65], SUN_P = 0.98;
+function sunK(t) {
+  if (t <= 0) return 0; if (t >= SUN_T[1]) return 1;
+  const m1 = 2 * (1 - SUN_P) / (SUN_T[1] - SUN_T[0]) * SUN_T[0];
+  if (t < SUN_T[0]) { const u = t / SUN_T[0]; return (3 * u * u - 2 * u * u * u) * SUN_P + (u * u * u - u * u) * m1; }
+  const v = (t - SUN_T[0]) / (SUN_T[1] - SUN_T[0]); return SUN_P + (1 - SUN_P) * (1 - (1 - v) * (1 - v));
+}
+// Lamp arm: damped spring 1.2 Hz, ζ 0.62 (≈ 8 % overshoot), settles by itself in ~1.1 s.
+const T = {
+  day:   { lock: 1.65, sharp: [1.65, 1.92], crane: [2.00, 2.70], fade: [2.05, 2.60], chip: [2.62, 2.95] },
+  night: { click: 0.20, lock: 1.35, sharp: [1.35, 1.60], crane: [1.70, 2.40], fade: [1.75, 2.30], chip: [2.32, 2.65] },
+};
+function armK(t) {
+  const tau = t - T.night.click; if (tau <= 0) return 0;
+  const z = 0.62, w = 2 * Math.PI * 1.2, wd = w * Math.sqrt(1 - z * z);
+  const x = 1 - Math.exp(-z * w * tau) * (Math.cos(wd * tau) + (z * w / wd) * Math.sin(wd * tau));
+  return lerp(x, 1, smooth(0.95, 1.15, tau));  // residual ≈ 1 % blended out over 0.2 s — invisible
+}
+// desk-lamp switch: short flicker 0–260 ms, then up to full in 500 ms (flick() from the design system)
+function flick(dt) {
+  if (dt < 0) return 0;
+  const steps = [[0.04, 0.55], [0.09, 0.12], [0.15, 0.8], [0.2, 0.35], [0.26, 0.88]];
+  for (const [end, v] of steps) if (dt < end) return v;
+  return lerp(0.88, 1, smooth(0.26, 0.76, dt));
+}
+// loader: hold level → slow sag (sine) → fast return on a stiff spring (ζ 0.75, 4.2 Hz): short seat, ~3 % undershoot
+function loaderB(ph) {
+  if (ph < 0.38) return 0;
+  if (ph < 0.78) return 0.5 - 0.5 * Math.cos(Math.PI * (ph - 0.38) / 0.40);
+  const tau = (ph - 0.78) * DUR.loader, z = 0.75, w = 2 * Math.PI * 4.2, wd = w * Math.sqrt(1 - z * z);
+  return Math.exp(-z * w * tau) * (Math.cos(wd * tau) + (z * w / wd) * Math.sin(wd * tau)) * (1 - smooth(0.9, 1.0, ph));
+}
+
+// Framing poses. A = azimuth (0 = camera on +z), E = elevation, W = width of the square (min viewport side) that must fit.
+const POSE = {
+  hold:  { target: new V3(-13, 16, 27), A: -8, E: 46, W: 58 },
+  end:   { target: new V3(0, 0, 0), A: 0, E: 90, W: 54 },
+  loader:{ target: MARK_C.clone(), A: 0, E: 90, W: 14 },
+};
+function mixPose(a, b, k) {
+  return { target: a.target.clone().lerp(b.target, k), A: lerp(a.A, b.A, k), E: lerp(a.E, b.E, k), W: lerp(a.W, b.W, k) };
+}
+function loopPose(ph) {
+  const p = POSE.hold, a = ph * Math.PI * 2;
+  return { target: p.target.clone().add(new V3(Math.sin(a) * 1.4, 0, Math.cos(a) * 1.0)), A: p.A + 4 * Math.sin(a), E: p.E + 2 * Math.sin(a + 1.1), W: p.W * 0.96 };
+}
+
+function evaluate(theme, mode, t) {
+  const day = theme === 'day', TT = T[theme];
+  const st = { k: 1, intensity: 1, cam: null, sharp: 1, postK: 0, chipU: 1, chipK: 0, sag: 0, pieces: true, word: true, chip: true };
+  if (mode === 'intro') {
+    t = Math.min(t, DUR.intro);
+    if (day) st.k = sunK(t); else { st.k = armK(t); st.intensity = flick(t - TT.click); }
+    st.sharp = smooth(TT.sharp[0], TT.sharp[1], t);          // focus pull: the level is caught
+    st.postK = 1 - smooth(TT.fade[0], TT.fade[1], t);        // jig posts leave the frame during the crane
+    const c = (t - TT.crane[0]) / (TT.crane[1] - TT.crane[0]);
+    if (c <= 0) { const h = POSE.hold; st.cam = { target: h.target.clone(), A: h.A, E: h.E, W: h.W * (1.04 - 0.04 * easeOut(clamp01(t / TT.lock))) }; }
+    else st.cam = mixPose(POSE.hold, POSE.end, easeCam(c));
+    st.chipU = clamp01((t - TT.chip[0]) / (TT.chip[1] - TT.chip[0]));
+    st.chipK = 1 - smooth(TT.chip[1], TT.chip[1] + 0.2, t);
+  } else if (mode === 'loop') {
+    const tl = t < LINK ? t : LINK + ((t - LINK) % DUR.loop);
+    st.cam = tl < LINK ? mixPose(POSE.end, loopPose(0), easeCam(tl / LINK)) : loopPose((tl - LINK) / DUR.loop);
+    st.postK = smooth(0.4, LINK, tl);
+  } else if (mode === 'loader') {
+    st.cam = { ...POSE.loader, target: POSE.loader.target.clone() };
+    st.sag = loaderB((t % DUR.loader) / DUR.loader);
+    st.pieces = false; st.word = false; st.chip = false;
+  }
+  if (!st.cam) st.cam = { ...POSE.end, target: POSE.end.target.clone() };
+  if (day) st.sun = sunDir(lerp(SUN.azStart, SUN.az, st.k), lerp(SUN.elStart, SUN.el, st.k));
+  else { st.lamp = lampAt(st.k); st.aim = aimAt(st.k); }
+  return st;
+}
+
+/* =====================================================================================
+   3. Renderer, scene, materials
+   ===================================================================================== */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));   // fill-rate bound: 1.5 is plenty for soft light
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(24, 1, 2, 3000);           // ~55 mm on full frame
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = envTex;
+
+// calm wood for the parts (canvas, 512²): few low-contrast fibres
+function woodTexture(base, dark, seed) {
+  const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+  let s = seed; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = base; g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 140; i++) {
+    const y = rnd() * 512, a = 0.04 + rnd() * 0.12, w = 0.5 + rnd() * 1.6, f = 0.003 + rnd() * 0.006, ph = rnd() * 6.3, amp = 2 + rnd() * 6;
+    g.strokeStyle = dark; g.globalAlpha = a; g.lineWidth = w; g.beginPath();
+    for (let x = -8; x <= 520; x += 8) { const yy = y + Math.sin(x * f + ph) * amp + Math.sin(x * f * 3.1 + ph * 2) * amp * 0.2; x < 0 ? g.moveTo(x, yy) : g.lineTo(x, yy); }
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  return t;
+}
+const MATS = {
+  walnut: new THREE.MeshStandardMaterial({ map: woodTexture('#6A4A31', '#46301F', 11), roughness: 0.62 }),
+  oak: new THREE.MeshStandardMaterial({ map: woodTexture('#B4936B', '#8E6E4B', 29), roughness: 0.66 }),
+  alu: new THREE.MeshStandardMaterial({ color: '#9E9B95', metalness: 0.8, roughness: 0.48, envMapIntensity: 0.6 }),
+  graphite: new THREE.MeshStandardMaterial({ color: '#2D2C2A', metalness: 0.5, roughness: 0.5 }),
+  plaster: new THREE.MeshStandardMaterial({ color: '#E2DDD3', roughness: 0.95 }),
+  acrylic: new THREE.MeshStandardMaterial({ color: '#D9501A', roughness: 0.18, transparent: true, opacity: 0.88 }),
+  brass: new THREE.MeshStandardMaterial({ color: '#A88555', metalness: 0.9, roughness: 0.38 }),
+  steel: new THREE.MeshStandardMaterial({ color: '#34322F', metalness: 0.6, roughness: 0.55 }),
+  lampBody: new THREE.MeshStandardMaterial({ color: '#3A3835', metalness: 0.55, roughness: 0.45 }),
+  lampFace: new THREE.MeshBasicMaterial({ color: '#E9E1D3' }),   // diffuser seen from the side: a lit surface, not a glow
+  chip: new THREE.MeshBasicMaterial({ color: '#D9501A', toneMapped: false }),       // colour solved per frame from the same light as the sheet
+};
+
+const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+const lampLight = new THREE.SpotLight(0xffffff, 1, 0, 0.3, 0.25, 2);
+const hemi = new THREE.HemisphereLight(0xfff3e2, 0x5a4a3a, 0.3);    // dark warm ground: parts are darker underneath
+// light bounced off the lit sheet (night): warm, from the pool upward, so the parts are not black silhouettes
+const bounce = new THREE.PointLight(0xffd9b0, 0, 0, 2);
+scene.add(sunLight, sunLight.target, lampLight, lampLight.target, hemi, bounce);
+renderer.toneMapping = THREE.NeutralToneMapping;   // objects only: the sheet shaders are calibrated and opt out
+
+/* ---------- oak table baked once into a texture (no per-pixel fbm at run time) ---------- */
+const NOISE_GLSL = /* glsl */`
+  float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
+    return mix(mix(hash(i), hash(i+vec2(1,0)), u.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y); }
+  float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++){ s += a*noise(p); p *= 2.03; a *= 0.5; } return s; }`;
+const OAK_R = new THREE.Vector4(-160, -160, 320, 320);
+const oakRT = new THREE.WebGLRenderTarget(2048, 2048, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, type: THREE.HalfFloatType });
+oakRT.texture.wrapS = oakRT.texture.wrapT = THREE.RepeatWrapping; oakRT.texture.anisotropy = 8;
+{
+  const m = new THREE.ShaderMaterial({ uniforms: { uR: { value: OAK_R } }, depthTest: false,
+    vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `precision highp float; uniform vec4 uR; varying vec2 vU; ${NOISE_GLSL}
+      void main(){
+        vec2 p = uR.xy + vU * uR.zw;
+        float plank = floor(p.y / 18.0);
+        vec2 q = vec2(p.x + hash(vec2(plank, 3.0)) * 400.0, p.y);
+        float n = fbm(vec2(q.x * 0.010, q.y * 0.35));
+        float grain = sin(q.y * 2.4 + n * 6.0 + fbm(q * vec2(0.03, 0.4)) * 2.0) * 0.5 + 0.5;
+        float fine = noise(vec2(q.x * 0.35, q.y * 20.0));
+        vec3 c1 = vec3(0.330, 0.232, 0.150), c2 = vec3(0.262, 0.178, 0.112);   // calm light oak, oiled
+        vec3 col = mix(c1, c2, smoothstep(0.35, 0.95, grain) * 0.55 + fine * 0.10);
+        col *= 0.95 + 0.07 * hash(vec2(plank, 7.0));
+        float e = abs(fract(p.y / 18.0) - 0.5) * 18.0;                          // distance from the board centre line
+        col *= mix(1.0, 0.6, smoothstep(8.86, 8.97, e));                        // thin dark seam between boards
+        gl_FragColor = vec4(col, 1.0);
+      }` });
+  const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m); q.frustumCulled = false;
+  const sc = new THREE.Scene(); sc.add(q);
+  renderer.setRenderTarget(oakRT); renderer.render(sc, new THREE.Camera()); renderer.setRenderTarget(null);
+  m.dispose(); q.geometry.dispose();
+}
+
+/* ---------- table + drawing sheet + ink: one analytic-light shader ---------- */
+const NC = 8, NE = 10, NP = 14;
+const surfaceUniforms = {
+  uEdge: { value: Array.from({ length: NC * NE }, () => new V3(0, 0, 1e9)) },
+  uPen: { value: new Array(NC).fill(0.05) },
+  uBound: { value: Array.from({ length: NC }, () => new V3(0, 0, -1)) },
+  uTrans: { value: Array.from({ length: NC }, () => new V3(0, 0, 0)) },
+  uSeg: { value: Array.from({ length: NP }, () => new THREE.Vector4(1e5, 1e5, 1e5, 1e5)) },
+  uSegP: { value: Array.from({ length: NP }, () => new V3(0.3, 0.05, 0)) },   // radius, penumbra, strength
+  uLight: { value: new V3(0, 1, 0) }, uPoint: { value: 0 },
+  uLCol: { value: new THREE.Color(1, 1, 1) }, uLI: { value: 1 }, uLRef: { value: 1 },
+  uSpotF: { value: new V3(0, -1, 0) }, uSpotR: { value: new V3(1, 0, 0) }, uSpotU: { value: new V3(0, 0, 1) },
+  uSpotA: { value: new V3(0.15, 0.06, 0.05) }, uWarm: { value: new THREE.Color(1.0, 0.93, 0.85) },
+  uAmb: { value: new THREE.Color(0.017, 0.017, 0.017) }, uAmbF: { value: new THREE.Vector4(0, 0, 1e4, 1) },
+  uBg: { value: new THREE.Color('#E4DDD2') }, uFog: { value: new THREE.Vector2(1e4, 1e4 + 1) }, uFocus: { value: new THREE.Vector2(0, 0) },
+  uPaper: { value: new THREE.Vector4(-80, -62, 70, 62) },    // sheet from a 1500 mm drafting roll, 1500 × 1240 mm
+  uMode: { value: 0 }, uInk: { value: new THREE.Color(0.02, 0.02, 0.02) },
+  uWin: { value: new THREE.Vector4(WIN.jamb, WIN.m0, WIN.m1, WIN.sill) }, uWall: { value: WALL }, uDay: { value: 1 },
+  uComb: { value: new THREE.Vector4(0, -1e4, 1, 1) },
+  uOak: { value: oakRT.texture }, uOakR: { value: OAK_R },
+};
+const surfaceVS = /* glsl */`
+  varying vec3 vW;
+  void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const surfaceFS = /* glsl */`
+  precision highp float;
+  #define NC ${NC}
+  #define NE ${NE}
+  #define NP ${NP}
+  uniform vec3 uEdge[NC*NE]; uniform float uPen[NC]; uniform vec3 uTrans[NC]; uniform vec3 uBound[NC];
+  uniform vec4 uSeg[NP]; uniform vec3 uSegP[NP];
+  uniform vec3 uLight; uniform float uPoint; uniform vec3 uLCol; uniform float uLI; uniform float uLRef;
+  uniform vec3 uSpotF; uniform vec3 uSpotR; uniform vec3 uSpotU; uniform vec3 uSpotA; uniform vec3 uWarm;
+  uniform vec3 uAmb; uniform vec4 uAmbF; uniform vec3 uBg; uniform vec2 uFog; uniform vec2 uFocus;
+  uniform vec4 uPaper; uniform float uMode; uniform vec3 uInk;
+  uniform vec4 uWin; uniform float uWall; uniform float uDay; uniform vec4 uComb;
+  uniform sampler2D uOak; uniform vec4 uOakR;
+  varying vec3 vW;
+  ${NOISE_GLSL}
+  float sdBox(vec2 p, vec2 b){ vec2 d = abs(p) - b; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }
+  float FW = 1e-3;   // pixel footprint, set once per fragment (no derivatives inside loops)
+  float stroke(float d, float w){ return 1.0 - smoothstep(w*0.5, w*0.5 + FW, abs(d)); }
+  float rectLine(vec2 q, vec2 mn, vec2 mx, float w){ return stroke(sdBox(q - (mn+mx)*0.5, (mx-mn)*0.5), w); }
+  float seg(vec2 q, vec2 a, vec2 b, float w){ vec2 pa = q-a, ba = b-a; float h = clamp(dot(pa,ba)/dot(ba,ba), 0.0, 1.0); return stroke(length(pa - ba*h), w); }
+
+  // sunlight through the window: right jamb, one mullion, sill. Penumbra = sun disc × distance to the wall.
+  float winLit(vec3 P){
+    vec3 u = uLight;
+    float s = (uWall - P.z) / max(u.z, 1e-3);
+    float hx = P.x + s*u.x, hy = P.y + s*u.y;
+    float pen = 0.25 + s * 0.0047;
+    float lit = 1.0 - smoothstep(-pen, pen, hx - uWin.x);
+    lit *= smoothstep(-pen, pen, hy - uWin.w);
+    lit *= smoothstep(-pen, pen, max(uWin.y - hx, hx - uWin.z));
+    return lit;
+  }
+
+  vec3 shadowVis(vec2 p, float px, out float ao){
+    // opaque parts: union (max occlusion, so overlaps add no seams); acrylic: transmittance multiplies
+    float occD = 0.0; vec3 tr = vec3(1.0);
+    for (int c = 0; c < NC; c++){
+      vec3 bd = uBound[c];
+      if (length(p - bd.xy) > bd.z) continue;   // early out: most pixels are far from every caster
+      float sd = -1e9;
+      for (int e = 0; e < NE; e++){ vec3 E = uEdge[c*NE + e]; sd = max(sd, E.x*p.x + E.y*p.y - E.z); }
+      float w = max(uPen[c], px * 0.7);
+      float occ = 1.0 - smoothstep(-w, w, sd);
+      if (dot(uTrans[c], vec3(1.0)) < 1e-4) occD = max(occD, occ); else tr *= mix(vec3(1.0), uTrans[c], occ);
+    }
+    // jig rods and posts (capsules), with a bounding test
+    for (int i = 0; i < NP; i++){
+      vec3 sp = uSegP[i];
+      if (sp.z <= 0.0) continue;
+      vec4 s = uSeg[i]; vec2 a = s.xy, b = s.zw;
+      float w = max(sp.y, px * 0.7);
+      if (length(p - 0.5*(a + b)) > 0.5*length(b - a) + sp.x + w) continue;
+      vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+      float d = length(pa - ba*h) - sp.x;
+      occD = max(occD, sp.z * (1.0 - smoothstep(-w, w, d)));
+    }
+    // contact shading around the comb bar of the jig
+    float dc = sdBox(p - uComb.xy, uComb.zw);
+    ao = 1.0 - 0.5 * (1.0 - smoothstep(0.0, 1.8, dc));
+    return (1.0 - occD) * tr;
+  }
+
+  void main(){
+    vec3 P = vW; vec2 p = vW.xz;
+    float px = length(fwidth(p)); FW = px + 1e-4;
+    // beyond the back wall: what the camera sees there is the wall itself (plaster, or the window glazing)
+    if (P.z > uWall){
+      vec3 C = cameraPosition; float tau = (uWall - C.z) / (P.z - C.z); vec3 Wp = C + tau * (P - C);
+      bool glass = Wp.y > uWin.w && Wp.x < uWin.x && !(Wp.x > uWin.y && Wp.x < uWin.z);
+      vec3 c = glass ? (uDay > 0.5 ? vec3(0.92, 0.905, 0.87) : vec3(0.0035, 0.0032, 0.0029))
+                     : vec3(0.62, 0.59, 0.55) * (uDay > 0.5 ? 0.11 + 0.04 * (1.0 - smoothstep(0.0, 60.0, Wp.y)) : uAmb.r * uAmbF.w);
+      c = mix(c, uBg, smoothstep(uFog.x, uFog.y, length(p - uFocus)));
+      gl_FragColor = vec4(c, 1.0);
+      #include <colorspace_fragment>
+      return;
+    }
+    vec3 alb; float alpha = 1.0;
+    vec2 pq = p - uPaper.xy, psz = uPaper.zw - uPaper.xy;
+    bool onPaper = all(greaterThan(pq, vec2(0.0))) && all(lessThan(pq, psz));
+    if (uMode > 0.5){
+      alb = uInk;                                   // printed word: its visibility comes only from the light
+    } else if (onPaper){
+      alb = vec3(0.879, 0.863, 0.823) * (0.988 + 0.024 * noise(p * 9.0));
+      // pencil border 10 mm in, and a title block in the lower right corner
+      float ln = rectLine(pq, vec2(1.0), psz - vec2(1.0), 0.06);
+      vec2 tb0 = psz - vec2(1.0 + 18.5, 1.0 + 5.5), tb1 = psz - vec2(1.0);
+      ln = max(ln, rectLine(pq, tb0, tb1, 0.06));
+      for (int i = 1; i < 7; i++) ln = max(ln, seg(pq, vec2(tb0.x, tb0.y + 0.786*float(i)), vec2(tb0.x + 6.5, tb0.y + 0.786*float(i)), 0.03));
+      ln = max(ln, seg(pq, vec2(tb0.x + 6.5, tb0.y), vec2(tb0.x + 6.5, tb1.y), 0.045));
+      ln = max(ln, seg(pq, vec2(tb0.x + 13.5, tb0.y), vec2(tb0.x + 13.5, tb1.y), 0.045));
+      alb = mix(alb, vec3(0.06), ln * 0.45);
+    } else {
+      alb = texture2D(uOak, (p - uOakR.xy) / uOakR.zw).rgb;
+      vec2 dq = max(-pq, pq - psz); float dOut = max(dq.x, dq.y);
+      alb *= mix(0.6, 1.0, smoothstep(0.0, 0.3, dOut));   // contact darkening at the sheet edge
+    }
+
+    float E; vec3 lc = uLCol; float fillW = 0.0;
+    if (uPoint > 0.5){
+      vec3 d = uLight - P; float d2 = dot(d, d); vec3 l = d * inversesqrt(d2);
+      E = uLI * max(l.y, 0.0) * uLRef / d2;
+      // oval reflector: elliptical pool with a hard edge (the reflector rim), slight falloff to the edge
+      vec3 m = -l; float f = dot(m, uSpotF);
+      vec2 q = vec2(dot(m, uSpotR), dot(m, uSpotU)) / max(f, 1e-3) / uSpotA.xy;
+      float r = length(q);
+      float spot = (1.0 - smoothstep(1.0 - uSpotA.z, 1.0 + uSpotA.z, r)) * (1.0 - 0.10 * r * r) * step(0.0, f);
+      lc *= mix(vec3(1.0), uWarm, smoothstep(0.93, 1.0, r));   // a touch warmer only at the very rim
+      E *= spot;
+    } else {
+      float wl = winLit(P);
+      E = uLI * max(uLight.y, 0.0) * wl;
+      fillW = 0.06 * (1.0 - wl);   // skylight still reaches the floor of the wall's shadow
+    }
+    E = E < 0.9 ? E : 0.9 + 0.22 * (1.0 - exp(-(E - 0.9) * 4.5));   // soft shoulder: no clipping
+    float ao; vec3 vis = shadowVis(p, px, ao);
+    vec2 da = p - uAmbF.xy;
+    vec3 amb = uAmb * mix(uAmbF.w, 1.0, exp(-dot(da, da) / (uAmbF.z * uAmbF.z)));   // night: bounce falls off away from the pool
+    vec3 col = alb * (amb + fillW + lc * E * vis) * ao;
+    col = mix(col, uBg, smoothstep(uFog.x, uFog.y, length(p - uFocus)));
+    gl_FragColor = vec4(col, alpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+const surfaceMat = new THREE.ShaderMaterial({ uniforms: surfaceUniforms, vertexShader: surfaceVS, fragmentShader: surfaceFS, toneMapped: false });
+const table = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2), surfaceMat);
+scene.add(table);
+
+// word «nivel» (without the dot) — ShapeGeometry from the SVG path, printed on the sheet
+const inkUniforms = { ...surfaceUniforms, uMode: { value: 1 } };
+const inkMat = new THREE.ShaderMaterial({ uniforms: inkUniforms, vertexShader: surfaceVS, fragmentShader: surfaceFS,
+  depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false });
+const wordGeo = new THREE.ShapeGeometry(SVGLoader.createShapes(wordPath), 8);
+{ const a = wordGeo.attributes.position;
+  for (let i = 0; i < a.count; i++) { const [x, z] = lockToWorld(a.getX(i), a.getY(i)); a.setXYZ(i, x, 0.01, z); }
+  a.needsUpdate = true; wordGeo.computeBoundingSphere(); }
+const word = new THREE.Mesh(wordGeo, inkMat); word.renderOrder = 1; scene.add(word);
+
+// the dot over i: a 0.4 mm orange acrylic chip, cut exactly to the SVG triangle (no bevel: no dark rim)
+const chipGeo = new THREE.ExtrudeGeometry(SVGLoader.createShapes(dotPath), { depth: 0.4, bevelEnabled: false, curveSegments: 1 });
+{ const a = chipGeo.attributes.position, n = chipGeo.attributes.normal;
+  for (let i = 0; i < a.count; i++) { const [x, z] = lockToWorld(a.getX(i), a.getY(i)); a.setXYZ(i, x, a.getZ(i) * SCALE + 0.012, z); n.setXYZ(i, n.getX(i), n.getZ(i), n.getY(i)); }
+  flipWinding(chipGeo); }
+const dotPts = ptsOf(dotPath).map((p) => lockToWorld(p.x, p.y));
+const chipC = new V3((dotPts[0][0] + dotPts[1][0] + dotPts[2][0]) / 3, 0, (dotPts[0][1] + dotPts[1][1] + dotPts[2][1]) / 3);
+chipGeo.translate(-chipC.x, 0, -chipC.z);
+const chip = new THREE.Mesh(chipGeo, MATS.chip); chip.renderOrder = 2; scene.add(chip);
+const CHIP_H = 0.04 + 0.012;
+const chipLocal = dotPts.flatMap(([x, z]) => [new V3(x - chipC.x, 0, z - chipC.z), new V3(x - chipC.x, CHIP_H, z - chipC.z)]);
+const CHIP_FROM = { dx: -1.4, dz: -3.7, yaw: 22 };   // 4 cm up-left of its place, next to the i
+
+function flipWinding(g) {
+  for (const name of Object.keys(g.attributes)) {
+    const at = g.attributes[name], sz = at.itemSize, arr = at.array;
+    for (let i = 0; i < at.count; i += 3) for (let k = 0; k < sz; k++) { const t = arr[(i + 1) * sz + k]; arr[(i + 1) * sz + k] = arr[(i + 2) * sz + k]; arr[(i + 2) * sz + k] = t; }
+    at.needsUpdate = true;
+  }
+}
+
+/* =====================================================================================
+   4. The parts (slices of the light cone) and the jig that holds them
+   ===================================================================================== */
+let partsGroup = null, parts = [], jig = null, lampRig = null;
+function buildParts(theme) {
+  if (partsGroup) { scene.remove(partsGroup); partsGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
+  partsGroup = new THREE.Group(); parts = [];
+  const point = theme === 'night';
+  const L = LAMP.final, U = sunDir(SUN.az, SUN.el);
+  const dirOf = (p) => point ? L.clone().sub(p).normalize() : U.clone();
+  const rodGeo = new THREE.CylinderGeometry(0.25, 0.25, 1, 12, 1, false);
+  const postGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 14, 1, false);
+  const bossGeo = new THREE.CylinderGeometry(0.62, 0.62, 1.6, 16, 1, false);
+  const collarGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.5, 14, 1, false);
+  const yAxis = new V3(0, 1, 0);
+  const cyl = (geo, mat, a, b) => { const m = new THREE.Mesh(geo, mat); m.position.copy(a).lerp(b, 0.5); m.scale.set(1, a.distanceTo(b), 1);
+    m.quaternion.setFromUnitVectors(yAxis, b.clone().sub(a).normalize()); partsGroup.add(m); return m; };
+  const posts = [];
+  for (const def of PARTS) {
+    const reg = REGIONS[def.id];
+    const base = reg.cast.map(([x, y]) => { const [wx, wz] = locToWorld(x, y); return new V3(wx, 0, wz); });
+    const cen = base.reduce((a, b) => a.add(b), new V3()).multiplyScalar(1 / base.length);
+    const rayAt = (p, h) => { const d = dirOf(p); return p.clone().addScaledVector(d, h / d.y); };
+    const nrm = ([ax, az]) => new V3(0, 1, 0).applyEuler(new THREE.Euler(ax * D2R, 0, az * D2R));
+    const hit = (p, C, n) => { const d = dirOf(p); return p.clone().addScaledVector(d, n.dot(C.clone().sub(p)) / n.dot(d)); };
+    const nB = nrm(def.tb), nT = nrm(def.tt);
+    const CB = rayAt(cen, def.h), CT = rayAt(cen, def.h + def.th);
+    const B = base.map((p) => hit(p, CB, nB)), T = base.map((p) => hit(p, CT, nT));
+    const mesh = new THREE.Mesh(chamferedSlice(B, T, nB, nT, Math.min(0.14, def.th * 0.22)), MATS[def.mat]);
+    partsGroup.add(mesh);
+    // rod: enters the upper face at `at` and runs up along the light ray to its post at depth zq
+    const [ax, az] = locToWorld(def.at[0], def.at[1]);
+    const foot = new V3(ax, 0, az);
+    const top = hit(foot, CT, nT);
+    const d = dirOf(top);
+    const s = (def.zq - top.z) / d.z;
+    const qTop = top.clone().addScaledVector(d, s);
+    const rodIn = hit(foot, CB.clone().lerp(CT, 0.5), nB.clone().lerp(nT, 0.5).normalize());   // rod end inside the part
+    const rod = cyl(rodGeo, MATS.brass, rodIn, qTop);
+    cyl(collarGeo, MATS.brass, top.clone().addScaledVector(d, 0.05), top.clone().addScaledVector(d, 0.55));
+    posts.push({ x: qTop.x, z: qTop.z, y: qTop.y, id: def.id });
+    parts.push({ def, B, T, mesh, rod, foot, rodA: rodIn, rodB: qTop, hAvg: def.h + def.th / 2 });
+  }
+  // jig base plate on the desk behind the sheet, a post up to each rod, a boss clamp at every joint
+  const xs = posts.map((p) => p.x), zs = posts.map((p) => p.z);
+  const x0 = Math.min(...xs) - 3, x1 = Math.max(...xs) + 3, z0 = Math.min(...zs) - 3, z1 = Math.max(...zs) + 3;
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 1.2, z1 - z0), MATS.steel);
+  plate.position.set((x0 + x1) / 2, 0.6, (z0 + z1) / 2); partsGroup.add(plate);
+  surfaceUniforms.uComb.value.set((x0 + x1) / 2, (z0 + z1) / 2, (x1 - x0) / 2, (z1 - z0) / 2);
+  jig = { posts: [], comb: { x0, x1, z0, z1 } };
+  for (const p of posts) {
+    const a = new V3(p.x, 1.2, p.z), b = new V3(p.x, p.y, p.z);   // the post ends in the boss at the rod: its shadow ends inside the mark
+    cyl(postGeo, MATS.brass, a, b);
+    const boss = new THREE.Mesh(bossGeo, MATS.steel); boss.position.set(p.x, p.y, p.z); partsGroup.add(boss);
+    jig.posts.push({ a, b, id: p.id });
+  }
+  // closest pair of posts on the plate (must stay > 1.3 cm: boss Ø 1.24)
+  let mind = 1e9; for (let i = 0; i < posts.length; i++) for (let j = i + 1; j < posts.length; j++) mind = Math.min(mind, Math.hypot(posts[i].x - posts[j].x, posts[i].z - posts[j].z));
+  jig.minGap = mind;
+  scene.add(partsGroup);
+  buildLamp(point);
+}
+
+// Night only: an architect lamp with a bar head (aluminium, diffuser underneath), two arms from a base behind the desk.
+function buildLamp(on) {
+  if (lampRig) { scene.remove(lampRig.group); lampRig.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); lampRig = null; }
+  if (!on) return;
+  const g = new THREE.Group();
+  const head = new THREE.Group();
+  const shell = new THREE.Mesh(new THREE.BoxGeometry(28, 5.2, 2.4), MATS.lampBody); shell.position.z = -1.3; head.add(shell);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(26.4, 3.6), MATS.lampFace); face.position.z = -0.08; head.add(face);
+  g.add(head);
+  const tube = new THREE.CylinderGeometry(0.55, 0.55, 1, 12);
+  const a1 = new THREE.Mesh(tube, MATS.lampBody), a2 = new THREE.Mesh(tube, MATS.lampBody);
+  const baseM = new THREE.Mesh(new THREE.CylinderGeometry(9, 9.6, 2.2, 32), MATS.lampBody);
+  baseM.position.copy(LAMP.base).setY(1.1);
+  const j = new THREE.Mesh(new THREE.SphereGeometry(1.1, 16, 12), MATS.lampBody);
+  g.add(a1, a2, baseM, j);
+  scene.add(g);
+  lampRig = { group: g, head, a1, a2, j };
+}
+function poseLamp(L, aim) {
+  if (!lampRig) return;
+  const f = aim.clone().sub(L).normalize();
+  const R = f.clone().cross(new V3(0, 1, 0)).normalize(), U = R.clone().cross(f).normalize();
+  const m = new THREE.Matrix4().makeBasis(R, U, f.clone().negate());   // head's local −z faces the aim
+  const H = L.clone().addScaledVector(f, -1.4);                          // diffuser just in front of the light point
+  lampRig.head.position.copy(H); lampRig.head.quaternion.setFromRotationMatrix(m);
+  // two-link arm: shoulder over the base → elbow (raised) → back of the head
+  const Sh = LAMP.base.clone().setY(2.2), Hb = H.clone().addScaledVector(f, -2.6);
+  const dv = Hb.clone().sub(Sh), dl = Math.min(dv.length(), LAMP.arm * 2 - 0.01);
+  const half = dl / 2, rise = Math.sqrt(Math.max(0, LAMP.arm * LAMP.arm - half * half));
+  const side = dv.clone().normalize(); const up = new V3(0, 1, 0).sub(side.clone().multiplyScalar(side.y)).normalize();
+  const El = Sh.clone().addScaledVector(side, half).addScaledVector(up, rise);
+  const setRod = (mesh, a, b) => { mesh.position.copy(a).lerp(b, 0.5); mesh.scale.set(1, a.distanceTo(b), 1); mesh.quaternion.setFromUnitVectors(new V3(0, 1, 0), b.clone().sub(a).normalize()); };
+  setRod(lampRig.a1, Sh, El); setRod(lampRig.a2, El, Hb); lampRig.j.position.copy(El);
+}
+
+// Solid between two perspective-related polygons B (lower) and T (upper). Side faces lie on light
+// rays, so the silhouette from the design light is exactly the region. Chamfers only cut the cap rims.
+function chamferedSlice(B, T, nB, nT, c) {
+  const n = B.length;
+  const r1 = B.map((b, i) => b.clone().add(T[i].clone().sub(b).setLength(c)));
+  const r2 = T.map((t, i) => t.clone().add(B[i].clone().sub(t).setLength(c)));
+  const r0 = insetPlanar(B, nB, c), r3 = insetPlanar(T, nT, c);
+  const all = [...B, ...T]; const C = all.reduce((a, b) => a.add(b), new V3()).multiplyScalar(1 / all.length);
+  const pos = [], nor = [], uv = [];
+  const tri = (a, b, d) => {
+    let N = b.clone().sub(a).cross(d.clone().sub(a)).normalize();
+    const fc = a.clone().add(b).add(d).multiplyScalar(1 / 3);
+    if (N.dot(fc.sub(C)) < 0) { [b, d] = [d, b]; N.negate(); }
+    const ax = Math.abs(N.x), ay = Math.abs(N.y), az = Math.abs(N.z);
+    for (const v of [a, b, d]) {
+      pos.push(v.x, v.y, v.z); nor.push(N.x, N.y, N.z);
+      const u = ay >= ax && ay >= az ? [v.x, v.z] : ax >= az ? [v.z, v.y] : [v.x, v.y];
+      uv.push(u[0] * 0.055, u[1] * 0.055);
+    }
+  };
+  const quad = (a, b, d, e) => { tri(a, b, d); tri(a, d, e); };
+  for (let i = 1; i < n - 1; i++) { tri(r0[0], r0[i], r0[i + 1]); tri(r3[0], r3[i], r3[i + 1]); }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    quad(r0[i], r0[j], r1[j], r1[i]);
+    quad(r1[i], r1[j], r2[j], r2[i]);
+    quad(r2[i], r2[j], r3[j], r3[i]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
+function insetPlanar(P, nrm, d) {
+  const e1 = P[1].clone().sub(P[0]).normalize(), e2 = nrm.clone().cross(e1).normalize();
+  const q = P.map((p) => new THREE.Vector2(p.clone().sub(P[0]).dot(e1), p.clone().sub(P[0]).dot(e2)));
+  let area = 0; for (let i = 0; i < q.length; i++) { const a = q[i], b = q[(i + 1) % q.length]; area += a.x * b.y - b.x * a.y; }
+  const sgn = area > 0 ? 1 : -1, n = q.length, out = [];
+  const line = (i) => { const a = q[i], b = q[(i + 1) % n]; const dv = b.clone().sub(a).normalize(); const inN = new THREE.Vector2(-dv.y, dv.x).multiplyScalar(sgn); return { p: a.clone().addScaledVector(inN, d), dv }; };
+  for (let i = 0; i < n; i++) {
+    const A = line((i - 1 + n) % n), Bl = line(i);
+    const den = A.dv.x * Bl.dv.y - A.dv.y * Bl.dv.x;
+    let r;
+    if (Math.abs(den) < 1e-9) r = Bl.p; else { const w = Bl.p.clone().sub(A.p); const s = (w.x * Bl.dv.y - w.y * Bl.dv.x) / den; r = A.p.clone().addScaledVector(A.dv, s); }
+    out.push(P[0].clone().addScaledVector(e1, r.x).addScaledVector(e2, r.y));
+  }
+  return out;
+}
+
+/* =====================================================================================
+   5. Per-frame shadow solve: project every vertex from the current light, hull, edges
+   ===================================================================================== */
+function hull2(raw) {
+  const pts = [];
+  for (const p of raw) if (!pts.some((q) => Math.abs(q[0] - p[0]) < 1e-3 && Math.abs(q[1] - p[1]) < 1e-3)) pts.push(p);
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 1e-12) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 1e-12) up.pop(); up.push(p); }
+  lo.pop(); up.pop();
+  const h = lo.concat(up);
+  return h.filter((p, i) => { const q = h[(i + 1) % h.length]; return h.length <= 3 || Math.hypot(q[0] - p[0], q[1] - p[1]) > 1e-3; });
+}
+function setCaster(ci, pts2, pen, trans) {
+  const h = hull2(pts2), Ed = surfaceUniforms.uEdge.value;
+  for (let e = 0; e < NE; e++) {
+    const o = Ed[ci * NE + e];
+    if (e < h.length) {
+      const a = h[e], b = h[(e + 1) % h.length];
+      let nx = b[1] - a[1], nz = -(b[0] - a[0]); const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+      o.set(nx, nz, nx * a[0] + nz * a[1]);
+    } else o.set(0, 0, 1e9);
+  }
+  let cx = 0, cz = 0; for (const q of h) { cx += q[0]; cz += q[1]; } cx /= h.length; cz /= h.length;
+  let r = 0; for (const q of h) r = Math.max(r, Math.hypot(q[0] - cx, q[1] - cz));
+  surfaceUniforms.uBound.value[ci].set(cx, cz, r + pen * 2 + 0.5);
+  surfaceUniforms.uPen.value[ci] = pen;
+  surfaceUniforms.uTrans.value[ci].copy(trans);
+}
+function clearCaster(ci) { surfaceUniforms.uBound.value[ci].set(0, 0, -1); const Ed = surfaceUniforms.uEdge.value; for (let e = 0; e < NE; e++) Ed[ci * NE + e].set(0, 0, e === 0 ? -1e9 : 1e9); }
+
+/* =====================================================================================
+   6. Theme setup (colour calibration: lit sheet = brand paper, shadow = asphalt, acrylic = signal)
+   ===================================================================================== */
+const lin = (hex) => new THREE.Color(hex);           // THREE.Color stores linear values
+const PAPER = new V3(0.879, 0.863, 0.823), ORANGE = lin('#D9501A');
+let TH = null;
+const THEMES = {
+  day: { bg: '#E4DDD2', lcol: [1, 1, 1], amb: 0.017, ambFloor: 1, fog: [1e4, 1e4 + 1], env: 0.22, hemi: 0.10, partsCol: 0xffffff },
+  // night: camera white balance on the lamp (paper in the pool = brand paper), warm rim and warm bounce; outside → #121110
+  night: { bg: '#121110', lcol: [1, 1, 1], amb: 0.0132, ambFloor: 0.5, fog: [72, 130], env: 0.03, hemi: 0.035, partsCol: 0xfff3e6 },
+};
+// CPU mirror of the shader light (used for calibration and for the chip, which is a mesh)
+function spotAt(P, L, aim, ang, soft) {
+  const f = aim.clone().sub(L).normalize(), R = f.clone().cross(new V3(0, 1, 0)).normalize(), U = R.clone().cross(f).normalize();
+  const m = P.clone().sub(L).normalize(), fz = m.dot(f);
+  const qx = m.dot(R) / fz / Math.tan(ang[0] * D2R), qy = m.dot(U) / fz / Math.tan(ang[1] * D2R);
+  const r = Math.hypot(qx, qy);
+  const sm = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  return { s: (1 - sm(1 - soft, 1 + soft, r)) * (1 - 0.10 * r * r) * (fz > 0 ? 1 : 0), f, R, U };
+}
+function winLitCPU(P, u) {
+  const s = (WALL - P.z) / Math.max(u.z, 1e-3), hx = P.x + s * u.x, hy = P.y + s * u.y, pen = 0.25 + s * 0.0047;
+  const sm = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  return (1 - sm(-pen, pen, hx - WIN.jamb)) * sm(-pen, pen, hy - WIN.sill) * sm(-pen, pen, Math.max(WIN.m0 - hx, hx - WIN.m1));
+}
+function lampE(P, L, aim, ang, soft) {
+  const d = L.clone().sub(P), d2 = d.lengthSq();
+  return Math.max(d.y / Math.sqrt(d2), 0) / d2 * spotAt(P, L, aim, ang, soft).s;
+}
+function applyTheme() {
+  const th = THEMES[S.theme]; TH = th;
+  const U = surfaceUniforms;
+  renderer.setClearColor(new THREE.Color(th.bg));
+  U.uBg.value.set(th.bg);
+  U.uLCol.value.setRGB(...th.lcol);
+  const warmAmb = S.theme === 'night' ? [1, 0.93, 0.82] : [1, 1, 1];
+  U.uAmb.value.setRGB(th.amb * warmAmb[0], th.amb * warmAmb[1], th.amb * warmAmb[2]);
+  U.uAmbF.value.set(MARK_C.x, MARK_C.z, 42, th.ambFloor);
+  U.uFog.value.set(...th.fog);
+  scene.environmentIntensity = th.env;
+  hemi.intensity = th.hemi;
+  U.uPoint.value = S.theme === 'night' ? 1 : 0;
+  U.uDay.value = S.theme === 'day' ? 1 : 0;
+  sunLight.visible = S.theme === 'day'; lampLight.visible = S.theme === 'night';
+  sunLight.color.set(th.partsCol); lampLight.color.set(th.partsCol);
+  // irradiance normalisation: E = 1 at the mark centre for the final light
+  if (S.theme === 'day') { const u = sunDir(SUN.az, SUN.el); U.uLI.value = 1 / u.y; }
+  else { U.uLRef.value = 1; U.uLI.value = 1 / lampE(MARK_C, LAMP.final, LAMP.aim, LAMP.ang, LAMP.soft); }
+  // orange acrylic transmittance and ink albedo solved so the final frame lands on brand colours
+  const lc = th.lcol, amb = U.uAmb.value;
+  TH.trans = new V3(clamp01((ORANGE.r / PAPER.x - amb.r) / lc[0]), clamp01((ORANGE.g / PAPER.y - amb.g) / lc[1]), clamp01((ORANGE.b / PAPER.z - amb.b) / lc[2]));
+  TH.chipAlb = new V3(ORANGE.r / (amb.r + lc[0]), ORANGE.g / (amb.g + lc[1]), ORANGE.b / (amb.b + lc[2]));
+  U.uInk.value.setRGB(PAPER.x * amb.r / (amb.r + lc[0]), PAPER.y * amb.g / (amb.g + lc[1]), PAPER.z * amb.b / (amb.b + lc[2]));
+  buildParts(S.theme);
+  App.dirty = true;
+}
+App.onTheme = applyTheme;
+applyTheme();
+
+/* =====================================================================================
+   7. Render a frame at time t
+   ===================================================================================== */
+function resize() {
+  const w = stage.clientWidth || innerWidth, h = stage.clientHeight || innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; App.dirty = true;
+}
+addEventListener('resize', resize);
+App.onMode = () => { resize(); };
+resize();
+
+// Camera: W always spans the shorter side with a 24° field of view on that side (portrait keeps the same lens).
+function placeCamera(c) {
+  const half = 12 * D2R, a = camera.aspect;
+  camera.fov = a < 1 ? 2 * Math.atan(Math.tan(half) / a) / D2R : 24;
+  camera.updateProjectionMatrix();
+  const dist = (c.W / 2) / Math.tan(half);
+  const A = c.A * D2R, El = Math.min(89.999, c.E) * D2R;
+  camera.position.set(c.target.x + dist * Math.cos(El) * Math.sin(A), c.target.y + dist * Math.sin(El), c.target.z + dist * Math.cos(El) * Math.cos(A));
+  camera.rotation.set(-El, A, 0, 'YXZ');
+  camera.updateMatrixWorld();
+}
+
+const ZERO = new V3();
+const DBG_HIDE = Q.get('dbg') === 'hide';
+const DBG_CAM = Q.get('cam') ? Q.get('cam').split(',').map(Number) : null;   // ?cam=tx,ty,tz,A,E,W — framing aid
+function renderAt(t) {
+  const st = evaluate(S.theme, S.mode, t);
+  const U = surfaceUniforms;
+  const loader = S.mode === 'loader';
+  let project, penOf, lightE;
+  bounce.intensity = 0;
+  if (st.sun) {
+    const u = st.sun;
+    U.uLight.value.copy(u);
+    U.uLI.value = 1 / u.y;   // the camera keeps exposure on the sheet while the sun moves (time-lapse)
+    sunLight.position.copy(u).multiplyScalar(300); sunLight.target.position.set(0, 0, 0);
+    sunLight.intensity = Math.PI * U.uLI.value * st.intensity;
+    project = (p) => [p.x - u.x * p.y / u.y, p.z - u.z * p.y / u.y];
+    penOf = (h) => (0.03 + h * 0.0047 / u.y) * 0.8;   // sun disc
+    lightE = (P) => U.uLI.value * u.y * winLitCPU(P, u);
+  } else {
+    const L = st.lamp, aim = loader ? MARK_C.clone() : st.aim;
+    U.uLight.value.copy(L);
+    // loader: a tight oval pool around the mark only (≈ 12 × 10 cm), hard rim
+    let ang = LAMP.ang, soft = LAMP.soft;
+    if (loader) { const d = L.distanceTo(MARK_C), el = Math.asin(L.y / d); ang = [Math.atan(6.2 / d) / D2R, Math.atan(5.0 * Math.sin(el) / d) / D2R]; soft = 0.03; }
+    const sp = spotAt(MARK_C, L, aim, ang, soft);
+    U.uSpotF.value.copy(sp.f); U.uSpotR.value.copy(sp.R); U.uSpotU.value.copy(sp.U);
+    U.uSpotA.value.set(Math.tan(ang[0] * D2R), Math.tan(ang[1] * D2R), soft);
+    U.uLI.value = 1 / lampE(MARK_C, LAMP.final, loader ? MARK_C : LAMP.aim, ang, soft);
+    lampLight.position.copy(L); lampLight.target.position.copy(aim);
+    lampLight.angle = Math.max(...ang) * 1.25 * D2R; lampLight.penumbra = 0.2;
+    lampLight.intensity = Math.PI * U.uLI.value * st.intensity;
+    project = (p) => { const s = L.y / (L.y - p.y); return [L.x + (p.x - L.x) * s, L.z + (p.z - L.z) * s]; };
+    penOf = (h) => 0.03 + LAMP.emitter * h / Math.max(1, L.y - h);
+    lightE = (P) => U.uLI.value * lampE(P, L, aim, ang, soft);
+    if (lampRig) { lampRig.group.visible = !loader && !DBG_HIDE; poseLamp(L, aim); }
+    bounce.position.set(aim.x, 3, aim.z + 6); bounce.intensity = loader ? 0 : 2600 * st.intensity;
+  }
+  U.uLCol.value.setRGB(TH.lcol[0] * st.intensity, TH.lcol[1] * st.intensity, TH.lcol[2] * st.intensity);
+  { const a = TH.amb * (S.theme === 'night' ? 0.3 + 0.7 * st.intensity : 1), w = S.theme === 'night' ? [1, 0.93, 0.82] : [1, 1, 1];
+    U.uAmb.value.setRGB(a * w[0], a * w[1], a * w[2]); }
+  // casters: parts (sharpened to the pixel once the level is caught: one penumbra for all parts, no steps)
+  parts.forEach((pt, i) => {
+    let pts = [...pt.B, ...pt.T].map(project);
+    if (st.sag) { const dz = SAG[pt.def.id] * st.sag; pts = pts.map(([x, z]) => [x, z + dz]); }
+    setCaster(i, pts, penOf(pt.hAvg) * (1 - st.sharp), pt.def.transmit ? TH.trans : ZERO);
+    pt.mesh.visible = pt.rod.visible = st.pieces && !DBG_HIDE;
+    // rod shadow: shrinks to a point inside the mark when the light reaches its design position
+    const a = project(pt.rodA), b = project(pt.rodB);
+    const pr = penOf(pt.rodB.y * 0.6);
+    U.uSeg.value[i].set(a[0], a[1], b[0], b[1]); U.uSegP.value[i].set(0.25, pr, st.pieces ? Math.min(1, 0.5 / (0.5 + pr)) : 0);
+  });
+  partsGroup.visible = st.pieces && !DBG_HIDE;
+  jig.posts.forEach((ps, i) => {
+    const a = project(ps.a), b = project(ps.b);
+    const pp = penOf(ps.b.y * 0.6);   // a thin post under a wide sun disc: its shadow is grey, not black
+    U.uSeg.value[7 + i].set(a[0], a[1], b[0], b[1]); U.uSegP.value[7 + i].set(0.3, pp, st.pieces ? st.postK * Math.min(1, 0.6 / (0.6 + pp)) : 0);
+  });
+  U.uComb.value.y = st.pieces ? (jig.comb.z0 + jig.comb.z1) / 2 : -1e4;
+  // chip: flicked from 4 cm away, slides to a stop with constant friction (distance left ∝ (1−u)²)
+  const left = (1 - st.chipU) * (1 - st.chipU);
+  chip.visible = st.chip;
+  chip.position.set(chipC.x + CHIP_FROM.dx * left, 0, chipC.z + CHIP_FROM.dz * left);
+  chip.rotation.set(0, CHIP_FROM.yaw * D2R * left, 0);
+  chip.updateMatrixWorld(true);
+  if (chip.visible && st.chipK > 0) {
+    const pts = chipLocal.map((v) => project(v.clone().applyMatrix4(chip.matrixWorld)));
+    setCaster(NC - 1, pts, 0.02, ZERO);
+  } else clearCaster(NC - 1);
+  if (chip.visible) {   // the chip is lit by exactly the light the sheet gets at that point
+    const e = lightE(chip.position) * st.intensity, amb = U.uAmb.value;
+    MATS.chip.color.setRGB(TH.chipAlb.x * (amb.r + e), TH.chipAlb.y * (amb.g + e), TH.chipAlb.z * (amb.b + e));
+  }
+  word.visible = st.word;
+  // camera and background
+  placeCamera(DBG_CAM ? { target: new V3(DBG_CAM[0], DBG_CAM[1], DBG_CAM[2]), A: DBG_CAM[3], E: DBG_CAM[4], W: DBG_CAM[5] } : st.cam);
+  if (loader) {   // loader: edges fall into the page colour, no visible canvas square
+    U.uFocus.value.set(MARK_C.x, MARK_C.z); U.uBg.value.set(S.theme === 'day' ? '#F1EFEA' : '#121110');
+    U.uFog.value.set(1e4, 1e4 + 1);
+    U.uAmbF.value.set(MARK_C.x, MARK_C.z, S.theme === 'day' ? 1e4 : 1e-3, TH.ambFloor);   // night: flat dark outside the pool, no halo
+  } else {
+    U.uFocus.value.set(st.cam.target.x, st.cam.target.z); U.uFog.value.set(...TH.fog); U.uBg.value.set(TH.bg);
+    U.uAmbF.value.set(MARK_C.x, MARK_C.z, 42, TH.ambFloor);
+  }
+  renderer.render(scene, camera);
+  if (!body.classList.contains('no-ui')) oTime.textContent = t.toFixed(2) + ' с';
+}
+
+// Deterministic hooks for capture scripts
+window.__nvRender = (t) => { S.frozen = t; renderAt(t); return true; };
+window.__nvInfo = () => ({ theme: S.theme, mode: S.mode, calls: renderer.info.render.calls, tris: renderer.info.render.triangles, parts: parts.length,
+  postGap: +jig.minGap.toFixed(2), postY: jig.posts.map((p) => +p.b.y.toFixed(1)) });
+// Final-frame check: is any part, rod, post, comb or lamp inside the final top view for a given aspect?
+window.__nvCheck = (aspects = [0.46, 0.5625, 0.75, 1, 1.6, 1.78, 2.33]) => {
+  const keep = camera.aspect, out = {};
+  const pts = [];
+  parts.forEach((pt) => { pts.push(...pt.B.map((v) => [pt.def.id, v]), ...pt.T.map((v) => [pt.def.id, v]), ['rod', pt.rodA], ['rod', pt.rodB]); });
+  jig.posts.forEach((p) => { pts.push(['post', p.a], ['post', p.b]); });
+  pts.push(['plate', new V3(jig.comb.x0, 0, jig.comb.z1)], ['plate', new V3(jig.comb.x1, 0, jig.comb.z1)]);
+  if (lampRig) pts.push(['lamp', LAMP.final], ['lampbase', LAMP.base]);
+  for (const a of aspects) {
+    camera.aspect = a; placeCamera(POSE.end);
+    const hits = new Set(); let worst = 0;
+    for (const [id, v] of pts) { const n = v.clone().project(camera); const m = Math.max(Math.abs(n.x), Math.abs(n.y)); if (n.z < 1 && m < 1.0) { hits.add(id); worst = Math.max(worst, 1 - m); } }
+    out[a] = { inside: [...hits], minMargin: 0 };
+    let mm = 1e9; for (const [, v] of pts) { const n = v.clone().project(camera); mm = Math.min(mm, Math.max(Math.abs(n.x), Math.abs(n.y))); }
+    out[a].minMargin = +mm.toFixed(3);
+  }
+  camera.aspect = keep; App.dirty = true;
+  return out;
+};
+App.snapshot = () => { try { return renderer.domElement.toDataURL('image/png'); } catch (e) { return null; } };
+
+let lastT = -1, lastDraw = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (S.mode === 'static') return;
+  let t = currentT(now);
+  if (S.mode === 'intro') t = Math.min(t, DUR.intro);
+  if (t === lastT && !App.dirty) return;
+  if (S.mode === 'loop' && now - lastDraw < 15 && !App.dirty) return;   // hero loop: at most ~60 fps
+  lastT = t; lastDraw = now; App.dirty = false;
+  renderAt(t);
+}
+body.classList.remove('no-gl');
+App.ready = true;
+if (body.classList.contains('poster')) {        // poster was up: hand over with a cross-fade
+  if (S.mode === 'intro') { S.playing = false; S.pausedAt = DUR.intro; }   // late scene: keep the final frame the poster shows
+  renderAt(currentT(performance.now()));
+  body.classList.add('poster-out');
+  setTimeout(() => body.classList.remove('poster', 'poster-out'), 650);
+} else renderAt(S.frozen != null ? S.frozen : currentT(performance.now()));
+window.__nvReady = true;
+requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

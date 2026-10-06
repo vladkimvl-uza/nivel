@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="ru" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nivel · Лазерная отметка</title>
+<meta name="description" content="Концепт 3D-анимации логотипа Nivel: ротационный лазер даёт черту уровня, отвес находит её остриём, слово встаёт на ту же черту.">
+<style>
+:root{--bg:#F1EFEA;--ink:#1D1D1B;--ink-2:#5E574D;--line:rgba(29,29,27,.2);--chip:rgba(241,239,234,.88);--acc:#D9501A;--laser:#E0301A}
+html[data-theme="night"]{--bg:#121110;--ink:#F1EFEA;--ink-2:#A39C90;--line:#3B3631;--chip:rgba(18,17,16,.84);--acc:#F06A30;--laser:#FF3F1F}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;width:100%;height:100%}
+html.warming #stage{visibility:hidden}
+#flat{position:fixed;inset:0;display:none;background:var(--bg)}
+#flat svg{position:absolute;display:block;overflow:visible}
+html.is-flat #flat{display:block}
+html.is-flat #stage{display:none}
+/* loader: SVG + CSS, frontal, the same rocking on the tip */
+#flat .ldr{left:50%;top:50%;width:min(30vw,168px);height:auto;transform:translate(-50%,-50%)}
+.ldr .rock{transform-box:view-box;transform-origin:0 0;animation:nv-rock var(--ldur,1.4s) linear infinite}
+.ldr .ray{animation:nv-ray var(--ldur,1.4s) linear infinite}
+html.ldr-frozen .ldr .rock,html.ldr-frozen .ldr .ray{animation-play-state:paused}
+#panel{position:fixed;left:16px;bottom:16px;right:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  font:500 12px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace;letter-spacing:.02em;pointer-events:none}
+#panel .grp{display:flex;gap:0;pointer-events:auto}
+#panel button{font:inherit;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:0;
+  padding:8px 10px;cursor:pointer;margin-left:-1px}
+#panel button:disabled{opacity:.4;cursor:default}
+#panel .grp button:first-child{border-radius:2px 0 0 2px;margin-left:0}
+#panel .grp button:last-child{border-radius:0 2px 2px 0}
+#panel .grp button:only-child{border-radius:2px}
+#panel button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#panel button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#panel .t{pointer-events:none;color:var(--ink-2);padding:0 4px;min-width:5.5em}
+html.no-ui #panel{display:none}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="stage" aria-hidden="true"></div>
+<div id="flat" role="img" aria-label="Nivel"></div>
+<nav id="panel" aria-label="Управление анимацией">
+  <div class="grp"><button type="button" data-act="replay">Повторить</button></div>
+  <div class="grp" role="group" aria-label="Время суток">
+    <button type="button" data-theme="day">День</button><button type="button" data-theme="night">Ночь</button>
+  </div>
+  <div class="grp" role="group" aria-label="Режим">
+    <button type="button" data-mode="intro">Заставка</button><button type="button" data-mode="loop">Повтор</button><button type="button" data-mode="loader">Загрузка</button><button type="button" data-mode="static">Статично</button>
+  </div>
+  <div class="grp" role="group" aria-label="Скорость">
+    <button type="button" data-speed="0.5">0.5×</button><button type="button" data-speed="1">1×</button>
+  </div>
+  <span class="t" id="clock">0.00 с</span>
+</nav>
+
+<script type="module">
+/* ------------------------------------------------------------------
+   Nivel · «Лазерная отметка», v2
+   Geometry comes verbatim from docs/brand/logos-v2/nivel-1-lockup.svg
+   (same path data, same group transforms). Nothing is redrawn by eye.
+   ------------------------------------------------------------------ */
+const MARK_D = ['M8 16h52v8h-52Z','M8 24L24 24L24 40Z','M24 24L40 24L24 40Z','M4 40h56v8h-56Z'];
+const WORD_D = 'M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z';
+const DOT_D = 'M64.53 -73.25L87.42 -73.25L75.98 -61.8Z';
+/* IBM Plex Mono Regular outlines of «±0.000» (fontTools, 1000 u/em, baseline 0, advance 3600) */
+const PLEX_ENGR = 'M262 -152V-351H62V-419H262V-618H338V-419H538V-351H338V-152ZM62 0V-68H538V0ZM900 12Q836 12 790 -12Q744 -37 714 -83Q684 -129 670 -196Q656 -263 656 -349Q656 -434 670 -502Q684 -569 714 -615Q744 -661 790 -686Q836 -710 900 -710Q964 -710 1010 -686Q1056 -661 1086 -615Q1116 -569 1130 -502Q1144 -434 1144 -349Q1144 -263 1130 -196Q1116 -129 1086 -83Q1056 -37 1010 -12Q964 12 900 12ZM900 -61Q942 -61 972 -78Q1002 -94 1020 -124Q1039 -154 1048 -196Q1057 -239 1057 -292V-406Q1057 -458 1048 -501Q1039 -544 1020 -574Q1002 -604 972 -620Q942 -637 900 -637Q858 -637 828 -620Q798 -604 780 -574Q761 -544 752 -501Q743 -458 743 -406V-292Q743 -239 752 -196Q761 -154 780 -124Q798 -94 828 -78Q858 -61 900 -61ZM900 -290Q865 -290 852 -304Q838 -318 838 -338V-360Q838 -380 852 -394Q865 -408 900 -408Q935 -408 948 -394Q962 -380 962 -360V-338Q962 -318 948 -304Q935 -290 900 -290ZM1500 9Q1459 9 1442 -8Q1426 -25 1426 -51V-69Q1426 -95 1442 -112Q1459 -129 1500 -129Q1541 -129 1558 -112Q1574 -95 1574 -69V-51Q1574 -25 1558 -8Q1541 9 1500 9ZM2100 12Q2036 12 1990 -12Q1944 -37 1914 -83Q1884 -129 1870 -196Q1856 -263 1856 -349Q1856 -434 1870 -502Q1884 -569 1914 -615Q1944 -661 1990 -686Q2036 -710 2100 -710Q2164 -710 2210 -686Q2256 -661 2286 -615Q2316 -569 2330 -502Q2344 -434 2344 -349Q2344 -263 2330 -196Q2316 -129 2286 -83Q2256 -37 2210 -12Q2164 12 2100 12ZM2100 -61Q2142 -61 2172 -78Q2202 -94 2220 -124Q2239 -154 2248 -196Q2257 -239 2257 -292V-406Q2257 -458 2248 -501Q2239 -544 2220 -574Q2202 -604 2172 -620Q2142 -637 2100 -637Q2058 -637 2028 -620Q1998 -604 1980 -574Q1961 -544 1952 -501Q1943 -458 1943 -406V-292Q1943 -239 1952 -196Q1961 -154 1980 -124Q1998 -94 2028 -78Q2058 -61 2100 -61ZM2100 -290Q2065 -290 2052 -304Q2038 -318 2038 -338V-360Q2038 -380 2052 -394Q2065 -408 2100 -408Q2135 -408 2148 -394Q2162 -380 2162 -360V-338Q2162 -318 2148 -304Q2135 -290 2100 -290ZM2700 12Q2636 12 2590 -12Q2544 -37 2514 -83Q2484 -129 2470 -196Q2456 -263 2456 -349Q2456 -434 2470 -502Q2484 -569 2514 -615Q2544 -661 2590 -686Q2636 -710 2700 -710Q2764 -710 2810 -686Q2856 -661 2886 -615Q2916 -569 2930 -502Q2944 -434 2944 -349Q2944 -263 2930 -196Q2916 -129 2886 -83Q2856 -37 2810 -12Q2764 12 2700 12ZM2700 -61Q2742 -61 2772 -78Q2802 -94 2820 -124Q2839 -154 2848 -196Q2857 -239 2857 -292V-406Q2857 -458 2848 -501Q2839 -544 2820 -574Q2802 -604 2772 -620Q2742 -637 2700 -637Q2658 -637 2628 -620Q2598 -604 2580 -574Q2561 -544 2552 -501Q2543 -458 2543 -406V-292Q2543 -239 2552 -196Q2561 -154 2580 -124Q2598 -94 2628 -78Q2658 -61 2700 -61ZM2700 -290Q2665 -290 2652 -304Q2638 -318 2638 -338V-360Q2638 -380 2652 -394Q2665 -408 2700 -408Q2735 -408 2748 -394Q2762 -380 2762 -360V-338Q2762 -318 2748 -304Q2735 -290 2700 -290ZM3300 12Q3236 12 3190 -12Q3144 -37 3114 -83Q3084 -129 3070 -196Q3056 -263 3056 -349Q3056 -434 3070 -502Q3084 -569 3114 -615Q3144 -661 3190 -686Q3236 -710 3300 -710Q3364 -710 3410 -686Q3456 -661 3486 -615Q3516 -569 3530 -502Q3544 -434 3544 -349Q3544 -263 3530 -196Q3516 -129 3486 -83Q3456 -37 3410 -12Q3364 12 3300 12ZM3300 -61Q3342 -61 3372 -78Q3402 -94 3420 -124Q3439 -154 3448 -196Q3457 -239 3457 -292V-406Q3457 -458 3448 -501Q3439 -544 3420 -574Q3402 -604 3372 -620Q3342 -637 3300 -637Q3258 -637 3228 -620Q3198 -604 3180 -574Q3161 -544 3152 -501Q3143 -458 3143 -406V-292Q3143 -239 3152 -196Q3161 -154 3180 -124Q3198 -94 3228 -78Q3258 -61 3300 -61ZM3300 -290Q3265 -290 3252 -304Q3238 -318 3238 -338V-360Q3238 -380 3252 -394Q3265 -408 3300 -408Q3335 -408 3348 -394Q3362 -380 3362 -360V-338Q3362 -318 3348 -304Q3335 -290 3300 -290Z';
+const BRAND = {
+  day:   {fg:'#1D1D1B', acc:'#D9501A', bg:'#F1EFEA', laser:'#E0301A'},
+  night: {fg:'#F1EFEA', acc:'#F06A30', bg:'#121110', laser:'#FF3F1F'}
+};
+const MARK_G = 'translate(-6.25 -74.97) scale(1.5619)';
+function markPaths(c){ const m = MARK_D; return `<path fill="${c.fg}" d="${m[0]}"/><path fill="${c.acc}" d="${m[1]}"/><path fill="${c.fg}" d="${m[2]}"/><path fill="${c.fg}" d="${m[3]}"/>`; }
+/* the lockup exactly as in nivel-1-lockup.svg (used by SVGLoader) */
+function lockupSVG(theme){
+  const c = BRAND[theme];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0"><g transform="${MARK_G}">${markPaths(c)}</g><g transform="translate(111.56 0)"><path fill="${c.fg}" d="${WORD_D}"/><path fill="${c.acc}" d="${DOT_D}"/></g></svg>`;
+}
+/* flat final frame: viewBox = the world box of the lockup (x 0…332.61, y −1.5…73.5) */
+function flatSVG(theme){
+  const c = BRAND[theme];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -73.5 332.61 75" preserveAspectRatio="none" aria-hidden="true"><g transform="${MARK_G}">${markPaths(c)}</g><g transform="translate(111.56 0)"><path fill="${c.fg}" d="${WORD_D}"/><path fill="${c.acc}" d="${DOT_D}"/></g></svg>`;
+}
+/* loader: the mark only, frontal; the tip of the triangle is the origin, so the rocking group turns about (0,0) */
+function loaderSVG(theme){
+  const c = BRAND[theme], m = MARK_D;
+  return `<svg class="ldr" xmlns="http://www.w3.org/2000/svg" viewBox="-44 -47 112 68" aria-hidden="true">
+<g transform="translate(-31.24 12.49)"><g transform="${MARK_G}"><path fill="${c.fg}" d="${m[3]}"/></g></g>
+<circle class="ray" cx="0" cy="-0.9" r="1.8" fill="${c.laser}"/>
+<g class="rock"><g transform="translate(-31.24 12.49)"><g transform="${MARK_G}"><path fill="${c.fg}" d="${m[0]}"/><path fill="${c.acc}" d="${m[1]}"/><path fill="${c.fg}" d="${m[2]}"/></g></g></g>
+</svg>`;
+}
+
+/* ---------------- params ---------------- */
+const Q = new URLSearchParams(location.search);
+const state = {
+  theme: Q.get('theme') === 'night' || Q.get('theme') === 'day' ? Q.get('theme') : 'night',
+  mode: ['intro','loop','loader','static'].includes(Q.get('mode')) ? Q.get('mode') : 'intro',
+  speed: Q.get('speed') === '0.5' ? 0.5 : 1,
+  frozen: Q.has('t') ? Math.max(0, parseFloat(Q.get('t')) || 0) : null,
+  autoplay: Q.get('autoplay') !== '0',
+  t: 0
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduce && state.frozen === null) state.mode = 'static';
+const root = document.documentElement;
+if (Q.get('ui') === '0' || state.frozen !== null) root.classList.add('no-ui');
+const clock = document.getElementById('clock');
+function markReady(){ requestAnimationFrame(() => { window.__ready = true; document.body.dataset.ready = '1'; }); }
+
+/* ---------------- shared numbers ---------------- */
+const clamp = (x,a=0,b=1) => Math.min(b, Math.max(a, x));
+const seg = (t,a,b) => clamp((t-a)/(b-a));
+const lerp = (a,b,u) => a + (b-a)*u;
+const eOutCubic = u => 1 - Math.pow(1-u, 3);
+const eInOutSine = u => -(Math.cos(Math.PI*u) - 1)/2;
+const eInQuad = u => u*u;
+/* impact: starts at 0 moving toward −1, decays */
+const bounce = (tau,k,w) => tau <= 0 ? 0 : -Math.exp(-k*tau)*Math.sin(w*tau);
+/* critically damped approach from −1 to 0, no overshoot */
+const crit = (tau,w) => tau <= 0 ? -1 : -(1 + w*tau)*Math.exp(-w*tau);
+const DEG = Math.PI/180;
+
+const MK = v => [-6.25 + 1.5619*v[0], 74.97 - 1.5619*v[1]];
+const TIP = MK([24,40]);            // (31.24, 12.49) — tip on the top face of the level bar
+const LEVEL = TIP[1];               // the level line of the mark = top face of the bar
+const SHELF_TOP = MK([0,16])[1];    // 49.97
+const SHELF_R = MK([60,0])[0];      // 87.46
+const SHELF_RETRACT = MK([40,0])[0] - SHELF_R; // shelf starts flush with the triangle
+const DOT_C = [111.56 + (64.53+87.42+75.98)/3, (73.25+73.25+61.8)/3];
+const BOX = {x0:0, x1:332.61, y0:-1.5, y1:73.5};
+const CENTER = [(BOX.x0+BOX.x1)/2, (BOX.y0+BOX.y1)/2];
+const STAND = 1.6, DEPTH = 10, BEV = 0.9;
+const ZF = STAND + DEPTH + 2*BEV;
+const ZM = STAND + BEV + DEPTH/2;
+const VFOV = 24*DEG;
+const DUR = {intro: 4.0, loop: 14, loader: 1.4};
+/* rotary laser on a wall mount, left of the mark; its plane sits just on the level line */
+const DEV = {x:-108, z:15};
+const LASER_Y = LEVEL + 0.7;
+
+/* camera framing of the final lockup — shared by WebGL and the flat SVG so the two coincide */
+function finalCam(aspect){
+  const tv = Math.tan(VFOV/2);
+  const D = Math.max(((BOX.y1-BOX.y0)/0.42/2)/tv, ((BOX.x1-BOX.x0)/0.70/2)/(tv*aspect));
+  return {T:[CENTER[0], CENTER[1]+1, ZM], yaw:0, pitch:4*DEG, D};
+}
+function finalRect(w, h){
+  const F = finalCam(w/h), s = Math.sin(F.pitch), c = Math.cos(F.pitch), tv = Math.tan(VFOV/2);
+  const C = [F.T[0], F.T[1] + F.D*s, F.T[2] + F.D*c];
+  const proj = (x,y,z) => { const d = [x-C[0], y-C[1], z-C[2]]; const xc = d[0], yc = d[1]*c - d[2]*s, zc = -d[1]*s - d[2]*c;
+    return [w/2 + (xc/zc)/tv*(h/2), h/2 - (yc/zc)/tv*(h/2)]; };
+  const z = ZF - BEV, a = proj(BOX.x0, BOX.y1, z), b = proj(BOX.x1, BOX.y0, z);
+  return {x:a[0], y:a[1], w:b[0]-a[0], h:b[1]-a[1]};
+}
+
+/* ---------------- flat views (static, loader, no-WebGL) ---------------- */
+const flat = document.getElementById('flat');
+let flatKey = '';
+function placeFlat(){
+  const svg = flat.querySelector('svg:not(.ldr)'); if (!svg) return;
+  const r = finalRect(innerWidth, innerHeight);
+  Object.assign(svg.style, {left:r.x+'px', top:r.y+'px', width:r.w+'px', height:r.h+'px'});
+}
+function loaderCSS(){
+  /* damped rock on the tip after a tap, then 0.3 s of stillness; the laser dot crosses under the mark once */
+  const N = 70, A = 5.5, w = 2*Math.PI/0.38, k = 4.6, T = DUR.loader;
+  let rock = '', ray = '';
+  for (let i=0;i<=N;i++){
+    const u = i/N, tau = u*T, th = tau < 1.1 ? A*Math.exp(-k*tau)*Math.sin(w*tau) : 0;
+    rock += `${(u*100).toFixed(2)}%{transform:rotate(${th.toFixed(3)}deg)}`;
+    const us = u/0.72, on = us <= 1 ? Math.pow(Math.sin(Math.PI*us), .6) : 0;
+    ray += `${(u*100).toFixed(2)}%{transform:translateX(${(lerp(-40, 48, Math.min(us,1))).toFixed(2)}px);opacity:${on.toFixed(3)}}`;
+  }
+  return `@keyframes nv-rock{${rock}}@keyframes nv-ray{${ray}}`;
+}
+(() => { const s = document.createElement('style'); s.textContent = loaderCSS(); document.head.appendChild(s); })();
+function showFlat(){
+  root.classList.add('is-flat');
+  const key = state.mode + state.theme;
+  if (key !== flatKey){ flat.innerHTML = state.mode === 'loader' ? loaderSVG(state.theme) : flatSVG(state.theme); flatKey = key; }
+  root.style.setProperty('--ldur', (DUR.loader/state.speed) + 's');
+  if (state.mode === 'loader'){
+    const t = state.frozen;
+    root.classList.toggle('ldr-frozen', t !== null);
+    flat.querySelectorAll('.rock,.ray').forEach(el => { el.style.animationDelay = t !== null ? (-(t % DUR.loader)/state.speed) + 's' : '0s'; });
+    clock.textContent = 'цикл ' + DUR.loader.toFixed(1) + ' с';
+  } else { placeFlat(); clock.textContent = 'финал'; }
+}
+function hideFlat(){ root.classList.remove('is-flat'); }
+
+/* ---------------- WebGL availability ---------------- */
+function hasWebGL(){
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }
+  catch(e){ return false; }
+}
+const GL = hasWebGL();
+let api = null, glBoot = null, startToken = 0;
+function disableGLButtons(){
+  document.querySelectorAll('#panel [data-mode]').forEach(b => { if (b.dataset.mode === 'intro' || b.dataset.mode === 'loop') b.disabled = true; });
+  document.querySelector('#panel [data-act="replay"]').disabled = true;
+}
+function is3D(){ return state.mode === 'intro' || state.mode === 'loop'; }
+
+/* ---------------- start (any mode) ---------------- */
+function start(){
+  const token = ++startToken;
+  if (is3D() && !GL){ state.mode = 'static'; }
+  syncUI();
+  if (!is3D()){ api && api.stop(); showFlat(); markReady(); return; }
+  if (!glBoot) glBoot = bootGL();
+  glBoot.then(a => {
+    if (token !== startToken) return;
+    if (!a){ state.mode = 'static'; disableGLButtons(); syncUI(); showFlat(); markReady(); return; }
+    api = a; a.start(token);
+  });
+}
+addEventListener('resize', () => { if (root.classList.contains('is-flat')) placeFlat(); else if (api) api.onResize(); });
+
+/* ---------------- UI ---------------- */
+function syncUI(){
+  document.querySelectorAll('#panel [data-theme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === state.theme)));
+  document.querySelectorAll('#panel [data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
+  document.querySelectorAll('#panel [data-speed]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.speed === state.speed)));
+  root.dataset.theme = state.theme;
+}
+document.getElementById('panel').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.act === 'replay'){ state.frozen = null; state.t = 0; if (!is3D()) state.mode = 'intro'; start(); return; }
+  if (b.dataset.theme){ state.theme = b.dataset.theme; state.frozen = null; start(); return; }
+  if (b.dataset.mode){ state.mode = b.dataset.mode; state.frozen = null; state.t = 0; start(); return; }
+  if (b.dataset.speed){ state.speed = +b.dataset.speed; syncUI(); if (state.mode === 'loader') showFlat(); }
+});
+if (!GL) disableGLButtons();
+start();
+
+/* ================================================================== */
+async function bootGL(){
+  let THREE, SVGLoader, RoomEnvironment;
+  try {
+    THREE = await import('three');
+    ({ SVGLoader } = await import('three/addons/loaders/SVGLoader.js'));
+    ({ RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js'));
+  } catch(e) {
+    console.warn('three.js unavailable, static SVG shown', e);
+    return null;
+  }
+
+  const stage = document.getElementById('stage');
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'}); }
+  catch(e){ console.warn('WebGL context failed', e); return null; }
+  const LITE = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, LITE ? 1.5 : 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;          // brand colours are matched by albedo and light, not by a curve
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.localClippingEnabled = true;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(24, 1, 5, 9000);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  /* paper: fine grain + sparse fibres, mean ≈ 0.97 so the albedo stays the brand paper */
+  function paperTex(){
+    const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d'), r = rng(7);
+    const img = g.createImageData(S,S);
+    for (let i=0;i<S*S;i++){ const v = 244 + (r()*11|0); img.data[i*4]=v; img.data[i*4+1]=v; img.data[i*4+2]=v; img.data[i*4+3]=255; }
+    g.putImageData(img,0,0);
+    g.globalAlpha = .04; g.strokeStyle = '#000'; g.lineWidth = .7;
+    for (let i=0;i<380;i++){ const x=r()*S, y=r()*S, a=r()*Math.PI, l=6+r()*22; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+Math.cos(a)*l*.5+r()*4, y+Math.sin(a)*l*.5+r()*4, x+Math.cos(a)*l, y+Math.sin(a)*l); g.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(9,6); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    return t;
+  }
+  /* window cookie for the day sun: the sash bars and the area outside the window only dim the sun (~12 %) */
+  function windowTex(){
+    const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d');
+    g.fillStyle = '#d9d9d9'; g.fillRect(0,0,S,S);
+    g.filter = 'blur(16px)';
+    g.fillStyle = '#fff';
+    const x0=40, y0=30, x1=S-40, y1=S-30, mull=22, tr=18, ty=y0+(y1-y0)*.30, mx=(x0+x1)/2;
+    g.fillRect(x0, y0, mx-mull/2-x0, ty-tr/2-y0);
+    g.fillRect(mx+mull/2, y0, x1-mx-mull/2, ty-tr/2-y0);
+    g.fillRect(x0, ty+tr/2, mx-mull/2-x0, y1-ty-tr/2);
+    g.fillRect(mx+mull/2, ty+tr/2, x1-mx-mull/2, y1-ty-tr/2);
+    g.filter = 'none';
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+  /* engraving «±0.000» from IBM Plex Mono outlines — identical on every device */
+  function engraveTex(){
+    const W = 512, H = 112, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'), s = 0.118;
+    g.translate(W/2 - 3600*s/2, H/2 + 700*s/2); g.scale(s, s);
+    g.fillStyle = '#fff'; g.strokeStyle = '#fff'; g.lineWidth = 34; g.lineJoin = 'round';
+    const p = new Path2D(PLEX_ENGR); g.fill(p); g.stroke(p);
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
+  }
+
+  /* ---------- laser plane: the line falls on every surface it crosses (wall, bar edge, tip, letters) ---------- */
+  const LU = {
+    uLY:{value:LASER_Y}, uLS:{value:.36}, uLX0:{value:-1e5}, uLX1:{value:-1e5}, uLA:{value:0}, uLC:{value:new THREE.Color()},
+    uHX:{value:0}, uHA:{value:0}, uHR:{value:1}, uHC:{value:new THREE.Color()}, uSplitA:{value:new THREE.Color()}
+  };
+  function laserize(m, split){
+    m.onBeforeCompile = sh => {
+      Object.assign(sh.uniforms, LU);
+      sh.vertexShader = 'varying vec3 vWP;\nvarying float vOX;\n' + sh.vertexShader.replace('#include <project_vertex>',
+        '#include <project_vertex>\n vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vOX = transformed.x;');
+      let fs = 'varying vec3 vWP;\nvarying float vOX;\nuniform float uLY, uLS, uLX0, uLX1, uLA, uHX, uHA, uHR;\nuniform vec3 uLC, uHC, uSplitA;\n' + sh.fragmentShader;
+      if (split) fs = fs.replace('#include <color_fragment>',
+        '#include <color_fragment>\n { float sw = max(fwidth(vOX), 1e-4) * 0.7; diffuseColor.rgb = mix(uSplitA, diffuseColor.rgb, smoothstep(-sw, sw, vOX)); }');
+      fs = fs.replace('#include <opaque_fragment>', `#include <opaque_fragment>
+      {
+        float d = (vWP.y - uLY) / uLS;
+        float a = uLA * exp(-d*d) * (1.0 - smoothstep(1.35, 1.8, abs(d))) * step(uLX0, vWP.x) * clamp((uLX1 - vWP.x) / 0.5 + 0.5, 0.0, 1.0);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uLC, clamp(a, 0.0, 1.0));
+        vec2 q = (vWP.xy - vec2(uHX, uLY)) / uHR;
+        float qq = dot(q, q); float h = uHA * exp(-qq*qq);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uHC, clamp(h, 0.0, 1.0));
+      }`);
+      sh.fragmentShader = fs;
+    };
+    m.customProgramCacheKey = () => 'nivel-laser' + (split ? '-split' : '');
+    return m;
+  }
+
+  /* ---------- wall ---------- */
+  const wallMat = laserize(new THREE.MeshStandardMaterial({color:'#F1EFEA', roughness:.95, metalness:0, map: paperTex()}));
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(6000, 3600), wallMat);
+  wall.position.set(CENTER[0], CENTER[1], 0); wall.receiveShadow = true; scene.add(wall);
+
+  /* ---------- geometry from the SVG ---------- */
+  const parsed = new SVGLoader().parse(lockupSVG('day')).paths; // 0..3 mark, 4 word, 5 dot
+  const toShape = (sp, n=7) => {
+    const pts = sp.getPoints(n).map(p => new THREE.Vector2(p.x, -p.y));
+    if (pts.length > 2 && pts[0].distanceTo(pts[pts.length-1]) < 1e-4) pts.pop();
+    return new THREE.Shape(pts);
+  };
+  const EXT = {depth:DEPTH, bevelEnabled:true, bevelThickness:BEV, bevelSize:BEV, bevelOffset:-BEV, bevelSegments:2, curveSegments:7};
+  function extrude(shapes, pivot){
+    const g = new THREE.ExtrudeGeometry(shapes, EXT);
+    g.translate(-pivot[0], -pivot[1], BEV + STAND - (pivot[2]||0));
+    g.computeBoundingSphere();
+    return g;
+  }
+
+  const mkMat = (o={}) => new THREE.MeshPhysicalMaterial(Object.assign({roughness:.6, metalness:0, specularIntensity:.5}, o));
+  const clipLine = new THREE.Plane(new THREE.Vector3(0,1,0), 2.2);   // letters rise out of the baseline
+  const matFg = laserize(mkMat()), matAcc = laserize(mkMat());
+  const matFgClip = laserize(mkMat({clippingPlanes:[clipLine], clipShadows:true, side:THREE.DoubleSide}));
+  const matTri = laserize(mkMat(), true);   // one solid triangle; orange left half is a colour split, no seam
+  const engraveClip = new THREE.Plane(new THREE.Vector3(-1,0,0), 0);
+  const matEngrave = new THREE.MeshStandardMaterial({color:'#A8A39A', roughness:.35, metalness:.6, alphaMap: engraveTex(), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4, clippingPlanes:[engraveClip]});
+  const shadowy = m => { m.castShadow = true; m.receiveShadow = true; return m; };
+
+  /* level bar — grows out of the laser line (down and off the wall) behind the moving dot */
+  const barGeo = extrude([toShape(parsed[3].subPaths[0])], [0,0]);
+  const bar = shadowy(new THREE.Mesh(barGeo, matFg)); scene.add(bar);
+  const barBase = Float32Array.from(barGeo.attributes.position.array);
+
+  /* plumb body: pivot at the tip */
+  const body = new THREE.Group(); scene.add(body);
+  const pL = parsed[1].subPaths[0].getPoints(), pR = parsed[2].subPaths[0].getPoints();
+  const triShape = new THREE.Shape([pL[0], pR[1], pL[2]].map(p => new THREE.Vector2(p.x, -p.y)));   // (8,24) (40,24) (24,40) of the SVG
+  const tri = shadowy(new THREE.Mesh(extrude([triShape], TIP), matTri));
+  const shelfGeo = extrude([toShape(parsed[0].subPaths[0])], TIP);
+  const shelf = shadowy(new THREE.Mesh(shelfGeo, matFg));
+  const shelfBase = Float32Array.from(shelfGeo.attributes.position.array);
+  const shelfMidLocal = (MK([8,0])[0] + SHELF_R)/2 - TIP[0];
+  body.add(tri, shelf);
+
+  const engr = new THREE.Mesh(new THREE.PlaneGeometry(36, 8.2), matEngrave);
+  engr.rotation.x = -Math.PI/2;
+  engr.position.set(31 - TIP[0], SHELF_TOP - TIP[1] + 0.02, ZM);
+  engr.renderOrder = 2;
+  body.add(engr);
+
+  /* i-dot: its own small plumb on a short thread */
+  const dot = shadowy(new THREE.Mesh(extrude([toShape(parsed[5].subPaths[0])], DOT_C), matAcc)); scene.add(dot);
+
+  /* letters: sub-paths of the word grouped by x */
+  const bins = [[175,'n'],[200,'i'],[256,'v'],[315,'e'],[1e9,'l']];
+  const groups = {};
+  for (const sp of parsed[4].subPaths){
+    const pts = sp.getPoints(2); let cx = 0; pts.forEach(p => cx += p.x); cx /= pts.length;
+    const key = bins.find(b => cx < b[0])[1];
+    (groups[key] = groups[key] || []).push(toShape(sp));
+  }
+  const letters = ['n','i','v','e','l'].map(k => {
+    const box = new THREE.Box2(); groups[k].forEach(s => s.getPoints().forEach(p => box.expandByPoint(p)));
+    const pv = [(box.min.x+box.max.x)/2, 0];
+    const m = shadowy(new THREE.Mesh(extrude(groups[k], pv), matFgClip));
+    m.userData.pv = pv; m.position.set(pv[0], 0, 0); scene.add(m);
+    return m;
+  });
+
+  /* threads */
+  const matThread = new THREE.MeshStandardMaterial({color:'#2A2724', roughness:.8});
+  const mkThread = () => { const m = new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,1,6,1,true), matThread); m.castShadow = true; scene.add(m); return m; };
+  const thread = mkThread(), dotThread = mkThread();
+  function setThread(m, bot, top){
+    const len = Math.hypot(top[0]-bot[0], top[1]-bot[1]);
+    m.scale.set(1, len, 1);
+    m.position.set((top[0]+bot[0])/2, (top[1]+bot[1])/2, ZM);
+    m.rotation.set(0, 0, Math.atan2(-(top[0]-bot[0]), top[1]-bot[1]));
+  }
+
+  /* engraving spot (the laser writing on the shelf) */
+  const spotMat = new THREE.MeshBasicMaterial({color:'#FFB08A', transparent:true, depthWrite:false});
+  const spot = new THREE.Mesh(new THREE.SphereGeometry(.45,10,8), spotMat); scene.add(spot);
+  const spotLight = new THREE.PointLight('#FF4A1E', 0, 12, 2); scene.add(spotLight);
+
+  /* ---------- the instrument: compact rotary laser on a wall bracket ---------- */
+  const dev = new THREE.Group(); dev.position.set(DEV.x, 0, DEV.z); scene.add(dev);
+  const devMat = new THREE.MeshPhysicalMaterial({color:'#34312D', roughness:.62, specularIntensity:.6});
+  const devDark = new THREE.MeshPhysicalMaterial({color:'#1B1A18', roughness:.35, specularIntensity:.8});
+  const metal = new THREE.MeshStandardMaterial({color:'#9A958D', roughness:.38, metalness:.8});
+  const winMat = new THREE.MeshBasicMaterial({color:'#FF3F1F'});
+  function rbox(w, h, d, r){
+    const s = new THREE.Shape(); const x = -w/2, y = -h/2;
+    s.moveTo(x+r, y); s.lineTo(x+w-r, y); s.quadraticCurveTo(x+w, y, x+w, y+r); s.lineTo(x+w, y+h-r); s.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    s.lineTo(x+r, y+h); s.quadraticCurveTo(x, y+h, x, y+h-r); s.lineTo(x, y+r); s.quadraticCurveTo(x, y, x+r, y);
+    const g = new THREE.ExtrudeGeometry(s, {depth:d-1.2, bevelEnabled:true, bevelThickness:.6, bevelSize:.6, bevelOffset:-.6, bevelSegments:2, curveSegments:4});
+    g.translate(0, 0, -(d-1.2)/2); return g;
+  }
+  const HEAD_H = 9, BODY_H = 20, BODY_D = 24;
+  const devBody = shadowy(new THREE.Mesh(rbox(28, BODY_H, BODY_D, 3), devMat));
+  const bodyTop = LASER_Y - HEAD_H/2 - 0.6;
+  devBody.position.y = bodyTop - BODY_H/2; dev.add(devBody);
+  const head = new THREE.Group(); head.position.y = LASER_Y; dev.add(head);
+  const headCyl = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6.2, HEAD_H, 32), devDark)); head.add(headCyl);
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 3.2), winMat); win.position.set(0, 0, -6.23); win.rotation.y = Math.PI; head.add(win);
+  /* protective roll cage: four posts and a top plate, as on site lasers */
+  const capY = LASER_Y + HEAD_H/2 + 0.8;
+  const cage = shadowy(new THREE.Mesh(rbox(27, 2.2, 23, 1.1), devMat)); cage.position.y = capY + 1.1; dev.add(cage);
+  for (const [px, pz] of [[-10.6,-8.8],[10.6,-8.8],[-10.6,8.8],[10.6,8.8]]){
+    const post = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, capY - bodyTop, 10), devDark));
+    post.position.set(px, (capY + bodyTop)/2, pz); dev.add(post);
+  }
+  const bTop = devBody.position.y - BODY_H/2;
+  const shelfPlate = shadowy(new THREE.Mesh(new THREE.BoxGeometry(30, 1.4, DEV.z + BODY_D/2), metal)); shelfPlate.position.set(0, bTop - .7, (BODY_D/2 - DEV.z)/2); dev.add(shelfPlate);
+  const backPlate = shadowy(new THREE.Mesh(new THREE.BoxGeometry(30, 18, 1.4), metal)); backPlate.position.set(0, bTop - 9, -DEV.z + .7); dev.add(backPlate);
+  function aimHead(phi){ head.rotation.y = -phi; }
+  const dotX = phi => DEV.x + DEV.z*Math.tan(phi);
+
+  /* lights */
+  const hemi = new THREE.HemisphereLight('#FFF8EE', '#D8CBB6', 1); scene.add(hemi);
+  const key = new THREE.SpotLight('#FFF3E2', 1, 0, 0.5, 0.35, 0);
+  key.castShadow = true;
+  key.shadow.mapSize.set(LITE ? 1024 : 2048, LITE ? 1024 : 2048);
+  scene.add(key, key.target);
+  const winTex = windowTex();
+  /* night: a framing spot (lamp with a snoot/shutters) — a soft, wide pool on the wall around the sign.
+     The cookie is built by casting each texel's ray onto the wall, so the pool is defined in wall units. */
+  const poolCanvas = document.createElement('canvas'); poolCanvas.width = poolCanvas.height = 128;
+  const poolTex = new THREE.CanvasTexture(poolCanvas); poolTex.colorSpace = THREE.SRGBColorSpace;
+  function buildPool(){
+    const S = poolCanvas.width, g = poolCanvas.getContext('2d'), img = g.createImageData(S, S);
+    const cam = new THREE.PerspectiveCamera(2*key.angle/DEG, 1, 1, 9000);
+    cam.position.copy(key.position); cam.lookAt(key.target.position); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+    const v = new THREE.Vector3(), P = TH.pool;
+    for (let r=0;r<S;r++) for (let c=0;c<S;c++){
+      v.set(2*(c+.5)/S - 1, 1 - 2*(r+.5)/S, 0.5).unproject(cam).sub(cam.position);
+      const k = -cam.position.z / v.z, x = cam.position.x + v.x*k, y = cam.position.y + v.y*k;
+      const q = Math.pow(Math.pow(Math.abs(x - P.cx)/P.ax, 3) + Math.pow(Math.abs(y - P.cy)/P.ay, 3), 1/3);
+      const u = clamp((q - P.r0)/(P.r1 - P.r0)), f = (1 - u*u*(3 - 2*u)) * clamp(1 - P.tilt*(x - P.cx)/166 - P.ytilt*(y - P.cy)/40, 0, 1.2);
+      /* a second, small flag-cut patch keeps the instrument readable in the first frames (off-frame in the final) */
+      const dd = Math.hypot(x - DEV.x, (y - 4)*1.3), f2 = 0.9*(1 - clamp((dd - 14)/22));
+      const ff = Math.max(f, f2*f2*(3 - 2*f2));
+      const lin = P.floor + (1 - P.floor)*ff, sv = lin <= 0.0031308 ? 12.92*lin : 1.055*Math.pow(lin, 1/2.4) - 0.055;
+      const i = (r*S + c)*4; img.data[i] = img.data[i+1] = img.data[i+2] = Math.round(255*sv); img.data[i+3] = 255;
+    }
+    g.putImageData(img, 0, 0); poolTex.needsUpdate = true;
+  }
+
+  /* themes — albedo and light calibrated so the final front faces read as the brand colours */
+  const THEME = {
+    day: {
+      wall:'#F3F1EC', fg:'#1D1D1B', acc:'#D9501A', fgRough:.62, accRough:.58, spec:.45,
+      engrave:'#B9B3A8', thread:'#2A2724', dev:'#3A3733',
+      hemiSky:'#F7F6F4', hemiGround:'#E6E3DE', hemiI:1.45, env:.06,
+      key:{color:'#FFFCF8', I:2.6, dir:[-.62,.46,.63], dist:1500, angle:34*DEG, pen:.35, map:true, radius:5, bias:-0.0004, nbias:0.3},
+      laser:{color:'#E0301A', hot:'#F2401F', sigma:.34, head:1.25}
+    },
+    night: {
+      wall:'#2A2826', fg:'#F1EFEA', acc:'#F06A30', fgRough:.55, accRough:.52, spec:.45,
+      engrave:'#6A6058', thread:'#BDB5AA', dev:'#2C2A27',
+      hemiSky:'#FFFFFF', hemiGround:'#FFFFFF', hemiI:.83, env:.006,
+      key:{color:'#FFFAF6', I:7.9e6, dir:[.38,.55,.74], dist:1500, angle:22*DEG, pen:.1, map:'pool', radius:4, decay:2, bias:-0.0006, nbias:0.8},
+      laser:{color:'#FF3F1F', hot:'#FF7A4E', sigma:.38, head:1.35},
+      pool:{cx:CENTER[0]+4, cy:CENTER[1]+6, ax:180, ay:95, r0:.78, r1:1.36, floor:0, tilt:.075, ytilt:.06}
+    }
+  };
+  let TH = THEME[state.theme];
+  function applyTheme(){
+    TH = THEME[state.theme];
+    wallMat.color.set(TH.wall);
+    for (const m of [matFg, matFgClip, matTri]){ m.color.set(TH.fg); m.roughness = TH.fgRough; m.specularIntensity = TH.spec; }
+    matAcc.color.set(TH.acc); matAcc.roughness = TH.accRough; matAcc.specularIntensity = TH.spec;
+    LU.uSplitA.value.set(TH.acc);
+    matEngrave.color.set(TH.engrave);
+    matEngrave.metalness = state.theme === 'day' ? .55 : 0;
+    matThread.color.set(TH.thread);
+    devMat.color.set(TH.dev);
+    LU.uLC.value.set(TH.laser.color); LU.uHC.value.set(TH.laser.hot); LU.uLS.value = TH.laser.sigma;
+    winMat.color.set(TH.laser.color);
+    spotMat.color.set(state.theme === 'day' ? '#FF6A40' : '#FFB08A');
+    hemi.color.set(TH.hemiSky); hemi.groundColor.set(TH.hemiGround); hemi.intensity = TH.hemiI;
+    scene.environmentIntensity = TH.env;
+    key.color.set(TH.key.color); key.intensity = TH.key.I; key.angle = TH.key.angle; key.penumbra = TH.key.pen;
+    key.decay = TH.key.decay || 0; key.map = TH.key.map === 'pool' ? poolTex : TH.key.map ? winTex : null;
+    placeKey(0); if (TH.key.map === 'pool') buildPool();
+    key.shadow.radius = TH.key.radius;
+    key.shadow.bias = TH.key.bias; key.shadow.normalBias = TH.key.nbias;
+    renderer.setClearColor(BRAND[state.theme].bg);
+  }
+
+  /* ---------- camera rig ---------- */
+  function fitDist(w, h){
+    const a = camera.aspect, tv = Math.tan(VFOV/2);
+    return Math.max((h/2)/tv, (w/2)/(tv*a));
+  }
+  function rig(T, yaw, pitch, D){
+    camera.position.set(T[0] + D*Math.sin(yaw)*Math.cos(pitch), T[1] + D*Math.sin(pitch), T[2] + D*Math.cos(yaw)*Math.cos(pitch));
+    camera.lookAt(T[0], T[1], T[2]);
+  }
+  const lerp3 = (a,b,u) => [lerp(a[0],b[0],u), lerp(a[1],b[1],u), lerp(a[2],b[2],u)];
+  const lerpLog = (a,b,u) => Math.exp(lerp(Math.log(a), Math.log(b), u));
+  const FINAL = () => finalCam(camera.aspect);
+
+  function placeKey(drift){
+    const k = TH.key, d = new THREE.Vector3(...k.dir).normalize();
+    const tgt = state.theme === 'day' ? [CENTER[0]+40+drift, CENTER[1]+10, 0] : [CENTER[0]+20, CENTER[1]-4, 0];
+    key.target.position.set(...tgt);
+    key.position.set(tgt[0]+d.x*k.dist, tgt[1]+d.y*k.dist, tgt[2]+d.z*k.dist);
+    key.shadow.camera.near = k.dist*0.5; key.shadow.camera.far = k.dist*1.6;
+    key.shadow.camera.updateProjectionMatrix();
+  }
+
+  /* ---------- intro timeline (s) ---------- */
+  const TL = {
+    sweep:[0, 0.5], phi0:38*DEG, phi1:89.7*DEG,
+    lower:[0.08, 1.0], approach:[1.0, 1.18], drop0:84,
+    swing:{a:7*DEG, T:0.7, k:2.6, off:[0.92, 1.16]},
+    touch:1.18, thread:[1.36, 1.56],
+    shelf:[1.38, 1.64], engrave:[1.42, 1.78],
+    cam01:[0.10, 1.15], cam1F:[1.40, 2.25],
+    word:1.90, wordStep:0.055, wordW:22, wordH:64,
+    dot:[2.22, 2.60], dotThread:[2.60, 2.76],
+    laserOff:[2.88, 2.98]
+  };
+  const L = 165;      // plumb thread
+  const L2 = 70;      // short thread of the i-dot
+
+  function setBar(fn){
+    const pos = barGeo.attributes.position, a = pos.array;
+    for (let i=0;i<a.length;i+=3){
+      const w = fn(barBase[i]);
+      a[i+1] = LEVEL - (LEVEL - barBase[i+1])*w;
+      a[i+2] = STAND + (barBase[i+2] - STAND)*w;
+    }
+    pos.needsUpdate = true;
+  }
+  function setShelf(dx){
+    const pos = shelfGeo.attributes.position, a = pos.array;
+    for (let i=0;i<a.length;i+=3) a[i] = shelfBase[i] + (shelfBase[i] > shelfMidLocal ? dx : 0);
+    pos.needsUpdate = true;
+  }
+  function setLaser(alpha, x1, headA, headX, headR){
+    LU.uLA.value = alpha; LU.uLX0.value = -1e5; LU.uLX1.value = x1;
+    LU.uHA.value = headA; LU.uHX.value = headX; LU.uHR.value = headR || TH.laser.head;
+    winMat.color.set(alpha > 0.01 ? TH.laser.color : '#3A2A26');
+  }
+
+  function poseFinal(){
+    setBar(() => 1); setShelf(0);
+    body.position.set(TIP[0], TIP[1], 0); body.rotation.set(0,0,0);
+    dot.position.set(DOT_C[0], DOT_C[1], 0); dot.rotation.set(0,0,0);
+    letters.forEach(m => { m.position.set(m.userData.pv[0], 0, 0); m.rotation.set(0,0,0); m.visible = true; });
+    engraveClip.constant = 1e4; engr.visible = true;
+    thread.visible = dotThread.visible = false; spot.visible = false; spotLight.intensity = 0;
+    setLaser(0, -1e5, 0, 0);
+    aimHead(60*DEG);
+    bar.visible = body.visible = dot.visible = true;
+    dev.visible = false;   // off-frame in the final framing; hidden so its shadow never reaches the edge
+  }
+
+  function poseIntro(t){
+    poseFinal();
+    /* 1 · the rotary head turns: the dot runs along the wall at x = x_dev + z·tan φ and leaves the level line */
+    const phi = lerp(TL.phi0, TL.phi1, seg(t, ...TL.sweep));
+    const hx = dotX(phi);
+    aimHead(phi);
+    dev.visible = t < TL.cam1F[0];
+    const lineA = 1 - seg(t, ...TL.laserOff);
+    const tipFlash = t >= TL.touch ? Math.exp(-(t - TL.touch)/0.055) : 0;
+    if (t < TL.sweep[1]) setLaser(lineA, hx, 1, hx);
+    else if (tipFlash > 0.02) setLaser(lineA, 1e5, tipFlash, TIP[0], TH.laser.head*1.25);
+    else setLaser(lineA, 1e5, 0, 0);
+
+    /* 2 · the level bar grows out of the line behind the dot */
+    setBar(x => {
+      const tp = TL.sweep[0] + (TL.sweep[1]-TL.sweep[0])*clamp((Math.atan((x - DEV.x)/DEV.z) - TL.phi0)/(TL.phi1 - TL.phi0));
+      return eOutCubic(clamp((t - tp - 0.02)/0.32));
+    });
+
+    /* 3 · plumb on its thread: damped swing (T 0.7 s, e^(−2.6t)), lowered, then set onto the line by hand */
+    const yDrop = (TL.drop0 - 3)*(1 - eInOutSine(seg(t, ...TL.lower))) + 3*(1 - eInOutSine(seg(t, ...TL.approach)));
+    const S = TL.swing;
+    let theta = S.a*Math.exp(-S.k*t)*Math.cos(2*Math.PI*t/S.T) * (1 - eInOutSine(seg(t, ...S.off)));
+    /* shelf hits its stop → the whole mark rocks a little on its tip */
+    theta += 0.9*DEG*bounce(t - TL.shelf[1], 11, 2*Math.PI/0.24);
+    body.rotation.z = theta;
+    body.position.set(TIP[0] + L*Math.sin(theta)*(t < TL.touch ? 1 : 0), TIP[1] + (t < TL.touch ? L*(1-Math.cos(theta)) : 0) + yDrop, 0);
+
+    const pull = 560*eInQuad(seg(t, ...TL.thread));
+    thread.visible = t < TL.thread[1];
+    if (thread.visible){
+      const h = SHELF_TOP - TIP[1];
+      const ax = TIP[0] - h*Math.sin(theta) + L*Math.sin(theta);
+      const ay = TIP[1] + yDrop + L*(1-Math.cos(theta)) + h*Math.cos(theta);
+      const px = TIP[0], py = TIP[1] + L + yDrop;
+      const ext = (L - h + 600)/(L - h);
+      setThread(thread, [ax, ay + pull], [ax + (px-ax)*ext, ay + (py-ay)*ext + pull]);
+    }
+
+    /* 4 · shelf slides out to its stop, visible knock and recoil */
+    const ps = eInQuad(seg(t, ...TL.shelf));
+    setShelf(SHELF_RETRACT*(1 - ps) + 2.5*bounce(t - TL.shelf[1], 13, 2*Math.PI/0.18));
+
+    /* 5 · the laser engraves ±0.000 on the shelf */
+    const ex = lerp(31 - 18, 31 + 18, seg(t, ...TL.engrave));
+    engraveClip.constant = t < TL.engrave[0] ? -1e4 : ex;
+    spot.visible = t > TL.engrave[0] && t < TL.engrave[1];
+    if (spot.visible){
+      const zr = ZM + 3.2*Math.sin(t*95);
+      spot.position.set(ex, SHELF_TOP + 0.3, zr);
+      spotLight.position.set(ex, SHELF_TOP + 1.2, zr); spotLight.intensity = state.theme === 'night' ? 6 : 0;
+    }
+
+    /* 6 · the word rises out of the baseline, letter by letter, critically damped (no overshoot) */
+    letters.forEach((m, i) => {
+      const st = TL.word + i*TL.wordStep;
+      m.position.y = TL.wordH*crit(t - st, TL.wordW);
+      m.visible = t > st;
+    });
+
+    /* 7 · the i-dot is lowered on a short thread, small damped swing, and stays */
+    const yTop = FINAL().T[1] + FINAL().D*Math.tan(VFOV/2)*1.25;
+    const drop2 = Math.max(90, yTop - DOT_C[1] + 30);
+    const tau2 = t - TL.dot[0];
+    const yd2 = drop2*(1 - eOutCubic(seg(t, ...TL.dot)));
+    const th2 = 4*DEG*Math.exp(-6*Math.max(0,tau2))*Math.cos(2*Math.PI*Math.max(0,tau2)/0.42) * (1 - seg(t, TL.dot[1]-0.1, TL.dot[1]));
+    dot.visible = t > TL.dot[0];
+    dot.rotation.set(0, 0, th2);
+    dot.position.set(DOT_C[0] + L2*Math.sin(th2), DOT_C[1] + L2*(1-Math.cos(th2)) + yd2, 0);
+    dotThread.visible = dot.visible && t < TL.dotThread[1];
+    if (dotThread.visible){
+      const pull2 = 400*eInQuad(seg(t, ...TL.dotThread));
+      const ux = -Math.sin(th2), uy = Math.cos(th2);
+      const ax = dot.position.x + (73.25 - DOT_C[1])*ux, ay = dot.position.y + (73.25 - DOT_C[1])*uy;
+      setThread(dotThread, [ax, ay + pull2], [ax + ux*900, ay + uy*900 + pull2]);
+    }
+  }
+
+  function poseLoop(t){
+    poseFinal();
+    /* once a cycle the rotary laser quietly re-checks the level */
+    const lt = t % DUR.loop;
+    const phi = lerp(52*DEG, 89.7*DEG, eInOutSine(seg(lt, 6.2, 7.8)));
+    aimHead(phi);
+    const a = Math.min(seg(lt, 6.2, 6.5), 1 - seg(lt, 8.6, 9.4));
+    const on = lt > 6.2 && lt < 7.8;
+    setLaser(a*0.85, on ? dotX(phi) : 1e5, on ? 0.9 : 0, dotX(phi));
+  }
+
+  function cameraFor(t){
+    const F = FINAL();
+    if (state.mode === 'intro'){
+      const sg = state.theme === 'day' ? 1 : -1;
+      const K0 = {T:[-26, 56, ZM], yaw:sg*20*DEG, pitch:9*DEG, D:fitDist(228, 168)};
+      const K1 = {T:[44, 27, ZM], yaw:sg*15*DEG, pitch:20*DEG, D:fitDist(128, 98)};
+      const mix = (a,b,u) => ({T:lerp3(a.T,b.T,u), yaw:lerp(a.yaw,b.yaw,u), pitch:lerp(a.pitch,b.pitch,u), D:lerpLog(a.D,b.D,u)});
+      const C = mix(mix(K0, K1, eInOutSine(seg(t, ...TL.cam01))), F, eInOutSine(seg(t, ...TL.cam1F)));
+      rig(C.T, C.yaw, C.pitch, C.D);
+      placeKey(0);
+    } else {
+      const ph = 2*Math.PI*((t % DUR.loop)/DUR.loop);
+      rig(F.T, 3.2*DEG*Math.sin(ph), F.pitch + 1.4*DEG*(1 - Math.cos(ph))/2, F.D);
+      placeKey(-22*Math.sin(ph));
+    }
+  }
+
+  function renderAt(t){
+    if (state.mode === 'intro') poseIntro(Math.min(t, DUR.intro));
+    else poseLoop(t);
+    cameraFor(t);
+    renderer.render(scene, camera);
+    clock.textContent = t.toFixed(2) + ' с';
+  }
+
+  /* ---------- sizing ---------- */
+  function resize(){
+    const w = stage.clientWidth || innerWidth, h = stage.clientHeight || innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w/h; camera.updateProjectionMatrix();
+  }
+
+  /* ---------- shader warm-up: compile every program before the clock starts ---------- */
+  const warmed = {};
+  async function warm(){
+    if (warmed[state.theme]) return;
+    const saved = [];
+    scene.traverse(o => { if (o.isMesh || o.isLight){ saved.push([o, o.visible, o.frustumCulled]); o.visible = true; o.frustumCulled = false; } });
+    spotLight.intensity = 1;
+    cameraFor(0);
+    try { await renderer.compileAsync(scene, camera); } catch(e){ /* older drivers: the warm render below compiles */ }
+    renderer.render(scene, camera);
+    saved.forEach(([o,v,f]) => { o.visible = v; o.frustumCulled = f; });
+    warmed[state.theme] = true;
+  }
+
+  let running = false, last = null;
+  function tick(ts){
+    if (!running) return;
+    if (last === null) last = ts;
+    const dt = Math.min(0.05, (ts - last)/1000); last = ts;
+    state.t += dt*state.speed;
+    if (state.mode === 'intro' && state.t >= DUR.intro){ state.t = DUR.intro; renderAt(state.t); running = false; return; }
+    renderAt(state.t);
+    requestAnimationFrame(tick);
+  }
+  function play(){ last = null; if (!running){ running = true; requestAnimationFrame(tick); } }
+  function stop(){ running = false; }
+
+  async function startGL(token){
+    stop();
+    applyTheme(); resize();
+    root.classList.add('warming');
+    await warm();
+    if (token !== startToken) return;
+    hideFlat();
+    root.classList.remove('warming');
+    if (state.frozen !== null){ state.t = state.frozen; renderAt(state.t); markReady(); return; }
+    if (!state.autoplay && state.mode === 'intro'){ state.t = 0; renderAt(0); markReady(); return; }
+    renderAt(state.t); markReady(); play();
+  }
+
+  /* for the frame renderer and colour checks */
+  const v3 = new THREE.Vector3();
+  window.NIVEL = {
+    renderAt: (t) => { state.t = t; renderAt(t); }, state,
+    project: (x,y,z) => { v3.set(x,y,z).project(camera); return [(v3.x+1)/2*innerWidth, (1-v3.y)/2*innerHeight]; },
+    probes: () => ({
+      tri: MK([18.5,28]), dot: [DOT_C[0], DOT_C[1]+1], n: [111.56+12.3, 22], l: [111.56+215, 40], bar: MK([46,44]), shelf: MK([46,20]), v: [111.56+117, 5]
+    }), ZF
+  };
+
+  return { start: startGL, stop, onResize(){ if (!TH) return; resize(); if (!running) renderAt(state.t); } };
+}
+</script>
+</body>
+</html>

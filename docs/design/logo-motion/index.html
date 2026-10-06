@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nivel — движение логотипа</title>
+<meta name="description" content="Четыре концепта 3D-анимации логотипа nivel-1 «Отметка уровня»: ночные видео, оценки рецензентов, сравнение.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --paper: #121110;
+    --paper-2: #1D1D1B;
+    --ink: #F1EFEA;
+    --ink-2: #A9A59C;
+    --rule: #34322E;
+    --signal: #F06A30;
+    --sans: "Fira Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 400 16px/1.55 var(--sans);
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 720px) { .wrap { padding: 0 32px; } }
+
+  header.top { padding: 40px 0 28px; border-bottom: 1px solid var(--ink); }
+  header.top svg { width: 220px; max-width: 60vw; height: auto; display: block; }
+  h1 { font: 600 clamp(26px, 4.4vw, 40px)/1.15 var(--sans); margin: 28px 0 10px; letter-spacing: -0.01em; }
+  .lead { max-width: 760px; color: var(--ink-2); margin: 0; }
+  .meta { font: 400 13px/1.5 var(--mono); color: var(--ink-2); margin-top: 16px; }
+  .meta span + span::before { content: " · "; }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 16px 0; border-bottom: 1px solid var(--rule); font: 500 14px/1.4 var(--mono); }
+  nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule); }
+  nav.toc a:hover { border-color: var(--ink); }
+
+  section.concept { padding: 44px 0 40px; border-bottom: 1px solid var(--rule); }
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+  .num { font: 500 13px/1 var(--mono); color: var(--signal); }
+  h2 { font: 600 clamp(22px, 3.2vw, 30px)/1.2 var(--sans); margin: 0; }
+  .slug { font: 400 13px/1 var(--mono); color: var(--ink-2); }
+
+  .grid { display: grid; gap: 28px; margin-top: 22px; grid-template-columns: 1fr; }
+  @media (min-width: 960px) { .grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 36px; } }
+
+  .videos { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .videos.pair { grid-template-columns: minmax(0, 1.78fr) minmax(0, 1fr); align-items: start; }
+  video.tall { aspect-ratio: 9 / 16; }
+  figure { margin: 0; }
+  video { width: 100%; height: auto; aspect-ratio: 1 / 1; display: block; background: var(--paper-2); border: 1px solid var(--rule); }
+  figcaption { font: 400 12px/1.4 var(--mono); color: var(--ink-2); margin-top: 6px; }
+  .open { display: inline-block; margin-top: 14px; padding: 10px 16px; background: var(--ink); color: var(--paper); text-decoration: none; font: 500 15px/1.2 var(--sans); }
+  .open:hover { background: #FFFFFF; }
+  .open:focus-visible, nav.toc a:focus-visible, summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  h3 { font: 600 13px/1.3 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin: 0 0 8px; }
+  .block + .block { margin-top: 22px; }
+  ul.theses { margin: 0; padding: 0; list-style: none; }
+  ul.theses li { padding-left: 18px; position: relative; margin-bottom: 8px; }
+  ul.theses li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 8px; height: 1px; background: var(--ink); }
+
+  .scores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .score { border: 1px solid var(--rule); padding: 10px 12px; }
+  .score b { font: 500 26px/1 var(--mono); display: block; }
+  .score small { font: 400 13px/1.4 var(--sans); color: var(--ink-2); }
+  .note { font: 400 12px/1.45 var(--mono); color: var(--ink-2); margin-top: 8px; }
+  .tag { display: inline-block; font: 500 11px/1 var(--mono); border: 1px solid var(--signal); color: var(--signal); padding: 3px 6px; vertical-align: 2px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  ul.use { margin: 0; padding-left: 18px; }
+  ul.use li { margin-bottom: 4px; }
+
+  details { margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 12px; }
+  summary { cursor: pointer; font: 500 14px/1.4 var(--sans); }
+  details ul { margin: 10px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; }
+  details li { margin-bottom: 6px; }
+
+  section.compare { padding: 48px 0 24px; }
+  .tablewrap { overflow-x: auto; margin-top: 18px; border: 1px solid var(--ink); }
+  table { width: 100%; border-collapse: collapse; min-width: 620px; font-size: 15px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th { font: 500 13px/1.3 var(--mono); background: var(--paper-2); border-bottom: 1px solid var(--ink); }
+  tbody th { font-weight: 500; width: 26%; }
+  td .v { font: 500 15px/1 var(--mono); display: block; margin-bottom: 3px; }
+  td .c { font-size: 13px; color: var(--ink-2); }
+  tr:last-child th, tr:last-child td { border-bottom: 0; }
+  .legend { font: 400 13px/1.5 var(--mono); color: var(--ink-2); margin-top: 10px; }
+  .verdict { margin-top: 24px; max-width: 820px; }
+  .hint { display: none; }
+  @media (max-width: 679px) { .hint { display: block; } }
+
+  footer { padding: 28px 0 48px; font: 400 12px/1.5 var(--mono); color: var(--ink-2); border-top: 1px solid var(--ink); margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#F1EFEA" d="M8 16h52v8h-52Z"/><path fill="#F06A30" d="M8 24L24 24L24 40Z"/><path fill="#F1EFEA" d="M24 24L40 24L24 40Z"/><path fill="#F1EFEA" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#F1EFEA" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#F06A30" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+  <h1>Движение логотипа: выбор концепта</h1>
+  <p class="lead">Четыре варианта 3D-анимации знака nivel-1 «Отметка уровня». Сайт только ночной (решение 06.10), поэтому показана ночная версия «Ночная съёмка». У каждого есть живой прототип с режимами: заставка, повтор, индикатор загрузки, статичный кадр. Геометрия во всех вариантах взята из SVG бренда.</p>
+  <div class="meta"><span>06.10.2026</span><span>4 концепта</span><span>видео 1080 × 1080, без звука</span></div>
+</header>
+
+<nav class="toc" aria-label="Концепты">
+  <a href="#laser">01 Лазерная отметка</a>
+  <a href="#shadow">02 Тень на уровне</a>
+  <a href="#blueprint">03 Чертёж в объём</a>
+  <a href="#fit">04 Посадка по допуску</a>
+  <a href="#compare">Сравнение</a>
+</nav>
+
+<!-- 01 -->
+<section class="concept" id="laser">
+  <div class="head"><span class="num">01</span><h2>«Лазерная отметка»</h2><span class="slug">laser · 4,0 с</span></div>
+  <div class="grid">
+    <div>
+      <div class="videos">
+        <figure><video src="laser/preview-night.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Лазерная отметка, ночь"></video><figcaption>Ночь · 1:1 · 5,0 с</figcaption></figure>
+      </div>
+      <a class="open" href="laser/index.html">Открыть живой прототип</a>
+    </div>
+    <div>
+      <div class="block">
+        <h3>Как ощущается и что значит</h3>
+        <ul class="theses">
+          <li>Ротационный нивелир на стене бросает черту уровня. Знак, кромка бруска и все пять букв оказываются на одной высоте: кадр «всё по уровню» читается сразу.</li>
+          <li>Действия как на объекте: отвес качается и касается черты, полка бьёт в упор, лазер гравирует ±0.000. Это точность, которую проверяют прибором.</li>
+          <li>Самый энергичный из четырёх: прибор, точка бежит по стене, камера отъезжает к фронтальному кадру. Лазерная черта красная, с оттенком «техники».</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Оценки рецензентов <span class="tag">до доработки</span></h3>
+        <div class="scores">
+          <div class="score"><b>7</b><small>Рецензент 1 · доработать</small></div>
+          <div class="score"><b>6,5</b><small>Рецензент 2 · доработать</small></div>
+        </div>
+        <p class="note">Все 10 пунктов первой рецензии и P1–P3 второй внесены. Повторно не оценивалось.</p>
+      </div>
+      <div class="block">
+        <h3>Где применять</h3>
+        <ul class="use">
+          <li>Заставка сайта: заставка при первом визите, затем бесшовный повтор</li>
+          <li>Индикатор загрузки: SVG и CSS, качание на острие, цикл 1,4 с</li>
+          <li>Начало Reels, 1:1 и 9:16</li>
+          <li>Бот: обложка из финального кадра, загрузчик как стикер</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <details>
+    <summary>Известные ограничения (6)</summary>
+    <ul>
+      <li>Ночью точка над i чуть светлее треугольника (#FC7038 против #EF6A33, ΔE2000 около 2).</li>
+      <li>Ночное пятно света в 16:9 и 9:16 может читаться как виньетка; на 21:9 края не ровно #121110.</li>
+      <li>Около 0,1 с в начале подъёма букв видны их обрубки (плоскость отсечения).</li>
+      <li>Предупреждения компилятора шейдеров D3D11 (X4122), на работу не влияют.</li>
+      <li>В первых кадрах прибор мелкий, ночью в полутени. На дешёвых экранах нужна проверка.</li>
+      <li>three.js грузится с jsDelivr: без сети показывается SVG. Для продакшена нужен бандл.</li>
+    </ul>
+  </details>
+</section>
+
+<!-- 02 -->
+<section class="concept" id="shadow">
+  <div class="head"><span class="num">02</span><h2>«Тень на уровне»</h2><span class="slug">shadow · 4,0 с</span></div>
+  <div class="grid">
+    <div>
+      <div class="videos">
+        <figure><video src="shadow/preview-night.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Тень на уровне, ночь"></video><figcaption>Ночь · 1:1 · 5,0 с</figcaption></figure>
+      </div>
+      <a class="open" href="shadow/index.html">Открыть живой прототип</a>
+    </div>
+    <div>
+      <div class="block">
+        <h3>Как ощущается и что значит</h3>
+        <ul class="theses">
+          <li>Детали стоят в кондукторе между светом и листом. Когда свет садится на место, их тени складываются в знак, полутень сходится в пиксель: «уровень пойман».</li>
+          <li>Тихий и предметный, как съёмка в мастерской. Слово открывает свет: наплывает край пятна лампы.</li>
+          <li>Знак собран из тени, а не из краски. Это красиво, но смысл доходит со второго просмотра, а на телефоне знак в косом плане занимает 12–14 % ширины кадра.</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Оценки рецензентов <span class="tag">до доработки</span></h3>
+        <div class="scores">
+          <div class="score"><b>6,5</b><small>Рецензент 1 · доработать</small></div>
+          <div class="score"><b>6</b><small>Рецензент 2 · доработать</small></div>
+        </div>
+        <p class="note">Постановка света переделана целиком, все замечания учтены. Повторно не оценивалось.</p>
+      </div>
+      <div class="block">
+        <h3>Где применять</h3>
+        <ul class="use">
+          <li>Заставка сайта: один раз за сессию, затем повтор с того же кадра</li>
+          <li>Индикатор загрузки: SVG/CSS-двойник (~2 КБ), детали проседают по одной</li>
+          <li>Начало Reels: финал чистый и в 9:16</li>
+          <li>Бот: видео при /start</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <details>
+    <summary>Известные ограничения (6)</summary>
+    <ul>
+      <li>Тени стоек кондуктора гаснут во время крана (2,05–2,60 с). Это не физика, оба рецензента приём допускали.</li>
+      <li>Лампы и окна в кадре нет: оба за камерой. О лампе говорят щелчок, пятно и его движение.</li>
+      <li>В момент совпадения тонкие тени стоек видны в просветах знака («линии построения»).</li>
+      <li>Знак в косом плане около 12–14 % ширины кадра.</li>
+      <li>Реальный Android не замерялся. В каждом прогоне 8–16 кадров длиннее 25 мс за первые 4 с (компиляция шейдеров).</li>
+      <li>В видео финал неподвижен около 2 с; для Reels обрезать до ~3,4 с.</li>
+    </ul>
+  </details>
+</section>
+
+<!-- 03 -->
+<section class="concept" id="blueprint">
+  <div class="head"><span class="num">03</span><h2>«Чертёж в объём»</h2><span class="slug">blueprint · 5,6 с</span></div>
+  <div class="grid">
+    <div>
+      <div class="videos">
+        <figure><video src="blueprint/preview-night.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Чертёж в объём, ночь"></video><figcaption>Ночь · 1:1 · 6,6 с</figcaption></figure>
+      </div>
+      <a class="open" href="blueprint/index.html">Открыть живой прототип</a>
+    </div>
+    <div>
+      <div class="block">
+        <h3>Как ощущается и что значит</h3>
+        <ul class="theses">
+          <li>Сначала лист по ЕСКД: вид сверху, проектная отметка ±0.000 на полке. Затем лист складывается, и чертёж вытягивается в металл. Это прямой рассказ «смета до покупки».</li>
+          <li>Деталь сажают по факту: строка «+0.010 → ±0.000», после касания пауза. Это «тесты до передачи»: проверено, а не на глаз.</li>
+          <li>Самый спокойный и инженерный, но и самый длинный (5,6 с). Металл со шлифом, по фронтам букв проходит полоса софтбокса.</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Оценки рецензентов <span class="tag">до доработки</span></h3>
+        <div class="scores">
+          <div class="score"><b>7</b><small>Рецензент 1 · доработать</small></div>
+          <div class="score"><b>7</b><small>Рецензент 2 · доработать</small></div>
+        </div>
+        <p class="note">Заставка собрана заново по обеим рецензиям. Повторно не оценивалось.</p>
+      </div>
+      <div class="block">
+        <h3>Где применять</h3>
+        <ul class="use">
+          <li>Заставка сайта: при первом визите, затем повтор в первом экране</li>
+          <li>Индикатор загрузки: 3D от 120 px, мельче — SVG/CSS с тем же таймингом</li>
+          <li>Начало Reels и Stories</li>
+          <li>Бот: загрузчик на «считаю смету»</li>
+          <li>Паспорт сборки и смета: кадр листа как фон титула</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <details>
+    <summary>Известные ограничения (11)</summary>
+    <ul>
+      <li>Заставка 5,6 с вместо 2,5–4 с из ТЗ (так просили рецензии). Для ≤4 с придётся сжать посадку и проезд камеры.</li>
+      <li>Реальный Android не проверялся, только Iris Xe с CPU ×4.</li>
+      <li>Ночью под локапом видно мягкое пятно лампы (#2E2822). Решение за владельцем.</li>
+      <li>Вывод линейный, а в дизайн-системе сайта NeutralToneMapping: там тёмные тёплые тона могут уйти в янтарь.</li>
+      <li>Ночью в финале полоса блика лежит на «e» (задумано, сдвигается фазой окружения).</li>
+      <li>Калибровка оранжевого привязана к финальному ракурсу и этому свету.</li>
+      <li>Бандл three 574 КБ (149 КБ gzip). Если three в продукте уже есть, бандл не нужен.</li>
+      <li>Подвис 67–92 мс в первые ~0,1 с, на пустом листе.</li>
+      <li>SVG/CSS-загрузчик покадрово через ?t= не снимается.</li>
+      <li>Кнопки панели в демо запускают заставку даже при reduced motion (параметры URL — нет).</li>
+      <li>Остался отладочный хук ?debug=1.</li>
+    </ul>
+  </details>
+</section>
+
+<!-- 04 -->
+<section class="concept" id="fit">
+  <div class="head"><span class="num">04</span><h2>«Посадка по допуску»</h2><span class="slug">fit · 3,4 с</span></div>
+  <div class="grid">
+    <div>
+      <div class="videos pair">
+        <figure><video src="fit/preview-night.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Посадка по допуску, ночь, 1:1"></video><figcaption>Ночь · 1:1 · 3,4 с · в прототипе есть звук</figcaption></figure>
+        <figure><video class="tall" src="fit/preview-night-9x16.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Посадка по допуску, ночь, 9:16"></video><figcaption>9:16 для Reels</figcaption></figure>
+      </div>
+      <a class="open" href="fit/index.html">Открыть живой прототип</a>
+    </div>
+    <div>
+      <div class="block">
+        <h3>Как ощущается и что значит</h3>
+        <ul class="theses">
+          <li>В плите фрезерованы гнёзда точно по контуру логотипа. Пустая разметка на первом кадре — это план до покупки, детали встают в неё заподлицо.</li>
+          <li>Порядок сборки: черта уровня, треугольник, полка, слово, точка над i. Каждая деталь защёлкивается с коротким отскоком и сухим щелчком. Ощущение «собрано по месту, без люфта».</li>
+          <li>Короткий и плотный, финал выглядит как снимок готового изделия. Самый лёгкий: около 6,8 тыс. треугольников, загрузчик без three.js.</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Оценки рецензентов <span class="tag">до доработки</span></h3>
+        <div class="scores">
+          <div class="score"><b>6,5</b><small>Рецензент 1 · доработать</small></div>
+          <div class="score"><b>6,5</b><small>Рецензент 2 · доработать</small></div>
+        </div>
+        <p class="note">Идея пересобрана: посадка в гнёзда вместо прежней. Повторно не оценивалось.</p>
+      </div>
+      <div class="block">
+        <h3>Где применять</h3>
+        <ul class="use">
+          <li>Заставка сайта: режим «заставка + повтор», один раз за сессию</li>
+          <li>Индикатор загрузки: CSS, 48–96 px, качание 5° на острие; меньше 32 px — фавикон</li>
+          <li>Начало Reels и Stories, 9:16, со звуком посадок</li>
+          <li>Бот: финальный кадр или две последние посадки</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <details>
+    <summary>Известные ограничения (9)</summary>
+    <ul>
+      <li>Реальный Android не проверен, только эмуляция в Edge с CPU ×4.</li>
+      <li>При первом визите three.js обычно грузится дольше 300 мс: сначала статичный логотип и сразу повтор, а заставку увидят при повторном визите. Нужен бандл с предзагрузкой.</li>
+      <li>Ночью в 9:16 пятно лампы уже кадра, похоже на виньетку.</li>
+      <li>Ночью нижние фаски чуть темнее грани: волосяная тень по низу букв.</li>
+      <li>Блик на фасках почти не виден при ширине логотипа меньше 400 px.</li>
+      <li>Звук синтезирован; для рекламы лучше записать настоящий щелчок.</li>
+      <li>Скрипты записи остались в scratchpad.</li>
+      <li>Видео 3,4 с без отдельной секунды финала (по рецензии); финал внутри держится ~1,2 с.</li>
+      <li>Добавлен пятый режим hero сверх четырёх из ТЗ.</li>
+    </ul>
+  </details>
+</section>
+
+<section class="compare" id="compare">
+  <h2>Сравнение</h2>
+  <p class="legend hint">Таблица листается вбок.</p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th scope="col">Критерий</th><th scope="col">01 Лазерная отметка</th><th scope="col">02 Тень на уровне</th><th scope="col">03 Чертёж в объём</th><th scope="col">04 Посадка по допуску</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Эффектность</th>
+          <td><span class="v">5/5</span><span class="c">прибор, лазер, камера</span></td>
+          <td><span class="v">4/5</span><span class="c">момент совпадения теней</span></td>
+          <td><span class="v">4/5</span><span class="c">складка листа, металл</span></td>
+          <td><span class="v">4/5</span><span class="c">пять посадок со щелчком</span></td></tr>
+        <tr><th scope="row">Ясность смысла</th>
+          <td><span class="v">5/5</span><span class="c">«всё по уровню» с первого кадра</span></td>
+          <td><span class="v">3/5</span><span class="c">доходит со второго просмотра</span></td>
+          <td><span class="v">5/5</span><span class="c">чертёж → изделие → проверка</span></td>
+          <td><span class="v">4/5</span><span class="c">сборка по месту</span></td></tr>
+        <tr><th scope="row">Премиальность</th>
+          <td><span class="v">4/5</span></td>
+          <td><span class="v">5/5</span><span class="c">тише всех, как предметная съёмка</span></td>
+          <td><span class="v">4/5</span></td>
+          <td><span class="v">4/5</span></td></tr>
+        <tr><th scope="row">Лёгкость на телефоне</th>
+          <td><span class="v">3/5</span><span class="c">three с CDN, прибор мелкий</span></td>
+          <td><span class="v">3/5</span><span class="c">знак мелкий в косом плане</span></td>
+          <td><span class="v">2/5</span><span class="c">5,6 с, бандл 149 КБ gzip</span></td>
+          <td><span class="v">5/5</span><span class="c">120 к/с при CPU ×4, 6,8 тыс. треуг.</span></td></tr>
+        <tr><th scope="row">Риск «вида ИИ»</th>
+          <td><span class="v">средний</span><span class="c">красный луч ближе к «технологичному»</span></td>
+          <td><span class="v">низкий</span></td>
+          <td><span class="v">низкий</span><span class="c">полоса блика — следить</span></td>
+          <td><span class="v">низкий</span></td></tr>
+        <tr><th scope="row">Как индикатор загрузки</th>
+          <td><span class="v">4/5</span><span class="c">SVG/CSS, цикл 1,4 с</span></td>
+          <td><span class="v">3/5</span><span class="c">просадка деталей, мелко читается хуже</span></td>
+          <td><span class="v">4/5</span><span class="c">3D от 120 px, ниже — SVG</span></td>
+          <td><span class="v">5/5</span><span class="c">CSS 48–96 px, без three.js</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="legend">Оценки в таблице — экспертная сводка по видео, замерам и известным ограничениям, не баллы рецензентов. 5 — лучше.</p>
+  <p class="verdict">Сильнее всего смысл передают «Лазерная отметка» и «Чертёж в объём». По лёгкости и пригодности для загрузчика лучшая «Посадка по допуску». «Тень на уровне» самая премиальная, но наименее ясная. Варианты можно сочетать: заставка из одного концепта, загрузчик из другого.</p>
+</section>
+
+<footer>NIVEL · движение логотипа nivel-1 · ночная версия · рабочие материалы, не для публикации</footer>
+</div>
+</body>
+</html>

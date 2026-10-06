@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="ru" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nivel — посадка по допуску</title>
+<meta name="description" content="Моушен логотипа Nivel: детали знака и слова садятся в гнёзда фрезерованной плиты.">
+<script>
+/* Theme and params resolved before first paint (no flash). */
+(function(){
+  var q=new URLSearchParams(location.search);
+  var th=q.get('theme'); if(th!=='day'&&th!=='night') th='night';
+  document.documentElement.setAttribute('data-theme',th);
+  if(q.get('ui')==='0') document.documentElement.classList.add('no-ui');
+})();
+</script>
+<style>
+:root{
+  --asphalt:#1D1D1B; --signal:#D9501A; --signal-dark:#F06A30; --paper:#F1EFEA;
+  --sans:"Segoe UI", "Fira Sans", Arial, sans-serif;
+  --mono:ui-monospace, "IBM Plex Mono", Consolas, monospace;
+}
+[data-theme="day"]{ --bg:#F1EFEA; --bg-img:none; --ink:#1D1D1B; --ink-2:#5E574D; --line:rgba(29,29,27,.18); --chip:rgba(241,239,234,.9); --on:#1D1D1B; --on-ink:#F1EFEA;
+  --mk-ink:#1D1D1B; --mk-acc:#D9501A; }
+/* night: same lamp pool as the 3D frame, so a switch to the flat SVG does not jump */
+[data-theme="night"]{ --bg:#121110; --bg-img:radial-gradient(circle at 50% 50%, #2C2825 0, #2A2623 35vmin, #25211F 50vmin, #181513 72vmin, #121110 92vmin);
+  --ink:#F1EFEA; --ink-2:#A39C90; --line:#3B3631; --chip:rgba(18,17,16,.86); --on:#F1EFEA; --on-ink:#121110;
+  --mk-ink:#F1EFEA; --mk-acc:#F06A30; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden}
+body{background-image:var(--bg-img)}
+#stage{position:fixed;inset:0}
+#c{position:absolute;inset:0;display:block;width:100%;height:100%;opacity:0;transition:opacity .25s linear}
+.gl-on #c{opacity:1}
+.gl-snap #c{transition:none}
+#flat,#loader{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column}
+#flat svg,#loader svg{display:block;height:auto}
+.show-flat #flat{display:flex}
+.show-loader #loader{display:flex}
+[data-theme="day"] .v-night,[data-theme="night"] .v-day{display:none!important}
+
+/* "±0.000" — level mark caption shown for a moment when the shelf seats (intro only) */
+#lbl{position:absolute;left:0;top:0;font:500 12px/1 var(--mono);letter-spacing:.02em;color:var(--ink-2);
+  white-space:nowrap;pointer-events:none;opacity:0;transform-origin:100% 100%;font-variant-numeric:tabular-nums}
+
+/* Loader: inline SVG + CSS. Shelf and triangle tilt around the apex and settle on the level line.
+   Keyframes sampled from the same damped curve as the 3D version (A = 5 deg, 1.4 s, rest 0.2 s). */
+#loader .ink{fill:var(--mk-ink)} #loader .acc{fill:var(--mk-acc)}
+#loader .tilt{transform-box:view-box;transform-origin:24px 40px;animation:nv-rock 1.4s linear infinite}
+#loader .cap{margin-top:14px;font:400 12px/1 var(--mono);color:var(--ink-2);letter-spacing:.04em}
+#loader:not(.rm) .cap{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+#loader.rm .tilt{animation:none}
+@keyframes nv-rock{
+  0%{transform:rotate(0deg)} 4%{transform:rotate(-.578deg)} 8%{transform:rotate(-2.087deg)} 12%{transform:rotate(-3.733deg)}
+  16%{transform:rotate(-4.776deg)} 20%{transform:rotate(-4.972deg)} 22%{transform:rotate(-5deg)} 26%{transform:rotate(-4.715deg)}
+  30%{transform:rotate(-3.991deg)} 34%{transform:rotate(-2.98deg)} 38%{transform:rotate(-1.856deg)} 42%{transform:rotate(-.778deg)}
+  46%{transform:rotate(.131deg)} 50%{transform:rotate(.781deg)} 54%{transform:rotate(1.137deg)} 58%{transform:rotate(1.218deg)}
+  62%{transform:rotate(1.083deg)} 66%{transform:rotate(.807deg)} 70%{transform:rotate(.474deg)} 74%{transform:rotate(.167deg)}
+  78%{transform:rotate(-.032deg)} 82%{transform:rotate(-.067deg)} 86%{transform:rotate(0deg)} 100%{transform:rotate(0deg)}
+}
+
+.ui{position:fixed;left:16px;bottom:16px;right:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  font:500 12px/1 var(--sans);pointer-events:none}
+.ui>*{pointer-events:auto}
+.no-ui .ui{display:none}
+.ui button{font:inherit;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:2px;
+  height:30px;padding:0 10px;cursor:pointer;transition:background-color .15s,color .15s,border-color .15s}
+.ui button:hover{border-color:var(--ink-2)}
+.ui button[aria-pressed="true"]{background:var(--on);color:var(--on-ink);border-color:var(--on)}
+.ui .seg{display:flex;flex-wrap:wrap}
+.ui .seg button+button{margin-left:-1px}
+.ui .tc{font:400 11px/1 var(--mono);color:var(--ink-2);padding:0 6px;font-variant-numeric:tabular-nums;min-width:96px}
+.ui button:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+@media (max-width:560px){ .ui .tc{display:none} .ui button{padding:0 7px} }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="flat"></div>
+  <div id="loader" role="status" aria-live="polite">
+    <!-- nivel-1.svg, verbatim paths; shelf + triangle grouped for the tilt -->
+    <svg viewBox="0 0 64 64" aria-hidden="true"><g class="tilt"><path class="ink" d="M8 16h52v8h-52Z"/><path class="acc" d="M8 24L24 24L24 40Z"/><path class="ink" d="M24 24L40 24L24 40Z"/></g><path class="ink" d="M4 40h56v8h-56Z"/></svg>
+    <span class="cap">загрузка</span>
+  </div>
+  <canvas id="c" aria-label="Логотип Nivel" role="img"></canvas>
+  <div id="lbl" aria-hidden="true">±0.000</div>
+</div>
+
+<div class="ui" id="ui" role="toolbar" aria-label="Управление анимацией">
+  <button type="button" data-act="replay">Повторить</button>
+  <button type="button" data-act="theme" aria-label="Переключить день и ночь"><span class="v-day">День</span><span class="v-night">Ночь</span></button>
+  <div class="seg" role="group" aria-label="Режим">
+    <button type="button" data-mode="intro">Заставка</button>
+    <button type="button" data-mode="hero" title="Заставка, затем повтор — сценарий для сайта">Заставка+повтор</button>
+    <button type="button" data-mode="loop">Повтор</button>
+    <button type="button" data-mode="loader">Загрузка</button>
+    <button type="button" data-mode="static">Статично</button>
+  </div>
+  <div class="seg" role="group" aria-label="Скорость">
+    <button type="button" data-speed="0.5">0.5×</button>
+    <button type="button" data-speed="1">1×</button>
+  </div>
+  <span class="tc" id="tc">0.00 с</span>
+</div>
+
+<!-- Sources copied verbatim from docs/brand/logos-v2. 3D geometry is parsed from nivel-1-lockup.svg. -->
+<template id="src-lockup"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#1D1D1B" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#D9501A" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg></template>
+<template id="src-lockup-inverse"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово для тёмного фона #1D1D1B</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#F1EFEA" d="M8 16h52v8h-52Z"/><path fill="#F06A30" d="M8 24L24 24L24 40Z"/><path fill="#F1EFEA" d="M24 24L40 24L24 40Z"/><path fill="#F1EFEA" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#F1EFEA" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#F06A30" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg></template>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<script type="module">
+/* =====================================================================
+   Nivel logo motion: "fit to tolerance".
+   A milled plate with pockets along the lockup contour; each part comes in
+   along its own axis, lines up over its pocket and drops in flush.
+   Deterministic timeline: every frame is a pure function of t.
+   ===================================================================== */
+const root = document.documentElement;
+const Q = new URLSearchParams(location.search);
+const DUR = { intro: 3.3, loop: 12, loader: 1.4 };       // seconds
+const MODES = ['intro', 'hero', 'loop', 'loader', 'static'];
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches && Q.get('rm') !== 'ignore';
+const T_START = performance.now();
+const INTRO_WAIT = 300;                                     // ms of plain background before falling back to the flat SVG
+
+const S = {
+  theme: root.getAttribute('data-theme'),
+  mode: MODES.includes(Q.get('mode')) ? Q.get('mode') : 'intro',
+  tFixed: Q.has('t') ? Math.max(0, parseFloat(Q.get('t')) || 0) : null,
+  autoplay: Q.get('autoplay') !== '0',
+  speed: Q.get('speed') === '0.5' ? 0.5 : 1,
+  webgl: null,          // null = unknown, true/false after the check
+  late: false,          // intro waited > INTRO_WAIT and fell back to the flat SVG
+};
+if (REDUCED && S.mode !== 'loader') S.mode = 'static';
+
+/* seat times (s) — shared with the video/audio script */
+const CLICKS = [
+  { id: 'line',  t: 0.52 }, { id: 'tri', t: 0.80 }, { id: 'shelf', t: 1.14 },
+  { id: 'word',  t: 1.60 }, { id: 'dot', t: 2.12 },
+];
+
+/* ---------- flat SVG version (static mode, no WebGL, reduced motion) ---------- */
+const flat = document.getElementById('flat');
+const loaderEl = document.getElementById('loader');
+const tpl = id => document.getElementById(id).innerHTML;
+function buildFlat() {
+  if (flat.dataset.built) return sizeFlat();
+  flat.innerHTML = `<div class="v-day">${tpl('src-lockup')}</div><div class="v-night">${tpl('src-lockup-inverse')}</div>`;
+  flat.dataset.built = '1';
+  sizeFlat();
+}
+/* Pixel width uses the same framing rule as the final 3D frame. */
+function frameFrac(w) { return w < 700 ? 0.8 : 0.62; }
+function sizeFlat() {
+  const w = innerWidth, h = innerHeight;
+  const px = Math.min(w * frameFrac(w), h * 0.5 * 348.6 / 83.0);
+  flat.querySelectorAll('svg').forEach(s => { s.style.width = px + 'px'; });
+  const mk = Math.min(w, h) * 0.26 * 64 / 56;                // mark: visible part is 56 of 64 units
+  loaderEl.querySelector('svg').style.width = mk + 'px';
+}
+function setupLoader() {
+  const tilt = loaderEl.querySelector('.tilt');
+  loaderEl.classList.toggle('rm', REDUCED);
+  loaderEl.setAttribute('aria-busy', 'true');
+  tilt.style.animationDuration = (DUR.loader / S.speed) + 's';
+  if (S.tFixed != null) { tilt.style.animationDelay = (-S.tFixed / S.speed) + 's'; tilt.style.animationPlayState = 'paused'; }
+  else { tilt.style.animationDelay = '0s'; tilt.style.animationPlayState = 'running'; }
+  // restart the CSS animation
+  tilt.style.animationName = 'none'; void tilt.getBoundingClientRect(); tilt.style.animationName = '';
+}
+
+/* ---------- control panel ---------- */
+const ui = document.getElementById('ui'), tc = document.getElementById('tc');
+function syncUI() {
+  ui.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)));
+  ui.querySelectorAll('[data-speed]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.speed === S.speed)));
+  const u = new URL(location.href);
+  u.searchParams.set('theme', S.theme); u.searchParams.set('mode', S.mode);
+  if (S.tFixed == null) u.searchParams.delete('t');
+  history.replaceState(null, '', u);
+}
+let engine = null, booting = null;
+ui.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.act === 'replay') { S.tFixed = null; S.late = false; applyMode(true); }
+  if (b.dataset.act === 'theme') setTheme(S.theme === 'day' ? 'night' : 'day');
+  if (b.dataset.mode) { S.mode = b.dataset.mode; S.tFixed = null; S.late = false; applyMode(true); }
+  if (b.dataset.speed) { S.speed = +b.dataset.speed; engine && engine.setSpeed(S.speed); if (S.mode === 'loader') setupLoader(); }
+  syncUI();
+});
+function setTheme(t) { S.theme = t; root.setAttribute('data-theme', t); engine && engine.setTheme(t); }
+
+const is3D = m => m === 'intro' || m === 'hero' || m === 'loop';
+function applyMode(user) {
+  const m = S.mode;
+  root.classList.toggle('show-loader', m === 'loader');
+  if (m === 'loader') setupLoader();
+  if (!is3D(m) || S.webgl === false) {                        // flat or loader, no WebGL needed
+    root.classList.toggle('show-flat', m !== 'loader');
+    root.classList.remove('gl-on');
+    buildFlat();
+    engine && engine.stop();
+    tc.textContent = m === 'loader' ? `${DUR.loader.toFixed(2)} с, CSS` : 'статично';
+    return;
+  }
+  buildFlat();
+  if (engine) { show3D(m); engine.setMode(m); return; }
+  // 3D not ready yet. Loop: show the flat lockup (identical to loop t = 0) until the first 3D frame.
+  // Intro: keep the plain background, at most INTRO_WAIT ms, then the flat lockup.
+  root.classList.toggle('show-flat', m !== 'intro');
+  if (m === 'intro' && S.tFixed == null && S.autoplay) {
+    setTimeout(() => { if (!engine && S.mode === 'intro') { S.late = true; root.classList.add('show-flat'); } }, Math.max(0, INTRO_WAIT - (performance.now() - T_START)));
+  }
+  ensureBoot();
+}
+function show3D(m) {
+  if (m === 'intro' && !S.late) {                              // the intro starts from the empty plate: no flat logo underneath
+    root.classList.add('gl-snap'); root.classList.remove('show-flat'); root.classList.add('gl-on');
+    requestAnimationFrame(() => root.classList.remove('gl-snap'));
+  } else {
+    root.classList.add('gl-on');                               // fade in over the flat lockup (same pose)
+    setTimeout(() => { if (root.classList.contains('gl-on')) root.classList.remove('show-flat'); }, 320);
+  }
+}
+addEventListener('resize', () => { sizeFlat(); engine && engine.resize(); });
+window.NV_LOGO = { ready: false, state: S, clicks: CLICKS, dur: DUR };
+
+/* ---------- 3D boot ---------- */
+function hasWebGL() {
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }
+  catch (e) { return false; }
+}
+function ensureBoot() {
+  if (booting) return booting;
+  booting = boot().then(() => {
+    window.NV_LOGO.ready = true;
+    if (!is3D(S.mode)) return;
+    if (S.late) { S.mode = 'hero'; engine.setMode('hero', DUR.intro); show3D('hero'); syncUI(); }  // intro came too late: go straight to the loop
+    else { show3D(S.mode); engine.setMode(S.mode); }
+  }).catch(err => {
+    console.error(err); S.webgl = false; engine = null; applyMode(); window.NV_LOGO.ready = true; window.NV_LOGO.error = String(err);
+  });
+  return booting;
+}
+
+syncUI();
+if (is3D(S.mode)) S.webgl = hasWebGL();
+applyMode();
+if (!is3D(S.mode)) window.NV_LOGO.ready = true;              // static / loader: three.js is never requested
+window.NV_LOGO.seekLoader = t => { S.tFixed = t; setupLoader(); };
+
+async function boot() {
+  const THREE = await import('three');
+  const { SVGLoader } = await import('three/addons/loaders/SVGLoader.js');
+  const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
+  const pc = (await import('https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/+esm')).default;
+
+  const D2R = Math.PI / 180;
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const smoother = x => { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); };
+  const easeOutCubic = x => 1 - Math.pow(1 - clamp(x), 3);
+  const easeInOutSine = x => -(Math.cos(Math.PI * clamp(x)) - 1) / 2;
+
+  /* ---------- renderer ---------- */
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  const lite = matchMedia('(pointer:coarse)').matches || innerWidth < 860;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, lite ? 1.5 : 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(20, 1, 10, 6000);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  /* ---------- geometry from the SVG ---------- */
+  const data = new SVGLoader().parse(tpl('src-lockup'));
+  const P = data.paths;                     // 0 shelf, 1 triangle left, 2 triangle right, 3 level line, 4 word, 5 i-dot triangle
+  if (P.length !== 6) throw new Error('nivel-1-lockup.svg: expected 6 paths, got ' + P.length);
+  const ring = (sp, div = 16) => {
+    const pts = sp.getPoints(div).map(p => [p.x, -p.y]);          // Y up
+    const a = pts[0], b = pts[pts.length - 1];
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-6) pts.pop();
+    return pts;
+  };
+  const area = r => { let s = 0; for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; };
+  const ccw = r => area(r) < 0 ? r.slice().reverse() : r;
+  const v2 = ([x, y]) => new THREE.Vector2(x, y);
+  const shapeOf = (outer, holes = []) => {
+    const s = new THREE.Shape(outer.map(v2));
+    holes.forEach(h => s.holes.push(new THREE.Path(h.map(v2))));
+    return s;
+  };
+
+  const DP = 6, BEV = 1.3;                  // pocket depth = part height; chamfer 1.3 x 45 deg
+  // groups: 0 face, 1 accent face/wall, 2 chamfer, 3 wall, 4 accent chamfer
+  function Builder() {
+    const B = [[], [], [], [], []];
+    const A = new THREE.Vector3(), Bv = new THREE.Vector3(), C = new THREE.Vector3(), N = new THREE.Vector3(), T = new THREE.Vector3();
+    return {
+      tri(a, b, c, g, hint) {
+        A.set(...a); Bv.set(...b); C.set(...c);
+        N.subVectors(Bv, A).cross(T.subVectors(C, A));
+        if (N.lengthSq() < 1e-12) return;
+        N.normalize();
+        if (hint && N.dot(T.set(...hint)) < 0) { [b, c] = [c, b]; N.negate(); }
+        B[g].push([a, b, c, [N.x, N.y, N.z]]);
+      },
+      quad(a, b, c, d, g, hint) { this.tri(a, b, c, g, hint); this.tri(a, c, d, g, hint); },
+      geometry() {
+        const pos = [], nor = [], out = new THREE.BufferGeometry(); let start = 0;
+        B.forEach((list, mi) => {
+          list.forEach(([a, b, c, n]) => { pos.push(...a, ...b, ...c); for (let k = 0; k < 3; k++) nor.push(...n); });
+          if (list.length) out.addGroup(start, list.length * 3, mi); start += list.length * 3;
+        });
+        out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+        out.computeBoundingBox(); return out;
+      },
+    };
+  }
+  /* Convex prism with a chamfer on selected edges only. Mating edges (shelf bottom, triangle top, colour seam)
+     stay sharp, so the seated mark reads as one solid "flag", not three parts. Face at z = 0, back at z = -DP. */
+  function prism(bld, r, chamfered, accent) {
+    r = ccw(r); const n = r.length;
+    const off = r.map((p, i) => chamfered(p, r[(i + 1) % n]) ? BEV : 0);
+    const nrm = r.map((p, i) => { const q = r[(i + 1) % n], dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l]; }); // inward
+    const inset = r.map((p, i) => {
+      const j = (i - 1 + n) % n;                                          // lines of edge j and edge i meet at vertex i
+      const [a1, b1] = nrm[j], c1 = a1 * r[j][0] + b1 * r[j][1] + off[j];
+      const [a2, b2] = nrm[i], c2 = a2 * p[0] + b2 * p[1] + off[i];
+      const det = a1 * b2 - a2 * b1;
+      return [(c1 * b2 - c2 * b1) / det, (a1 * c2 - a2 * c1) / det];
+    });
+    const gF = accent ? 1 : 0, gC = accent ? 4 : 2, gW = accent ? 1 : 3;
+    for (let i = 1; i < n - 1; i++) bld.tri([...inset[0], 0], [...inset[i], 0], [...inset[i + 1], 0], gF, [0, 0, 1]);
+    for (let i = 1; i < n - 1; i++) bld.tri([...r[0], -DP], [...r[i], -DP], [...r[i + 1], -DP], gW, [0, 0, -1]);
+    for (let i = 0; i < n; i++) {
+      const k = (i + 1) % n, out = [-nrm[i][0], -nrm[i][1], 0];
+      bld.quad([...inset[i], 0], [...inset[k], 0], [...r[k], -BEV], [...r[i], -BEV], off[i] ? gC : gW, off[i] ? [out[0], out[1], 1] : out);
+      bld.quad([...r[i], -BEV], [...r[k], -BEV], [...r[k], -DP], [...r[i], -DP], gW, out);
+    }
+  }
+  /* Curved outlines (letters): ExtrudeGeometry with the chamfer cut inside the contour. */
+  function extruded(shapes) {
+    const g = new THREE.ExtrudeGeometry(shapes, { depth: DP - 2 * BEV, bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelOffset: -BEV, bevelSegments: 1, curveSegments: 1 });
+    g.computeBoundingBox(); g.translate(0, 0, -g.boundingBox.max.z);
+    const pos = g.attributes.position, bld = Builder();
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3(), t = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i += 3) {
+      a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c.fromBufferAttribute(pos, i + 2);
+      n.subVectors(b, a).cross(t.subVectors(c, a)).normalize();
+      const nz = Math.abs(n.z), gi = nz > 0.95 ? 0 : nz > 0.2 ? 2 : 3;
+      bld.tri(a.toArray(), b.toArray(), c.toArray(), gi, null);
+    }
+    g.dispose(); return bld.geometry();
+  }
+
+  // mark parts (lockup coordinates, Y up)
+  const shelfRing = ring(P[0].subPaths[0]);
+  const L = ring(P[1].subPaths[0]), R = ring(P[2].subPaths[0]);   // L: A,B,C   R: B,D,C
+  const seamX = L[1][0], apex = { x: L[2][0], y: L[2][1] }, topY = L[0][1];
+  const lineRing = ring(P[3].subPaths[0]);
+  const dotRing = ring(P[5].subPaths[0]);
+  const near = (a, b) => Math.abs(a - b) < 1e-3;
+  const shelfMinY = Math.min(...shelfRing.map(p => p[1]));
+  const geoShelf = (() => { const b = Builder(); prism(b, shelfRing, (p, q) => !(near(p[1], shelfMinY) && near(q[1], shelfMinY))); return b.geometry(); })();
+  const geoTri = (() => {
+    const b = Builder();
+    const sharp = (p, q) => (near(p[1], topY) && near(q[1], topY)) || (near(p[0], seamX) && near(q[0], seamX));
+    prism(b, L, (p, q) => !sharp(p, q), true);
+    prism(b, R, (p, q) => !sharp(p, q), false);
+    return b.geometry();
+  })();
+  const geoLine = (() => { const b = Builder(); prism(b, lineRing, () => true); return b.geometry(); })();
+  const geoDot = (() => { const b = Builder(); prism(b, dotRing, () => true, true); return b.geometry(); })();
+  // word: union of subpaths ("n" and "e" are overlapping parts in the SVG), one rigid part
+  const wordRings = P[4].subPaths.map(sp => ring(sp, 16));
+  const united = pc.union(...wordRings.map(r => [[...r, r[0]]]));
+  const letters = united.map(poly => poly.map(r => r.slice(0, -1)));
+  const geoWord = extruded(letters.map(poly => shapeOf(poly[0], poly.slice(1))));
+
+  /* ---------- the plate: rectangle minus the lockup contour = pockets ---------- */
+  const LOCK_C = new THREE.Vector3(170.3, 36, 0);          // lockup viewBox centre
+  const MARK_C = new THREE.Vector3(43.73, 25.0, 0);        // mark centre
+  const closeR = r => [...r, r[0]];
+  const plateRect = [[[-2000, -1600], [2400, -1600], [2400, 1700], [-2000, 1700], [-2000, -1600]]];
+  const partsPolys = [[closeR(shelfRing)], [closeR(L)], [closeR(R)], [closeR(lineRing)], [closeR(dotRing)], ...united];
+  const plateMP = pc.difference(plateRect, ...partsPolys);
+  const plateShapes = plateMP.map(poly => shapeOf(poly[0].slice(0, -1), poly.slice(1).map(h => h.slice(0, -1))));
+  const plateGeo = new THREE.ExtrudeGeometry(plateShapes, { depth: DP, bevelEnabled: false, curveSegments: 1 });
+  plateGeo.translate(0, 0, -DP);
+
+  /* ---------- textures (canvas, procedural) ---------- */
+  function noiseTex(size, lo, hi, seed, lines) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const x = c.getContext('2d'), id = x.createImageData(size, size);
+    let s = seed; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < id.data.length; i += 4) {
+      let v = lo + rnd() * (hi - lo);
+      if (lines) { const row = (i / 4 / size) | 0; v -= (row % lines === 0) ? 10 : 0; }    // milling toolpath rows
+      id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255;
+    }
+    x.putImageData(id, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+  const plateTex = noiseTex(256, 246, 255, 7); plateTex.repeat.set(1 / 40, 1 / 40);     // ExtrudeGeometry UV = world units
+  const floorTex = noiseTex(128, 236, 255, 11, 4); floorTex.repeat.set(26, 8);
+
+  /* ---------- materials ---------- */
+  function glintPatch(mat) {
+    // a narrow raking source that acts on the chamfers of one part only: a real specular highlight, not emission
+    mat.userData.uGlint = { value: new THREE.Vector2(0, 60) };              // strength, exponent
+    mat.userData.uGlintDir = { value: new THREE.Vector3(0, 1, 0) };
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.uGlint = mat.userData.uGlint; sh.uniforms.uGlintDir = mat.userData.uGlintDir;
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec2 uGlint;\nuniform vec3 uGlintDir;')
+        .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+          if (uGlint.x > 0.0) {
+            vec3 gL = normalize((viewMatrix * vec4(uGlintDir, 0.0)).xyz);
+            vec3 gV = normalize(vViewPosition);
+            vec3 gH = normalize(gL + gV);
+            float gs = pow(max(dot(normal, gH), 0.0), uGlint.y) * max(dot(normal, gL), 0.0);
+            reflectedLight.directSpecular += vec3(1.0, 0.97, 0.93) * (uGlint.x * gs);
+          }`);
+    };
+    mat.customProgramCacheKey = () => 'glint';
+    return mat;
+  }
+  const THEME = {
+    day: {
+      clear: '#F1EFEA', plate: '#ECEBE8', wall: '#DAD5CC', floor: '#D2CCC2',
+      ink: '#1D1D1B', acc: '#C94A17', inkRough: 0.5, inkMetal: 0.2, accRough: 0.45, accMetal: 0.08,
+      bevMetal: 0.35, bevRough: 0.3, bevEnv: 0.45, bevLift: 1, guide: '#1D1D1B', guideOp: 0.45, glint: 7,
+    },
+    night: {
+      clear: '#121110', plate: '#1B1410', wall: '#130F0C', floor: '#0C0B0A',
+      ink: '#EEEDEA', acc: '#F06A30', inkRough: 0.72, inkMetal: 0.0, accRough: 0.72, accMetal: 0.0,
+      bevMetal: 0.0, bevRough: 0.5, bevEnv: 9, bevLift: 1.12, guide: '#F1EFEA', guideOp: 0.34, glint: 3.5,
+    },
+  };
+  const parts = [];
+  function partMaterials(kind) {          // kind: 'ink' | 'acc' | 'split'
+    const ink = new THREE.MeshStandardMaterial(), wall = new THREE.MeshStandardMaterial(), acc = new THREE.MeshStandardMaterial();
+    const bev = glintPatch(new THREE.MeshStandardMaterial()), bevAcc = glintPatch(new THREE.MeshStandardMaterial());
+    const set = { kind, ink, wall, acc, bev, bevAcc };
+    const face = kind === 'acc' ? acc : ink, w = kind === 'acc' ? acc : wall, b = kind === 'acc' ? bevAcc : bev;
+    return { set, list: [face, acc, b, w, bevAcc] };
+  }
+  const plateMat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, map: plateTex });
+  const wallMat = new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0 });
+  const floorMat = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0, map: floorTex });
+  function paint(theme) {
+    const T = THEME[theme];
+    plateMat.color.set(T.plate); wallMat.color.set(T.wall); floorMat.color.set(T.floor);
+    parts.forEach(({ set: m }) => {
+      m.ink.color.set(T.ink); m.ink.roughness = T.inkRough; m.ink.metalness = T.inkMetal;
+      m.wall.color.set(T.ink); m.wall.roughness = Math.min(1, T.inkRough + 0.1); m.wall.metalness = T.inkMetal;
+      m.acc.color.set(T.acc); m.acc.roughness = T.accRough; m.acc.metalness = T.accMetal;
+      [[m.bev, T.ink], [m.bevAcc, T.acc]].forEach(([b, col]) => { b.color.set(col).multiplyScalar(T.bevLift); b.metalness = T.bevMetal; b.roughness = T.bevRough; b.envMapIntensity = T.bevEnv; });
+    });
+  }
+
+  /* ---------- scene graph: the assembly (plate + parts) is one rig ---------- */
+  const rig = new THREE.Group(); scene.add(rig);
+  const plate = new THREE.Mesh(plateGeo, [plateMat, wallMat]);
+  plate.receiveShadow = true; plate.castShadow = true; rig.add(plate);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(420, 140), floorMat);
+  floor.position.set(LOCK_C.x, LOCK_C.y, -DP); floor.receiveShadow = true; rig.add(floor);
+
+  function part(name, geo, kind) {
+    const { set, list } = partMaterials(kind);
+    const mesh = new THREE.Mesh(geo, list);
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh.name = name;
+    rig.add(mesh);
+    const bb = geo.boundingBox;
+    mesh.userData.center = new THREE.Vector3((bb.min.x + bb.max.x) / 2, (bb.min.y + bb.max.y) / 2, 0);
+    parts.push({ mesh, set });
+    return mesh;
+  }
+  const mLine = part('line', geoLine, 'ink');
+  const mTri = part('tri', geoTri, 'split');
+  const mShelf = part('shelf', geoShelf, 'ink');
+  const mWord = part('word', geoWord, 'ink');
+  const mDot = part('dot', geoDot, 'acc');
+  const setOf = m => parts.find(p => p.mesh === m).set;
+
+  // layout marks scribed on the plate, leading into each pocket (assembly-drawing axes)
+  function guide(from, to) {
+    const g = new THREE.BufferGeometry().setFromPoints([from, to]);
+    const l = new THREE.Line(g, new THREE.LineDashedMaterial({ dashSize: 5, gapSize: 3, transparent: true, opacity: 0, depthWrite: false }));
+    l.computeLineDistances(); l.visible = false; rig.add(l); return l;
+  }
+  const C = m => m.userData.center, bbx = m => m.geometry.boundingBox;
+  const GZ = 0.12;
+  const G = {
+    line:  guide(new THREE.Vector3(bbx(mLine).min.x - 170, C(mLine).y, GZ), new THREE.Vector3(bbx(mLine).min.x - 1, C(mLine).y, GZ)),
+    tri:   guide(new THREE.Vector3(apex.x, bbx(mShelf).max.y + 1, GZ), new THREE.Vector3(apex.x, bbx(mShelf).max.y + 120, GZ)),
+    shelf: guide(new THREE.Vector3(bbx(mShelf).max.x + 1, C(mShelf).y, GZ), new THREE.Vector3(bbx(mShelf).max.x + 190, C(mShelf).y, GZ)),
+    dot:   guide(new THREE.Vector3(C(mDot).x, bbx(mDot).max.y + 1, GZ), new THREE.Vector3(C(mDot).x, bbx(mDot).max.y + 260, GZ)),
+  };
+
+  /* ---------- light ---------- */
+  const hemi = new THREE.HemisphereLight(0xfffaf4, 0xb3a493, 0.6); scene.add(hemi);
+  // day: soft sun from the window, upper left (no window-frame occluder: it read as dirt)
+  const sun = new THREE.DirectionalLight(0xfffcf7, 2.3);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048);
+  Object.assign(sun.shadow.camera, { left: -380, right: 380, top: 300, bottom: -300, near: 200, far: 2200 });
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.35;
+  scene.add(sun); scene.add(sun.target);
+  const SUN_DIR = new THREE.Vector3(-0.46, 0.58, 0.67).normalize();
+  // night: desk lamp high above the table, aimed between the mark and the word (the mark gets no less light)
+  const lamp = new THREE.SpotLight(0xfffbf6, 0, 0, 0.44, 0.9, 0);
+  lamp.castShadow = true;
+  lamp.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048);
+  lamp.shadow.bias = -0.0004; lamp.shadow.normalBias = 0.35; lamp.shadow.camera.near = 300; lamp.shadow.camera.far = 2400;
+  scene.add(lamp); scene.add(lamp.target);
+
+  let theme = S.theme;
+  function lightTheme(t) {
+    theme = t; const T = THEME[t];
+    paint(t);
+    renderer.setClearColor(T.clear);
+    Object.values(G).forEach(l => l.material.color.set(T.guide));
+    // Neutral tone mapping subtracts the min channel in darks and over-saturates a dark scene, so night renders linear
+    if (t === 'day') { scene.environmentIntensity = 0.5; renderer.toneMapping = THREE.NeutralToneMapping; }
+    else { scene.environmentIntensity = 0.06; renderer.toneMapping = THREE.NoToneMapping; }
+    sun.visible = t === 'day'; lamp.visible = t === 'night';
+  }
+
+  /* ---------- motion: approach, line up, drop into the pocket ---------- */
+  /* Velocity profile of the approach: short ease-in (70 ms), then braking to ~15 % of the peak, never to zero.
+     The part is at 98.5 % of its travel when the pocket's lead-in chamfer takes it; the last 1.5 % and the
+     drop happen together in `drop` seconds, accelerating, and end on the floor of the pocket. */
+  function profile(Tz, ta, ve, gravity) {
+    const N = 256, lut = new Float32Array(N + 1); let acc = 0; lut[0] = 0;
+    const xa = Math.min(0.9, ta / Tz);
+    const vel = x => gravity
+      ? Math.min(1, x / xa) * (x < 0.7 ? 0.25 + 0.75 * x / 0.7 : ve + (1 - ve) * Math.pow((1 - x) / 0.3, 2))
+      : Math.min(1, x / xa) * (ve + (1 - ve) * Math.pow(1 - x, 2));
+    for (let i = 1; i <= N; i++) { acc += vel((i - 0.5) / N); lut[i] = acc; }
+    for (let i = 0; i <= N; i++) lut[i] /= acc;
+    return x => { x = clamp(x) * N; const i = Math.floor(x), f = x - i; return i >= N ? 1 : lerp(lut[i], lut[i + 1], f); };
+  }
+  // bounce after the hit: outward only (out of the pocket), restitution 0.42
+  function bounce(tau, A, T1) {
+    if (tau <= 0) return 0;
+    let a = A, T = T1, t = tau;
+    while (a > 0.03) { if (t < T) { const x = t / T; return 4 * a * x * (1 - x); } t -= T; T *= 0.42; a *= 0.42 * 0.42; }
+    return 0;
+  }
+  const AX = {
+    line:  { m: mLine,  dir: [-1, 0], dist: 92,  hover: 9,  zFrom: 9,  t0: 0.10, t1: 0.52, drop: 0.05, bounce: 1.4, recoil: [0.5, 0],  rot: null },
+    tri:   { m: mTri,   dir: [0, 1],  dist: 62,  hover: 9,  zFrom: 9,  t0: 0.30, t1: 0.80, drop: 0.05, bounce: 1.4, recoil: [0, -0.5], rot: ['z', -7] },
+    shelf: { m: mShelf, dir: [1, 0],  dist: 104, hover: 9,  zFrom: 9,  t0: 0.74, t1: 1.14, drop: 0.05, bounce: 1.4, recoil: [-0.5, 0], rot: ['y', 14] },
+    word:  { m: mWord,  dir: [1, 0],  dist: 250, hover: 9,  zFrom: 9,  t0: 1.02, t1: 1.60, drop: 0.055, bounce: 1.2, recoil: [-0.45, 0], rot: null },
+    dot:   { m: mDot,   dir: [0, 1],  dist: 300, hover: 14, zFrom: 14, t0: 1.66, t1: 2.12, drop: 0.06, bounce: 2.0, recoil: [0, -0.6], rot: null, gravity: true },
+  };
+  Object.values(AX).forEach(a => { a.Tz = a.t1 - a.t0 - a.drop; a.prof = profile(a.Tz, a.gravity ? 0.12 : 0.07, a.gravity ? 0.2 : 0.15, a.gravity); });
+
+  const tmpE = new THREE.Euler(), tmpV = new THREE.Vector3();
+  function placePart(a, t) {
+    const m = a.m, c = m.userData.center, tau = t - a.t0;
+    let s, z, r = 0;
+    if (tau <= 0) { s = 0; z = a.zFrom; r = 1; }
+    else if (tau < a.Tz) {
+      const x = tau / a.Tz, p = a.prof(x);
+      s = 0.985 * p; z = lerp(a.zFrom, a.hover, p); r = 1 - easeInOutSine(x / 0.85);
+    } else if (tau < a.Tz + a.drop) {
+      const k = (tau - a.Tz) / a.drop;
+      s = 0.985 + 0.015 * k; z = a.hover * (1 - k * k); r = 0;
+    } else { s = 1; z = bounce(t - a.t1, a.bounce, 0.075); }
+    const off = a.dist * (1 - s);
+    m.position.set(a.dir[0] * off, a.dir[1] * off, z);
+    m.rotation.set(0, 0, 0);
+    if (a.rot && r > 0) {
+      const ang = a.rot[1] * D2R * r;
+      tmpE.set(a.rot[0] === 'x' ? ang : 0, a.rot[0] === 'y' ? ang : 0, a.rot[0] === 'z' ? ang : 0);
+      m.quaternion.setFromEuler(tmpE);
+      tmpV.copy(c).applyQuaternion(m.quaternion); m.position.add(c).sub(tmpV);   // rotate around the part centre
+    }
+  }
+  // raking glint over the chamfers of the part that just seated: the source sweeps from upper left to upper right
+  /* The source is placed each frame where its reflection off a 45-degree chamfer facing azimuth phi enters the lens,
+     and phi sweeps from upper left to upper right: the highlight runs along the chamfers like a passing lamp. */
+  const gV = new THREE.Vector3(), gN = new THREE.Vector3(), gL = new THREE.Vector3();
+  function glintAt(m, t, tClick, T) {
+    const set = setOf(m), k = t - tClick, on = k > 0 && k < 0.42;
+    let str = 0;
+    if (on) {
+      const p = clamp(k / 0.42), phi = lerp(150, 30, easeOutCubic(p)) * D2R;
+      gV.copy(camera.position).sub(tmpV.copy(m.userData.center).add(m.position).add(rig.position)).normalize();
+      gN.set(Math.cos(phi), Math.sin(phi), 1).normalize();
+      gL.copy(gN).multiplyScalar(2 * gN.dot(gV)).sub(gV).normalize();
+      str = T.glint * Math.pow(Math.sin(Math.PI * Math.sqrt(p)), 2);
+    }
+    [set.bev, set.bevAcc].forEach(b => { b.userData.uGlint.value.x = str; if (on) b.userData.uGlintDir.value.copy(gL); });
+  }
+  function guideOpacity(l, t, tShow, tHide) {
+    const a = smoother((t - tShow) / 0.2) * (1 - smoother((t - tHide) / 0.16));
+    l.material.opacity = THEME[theme].guideOp * a; l.visible = a > 0.002;
+  }
+  function resetParts() {
+    parts.forEach(({ mesh, set }) => { mesh.position.set(0, 0, 0); mesh.rotation.set(0, 0, 0); mesh.visible = true;
+      set.bev.userData.uGlint.value.x = 0; set.bevAcc.userData.uGlint.value.x = 0; });
+    Object.values(G).forEach(l => (l.visible = false));
+    rig.position.set(0, 0, 0);
+  }
+
+  /* ---------- camera ---------- */
+  let W = 1, H = 1;
+  function fitDist(cw, ch, fw, fh) {
+    const vf = camera.fov * D2R, asp = W / H;
+    return Math.max((cw / fw) / 2 / (Math.tan(vf / 2) * asp), (ch / fh) / 2 / Math.tan(vf / 2));
+  }
+  const lockDist = () => fitDist(348.6, 83.0, frameFrac(W), 0.5);
+  function orbit(target, dist, yaw, pitch) {
+    camera.position.set(
+      target.x + dist * Math.sin(yaw) * Math.cos(pitch),
+      target.y + dist * Math.sin(pitch),
+      target.z + dist * Math.cos(yaw) * Math.cos(pitch));
+    camera.lookAt(target);
+  }
+
+  /* ---------- light over time ---------- */
+  function lights(lampK, sunDrift) {
+    if (theme === 'day') {
+      const d = SUN_DIR.clone();
+      if (sunDrift) d.applyAxisAngle(new THREE.Vector3(0, 0, 1), sunDrift * D2R).normalize();
+      sun.target.position.copy(LOCK_C);
+      sun.position.copy(LOCK_C).addScaledVector(d, 1200);
+      hemi.intensity = 0.62; hemi.color.set(0xfffaf4); hemi.groundColor.set(0xb3a493);
+    } else {
+      lamp.position.set(LOCK_C.x - 20, LOCK_C.y + 300, 980);
+      lamp.target.position.set(LOCK_C.x - 22, LOCK_C.y - 4, 0);
+      lamp.intensity = 2.85 * lampK;
+      hemi.intensity = 0.03 + 0.12 * lampK;
+      hemi.color.set(0xfff1e4); hemi.groundColor.set(0x2a241f);
+    }
+  }
+  const lampOn = t => t < 0.06 ? 0 : 0.62 + 0.38 * easeOutCubic((t - 0.06) / 0.34);   // switch click, driver ramp
+
+  /* ---------- "±0.000" caption over the shelf (intro only) ---------- */
+  const lbl = document.getElementById('lbl');
+  const pA = new THREE.Vector3(), pB = new THREE.Vector3();
+  function label(t) {
+    const a = smoother((t - 1.16) / 0.08) * (1 - smoother((t - 1.50) / 0.12));
+    if (a <= 0.001) { lbl.style.opacity = 0; return; }
+    const bb = bbx(mShelf); camera.updateMatrixWorld();
+    pA.set(bb.max.x, bb.max.y + 3.2, 0).project(camera); pB.set(bb.max.x - 10, bb.max.y + 3.2, 0).project(camera);
+    const x = (pA.x + 1) / 2 * W, y = (1 - pA.y) / 2 * H, ppu = Math.abs(pA.x - pB.x) / 2 * W / 10;
+    lbl.style.fontSize = (8.6 * ppu).toFixed(2) + 'px';
+    lbl.style.transform = `translate(${x}px, ${y}px) translate(-100%, -100%)`;
+    lbl.style.opacity = (0.9 * a).toFixed(3);
+  }
+
+  /* ---------- frame ---------- */
+  let mode = S.mode;
+  const CAM_END = 1.95;
+  function intro(t) {
+    const T = THEME[theme];
+    // camera: 16 deg orbit to frontal, mark framing to lockup framing; still from 1.95 s, before the last two hits settle
+    const e = smoother(t / CAM_END), e2 = smoother((t - 0.3) / (CAM_END - 0.3));
+    const tg = new THREE.Vector3().copy(MARK_C).lerp(LOCK_C, e2); tg.y += lerp(26, 0, e);
+    orbit(tg, lerp(lockDist() * 0.62, lockDist(), e2), lerp(-16, 0, e) * D2R, lerp(10, 0, e) * D2R);
+    for (const k of Object.keys(AX)) {
+      const a = AX[k]; placePart(a, t); glintAt(a.m, t, a.t1, T);
+      if (k === 'dot') a.m.visible = t > a.t0 - 0.05;
+      const rc = t - a.t1; if (rc >= 0 && rc < 0.12) { const e = Math.exp(-rc / 0.025); rig.position.x += a.recoil[0] * e; rig.position.y += a.recoil[1] * e; }
+    }
+    for (const k of ['line', 'tri', 'shelf']) guideOpacity(G[k], t, -1, AX[k].t1 - AX[k].drop - 0.16);
+    guideOpacity(G.dot, t, AX.dot.t0 - 0.35, AX.dot.t1 - AX.dot.drop - 0.16);
+    lights(theme === 'night' ? lampOn(t) : 1, 0);
+    label(t);
+  }
+  /* loop: seated lockup; camera breathes, the day sun drifts. tau = 0 is exactly the final intro pose. */
+  function loop(tau, ramp) {
+    const p = (tau % DUR.loop) / DUR.loop, w = 2 * Math.PI * p, A = ramp ? smoother(tau / 3) : 1;
+    orbit(LOCK_C, lockDist(), A * 2.2 * Math.sin(w) * D2R, A * 1.1 * Math.sin(2 * w) * D2R);
+    lights(1, A * 4 * Math.sin(w));
+    lbl.style.opacity = 0;
+  }
+  function renderAt(tRaw) {
+    resetParts();
+    if (mode === 'intro') intro(Math.min(tRaw, DUR.intro));
+    else if (mode === 'hero') { if (tRaw < DUR.intro) intro(tRaw); else loop(tRaw - DUR.intro, true); }
+    else loop(tRaw, false);
+    renderer.render(scene, camera);
+  }
+
+  /* ---------- size ---------- */
+  function resize() {
+    W = innerWidth; H = innerHeight;
+    renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
+    // the i-dot starts above the top edge of the final frame, whatever the aspect (1:1, 9:16, phone)
+    AX.dot.dist = Math.max(260, lockDist() * Math.tan(camera.fov * D2R / 2) - (bbx(mDot).min.y - LOCK_C.y) + 40);
+    kick();
+  }
+
+  /* ---------- clock ----------
+     t0 is taken from the first frame that is actually drawn; a stalled frame (> 100 ms) shifts t0 instead of skipping time. */
+  let t0 = null, last = 0, tNow = S.tFixed ?? 0, playing = false, raf = 0, dead = false;
+  const trace = window.NV_LOGO.trace = [];
+  const playable = () => S.tFixed == null && S.autoplay;
+  const endOf = () => mode === 'intro' ? DUR.intro : Infinity;
+  function tick(now) {
+    raf = 0; if (dead) return;
+    if (playing) {
+      if (t0 == null) t0 = now - tNow * 1000 / S.speed;
+      else if (now - last > 100) t0 += (now - last) - 1000 / 60;
+      last = now;
+      tNow = (now - t0) / 1000 * S.speed;
+      if (tNow >= endOf()) { tNow = endOf(); playing = false; }
+      if (trace.length < 8) trace.push(+tNow.toFixed(3));                  // first drawn times, for the cold-start check
+    }
+    renderAt(tNow);
+    tc.textContent = mode === 'loop' ? `${(tNow % DUR.loop).toFixed(2)} / ${DUR.loop.toFixed(2)} с`
+      : mode === 'hero' ? (tNow < DUR.intro ? `${tNow.toFixed(2)} / ${DUR.intro.toFixed(2)} с` : `повтор ${((tNow - DUR.intro) % DUR.loop).toFixed(2)} с`)
+      : `${tNow.toFixed(2)} / ${DUR.intro.toFixed(2)} с`;
+    if (playing) raf = requestAnimationFrame(tick);
+  }
+  function kick() { if (!raf && !dead) raf = requestAnimationFrame(tick); }
+  function start(at = 0) { tNow = S.tFixed ?? at; t0 = null; playing = playable(); kick(); }
+
+  canvas.addEventListener('webglcontextlost', e => {          // GPU reset: stop the loop, fall back to the flat SVG
+    e.preventDefault(); dead = true; if (raf) cancelAnimationFrame(raf); raf = 0;
+    S.webgl = false; engine = null; root.classList.remove('gl-on'); applyMode();
+  }, { once: true });
+
+  lightTheme(theme);
+  resize();
+  // warm-up: compile all programs (incl. shadow depth) and draw once off screen, so the first visible frame is t = 0
+  mode = 'intro';
+  await renderer.compileAsync(scene, camera);
+  renderAt(0);
+  await new Promise(r => requestAnimationFrame(r));
+
+  engine = {
+    setSpeed(sp) { if (playing && t0 != null) t0 = performance.now() - tNow * 1000 / sp; },
+    setTheme(t) { lightTheme(t); renderer.compile(scene, camera); kick(); },
+    setMode(m, at = 0) { mode = m; dead = false; start(at); },
+    stop() { playing = false; if (raf) cancelAnimationFrame(raf); raf = 0; },
+    resize,
+  };
+  // frame capture: seek(t) renders synchronously
+  Object.assign(window.NV_LOGO, {
+    seek(t) { playing = false; S.tFixed = t; tNow = t; renderAt(t); tc.textContent = `${t.toFixed(2)} с`; return renderer.info.render; },
+    info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, plateHoles: plateMP.length }),
+    // screen-space box of a part in the last drawn frame (for review contact sheets)
+    box(name) {
+      const m = parts.find(p => p.mesh.name === name).mesh, bb = m.geometry.boundingBox, v = new THREE.Vector3();
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; m.updateMatrixWorld(); camera.updateMatrixWorld();
+      for (let i = 0; i < 8; i++) {
+        v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).applyMatrix4(m.matrixWorld).project(camera);
+        const x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+      return [x0, y0, x1, y1];
+    },
+  });
+}
+</script>
+</body>
+</html>

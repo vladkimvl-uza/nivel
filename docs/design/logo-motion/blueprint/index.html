@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="ru" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nivel — чертёж в объём</title>
+<meta name="description" content="Анимация знака Nivel: отметка уровня чертится по ЕСКД, вытягивается в тело и садится по месту.">
+<style>
+  :root{
+    --asphalt:#1D1D1B; --signal:#D9501A; --signal-dark:#F06A30; --paper:#F1EFEA;
+    --mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+    --bg:#F1EFEA; --ink:#1D1D1B; --ink-2:#5E574D; --line:rgba(29,29,27,.14); --accent:#B4481A;
+  }
+  [data-theme="night"]{ --bg:#0E0C0B; --ink:#F1EFEA; --ink-2:#A39C90; --line:#2E2A26; --accent:#F06A30; }
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden}
+  body{font-family:var(--mono);-webkit-font-smoothing:antialiased}
+  #stage{position:fixed;inset:0}
+  #c{display:block;width:100%;height:100%;visibility:hidden}
+  .gl #c{visibility:visible}
+  /* the SVG lockup is the page until WebGL draws its first frame (no CDN, no WebGL, gated devices) */
+  .fb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+  #fallback svg{width:min(72vw,620px);height:auto}
+  .gl #fallback{display:none}
+  .static #fallback{display:flex} .static #c{display:none}
+  #ldr{display:none} #ldr svg{width:min(72vmin,160px);height:auto;overflow:visible}
+  .svgldr #ldr{display:flex} .svgldr #fallback, .svgldr #c{display:none}
+  .lg-n{display:none}
+  [data-theme="night"] .lg-d{display:none}
+  [data-theme="night"] .lg-n{display:block}
+  /* SVG loader: same timing as the WebGL loader (1.4 s: lift 0-0.30, hover, seat 0.38-0.72, rest) */
+  @keyframes nv-seat{
+    0%{transform:translateY(0);animation-timing-function:cubic-bezier(.65,0,.35,1)}
+    21.43%{transform:translateY(-4px);animation-timing-function:linear}
+    27.14%{transform:translateY(-4px);animation-timing-function:cubic-bezier(.5,0,.08,1)}
+    51.43%,100%{transform:translateY(0)}
+  }
+  #ldr .up{animation:nv-seat 1.4s infinite}
+  @media (prefers-reduced-motion:reduce){ #ldr .up{animation:none} }
+
+  #panel{position:fixed;left:0;right:0;margin:0 auto;width:max-content;bottom:max(16px,env(safe-area-inset-bottom));
+    display:flex;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 32px);box-sizing:border-box;
+    font:400 11px/1 var(--mono);letter-spacing:.02em;color:var(--ink-2);
+    border:1px solid var(--line);border-radius:2px;background:var(--bg)}
+  #panel[hidden]{display:none}
+  #panel .grp{display:flex;border-left:1px solid var(--line)}
+  #panel .grp:first-child{border-left:0}
+  #panel button{all:unset;cursor:pointer;padding:9px 10px;color:var(--ink-2);white-space:nowrap}
+  #panel button:hover{color:var(--ink)}
+  #panel button[aria-pressed="true"]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+  #panel button:focus-visible{outline:1px solid var(--accent);outline-offset:-3px}
+  @media (max-width:560px){ #panel button{padding:9px 7px} }
+</style>
+<script>
+  // before paint: theme for the SVG fallback, and a safety net for capture tools if the module never starts
+  (function () {
+    var q = new URLSearchParams(location.search), th = q.get('theme');
+    if (th !== 'day' && th !== 'night') th = 'night';
+    document.documentElement.dataset.theme = th;
+    setTimeout(function () { if (!window.__nivelReady) { window.__nivelFallback = 'timeout'; window.__nivelReady = true; } }, 8000);
+  })();
+</script>
+<!-- local files only: Three.js r169 subset (MIT), IBM Plex Mono (OFL), precomputed word outline -->
+<script src="vendor/three-nivel.min.js"></script>
+<script src="vendor/fonts.js"></script>
+<script src="vendor/word-union.js"></script>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" aria-label="Знак Nivel: отметка уровня"></canvas>
+  <div id="fallback" class="fb" role="img" aria-label="Nivel">
+    <!-- docs/brand/logos-v2/nivel-1-lockup.svg, as is -->
+    <svg class="lg-d" xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#1D1D1B" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#D9501A" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+    <!-- docs/brand/logos-v2/nivel-1-lockup-inverse.svg, as is -->
+    <svg class="lg-n" xmlns="http://www.w3.org/2000/svg" viewBox="-4.0 -77.5 348.6 83.0" role="img" aria-label="Nivel"><title>Nivel — Отметка уровня с полкой, знак и слово для тёмного фона #1D1D1B</title><g transform="translate(-6.25 -74.97) scale(1.5619)"><path fill="#F1EFEA" d="M8 16h52v8h-52Z"/><path fill="#F06A30" d="M8 24L24 24L24 40Z"/><path fill="#F1EFEA" d="M24 24L40 24L24 40Z"/><path fill="#F1EFEA" d="M4 40h56v8h-56Z"/></g><g transform="translate(111.56 0)"><path fill="#F1EFEA" d="M44.35 0V-26Q44.35 -28.55 44 -31.65Q43.65 -34.75 42.38 -37.62Q41.1 -40.5 38.58 -42.35Q36.05 -44.2 31.75 -44.2Q29.45 -44.2 27.2 -43.45Q24.95 -42.7 23.12 -40.88Q21.3 -39.05 20.2 -35.88Q19.1 -32.7 19.1 -27.75L11.95 -30.8Q11.95 -37.7 14.62 -43.3Q17.3 -48.9 22.5 -52.23Q27.7 -55.55 35.3 -55.55Q41.3 -55.55 45.2 -53.55Q49.1 -51.55 51.4 -48.45Q53.7 -45.35 54.8 -41.85Q55.9 -38.35 56.23 -35.23Q56.55 -32.1 56.55 -30.15V0ZM6.9 0V-54H17.65V-37.25H19.1V0ZM69.95 0V-54H82V0ZM111 0 91.4 -54H103.45L117.05 -14.85L130.6 -54H142.7L123.1 0ZM172.95 1.5Q164.75 1.5 158.55 -2.05Q152.35 -5.6 148.88 -11.9Q145.4 -18.2 145.4 -26.4Q145.4 -35.25 148.8 -41.78Q152.2 -48.3 158.25 -51.9Q164.3 -55.5 172.25 -55.5Q180.65 -55.5 186.53 -51.58Q192.4 -47.65 195.25 -40.5Q198.1 -33.35 197.4 -23.65H185.45V-28.05Q185.4 -36.85 182.35 -40.9Q179.3 -44.95 172.75 -44.95Q165.35 -44.95 161.75 -40.38Q158.15 -35.8 158.15 -27Q158.15 -18.8 161.75 -14.3Q165.35 -9.8 172.25 -9.8Q176.7 -9.8 179.93 -11.78Q183.15 -13.75 184.9 -17.5L196.8 -13.9Q193.7 -6.6 187.23 -2.55Q180.75 1.5 172.95 1.5ZM154.35 -23.65V-32.75H191.5V-23.65ZM209 0V-73.5H221.05V0Z"/><path fill="#F06A30" d="M64.53 -73.25L87.42 -73.25L75.98 -61.8Z"/></g></svg>
+  </div>
+  <div id="ldr" class="fb" role="img" aria-label="Загрузка">
+    <!-- docs/brand/logos-v2/nivel-1.svg / nivel-1-inverse.svg paths; the upper part seats on the level line -->
+    <svg class="lg-d" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g class="up"><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/></g><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></svg>
+    <svg class="lg-n" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g class="up"><path fill="#F1EFEA" d="M8 16h52v8h-52Z"/><path fill="#F06A30" d="M8 24L24 24L24 40Z"/><path fill="#F1EFEA" d="M24 24L40 24L24 40Z"/></g><path fill="#F1EFEA" d="M4 40h56v8h-56Z"/></svg>
+  </div>
+</div>
+
+<nav id="panel" aria-label="Управление анимацией">
+  <div class="grp"><button type="button" id="b-replay">Повторить</button></div>
+  <div class="grp"><button type="button" data-theme-btn="day">День</button><button type="button" data-theme-btn="night">Ночь</button></div>
+  <div class="grp"><button type="button" data-mode-btn="intro">Заставка</button><button type="button" data-mode-btn="loop">Повтор</button><button type="button" data-mode-btn="loader">Загрузка</button><button type="button" data-mode-btn="static">Статично</button></div>
+  <div class="grp"><button type="button" data-speed-btn="0.5">0.5×</button><button type="button" data-speed-btn="1">1×</button></div>
+</nav>
+
+<script type="module">
+/* ------------------------------------------------------------------ params */
+const NV = window.NV3 || null;
+const Q = new URLSearchParams(location.search);
+const MODES = ['intro', 'loop', 'loader', 'static'];
+const root = document.documentElement, body = document.body;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let theme = root.dataset.theme;
+// reduced motion always wins over ?mode= (the site will pass the mode explicitly)
+let mode = reduced ? 'static' : (MODES.includes(Q.get('mode')) ? Q.get('mode') : 'intro');
+const tFixed = Q.has('t') ? Math.max(0, parseFloat(Q.get('t')) || 0) : null;
+const autoplay = tFixed === null && Q.get('autoplay') !== '0';
+let speed = 1;
+const showUI = tFixed === null && Q.get('ui') !== '0';
+const forceSvgLoader = Q.get('loader') === 'svg';
+
+/* ------------------------------------------------------------------ gate (NV.gate from the design system) */
+function softGate() {
+  if (Q.get('gate') === '0') return '';
+  const c = navigator.connection;
+  if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return 'save-data';
+  if (navigator.deviceMemory && navigator.deviceMemory < 4) return 'device-memory';
+  if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) return 'cpu';
+  return '';
+}
+let gateWhy = NV ? softGate() : 'no-three';
+if (!gateWhy && mode === 'static' && !showUI) gateWhy = 'static'; // production static: never create a WebGL context
+let renderer = null;
+const canvas = document.getElementById('c');
+if (!gateWhy) {
+  try {
+    renderer = new NV.THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    const g = renderer.getContext(), ext = g.getExtension('WEBGL_debug_renderer_info');
+    const name = ext ? String(g.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    if (Q.get('gate') !== '0' && /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name)) { gateWhy = 'software-gl'; renderer.dispose(); renderer = null; }
+  } catch (e) { gateWhy = 'no-webgl'; renderer = null; }
+}
+const glOK = !!renderer;
+
+/* --------------------------------------------------------------- DOM / UI */
+const panel = document.getElementById('panel');
+panel.hidden = !showUI;
+const svgLoaderOn = () => mode === 'loader' && (!glOK || forceSvgLoader || Math.min(innerWidth, innerHeight) < 120);
+function syncUI() {
+  root.dataset.theme = theme;
+  body.classList.toggle('svgldr', svgLoaderOn());
+  body.classList.toggle('static', !svgLoaderOn() && (mode === 'static' || !glOK));
+  panel.querySelectorAll('[data-theme-btn]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeBtn === theme)));
+  panel.querySelectorAll('[data-mode-btn]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.modeBtn === mode)));
+  panel.querySelectorAll('[data-speed-btn]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.speedBtn === speed)));
+}
+function writeURL() {
+  try { const u = new URL(location.href); u.searchParams.set('theme', theme); u.searchParams.set('mode', mode); history.replaceState(null, '', u); } catch (e) { /* file:// */ }
+}
+const api = { ready: false, gate: gateWhy || 'ok', duration: () => ({ intro: 5.6, loop: 16, loader: 1.4 })[mode] ?? 0 };
+window.NIVEL = api;
+
+if (!glOK) {
+  panel.querySelectorAll('[data-speed-btn]').forEach(b => b.closest('.grp').remove());
+  panel.querySelectorAll('[data-mode-btn="intro"],[data-mode-btn="loop"]').forEach(b => b.remove());
+  if (mode === 'intro' || mode === 'loop') mode = 'static';
+  panel.querySelectorAll('[data-theme-btn]').forEach(b => b.onclick = () => { theme = b.dataset.themeBtn; syncUI(); writeURL(); });
+  panel.querySelectorAll('[data-mode-btn]').forEach(b => b.onclick = () => { mode = b.dataset.modeBtn; syncUI(); writeURL(); });
+  document.getElementById('b-replay').remove();
+  syncUI();
+  api.ready = true; window.__nivelReady = true;
+} else {
+  start().catch(e => { console.error(e); body.classList.remove('gl'); body.classList.add('static'); api.ready = true; window.__nivelReady = true; });
+}
+
+async function start() {
+const { THREE, SVGLoader, Line2, LineSegments2, LineGeometry, LineSegmentsGeometry, LineMaterial, RoomEnvironment } = NV;
+
+/* --------------------------------------------------------------- timeline */
+const DUR = { intro: 5.6, loop: 16, loader: 1.4 };
+const D = 8;          // extrusion depth, mark units (module 8 of the 64 grid)
+const B = 1.1;        // chamfer 45 deg; bevelOffset = -B keeps the outer silhouette = SVG
+const LIFT = 10;      // approach height before seating: 10 units = 10 mm at M 1:1 -> +0.010
+const GAP = 10;       // gap between the main view and the plan view on the sheet
+
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const seg = (t, a, b) => clamp01((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+function bezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const sx = u => ((ax * u + bx) * u + cx) * u, sy = u => ((ay * u + by) * u + cy) * u;
+  const dx = u => (3 * ax * u + 2 * bx) * u + cx;
+  return x => {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    let u = x;
+    for (let i = 0; i < 8; i++) { const e = sx(u) - x, d = dx(u); if (Math.abs(e) < 1e-6 || Math.abs(d) < 1e-6) break; u -= e / d; }
+    if (u < 0 || u > 1) { let lo = 0, hi = 1; u = x; for (let i = 0; i < 30; i++) { const v = sx(u); if (v < x) lo = u; else hi = u; u = (lo + hi) / 2; } }
+    return sy(u);
+  };
+}
+const E = {
+  draw: bezier(.45, 0, .2, 1),     // pen: quick start, careful finish
+  out: bezier(.2, .7, .2, 1),      // design system --ease-out
+  io: bezier(.65, 0, .35, 1),      // design system --ease-io
+  cam: bezier(.55, 0, .25, 1),     // camera: dolly with long settle
+  land: bezier(.3, 0, .1, 1),      // seating: steady approach, slow last millimetres, no bounce
+};
+
+/* ------------------------------------------------------------ brand data */
+// Geometry comes only from the approved SVG files (copied verbatim).
+const MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Nivel — Отметка уровня с полкой</title><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></svg>`;
+const LOCKUP_SVG = document.querySelector('#fallback .lg-d').outerHTML;
+
+const PAL = {
+  day: { bg: '#F1EFEA', main: '#1D1D1B', hatch: '#D9501A', text: '#1D1D1B', dimText: '#5E574D',
+    op: { main: .92, edge: .9, dim: .5, hatch: .95, hidden: .55, axis: .4, ground: .7, fold: .55, grid: .06, gridMaj: .11 } },
+  night: { bg: '#0E0C0B', main: '#F1EFEA', hatch: '#F06A30', text: '#F1EFEA', dimText: '#A39C90',
+    op: { main: .86, edge: .86, dim: .42, hatch: .95, hidden: .5, axis: .32, ground: .62, fold: .5, grid: .045, gridMaj: .085 } },
+};
+// signal colours are input albedo, calibrated so the lit flat face renders as the brand colour (#D9501A day, #F06A30 night)
+const MAT = {
+  day: {
+    clay: '#A8A196',
+    base: { color: '#111110', metalness: 0, roughness: .62, clearcoat: 0, clearcoatRoughness: .5, anisotropy: 0, envI: .32 },
+    signal: { color: '#DD4F03', metalness: 0, roughness: .5, clearcoat: .06, clearcoatRoughness: .4, anisotropy: 0, envI: .3, specI: .3 },
+  },
+  night: {
+    clay: '#4A443E',
+    base: { color: '#E6E2DA', metalness: .92, roughness: .3, clearcoat: 0, clearcoatRoughness: .5, anisotropy: .45, envI: .9 },
+    signal: { color: '#E76423', metalness: 0, roughness: .45, clearcoat: .1, clearcoatRoughness: .3, anisotropy: 0, envI: 1.45, specI: .3 },
+  },
+};
+
+/* ------------------------------------------------------------------ fonts (local, data URIs) */
+const F = window.NV_FONTS;
+if (F) {
+  const faces = [
+    new FontFace('IBM Plex Mono', `url(data:font/woff2;base64,${F.l400})`, { weight: '400', unicodeRange: 'U+0000-00FF,U+2000-206F,U+2212' }),
+    new FontFace('IBM Plex Mono', `url(data:font/woff2;base64,${F.c400})`, { weight: '400', unicodeRange: 'U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116' }),
+    new FontFace('IBM Plex Mono', `url(data:font/woff2;base64,${F.l500})`, { weight: '500', unicodeRange: 'U+0000-00FF,U+2000-206F,U+2212' }),
+  ];
+  try { await Promise.all(faces.map(f => f.load().then(ff => document.fonts.add(ff)))); } catch (e) { /* system mono */ }
+}
+
+const coarse = matchMedia('(pointer: coarse)').matches;
+let DPR = Math.min(window.devicePixelRatio || 1, coarse ? 1.75 : 2);
+renderer.setPixelRatio(DPR);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+// linear output: Neutral tone mapping subtracts the darkest channel in shadows and turns warm darks amber
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(20, 1, 1, 1000);
+const lineMats = [];
+
+/* ------------------------------------------------------------ procedural textures (seeded = deterministic) */
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function canvasTex(w, h, paint, { srgb = false, repeat = [1, 1] } = {}) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  paint(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); t.anisotropy = 8;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+// paper: #F1EFEA with faint fibres (+-1.5 %)
+const paperTex = canvasTex(512, 512, (x, w, h) => {
+  const r = rng(7); x.fillStyle = '#F1EFEA'; x.fillRect(0, 0, w, h);
+  const img = x.getImageData(0, 0, w, h), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const n = (r() - .5) * 5; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  x.putImageData(img, 0, 0);
+  for (let i = 0; i < 900; i++) { const px = r() * w, py = r() * h, a = r() * Math.PI, l = 3 + r() * 9;
+    x.strokeStyle = r() < .5 ? 'rgba(120,105,85,.05)' : 'rgba(255,255,255,.08)'; x.lineWidth = .6;
+    x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke(); }
+}, { srgb: true });
+// asphalt micro relief: roughness 0.75..1 multiplier + bump from the same noise
+const asphaltTex = canvasTex(256, 256, (x, w, h) => {
+  const r = rng(11); const img = x.createImageData(w, h), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const v = 190 + r() * 65; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+  x.putImageData(img, 0, 0);
+}, { repeat: [1 / 14, 1 / 14] });
+// brushed metal: fine horizontal streaks (roughness and albedo multiplier)
+const brushedTex = canvasTex(512, 512, (x, w, h) => {
+  const r = rng(23); x.fillStyle = '#e6e6e6'; x.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y++) { const v = 205 + r() * 50; x.fillStyle = `rgb(${v},${v},${v})`; x.globalAlpha = .55; x.fillRect(0, y, w, 1); }
+  x.globalAlpha = 1;
+  for (let i = 0; i < 1400; i++) { const y = r() * h, x0 = r() * w, l = 30 + r() * 220, v = r() < .5 ? 180 : 255;
+    x.strokeStyle = `rgba(${v},${v},${v},.35)`; x.lineWidth = .7;
+    for (const o of [0, -w]) { x.beginPath(); x.moveTo(x0 + o, y); x.lineTo(x0 + o + l, y); x.stroke(); } } // wrapped: tiles without seams
+}, { repeat: [1 / 24, 1 / 24] });
+const brushedCol = brushedTex.clone(); brushedCol.colorSpace = THREE.SRGBColorSpace; brushedCol.needsUpdate = true;
+// night desk: dark oak, grain along x, around #19150F (neutral enough that lamp light stays B >= 0.5 R)
+const woodTex = canvasTex(1024, 512, (x, w, h) => {
+  const r = rng(31); x.fillStyle = '#19150F'; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 260; i++) {
+    const y0 = r() * h, amp = 2 + r() * 6, f = (1 + r() * 3) * Math.PI * 2 / w, ph = r() * 6, v = r();
+    x.strokeStyle = v < .5 ? `rgba(10,8,6,${.25 + r() * .3})` : `rgba(46,40,33,${.12 + r() * .2})`;
+    x.lineWidth = .6 + r() * 1.6; x.beginPath();
+    for (let px = 0; px <= w; px += 8) { const py = y0 + Math.sin(px * f + ph) * amp; px ? x.lineTo(px, py) : x.moveTo(px, py); }
+    x.stroke();
+  }
+}, { srgb: true, repeat: [1, 1] });
+
+/* ----------------------------------------------------------- environment */
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envDay = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+function nightEnvScene() {
+  // dark warm room; reflectors are neutral-warm so chamfers do not pick up an orange rim
+  const s = new THREE.Scene();
+  s.add(new THREE.Mesh(new THREE.BoxGeometry(40, 40, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.012, 0.011, 0.010), side: THREE.BackSide })));
+  const card = (w, h, rgb, pos, look) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(...rgb), side: THREE.DoubleSide }));
+    m.position.set(...pos); m.lookAt(...look); s.add(m);
+  };
+  card(46, 26, [0.70, 0.695, 0.685], [0, -6, 19.5], [0, -6, 0]);   // large bounce card in front, low: fronts read as bright brushed metal
+  card(3, 34, [3.2, 3.15, 3.05], [4.5, -4, 19.4], [4.5, -4, 0]); // narrow softbox strip: the band that travels across the fronts
+  card(30, 3, [1.1, 1.06, 1.0], [0, 19, -2], [0, 0, 0]);       // ceiling strip: top chamfers
+  card(7, 5, [2.6, 2.45, 2.25], [-10, 16, 8], [0, 0, 0]);       // lamp shade opening, kept neutral
+  return s;
+}
+const envNight = pmrem.fromScene(nightEnvScene(), 0.03).texture;
+
+/* --------------------------------------------------------------- lights */
+const hemi = new THREE.HemisphereLight(0xFFF3E2, 0xA88E72, 1);
+scene.add(hemi);
+const SUN_DIR = new THREE.Vector3(-0.12, 0.88, 0.46).normalize(); // high, front-left: short contact shadows that fall back
+const sun = new THREE.DirectionalLight(0xFFF0DC, 2.4);
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05; sun.shadow.radius = 4;
+scene.add(sun, sun.target);
+const lamp = new THREE.SpotLight(0xFFE8D0, 7, 0, 0.5, 0.9, 0);
+lamp.shadow.camera.near = 40; lamp.shadow.camera.far = 700;
+lamp.shadow.bias = -0.0004; lamp.shadow.normalBias = 0.05; lamp.shadow.radius = 5;
+scene.add(lamp, lamp.target);
+function shadowSize(n) {
+  for (const l of [sun, lamp]) {
+    if (l.shadow.mapSize.x === n) continue;
+    l.shadow.mapSize.set(n, n);
+    if (l.shadow.map) { l.shadow.map.dispose(); l.shadow.map = null; }
+  }
+}
+function sunFrustum(half) { Object.assign(sun.shadow.camera, { left: -half, right: half, top: half * .8, bottom: -half * .8, near: 1, far: 1400 }); sun.shadow.camera.updateProjectionMatrix(); }
+
+/* ------------------------------------------------------------- room: paper sweep by day, desk by night */
+const WALL_Z = -40;
+const room = new THREE.Group(); scene.add(room);
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(3000, 900), null);
+wall.position.set(0, 450, WALL_Z); wall.receiveShadow = true;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), null);
+floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, 1500 + WALL_Z); floor.receiveShadow = true;
+{ const k = 3000 / 64; paperTex.repeat.set(k, k); }
+// Day: window light. The frame of a tall window (jambs, one mullion, head) is projected along the sun direction
+// onto the paper sweep: soft penumbra, same sun that casts the contact shadows. Analytic, so it costs no shadow map.
+const GOBO = { uSunL: { value: SUN_DIR }, uGobo: { value: 0 }, uWin: { value: new THREE.Vector4(-78, 345, 80, 4.5) }, uMull: { value: new THREE.Vector2(240, 4) },
+  uTint: { value: new THREE.Color(0.93, 0.92, 0.90) } };
+const goboCompile = sh => {
+  Object.assign(sh.uniforms, GOBO);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vNvW;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vNvW;
+uniform vec3 uSunL, uTint; uniform float uGobo; uniform vec4 uWin; uniform vec2 uMull;
+float nvGobo(vec3 P) {
+  vec2 W = P.xy + uSunL.xy * ((${WALL_Z.toFixed(1)} - P.z) / uSunL.z); // where the sun ray through P crosses the wall plane
+  float s = uWin.w;
+  float o = smoothstep(uWin.z - s, uWin.z + s, W.y);
+  o = max(o, 1.0 - smoothstep(uWin.x - s, uWin.x + s, W.x));
+  o = max(o, smoothstep(uWin.y - s, uWin.y + s, W.x));
+  o = max(o, 1.0 - smoothstep(uMull.y - s, uMull.y + s, abs(W.x - uMull.x)));
+  return o;
+}`).replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= mix(vec3(1.0), uTint, uGobo * nvGobo(vNvW));');
+};
+function paperMat(k) { // k: the vertical wall of the sweep gets less sun than the floor
+  const m = new THREE.MeshBasicMaterial({ map: paperTex, toneMapped: false, color: new THREE.Color(k, k, k) });
+  m.customProgramCacheKey = () => 'nv-gobo'; m.onBeforeCompile = goboCompile; return m;
+}
+const paperMatWall = paperMat(0.965), paperMatFloor = paperMat(1);
+const nightWallMat = new THREE.MeshStandardMaterial({ color: 0x2A2621, roughness: 1, metalness: 0, emissive: 0x0E0C0B }); // never darker than the page (#0E0C0B) // lit by the lamp spill only
+woodTex.repeat.set(3000 / 160, 3000 / 80);
+const nightFloorMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0xffffff, roughness: .82, metalness: 0, envMapIntensity: .15, emissive: 0x0B0A09 });
+// shadow catchers over the paper (day only): gobo of the window frame and contact shadows
+const shOpts = { color: 0x2A1E14, opacity: .2, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 };
+const wallShadow = new THREE.Mesh(wall.geometry, new THREE.ShadowMaterial(shOpts));
+wallShadow.position.copy(wall.position); wallShadow.receiveShadow = true; wallShadow.renderOrder = 0;
+const floorShadow = new THREE.Mesh(floor.geometry, new THREE.ShadowMaterial(shOpts));
+floorShadow.rotation.copy(floor.rotation); floorShadow.position.copy(floor.position); floorShadow.receiveShadow = true; floorShadow.renderOrder = 0;
+room.add(wall, floor, wallShadow, floorShadow);
+wall.renderOrder = floor.renderOrder = -1;
+
+/* ------------------------------------------------------------- geometry */
+const svgLoader = new SVGLoader();
+function mapShapePath(sp, f) {
+  const seen = new Set();
+  const visit = v => { if (v && v.isVector2 && !seen.has(v)) { seen.add(v); f(v); } };
+  for (const sub of sp.subPaths) { for (const c of sub.curves) ['v0', 'v1', 'v2', 'v3'].forEach(k => visit(c[k])); visit(sub.currentPoint); }
+}
+const markMap = v => { v.y = 48 - v.y; };                                                   // 64-grid: y down -> y up, level line bottom at 0
+const lockMap = v => { v.x = (v.x + 6.25) / 1.5619; v.y = 48 - (v.y + 74.97) / 1.5619; };  // lockup units -> mark units
+
+const extrudeOpts = { depth: D - 2 * B, bevelEnabled: true, bevelThickness: B, bevelSize: B, bevelOffset: -B, bevelSegments: 1, curveSegments: 10 };
+function extrude(shapes) { const g = new THREE.ExtrudeGeometry(shapes, extrudeOpts); g.translate(0, 0, B); return g; }
+
+// mark: shelf, signal wedge, dark wedge, level bar (order of paths in nivel-1.svg)
+const markPaths = svgLoader.parse(MARK_SVG).paths;
+const markPts = new Set();
+markPaths.forEach(p => mapShapePath(p, v => { markMap(v); }));
+markPaths.forEach(p => mapShapePath(p, v => markPts.add(`${Math.round(v.x * 100) / 100},${Math.round(v.y * 100) / 100}`)));
+const markShapes = markPaths.map(p => SVGLoader.createShapes(p));
+// upper part = ONE body: shelf + dark wedge + signal wedge (their union, vertices taken from nivel-1.svg);
+// the signal colour is a flush inlay drawn by the material (no inner chamfer, no seam)
+const UPPER = [[8, 32], [60, 32], [60, 24], [40, 24], [24, 8], [8, 24]];
+UPPER.forEach(([x, y]) => { if (!markPts.has(`${x},${y}`)) console.warn('nivel: upper vertex not in nivel-1.svg', x, y); });
+const upperShape = new THREE.Shape(UPPER.map(([x, y]) => new THREE.Vector2(x, y)));
+
+// word: overlapping sub-paths united offline (vendor/word-union.js); the dot comes straight from the SVG
+const lockPaths = svgLoader.parse(LOCKUP_SVG).paths;
+const wordPaths = lockPaths.slice(4);
+wordPaths.forEach(p => mapShapePath(p, lockMap));
+const v2 = a => { const o = []; for (let i = 0; i < a.length; i += 2) o.push(new THREE.Vector2(a[i], a[i + 1])); return o; };
+const wordShapes = window.NV_WORD
+  ? window.NV_WORD.map(s => { const sh = new THREE.Shape(v2(s.o)); s.h.forEach(h => sh.holes.push(new THREE.Path(v2(h)))); return sh; })
+  : SVGLoader.createShapes(wordPaths[0]);
+const dotShapes = SVGLoader.createShapes(wordPaths[1]);
+const LETTER_SPLIT = [116, 130, 167.6, 205];
+const letterShapes = [[], [], [], [], []];
+for (const sh of wordShapes) {
+  const bb = new THREE.Box2().setFromPoints(sh.getPoints());
+  letterShapes[LETTER_SPLIT.filter(s => (bb.min.x + bb.max.x) / 2 > s).length].push(sh);
+}
+
+/* ------------------------------------------------------------- materials */
+function physMat() { return new THREE.MeshPhysicalMaterial({ color: 0xffffff, side: THREE.FrontSide, clearcoat: 0 }); }
+const matBase = physMat(), matUpper = physMat(), matDot = physMat();
+// signal inlay inside the one-piece upper body: region x < 24 && y < 24 in mark units, antialiased by fwidth
+const SIG = { uSigColor: { value: new THREE.Color() }, uSigRough: { value: .4 }, uSigMetal: { value: 0 }, uSigCoat: { value: .4 }, uSigCoatR: { value: .25 }, uBaseCoat: { value: 0 }, uSigEnv: { value: 1 }, uSigSpec: { value: 1 } };
+// the dot over the i uses the same shader with the mask forced to 1: one paint, one calibration
+const inlayCompile = force => sh => {
+  Object.assign(sh.uniforms, SIG, { uForce: { value: force } });
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vNvP;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNvP = position.xy;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec2 vNvP;
+uniform vec3 uSigColor; uniform float uSigRough, uSigMetal, uSigCoat, uSigCoatR, uBaseCoat, uSigEnv, uSigSpec, uForce;
+float nvMask() { vec2 w = max(fwidth(vNvP), vec2(1e-4)); vec2 k = clamp((24.0 - vNvP) / w + 0.5, 0.0, 1.0); return max(uForce, k.x * k.y); }`)
+    .replace('#include <color_fragment>', '#include <color_fragment>\nfloat nvS = nvMask();\ndiffuseColor.rgb = mix(diffuseColor.rgb, uSigColor, nvS);')
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, uSigRough, nvS);')
+    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, uSigMetal, nvS);')
+    .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
+#ifdef USE_CLEARCOAT
+material.clearcoat = mix(uBaseCoat, uSigCoat, nvS);
+material.clearcoatRoughness = min(max(mix(clearcoatRoughness, uSigCoatR, nvS), 0.0525) + geometryRoughness, 1.0);
+#endif
+#ifdef USE_ANISOTROPY
+material.anisotropy *= (1.0 - nvS);
+material.alphaT = mix(pow2(material.roughness), 1.0, pow2(material.anisotropy));
+#endif`)
+    .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+#if defined( USE_ENVMAP ) && defined( RE_IndirectSpecular )
+radiance *= mix(1.0, uSigSpec, nvS); // enamel: its own share of room light, not the metal's
+iblIrradiance *= mix(1.0, uSigEnv, nvS);
+#ifdef USE_CLEARCOAT
+clearcoatRadiance *= mix(1.0, uSigSpec, nvS);
+#endif
+#endif`);
+};
+for (const [m, f] of [[matUpper, 0], [matDot, 1]]) {
+  m.clearcoat = 1; // enables the clearcoat path; the amount comes from the mask
+  m.onBeforeCompile = inlayCompile(f); m.customProgramCacheKey = () => 'nv-inlay-' + f;
+}
+const tmpC = new THREE.Color();
+function applyProps(m, P, k, clay) {
+  m.color.set(clay).lerp(tmpC.set(P.color), k);
+  m.metalness = lerp(0, P.metalness, k);
+  m.roughness = lerp(1, P.roughness, k);
+  m.anisotropy = P.anisotropy * k;
+  m.anisotropyRotation = Math.PI / 2; // brushed along x: highlights stretch across the grain
+}
+function setMats(k) { // k: clay -> final material
+  const M = MAT[theme];
+  for (const m of [matBase, matUpper, matDot]) {
+    applyProps(m, M.base, k, M.clay);
+    if (m === matBase) { m.clearcoat = M.base.clearcoat * k; m.clearcoatRoughness = M.base.clearcoatRoughness; }
+  }
+  SIG.uSigColor.value.set(M.clay).lerp(tmpC.set(M.signal.color), k);
+  SIG.uSigRough.value = lerp(1, M.signal.roughness, k);
+  SIG.uSigMetal.value = lerp(0, M.signal.metalness, k);
+  SIG.uSigCoat.value = M.signal.clearcoat * k; SIG.uSigCoatR.value = M.signal.clearcoatRoughness;
+  SIG.uBaseCoat.value = 0;
+  SIG.uSigEnv.value = M.signal.envI / M.base.envI;
+  SIG.uSigSpec.value = M.signal.specI / M.base.envI;
+  matBase.envMapIntensity = matUpper.envMapIntensity = matDot.envMapIntensity = M.base.envI;
+  matUpper.clearcoatRoughness = matDot.clearcoatRoughness = M.base.clearcoatRoughness;
+}
+function themeMaps() {
+  const day = theme === 'day';
+  for (const m of [matBase, matUpper, matDot]) {
+    m.roughnessMap = day ? asphaltTex : brushedTex;
+    m.bumpMap = day ? asphaltTex : null; m.bumpScale = day ? .35 : 0;
+    m.map = day ? null : brushedCol;
+    m.needsUpdate = true;
+  }
+}
+const envMats = [matBase, matUpper, matDot, nightFloorMat];
+function solid(geo, mat) { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; m.renderOrder = 1; return m; }
+
+/* ------------------------------------------------------------------ lines */
+const WIDTH = { main: 1.7, edge: 1.5, dim: 1.0, hatch: 1.15, hidden: 1.1, axis: 1.0, ground: 1.2, fold: 1.0 };
+function mkLine(pts, role, o = {}) {
+  const g = new LineGeometry(); g.setPositions(pts.flat());
+  const m = new LineMaterial({ color: 0x000000, linewidth: 1, worldUnits: false, transparent: true, opacity: 1, dashed: true, dashSize: 1e5, gapSize: 1, toneMapped: false, depthWrite: false });
+  m.userData = { role, w: o.w ?? WIDTH[role] ?? 1 };
+  if (o.dash) { m.dashSize = o.dash[0]; m.gapSize = o.dash[1]; m.userData.fixedDash = true; }
+  const l = new Line2(g, m);
+  l.computeLineDistances();
+  let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]);
+  l.userData.len = len; l.renderOrder = 5; l.frustumCulled = false;
+  lineMats.push(m);
+  return l;
+}
+function mkSegs(flat, role) {
+  const g = new LineSegmentsGeometry(); g.setPositions(flat);
+  const m = new LineMaterial({ color: 0x000000, linewidth: 1, worldUnits: false, transparent: true, opacity: 1, toneMapped: false, depthWrite: false });
+  m.userData = { role, w: WIDTH[role] ?? 1 };
+  const l = new LineSegments2(g, m); l.renderOrder = 5; l.frustumCulled = false;
+  lineMats.push(m);
+  return l;
+}
+function reveal(l, p, op = 1) {
+  if (p <= 0 || op <= 0.002) { l.visible = false; return; }
+  l.visible = true;
+  const m = l.material, len = l.userData.len;
+  if (!m.userData.fixedDash && len) { m.dashSize = p >= 1 ? len * 4 + 1 : p * len; m.gapSize = len * 4 + 1; }
+  m.opacity = PAL[theme].op[m.userData.role] * op;
+}
+const v3 = (x, y, z = 0) => [x, y, z];
+
+/* ------------------------------------------------------------------ text: drawn once per theme, revealed by a UV clip */
+const FONT = '"IBM Plex Mono", ui-monospace, Consolas, monospace';
+const labels = [];
+function clipMat(map) {
+  const mat = new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 });
+  const clip = { value: 1 };
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uClip = clip;
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uClip;\nvoid main() {')
+      .replace('#include <map_fragment>', 'if (vMapUv.x > uClip) discard;\n#include <map_fragment>');
+  };
+  mat.customProgramCacheKey = () => 'nv-clip';
+  return { mat, clip };
+}
+function mkLabel(text, { em = 3, role = 'dimText', align = 'left', weight = 400, rot = 0 } = {}) {
+  const PX = 128, pad = Math.round(0.25 * PX);
+  const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+  ctx.font = `${weight} ${PX}px ${FONT}`;
+  const fullW = ctx.measureText(text).width;
+  cv.width = Math.ceil(fullW + pad * 2); cv.height = Math.ceil(PX * 1.3);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.generateMipmaps = true;
+  const { mat, clip } = clipMat(tex);
+  const w = cv.width / PX * em, h = cv.height / PX * em, padW = pad / PX * em;
+  const geo = new THREE.PlaneGeometry(w, h);
+  const tx = align === 'left' ? w / 2 - padW : align === 'right' ? -(w / 2 - padW) : 0;
+  geo.translate(tx, 1.0 * em - h / 2, 0);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.z = rot; mesh.renderOrder = 6; mesh.frustumCulled = false;
+  ctx.font = `${weight} ${PX}px ${FONT}`; // resizing the canvas above reset the context font
+  const stops = []; for (let n = 0; n <= text.length; n++) stops.push((pad + ctx.measureText(text.slice(0, n)).width) / cv.width);
+  const L = { mesh, tex,
+    draw() { ctx.clearRect(0, 0, cv.width, cv.height); ctx.font = `${weight} ${PX}px ${FONT}`; ctx.fillStyle = PAL[theme][role]; ctx.textBaseline = 'alphabetic'; ctx.fillText(text, pad, PX * 1.0); tex.needsUpdate = true; },
+    set(p, op = 1) { const n = Math.round(clamp01(p) * text.length); mesh.visible = n > 0 && op > 0.002; if (!mesh.visible) return; clip.value = n >= text.length ? 1 : stops[n]; mat.opacity = op; },
+  };
+  labels.push(L);
+  return L;
+}
+// digits: one glyph atlas, a fixed row of quads; the value changes by rewriting UVs, never the canvas
+const ATLAS_CH = '0123456789+±.';
+const atlas = (() => {
+  const PX = 96, cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+  ctx.font = `500 ${PX}px ${FONT}`;
+  const adv = Math.ceil(ctx.measureText('0').width), cw = adv + 8;
+  cv.width = cw * ATLAS_CH.length; cv.height = Math.ceil(PX * 1.3);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  return { PX, adv, cw, cv, tex,
+    draw() { ctx.clearRect(0, 0, cv.width, cv.height); ctx.font = `500 ${PX}px ${FONT}`; ctx.fillStyle = PAL[theme].text; ctx.textBaseline = 'alphabetic';
+      [...ATLAS_CH].forEach((c, i) => ctx.fillText(c, i * cw + 4, PX)); tex.needsUpdate = true; } };
+})();
+function mkDigits(n, em) {
+  const k = em / atlas.PX, gw = atlas.cw * k, ga = atlas.adv * k, gh = atlas.cv.height * k;
+  const pos = [], uv = [], idx = [];
+  for (let i = 0; i < n; i++) {
+    const x0 = -(n - i) * ga - 4 * k, y0 = 1.0 * em - gh;
+    pos.push(x0, y0, 0, x0 + gw, y0, 0, x0 + gw, y0 + gh, 0, x0, y0 + gh, 0);
+    uv.push(0, 0, 0, 0, 0, 0, 0, 0);
+    const b = i * 4; idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const uvA = new THREE.Float32BufferAttribute(uv, 2); g.setAttribute('uv', uvA); g.setIndex(idx);
+  const mat = new THREE.MeshBasicMaterial({ map: atlas.tex, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 });
+  const mesh = new THREE.Mesh(g, mat); mesh.renderOrder = 6; mesh.frustumCulled = false;
+  let shown = '';
+  return { mesh, value(str, op) {
+    mesh.visible = op > 0.002; if (!mesh.visible) return; mat.opacity = op;
+    if (str === shown) return; shown = str;
+    const W = atlas.cv.width;
+    for (let i = 0; i < n; i++) {
+      const c = ATLAS_CH.indexOf(str[i]), u0 = c * atlas.cw / W, u1 = (c + 1) * atlas.cw / W;
+      uvA.array.set([u0, 0, u1, 0, u1, 1, u0, 1], i * 8);
+    }
+    uvA.needsUpdate = true;
+  } };
+}
+
+/* ------------------------------------------------------------ scene graph */
+const world = new THREE.Group(); scene.add(world);
+const draft = new THREE.Group(); world.add(draft);          // frontal sheet (z = 0)
+const planPivot = new THREE.Group(); world.add(planPivot);  // plan view, folds on the fold line and slides under the part
+const barG = new THREE.Group(); world.add(barG);
+const upperG = new THREE.Group(); world.add(upperG);
+const wordG = new THREE.Group(); world.add(wordG);
+
+const meshUpper = solid(extrude(upperShape), matUpper);
+const meshBar = solid(extrude(markShapes[3]), matBase);
+const upperSolid = new THREE.Group(); upperSolid.add(meshUpper); upperG.add(upperSolid);
+const barSolid = new THREE.Group(); barSolid.add(meshBar); barG.add(barSolid);
+const letters = letterShapes.map(shs => { const g = new THREE.Group(); g.add(solid(extrude(shs), matBase)); wordG.add(g); return g; });
+const dotG = new THREE.Group(); dotG.add(solid(extrude(dotShapes), matDot)); wordG.add(dotG);
+
+/* ------------------------------------------------------------- the drawing */
+const draws = []; // {obj, a, b, kind: 'line'|'fade'|'fadeText', fade}
+const addDraw = (obj, a, b, kind = 'line', fade = 'draft') => { draws.push({ obj, a, b, kind, fade }); return obj; };
+
+// construction grid (4-unit, 8-unit majors = the 64-grid modules), fading out radially: the sheet has no hard edge
+function gridLines(major) {
+  const pos = [], col = [];
+  const fall = (x, y) => { const r = Math.hypot((x - 31) / 54, (y - 7) / 50); return 1 - Math.min(1, Math.max(0, (r - .55) / .45)) ** 1.5; };
+  const seg2 = (x0, y0, x1, y1) => {
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 2);
+    for (let i = 0; i < n; i++) {
+      const a = i / n, b = (i + 1) / n;
+      const xa = lerp(x0, x1, a), ya = lerp(y0, y1, a), xb = lerp(x0, x1, b), yb = lerp(y0, y1, b);
+      pos.push(xa, ya, 0, xb, yb, 0); col.push(1, 1, 1, fall(xa, ya), 1, 1, 1, fall(xb, yb));
+    }
+  };
+  for (let x = -36; x <= 100; x += 4) { if ((x % 8 === 0) === major) seg2(x, -48, x, 64); }
+  for (let y = -48; y <= 64; y += 4) { if ((y % 8 === 0) === major) seg2(-36, y, 100, y); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
+  const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, toneMapped: false, depthWrite: false });
+  const l = new THREE.LineSegments(g, m); l.renderOrder = 4; l.position.z = -0.05; l.frustumCulled = false;
+  return l;
+}
+const gridMin = gridLines(false), gridMaj = gridLines(true);
+draft.add(gridMin, gridMaj);
+
+// ground line = level line of the sheet, drawn first
+draft.add(addDraw(mkLine([v3(-14, 0), v3(78, 0)], 'ground'), .05, .45));
+// axis through the apex
+draft.add(addDraw(mkLine([v3(24, -6), v3(24, 37.5)], 'axis', { dash: [2.4, 1.1] }), .55, .85, 'fade'));
+// fold line between the views, ESKD (GOST 2.303): dash-dot-dot
+{
+  const flat = [], y = -GAP / 2; let x = -12;
+  while (x < 76) { const e = Math.min(x + 6, 76); flat.push(x, y, 0, e, y, 0); x = e + 1.1; for (let k = 0; k < 2 && x < 76; k++) { flat.push(x, y, 0, x + .35, y, 0); x += .35 + 1.1; } }
+  draft.add(addDraw(mkSegs(flat, 'fold'), .5, .78, 'fade'));
+}
+
+// part outlines: back copies are the front-view drawing, front copies + connectors ride the extrusion as edges
+function partEdges(group, loops, corners, windows) {
+  const back = [], front = [], fg = new THREE.Group();
+  loops.forEach((lp, i) => {
+    const pts = lp.map(([x, y]) => v3(x, y)); if (lp.closed !== false) pts.push(pts[0]);
+    const lb = mkLine(pts, 'main'); group.add(lb); back.push(lb);
+    addDraw(lb, windows[i][0], windows[i][1], 'line', 'edge');
+    const lf = mkLine(pts, 'edge'); fg.add(lf); front.push(lf);
+  });
+  group.add(fg);
+  const flat = []; corners.forEach(([x, y]) => flat.push(x, y, 0, x, y, 1));
+  const cg = new THREE.Group(); const cs = mkSegs(flat, 'edge'); cg.add(cs); group.add(cg);
+  return { back, front, fg, cg, cs };
+}
+const barEdges = partEdges(barG, [[[4, 0], [60, 0], [60, 8], [4, 8]]], [[4, 0], [60, 0], [60, 8], [4, 8]], [[.15, .55]]);
+const splitLoop = [[24, 24], [24, 8]]; splitLoop.closed = false;
+const upEdges = partEdges(upperG, [[[8, 24], [40, 24], [24, 8]], splitLoop, [[8, 24], [60, 24], [60, 32], [8, 32]]], UPPER, [[.25, .65], [.5, .7], [.35, .8]]);
+
+// section hatching of the signal wedge (8,24)-(24,24)-(24,8): lines y = x + c, 45 deg
+const hatchG = new THREE.Group(); upperG.add(hatchG);
+{
+  const step = 2 * Math.SQRT2;
+  const cs = []; for (let c = -16 + step / 2; c < 16; c += step) cs.push(c);
+  cs.forEach((c, i) => {
+    const p0 = [(32 - c) / 2, (32 + c) / 2], p1 = c < 0 ? [24, 24 + c] : [24 - c, 24];
+    const l = mkLine([v3(p0[0], p0[1]), v3(p1[0], p1[1])], 'hatch');
+    hatchG.add(l);
+    const a = .6 + i * .035; addDraw(l, a, a + .16, 'line', 'hatch');
+  });
+}
+
+// dimensions (architectural ticks)
+function tick(x, y) { return mkLine([v3(x - .9, y - .9), v3(x + .9, y + .9)], 'dim'); }
+function dimH(parent, x1, x2, y, ye1, ye2, text, a, fade = 'draft') {
+  const s = Math.sign(y - ye1) || 1;
+  [[x1, ye1], [x2, ye2]].forEach(([x, ye]) => parent.add(addDraw(mkLine([v3(x, ye + s * 1.2), v3(x, y + s * 1.4)], 'dim'), a, a + .18, 'line', fade)));
+  parent.add(addDraw(mkLine([v3(x1 - 1.4, y), v3(x2 + 1.4, y)], 'dim'), a + .06, a + .3, 'line', fade));
+  parent.add(addDraw(tick(x1, y), a + .2, a + .26, 'fade', fade), addDraw(tick(x2, y), a + .26, a + .32, 'fade', fade));
+  const L = mkLabel(text, { em: 2.9, align: 'center' });
+  L.mesh.position.set((x1 + x2) / 2, y + (s > 0 ? .7 : -2.9), .02); parent.add(L.mesh);
+  addDraw(L, a + .22, a + .38, 'fadeText', fade);
+}
+function dimV(parent, y1, y2, x, xe, text, a, fade = 'draft') {
+  const s = Math.sign(x - xe) || 1;
+  [y1, y2].forEach(y => parent.add(addDraw(mkLine([v3(xe + s * 1.2, y), v3(x + s * 1.4, y)], 'dim'), a, a + .18, 'line', fade)));
+  parent.add(addDraw(mkLine([v3(x, y1 - 1.4), v3(x, y2 + 1.4)], 'dim'), a + .06, a + .3, 'line', fade));
+  parent.add(addDraw(tick(x, y1), a + .2, a + .26, 'fade', fade), addDraw(tick(x, y2), a + .26, a + .32, 'fade', fade));
+  const L = mkLabel(text, { em: 2.9, align: 'center', rot: Math.PI / 2 });
+  L.mesh.position.set(x - .7, (y1 + y2) / 2, .02); parent.add(L.mesh);
+  addDraw(L, a + .22, a + .38, 'fadeText', fade);
+}
+dimH(draft, 8, 60, 42.5, 33.2, 33.2, '52', .75);
+dimV(draft, 0, 32, -3, 2.8, '32', .8);
+dimV(draft, 0, 8, 66.5, 61.2, '8', .85);
+dimV(draft, 8, 24, 66.5, 61.2, '16', .9);
+dimV(draft, 24, 32, 66.5, 61.2, '8', .95);
+
+// plan view (first-angle projection, ESKD: below the main view, with a gap). pivot sits on the fold line
+const PZ = 0.06, PY = -GAP / 2; // local y of the plan's back edge relative to the pivot
+const planLines = [
+  mkLine([v3(4, PY, PZ), v3(60, PY, PZ), v3(60, PY - D, PZ), v3(4, PY - D, PZ), v3(4, PY, PZ)], 'main'),
+  mkLine([v3(8, PY, PZ), v3(8, PY - D, PZ)], 'main'),
+];
+const planHidden = [
+  mkLine([v3(24, PY, PZ), v3(24, PY - D, PZ)], 'hidden', { dash: [1.4, .9] }),
+  mkLine([v3(40, PY, PZ), v3(40, PY - D, PZ)], 'hidden', { dash: [1.4, .9] }),
+];
+planLines.forEach((l, i) => { planPivot.add(l); addDraw(l, .45 + i * .12, .95 + i * .05, 'line', 'plan'); });
+planHidden.forEach((l, i) => { planPivot.add(l); addDraw(l, .85 + i * .05, 1.0 + i * .05, 'fade', 'plan'); });
+const planDims = new THREE.Group(); planPivot.add(planDims);
+dimV(planDims, PY - D, PY, 66.5, 61.2, '8', 1.0);
+dimH(planDims, 4, 60, PY - D - 5, PY - D - 1, PY - D - 1, '56', .92);
+
+// design elevation on the shelf (the mark is a level mark: the shelf carries the figure)
+const design = mkLabel('±0.000', { em: 3.7, role: 'text', align: 'right', weight: 500 });
+design.mesh.position.set(58.6, 34.3, 0); upperG.add(design.mesh);
+// measured value, shown only while the part seats: "факт +0.010 -> ±0.000", at the level line
+const factG = new THREE.Group(); world.add(factG);
+const factWord = mkLabel('факт', { em: 2.6, role: 'dimText', align: 'right' });
+const factNum = mkDigits(6, 2.6);
+factNum.mesh.position.set(58.6, 0, 0);
+factWord.mesh.position.set(58.6 - 6 * atlas.adv * 2.6 / atlas.PX - 1.2, 0, 0);
+factG.add(factWord.mesh, factNum.mesh);
+factG.position.set(0, 10.4, D + .05);
+// title block
+const title = mkLabel('NIVEL-1 · ОТМЕТКА УРОВНЯ · М 1:1', { em: 1.9, role: 'dimText', align: 'right' });
+title.mesh.position.set(78, -31, .02); draft.add(title.mesh);
+
+// word outlines: drawn by the pen at the front plane, then they ride the extrusion as edges and go out
+const letterEdges = letterShapes.map((shs, i) => {
+  const g = new THREE.Group(), ls = [];
+  for (const sh of shs) for (const path of [sh, ...sh.holes]) {
+    const pts = path.getPoints(10).map(p => v3(p.x, p.y)); pts.push(pts[0]);
+    const l = mkLine(pts, 'edge'); g.add(l); ls.push(l);
+  }
+  letters[i].parent.add(g);
+  return { g, ls };
+});
+const dotEdge = (() => { const g = new THREE.Group(), ls = []; for (const sh of dotShapes) { const pts = sh.getPoints().map(p => v3(p.x, p.y)); pts.push(pts[0]); const l = mkLine(pts, 'edge'); g.add(l); ls.push(l); } wordG.add(g); return { g, ls }; })();
+
+/* --------------------------------------------------------------- camera */
+const K0 = { x: 31, y: 7.5, z: 0, az: 0, el: 0, fov: 0.9, w: 104, h: 92 };     // orthographic sheet
+const KC = { x: 33, y: 14, z: 4, az: -42, el: 27, fov: 0, w: 86, h: 66 };       // bezier control: passes a 3/4 view
+const KS = { x: 35, y: 19, z: 4, az: -7, el: 3, fov: 22, w: 88, h: 62 };        // level view for the seating, still
+const KM = { x: 35, y: 23.5, z: 4, az: -9, el: 7, fov: 20, w: 286, h: 100 };    // pulled back over the mark
+const KF = { x: 110.5, y: 23.5, z: 4, az: -9, el: 7, fov: 20, w: 286, h: 100 }; // final lockup
+const KLd = { x: 32, y: 18, z: 4, az: 0, el: 6, fov: 20, w: 82, h: 64 };       // loader: frontal (reads at 64 px)
+const camLerp = (a, b, k) => { const o = {}; for (const key in a) o[key] = lerp(a[key], b[key], k); return o; };
+const camQuad = (a, c, b, k) => { const o = {}; for (const key in a) o[key] = (1 - k) * (1 - k) * a[key] + 2 * k * (1 - k) * c[key] + k * k * b[key]; return o; };
+let aspect = 1;
+const target = new THREE.Vector3();
+function placeCamera(c) {
+  const fov = c.fov * Math.PI / 180, tn = Math.tan(fov / 2);
+  const dist = Math.max(c.h / 2 / tn, c.w / 2 / (tn * aspect));
+  const az = c.az * Math.PI / 180, el = c.el * Math.PI / 180;
+  target.set(c.x, c.y, c.z);
+  camera.fov = c.fov; camera.aspect = aspect;
+  camera.position.set(c.x + dist * Math.sin(az) * Math.cos(el), c.y + dist * Math.sin(el), c.z + dist * Math.cos(az) * Math.cos(el));
+  camera.near = Math.max(0.5, dist - 500); camera.far = dist + 2500;
+  camera.lookAt(target);
+  camera.updateProjectionMatrix();
+}
+
+/* ------------------------------------------------------------ theme setup */
+function applyTheme() {
+  const P = PAL[theme], day = theme === 'day';
+  renderer.setClearColor(new THREE.Color(P.bg), 1);
+  for (const m of lineMats) m.color.set(P[m.userData.role === 'hatch' ? 'hatch' : 'main']);
+  gridMin.material.color.set(P.main); gridMaj.material.color.set(P.main);
+  // env per material (scene.environment would ignore each material's envMapIntensity)
+  for (const m of envMats) { m.envMap = day ? envDay : envNight; m.needsUpdate = true; }
+  nightFloorMat.envMapIntensity = .15;
+  hemi.color.set(day ? 0xFFF3E2 : 0xFFE6CC);
+  hemi.groundColor.set(day ? 0xA88E72 : 0x14110E);
+  sun.castShadow = day; lamp.castShadow = !day;
+  wall.material = day ? paperMatWall : nightWallMat;
+  floor.material = day ? paperMatFloor : nightFloorMat;
+  wallShadow.visible = floorShadow.visible = day;
+  themeMaps();
+  for (const L of labels) L.draw();
+  atlas.draw();
+  for (const L of labels) renderer.initTexture(L.tex);
+  renderer.initTexture(atlas.tex);
+}
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  aspect = w / h;
+  const k = Math.min(1.35, Math.max(.75, Math.min(w, h) / 900)) * DPR;
+  for (const m of lineMats) { m.resolution.set(w * DPR, h * DPR); m.linewidth = m.userData.w * k; }
+}
+function applyMode() {
+  const loader = mode === 'loader';
+  shadowSize(loader ? 512 : coarse ? 1024 : 2048);
+  sunFrustum(loader ? 60 : 150);
+}
+
+/* ---------------------------------------------------------- pose by time */
+function fadeOf(kind, t) {
+  if (mode !== 'intro') return 0;
+  switch (kind) {
+    case 'draft': return 1 - seg(t, 1.65, 1.95);
+    case 'plan': return 1 - seg(t, 2.5, 2.8);
+    case 'edge': return 1 - seg(t, 2.3, 2.55);
+    case 'hatch': return 1 - seg(t, 2.05, 2.3);
+  }
+  return 1;
+}
+function lampLevel(t) { // switch-on: click with two short dips, then up (design system: flicker 0-260 ms)
+  const k = [[1.40, 0], [1.425, .75], [1.46, .2], [1.50, .85], [1.53, .6], [1.66, 1]];
+  if (t <= k[0][0]) return 0;
+  for (let i = 1; i < k.length; i++) if (t < k[i][0]) return lerp(k[i - 1][1], k[i][1], (t - k[i - 1][0]) / (k[i][0] - k[i - 1][0]));
+  return 1;
+}
+const swing = ph => (1 - Math.cos(ph)) / 2; // 0 -> 1 -> 0, zero velocity at the start: seamless from the intro's last frame
+
+function pose(t) {
+  const intro = mode === 'intro', loop = mode === 'loop', loader = mode === 'loader';
+  const T = intro ? Math.min(t, DUR.intro) : t;
+  const day = theme === 'day';
+
+  // ---------------- drawing
+  draft.visible = intro && T < 2.0;
+  planPivot.visible = intro && T < 2.85;
+  if (intro) {
+    const f = fadeOf('draft', T);
+    gridMin.material.opacity = PAL[theme].op.grid * seg(T, 0, .3) * f;
+    gridMaj.material.opacity = PAL[theme].op.gridMaj * seg(T, 0, .3) * f;
+    for (const d of draws) {
+      const p = seg(T, d.a, d.b), fo = fadeOf(d.fade, T);
+      if (d.kind === 'line') reveal(d.obj, E.draw(p), fo);
+      else if (d.kind === 'fade') reveal(d.obj, p > 0 ? 1 : 0, p * fo);
+      else if (d.kind === 'fadeText') d.obj.set(p > 0 ? 1 : 0, p * fo);
+    }
+    title.set(seg(T, .95, 1.4), f);
+    planDims.visible = T < 2.0;
+  }
+
+  // ---------------- extrusion, approach, seating
+  let eBar = 1, eUp = 1, lift = 0, matK = 1, edgeF = 0;
+  if (intro) {
+    eBar = E.out(seg(T, 1.85, 2.2));
+    eUp = E.out(seg(T, 1.95, 2.3));
+    lift = LIFT * (E.io(seg(T, 2.0, 2.45)) - E.land(seg(T, 2.85, 3.35)));
+    matK = E.io(seg(T, 2.2, 2.6));
+    edgeF = fadeOf('edge', T);
+  } else if (loader) {
+    const u = (t % DUR.loader) / DUR.loader;
+    lift = 4 * (E.io(seg(u, 0, .2143)) - E.land(seg(u, .2714, .5143)));
+  }
+  barSolid.scale.z = Math.max(eBar, 1e-3);
+  upperSolid.scale.z = Math.max(eUp, 1e-3);
+  barSolid.visible = eBar > 0.002; upperSolid.visible = eUp > 0.002;
+  upperG.position.y = lift;
+
+  // edges ride the extrusion (front copy on the rim where the chamfer starts)
+  for (const [Ed, e] of [[barEdges, eBar], [upEdges, eUp]]) {
+    const on = intro && e > 0.002;
+    Ed.fg.position.z = e * (D - B) + .02;
+    Ed.cg.scale.z = Math.max(e * (D - B), 1e-3);
+    Ed.front.forEach(l => reveal(l, on ? 1 : 0, edgeF));
+    Ed.cs.visible = on && edgeF > 0.002;
+    Ed.cs.material.opacity = PAL[theme].op.edge * edgeF;
+    if (!intro) Ed.back.forEach(l => (l.visible = false));
+  }
+  hatchG.position.z = eUp * D + .04;
+  hatchG.visible = intro;
+
+  // readouts: design figure typed on the drawing; the measured value appears only for the seating
+  if (intro) {
+    const out = 1 - seg(T, 3.5, 3.65);
+    design.set(seg(T, 1.0, 1.3), out);
+    design.mesh.position.z = eUp * D + .05;
+    const v = lift / 1000;
+    factWord.set(1, seg(T, 2.72, 2.85) * out);
+    factNum.value(v < 0.0005 ? '±0.000' : '+' + v.toFixed(3), seg(T, 2.72, 2.85) * out);
+  } else { design.mesh.visible = false; factWord.mesh.visible = false; factNum.mesh.visible = false; }
+
+  // ---------------- materials
+  setMats(intro ? matK : 1);
+
+  // ---------------- word: camera first, then the pen, then the extrusion in place (no transparency)
+  wordG.visible = intro ? T > 3.8 : loop;
+  const ledge = intro ? 1 - seg(T, 4.35, 4.58) : 0;
+  letters.forEach((g, i) => {
+    let kd = 1, ke = 1;
+    if (intro) { kd = seg(T, 3.85 + i * .06, 4.11 + i * .06); ke = E.out(seg(T, 4.05 + i * .055, 4.33 + i * .055)); }
+    g.scale.z = Math.max(ke, 1e-3); g.visible = ke > 0.002;
+    const Ed = letterEdges[i];
+    Ed.g.position.z = ke * (D - B) + .02;
+    Ed.ls.forEach(l => reveal(l, intro ? E.draw(kd) : 0, ledge));
+  });
+  {
+    let kd = 1, ke = 1;
+    if (intro) { kd = seg(T, 4.0, 4.2); ke = E.out(seg(T, 4.3, 4.55)); }
+    dotG.scale.z = Math.max(ke, 1e-3); dotG.visible = ke > 0.002;
+    dotEdge.g.position.z = ke * (D - B) + .02;
+    dotEdge.ls.forEach(l => reveal(l, intro ? E.draw(kd) : 0, ledge));
+  }
+
+  // ---------------- plan fold: hinge on the fold line, then slide the strip under the part
+  if (intro) {
+    const kf = E.io(seg(T, 1.75, 2.25));
+    planPivot.rotation.x = -Math.PI / 2 * kf;
+    planPivot.position.set(0, PY * (1 - kf), PY * kf);
+  }
+
+  // ---------------- camera
+  let c, envRot = 0;
+  if (intro) {
+    if (T < 1.7) c = { ...K0 };
+    else if (T < 3.65) {
+      const k = E.cam(seg(T, 1.7, 2.85));
+      c = camQuad(K0, KC, KS, k);
+      c.fov = Math.exp(lerp(Math.log(K0.fov), Math.log(KS.fov), k)); // orthographic -> perspective, even on a log scale
+    } else {
+      const pull = E.io(seg(T, 3.65, 4.15)), truck = E.io(seg(T, 3.85, 4.5));
+      c = camLerp(KS, KM, pull);
+      c.x = lerp(KS.x, KF.x, truck); // truck along the level line, pitch already set
+    }
+  } else if (loop) {
+    const ph = 2 * Math.PI * (t % DUR.loop) / DUR.loop, s = swing(ph);
+    c = { ...KF, az: KF.az + 5 * s, el: KF.el + 1.5 * s };
+    envRot = -0.55 * s; // reflectors travel across the fronts and run along the chamfers
+  } else c = { ...KLd };
+  placeCamera(c);
+  for (const m of envMats) m.envMapRotation.set(0, envRot, 0);
+
+  // ---------------- light
+  const focus = intro ? E.io(seg(T, 3.85, 4.5)) : loop ? 1 : 0;
+  const fx = loader ? 32 : lerp(32, 110, focus), fz = 4;
+  const lit = intro ? E.io(seg(T, 1.75, 2.5)) : 1;
+  sun.target.position.set(fx, 0, fz);
+  sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 700);
+  // night: a desk lamp almost overhead, slightly front-left; the cone is aimed at the parts, the desk only catches its edge
+  lamp.target.position.set(fx - 14, 6, fz - 4);
+  lamp.position.set(fx - 64, 270, fz + 55);
+  if (day) {
+    hemi.intensity = .75;
+    sun.intensity = 2.4;
+    lamp.intensity = 0;
+    wallShadow.material.opacity = floorShadow.material.opacity = .2 * lit;
+    GOBO.uGobo.value = loader ? 0 : lit;
+    paperMatWall.color.setScalar(lerp(1, .965, lit)); // the sheet is flat paper until the sun comes in
+  } else {
+    hemi.intensity = .15;
+    sun.intensity = 0;
+    lamp.intensity = 2.6 * (intro ? lampLevel(T) : 1);
+    lamp.angle = loader ? .26 : lerp(.32, .55, focus); lamp.penumbra = .8;
+  }
+}
+
+/* ------------------------------------------------------------------ loop */
+let t0 = performance.now(), tNow = 0, raf = 0, lastNow = 0;
+const frameTimes = []; let degraded = false;
+function guard(now) { // one-step quality fallback for weak GPUs: lower pixel ratio, keep everything else
+  if (degraded || !lastNow) { lastNow = now; return; }
+  frameTimes.push(now - lastNow); lastNow = now;
+  if (frameTimes.length === 40) {
+    const med = [...frameTimes].sort((a, b) => a - b)[20];
+    if (med > 19 && DPR > 1) { DPR = Math.max(1, DPR * .7); renderer.setPixelRatio(DPR); resize(); }
+    degraded = true;
+  }
+}
+let firstFrame = true;
+function draw() { renderer.render(scene, camera); if (firstFrame) { firstFrame = false; body.classList.add('gl'); } }
+function frame(now) {
+  raf = 0;
+  guard(now);
+  tNow = (now - t0) / 1000 * speed;
+  pose(tNow); draw();
+  if (mode === 'intro' && tNow >= DUR.intro) return; // hold the final frame, stop rendering
+  raf = requestAnimationFrame(frame);
+}
+function play(fromT = 0) {
+  if (raf) cancelAnimationFrame(raf), raf = 0;
+  syncUI();
+  if (mode === 'static' || svgLoaderOn()) return;
+  t0 = performance.now() - fromT * 1000 / speed;
+  raf = requestAnimationFrame(frame);
+}
+function renderAt(t) { tNow = t; pose(t); draw(); }
+
+if (Q.get('debug') === '1') api.dbg = { THREE, scene, camera, renderer, lamp, sun, hemi, wall, floor, matBase, matUpper, matDot, SIG, MAT, woodTex, pose, draw, themeMaps };
+api.seek = t => { if (raf) cancelAnimationFrame(raf), raf = 0; renderAt(t); return true; };
+api.setTheme = th => { theme = th; applyTheme(); syncUI(); writeURL(); if (!raf && mode !== 'static') renderAt(tNow); };
+api.setMode = m => { mode = m; applyMode(); syncUI(); writeURL(); if (mode !== 'static' && !svgLoaderOn()) { if (autoplay || showUI) play(0); else renderAt(0); } };
+
+applyTheme(); applyMode(); resize();
+window.addEventListener('resize', () => { resize(); syncUI(); if (!raf && mode !== 'static') renderAt(tNow); });
+
+// warm-up: compile every program the intro, loop and loader will need, upload all textures before the first frame
+{
+  const m0 = mode;
+  for (const tx of [paperTex, asphaltTex, brushedTex, brushedCol, woodTex]) renderer.initTexture(tx);
+  // real renders while the canvas is still hidden: also compiles the shadow-pass programs that compile() skips
+  for (const [m, ts] of [['intro', [.9, 1.5, 1.8, 2.2, 3.0, 4.2, DUR.intro]], ['loop', [2]]]) { mode = m; for (const tw of ts) { pose(tw); renderer.render(scene, camera); } }
+  mode = m0; applyMode();
+}
+
+syncUI();
+if (mode !== 'static' && !svgLoaderOn()) {
+  if (tFixed !== null) renderAt(tFixed);
+  else if (autoplay) play(0);
+  else renderAt(mode === 'intro' ? DUR.intro : 0);
+}
+
+// panel
+document.getElementById('b-replay').onclick = () => { if (mode === 'static') api.setMode('intro'); else play(0); };
+panel.querySelectorAll('[data-theme-btn]').forEach(b => b.onclick = () => api.setTheme(b.dataset.themeBtn));
+panel.querySelectorAll('[data-mode-btn]').forEach(b => b.onclick = () => api.setMode(b.dataset.modeBtn));
+panel.querySelectorAll('[data-speed-btn]').forEach(b => b.onclick = () => { const cur = tNow; speed = +b.dataset.speedBtn; syncUI(); if (raf) play(cur); });
+
+api.ready = true;
+window.__nivelReady = true;
+}
+</script>
+</body>
+</html>
