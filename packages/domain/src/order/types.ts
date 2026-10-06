@@ -73,7 +73,8 @@ export interface OrderSnapshot {
     hasLimitOverrunConsent: boolean;
   };
   purchasesComplete: boolean;
-  report?: { accepted: boolean; objectionOpen: boolean };
+  /** objectionUntil: end of the objection window (SEND_REPORT + 3 working days); null while it is unknown. */
+  report?: { accepted: boolean; objectionOpen: boolean; objectionUntil: Date | null };
   firstOrderOfCustomer: boolean;
   grandTotal: Sum;
   purchaseNotBefore?: Date;

@@ -260,10 +260,14 @@ export const RULES: readonly Rule[] = [
     event: "OBJECTION",
     to: "report_sent",
     actors: ["customer"],
-    // The window itself (objectionUntil) is not in the snapshot: after it the system sends REPORT_DEEMED_ACCEPTED,
-    // and an objection to an accepted report is rejected here.
-    guard: ({ o, e }) =>
-      o.report === undefined || o.report.accepted || blank(e.text) ? "invalid_transition" : undefined,
+    // The window is report.objectionUntil: an objection is possible up to and including that instant. With no known
+    // window (null) the customer is not cut off; an unusable value fails closed.
+    guard: ({ o, e, now }) => {
+      if (o.report === undefined || o.report.accepted || blank(e.text)) return "invalid_transition";
+      const until = o.report.objectionUntil;
+      if (until == null) return undefined;
+      return isValidDate(until) && now.getTime() <= until.getTime() ? undefined : "invalid_transition";
+    },
     effects: () => [notify("owner_topic", "order.report_objection")],
   }),
   rule({
@@ -278,8 +282,15 @@ export const RULES: readonly Rule[] = [
     event: "REPORT_DEEMED_ACCEPTED",
     to: "report_sent",
     actors: ["system"],
-    // "The term has expired" is the job objection_window firing as the system actor.
-    guard: ({ o }) => reportAcceptanceGuard(o),
+    // "The term has expired" is the job objection_window firing as the system actor, strictly after objectionUntil.
+    // Without a window (null) there is no term to expire, so the report is never deemed accepted.
+    guard: ({ o, now }) => {
+      const error = reportAcceptanceGuard(o);
+      if (error !== undefined) return error;
+      const until = o.report?.objectionUntil;
+      if (until == null || !isValidDate(until)) return "invalid_transition";
+      return now.getTime() > until.getTime() ? undefined : "report_objection_open";
+    },
   }),
   rule({
     from: ["report_sent"],

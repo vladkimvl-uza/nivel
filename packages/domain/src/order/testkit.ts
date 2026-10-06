@@ -90,7 +90,7 @@ export function order(patch: OrderPatch = {}): OrderSnapshot {
       ? undefined
       : patch.report === undefined
         ? undefined
-        : { accepted: false, objectionOpen: false, ...patch.report };
+        : { accepted: false, objectionOpen: false, objectionUntil: new Date(NOW.getTime() + 3 * DAY), ...patch.report };
   const base: OrderSnapshot = {
     status: patch.status ?? "estimate_draft",
     kind: patch.kind ?? "pc",

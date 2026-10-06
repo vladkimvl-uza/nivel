@@ -96,7 +96,7 @@ const SPEC: Spec[] = [
     event: "REPORT_DEEMED_ACCEPTED",
     to: "report_sent",
     actors: ["system"],
-    ok: { report: {} },
+    ok: { report: { objectionUntil: new Date(NOW.getTime() - 1) } },
   },
   {
     from: ["report_sent"],

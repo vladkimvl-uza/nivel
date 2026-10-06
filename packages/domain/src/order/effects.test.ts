@@ -182,7 +182,8 @@ describe("effects of purchasing and the report", () => {
 
   it("report acceptance has no effects", () => {
     expect(effectsOf({ status: "report_sent", report: {} }, EVENTS.REPORT_ACCEPTED, "customer")).toEqual([]);
-    expect(effectsOf({ status: "report_sent", report: {} }, EVENTS.REPORT_DEEMED_ACCEPTED, "system")).toEqual([]);
+    const windowClosed = { status: "report_sent", report: { objectionUntil: at(NOW.getTime() - 1) } } as const;
+    expect(effectsOf(windowClosed, EVENTS.REPORT_DEEMED_ACCEPTED, "system")).toEqual([]);
   });
 });
 
