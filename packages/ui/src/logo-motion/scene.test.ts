@@ -13,6 +13,7 @@ import {
 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { logoScene } from "../themes/logo-motion.ts";
+import { brand, themeTokens } from "../themes/tokens.ts";
 import { buildLogoGeometry } from "./geometry.ts";
 import { createLogoScene, noiseTexture } from "./scene.ts";
 import {
@@ -219,7 +220,7 @@ describe("scene: light on the chamfers", () => {
       fragmentShader: "#include <common>\n#include <lights_fragment_end>\n",
     };
     (material.onBeforeCompile as (shader: unknown, renderer: unknown) => void)(shader, null);
-    expect(Object.keys(shader.uniforms).sort()).toEqual(["uBounce", "uGlint", "uGlintDir"]);
+    expect(Object.keys(shader.uniforms).sort()).toEqual(["uBounce", "uGlint", "uGlintColor", "uGlintDir"]);
     expect(shader.fragmentShader).toContain("uniform float uGlint;");
     expect(shader.fragmentShader).toContain("uniform float uBounce;");
     expect(shader.fragmentShader).toContain("reflectedLight.directDiffuse += diffuseColor.rgb * (uBounce *");
@@ -357,3 +358,78 @@ function uniformsOf(material: MeshStandardMaterial): Record<string, { value: unk
 const glintStrength = (m: MeshStandardMaterial) => uniformsOf(m).uGlint?.value as number;
 const bounce = (m: MeshStandardMaterial) => uniformsOf(m).uBounce?.value as number;
 const glintDirection = (m: MeshStandardMaterial) => uniformsOf(m).uGlintDir?.value as Vector3;
+
+describe("scene: no raw colors left in the shader, and the theme file follows the tokens", () => {
+  it("the color of the glint is a uniform from logoScene (linear RGB), not a literal in the GLSL", () => {
+    const s = setup();
+    const material = s.chamfer("line");
+    const shader = {
+      uniforms: {} as Record<string, { value: unknown }>,
+      fragmentShader: "#include <common>\n#include <lights_fragment_end>",
+    };
+    (material.onBeforeCompile as (sh: unknown, r: unknown) => void)(shader, null);
+    expect(shader.fragmentShader).not.toMatch(/vec3\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*\)\s*\*\s*\(uGlint/);
+    expect(shader.fragmentShader).toContain("uGlintColor");
+    const color = shader.uniforms.uGlintColor?.value as Vector3;
+    expect(color.toArray()).toEqual([...logoScene.glintColor]);
+  });
+
+  it("clear color, accent and guide color are the tokens of the night theme and the brand (one source of truth)", () => {
+    expect(logoScene.clear).toBe(themeTokens.night.bg);
+    expect(logoScene.accent).toBe(brand.signalDark);
+    expect(logoScene.accent).toBe(themeTokens.night.accent);
+    expect(logoScene.guide).toBe(brand.paper);
+  });
+
+  it("the lamp is set from logoScene alone: no second intensity in the timeline", () => {
+    expect("intensity" in LAMP_BASE).toBe(false);
+  });
+});
+
+describe("scene: the shadow map is redrawn only when something that casts a shadow has moved", () => {
+  function shadowLog() {
+    const renderer = fakeRenderer();
+    const updates: boolean[] = [];
+    let flag = false;
+    Object.defineProperty(renderer.shadowMap, "needsUpdate", {
+      get: () => flag,
+      set: (v: boolean) => {
+        flag = v;
+      },
+    });
+    const logo = createLogoScene(renderer, { lite: false, environment: null }, geometry);
+    logo.setSize(1080, 1080);
+    // what the renderer would do at render(): read the flag, then clear it as three does
+    renderer.render.mockImplementation(() => {
+      updates.push(flag);
+      flag = false;
+    });
+    return { renderer, logo, updates };
+  }
+
+  it("takes the update over from three (autoUpdate off) for the whole life of the scene", () => {
+    const { renderer } = shadowLog();
+    expect((renderer.shadowMap as { autoUpdate?: boolean }).autoUpdate).toBe(false);
+  });
+
+  it("every frame of the intro redraws the shadows (the parts move); the first loop frame too", () => {
+    const { logo, updates } = shadowLog();
+    logo.draw(frameAt("intro", 0));
+    logo.draw(frameAt("intro", 1));
+    logo.draw(frameAt("intro", 3.3));
+    logo.draw(frameAt("hero", 3.4));
+    expect(updates).toEqual([true, true, true, true]);
+  });
+
+  it("in the loop only the camera moves: the shadows are not redrawn until the size changes", () => {
+    const { logo, updates } = shadowLog();
+    logo.draw(frameAt("hero", 3.4));
+    logo.draw(frameAt("hero", 5));
+    logo.draw(frameAt("hero", 8));
+    expect(updates).toEqual([true, false, false]);
+    logo.setSize(1080, 1920); // the lamp cone follows the frame, so the shadow camera changes
+    logo.draw(frameAt("hero", 9));
+    logo.draw(frameAt("hero", 10));
+    expect(updates.slice(3)).toEqual([true, false]);
+  });
+});

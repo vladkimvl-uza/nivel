@@ -117,6 +117,8 @@ interface GlintUniforms {
   dir: { value: Vector3 };
   /** Warm bounce from the plate onto chamfers that look down, 0 with the lamp off. */
   bounce: { value: number };
+  /** Color of the glint, linear RGB (logoScene.glintColor). */
+  color: { value: Vector3 };
 }
 
 /**
@@ -124,15 +126,21 @@ interface GlintUniforms {
  * (a real specular highlight, not emission) and the bounce of the lit plate onto the chamfers that look down.
  */
 function withGlint(mat: MeshStandardMaterial): MeshStandardMaterial & { glint: GlintUniforms } {
-  const glint: GlintUniforms = { strength: { value: 0 }, dir: { value: new Vector3(0, 1, 0) }, bounce: { value: 0 } };
+  const glint: GlintUniforms = {
+    strength: { value: 0 },
+    dir: { value: new Vector3(0, 1, 0) },
+    bounce: { value: 0 },
+    color: { value: new Vector3(...logoScene.glintColor) },
+  };
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uGlint = glint.strength;
     shader.uniforms.uGlintDir = glint.dir;
     shader.uniforms.uBounce = glint.bounce;
+    shader.uniforms.uGlintColor = glint.color;
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
-        "#include <common>\nuniform float uGlint;\nuniform vec3 uGlintDir;\nuniform float uBounce;",
+        "#include <common>\nuniform float uGlint;\nuniform vec3 uGlintDir;\nuniform float uBounce;\nuniform vec3 uGlintColor;",
       )
       .replace(
         "#include <lights_fragment_end>",
@@ -144,7 +152,7 @@ function withGlint(mat: MeshStandardMaterial): MeshStandardMaterial & { glint: G
             vec3 gV = normalize(vViewPosition);
             vec3 gH = normalize(gL + gV);
             float gs = pow(max(dot(normal, gH), 0.0), 60.0) * max(dot(normal, gL), 0.0);
-            reflectedLight.directSpecular += vec3(1.0, 0.97, 0.93) * (uGlint * gs);
+            reflectedLight.directSpecular += uGlintColor * (uGlint * gs);
           }`,
       );
   };
@@ -199,6 +207,10 @@ export function createLogoScene(
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFShadowMap;
+  // Shadows are redrawn on request: only the parts move in the intro; in the loop only the camera does.
+  renderer.shadowMap.autoUpdate = false;
+  let shadowDirty = true;
+  let lastPhase: string | null = null;
   scene.environment = options.environment;
   scene.environmentIntensity = T.environmentIntensity;
 
@@ -344,6 +356,7 @@ export function createLogoScene(
     H = Math.max(1, height);
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
+    shadowDirty = true; // the cone of the lamp, and with it the shadow camera, follows the frame
     // the i-dot starts above the top edge of the final frame, whatever the aspect (1:1, 9:16, phone)
     dotDistance = Math.max(
       DOT_MIN_DISTANCE,
@@ -475,6 +488,9 @@ export function createLogoScene(
     draw(plan) {
       reset();
       const info = plan.phase === "intro" ? intro(plan.t) : loop(plan.t, plan.ramp === true);
+      if (shadowDirty || plan.phase === "intro" || plan.phase !== lastPhase) renderer.shadowMap.needsUpdate = true;
+      shadowDirty = false;
+      lastPhase = plan.phase;
       renderer.render(scene, camera);
       return info;
     },

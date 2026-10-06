@@ -7,16 +7,18 @@
 // plate that lifts the lower chamfers: no hairline shadow under the letters) and the lamp that widens for a tall
 // frame (timeline.ts `lampForAspect`, no vignette in 9:16).
 
+import { brand, themeTokens } from "./tokens.ts";
+
 export const logoScene = {
   /** Clear color of the canvas: the page background. */
-  clear: "#121110",
+  clear: themeTokens.night.bg,
   /** Plate: warm black; in the lamp pool about #2C2825, in the corners about #181513. */
   plate: "#1B1410",
   wall: "#130F0C",
   floor: "#0C0B0A",
   /** Parts: light "paper" ink and the signal orange of the night (brand.signalDark). */
   ink: "#EEEDEA",
-  accent: "#F06A30",
+  accent: brand.signalDark,
   inkRoughness: 0.72,
   accentRoughness: 0.72,
   /** Chamfers: lighter than the face, not metal, they reflect the environment. */
@@ -26,10 +28,12 @@ export const logoScene = {
   /** Strength of the raking glint on the chamfers of the part that has just seated. */
   glint: 3.5,
   /** Dashed layout axes scribed on the plate. */
-  guide: "#F1EFEA",
+  guide: brand.paper,
   guideOpacity: 0.34,
   /** Lamp and sky. */
   lampColor: "#FFFBF6",
+  /** Color of the raking glint on the chamfers, linear RGB (a uniform of the shader, not a literal in the GLSL). */
+  glintColor: [1, 0.97, 0.93] as const,
   skyColor: "#FFF1E4",
   groundColor: "#2A241F",
   /**

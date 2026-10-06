@@ -352,7 +352,6 @@ export const LAMP_BASE = {
   /** Half-angle of the cone, rad, and the soft edge. */
   angle: 0.44,
   penumbra: 0.9,
-  intensity: 2.85,
   /** Largest half-angle: beyond it the lamp would light the walls of the room, not the desk. */
   maxAngle: 1.0,
 } as const;

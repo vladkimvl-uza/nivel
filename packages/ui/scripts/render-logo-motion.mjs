@@ -21,12 +21,13 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { stripTypeScriptTypes } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, normalize, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import { renderClickTrack, SAMPLE_RATE, wavBytes } from "../src/logo-motion/click-sound.ts";
 import { CLICKS, finalFramePoint, INTRO_DURATION } from "../src/logo-motion/timeline.ts";
+import { insideRoot } from "./safe-path.mjs";
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // three/build/three.module.js -> the package folder
@@ -100,8 +101,8 @@ window.__ready = true;
       const roots = { "/ui/": PKG, "/three/": THREE_DIR };
       const prefix = Object.keys(roots).find((p) => url.pathname.startsWith(p));
       if (!prefix) throw new Error("not found");
-      const file = normalize(join(roots[prefix], decodeURIComponent(url.pathname.slice(prefix.length))));
-      if (!file.startsWith(roots[prefix])) throw new Error("outside the root");
+      const file = insideRoot(roots[prefix], decodeURIComponent(url.pathname.slice(prefix.length)));
+      if (!MIME[extname(file)] && !file.endsWith(".ts")) throw new Error("not a served kind of file");
       let body = await readFile(file);
       let type = MIME[extname(file)] ?? "application/octet-stream";
       if (file.endsWith(".ts")) {
