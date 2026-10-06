@@ -304,12 +304,12 @@ describe("the AI counters of the site", () => {
       web,
       "insert into ai.conversations (channel, lang, model, cost_micro_usd) values ('web', 'uz', 'm', 500) returning id",
     );
-    expect((await pgError(web, "update ai.conversations set purge_after = 'infinity' where id = $1", [c.id])).code).toBe(
-      DENIED,
-    );
-    expect((await pgError(web, "update ai.conversations set cost_micro_usd = 0 where id = $1", [c.id])).message).toMatch(
-      /counters_only_grow/,
-    );
+    expect(
+      (await pgError(web, "update ai.conversations set purge_after = 'infinity' where id = $1", [c.id])).code,
+    ).toBe(DENIED);
+    expect(
+      (await pgError(web, "update ai.conversations set cost_micro_usd = 0 where id = $1", [c.id])).message,
+    ).toMatch(/counters_only_grow/);
     await web.query("update ai.conversations set cost_micro_usd = cost_micro_usd + 5, filter_hits = 2 where id = $1", [
       c.id,
     ]);
@@ -318,7 +318,8 @@ describe("the AI counters of the site", () => {
       day,
     ]);
     expect(
-      (await pgError(web, "update ai.usage_daily set cost_micro_usd = 0 where day = $1 and model = 'm'", [day])).message,
+      (await pgError(web, "update ai.usage_daily set cost_micro_usd = 0 where day = $1 and model = 'm'", [day]))
+        .message,
     ).toMatch(/counters_only_grow/);
     expect(
       (await pgError(web, "update ai.usage_daily set conversations = 0 where day = $1 and model = 'm'", [day])).message,
@@ -355,22 +356,27 @@ describe("journal rows written by the public roles", () => {
     expect(row.in_future).toBe(false);
   });
 
-  it.each(["web", "bot"] as const)("makes a consent of %s a row of now: it cannot outlive a withdrawal", async (who) => {
-    const c = { web, bot }[who];
-    const o = await createOrder(migrator);
-    await c.query(
-      "insert into ops.consents (customer_id, order_id, kind, granted, at) values ($1, $2, 'non_returnable', true, '2999-01-01')",
-      [o.customerId, o.orderId],
-    );
-    await c.query("insert into ops.consents (customer_id, order_id, kind, granted) values ($1, $2, 'non_returnable', false)", [
-      o.customerId,
-      o.orderId,
-    ]);
-    const latest = await one<{ granted: boolean }>(migrator, "select ops.consent_granted($1, 'non_returnable') as granted", [
-      o.orderId,
-    ]);
-    expect(latest.granted).toBe(false);
-  });
+  it.each(["web", "bot"] as const)(
+    "makes a consent of %s a row of now: it cannot outlive a withdrawal",
+    async (who) => {
+      const c = { web, bot }[who];
+      const o = await createOrder(migrator);
+      await c.query(
+        "insert into ops.consents (customer_id, order_id, kind, granted, at) values ($1, $2, 'non_returnable', true, '2999-01-01')",
+        [o.customerId, o.orderId],
+      );
+      await c.query(
+        "insert into ops.consents (customer_id, order_id, kind, granted) values ($1, $2, 'non_returnable', false)",
+        [o.customerId, o.orderId],
+      );
+      const latest = await one<{ granted: boolean }>(
+        migrator,
+        "select ops.consent_granted($1, 'non_returnable') as granted",
+        [o.orderId],
+      );
+      expect(latest.granted).toBe(false);
+    },
+  );
 
   it("keeps the time the migrator and the admin give (seed, imports, tests)", async () => {
     const o = await createOrder(migrator);

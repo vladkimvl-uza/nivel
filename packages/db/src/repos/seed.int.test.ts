@@ -102,9 +102,15 @@ describe("rule seed", () => {
       await c.query("begin");
       try {
         await seed.seedRules(c, { APP_MODE: "development" });
-        await c.query("update catalog.categories set freshness_days = 99 where code = (select min(code) from catalog.categories)");
-        await c.query("update catalog.base_builds set status = 'not_offered', redirect_task = 'gaming' where id = (select min(id::text)::uuid from catalog.base_builds where status = 'offered')");
-        await c.query("delete from catalog.base_build_items where base_build_id in (select id from catalog.base_builds where status = 'offered' and task = 'office' and tier = 'T1' and variant = 'base')");
+        await c.query(
+          "update catalog.categories set freshness_days = 99 where code = (select min(code) from catalog.categories)",
+        );
+        await c.query(
+          "update catalog.base_builds set status = 'not_offered', redirect_task = 'gaming' where id = (select min(id::text)::uuid from catalog.base_builds where status = 'offered')",
+        );
+        await c.query(
+          "delete from catalog.base_build_items where base_build_id in (select id from catalog.base_builds where status = 'offered' and task = 'office' and tier = 'T1' and variant = 'base')",
+        );
         await c.query("update catalog.price_classes set step = step + 100 where key = 'gpu.rtx5050'");
         await c.query("update catalog.ladders set steps = '{}' where code = 'gpu'");
         const edited = [
@@ -115,7 +121,9 @@ describe("rule seed", () => {
         await seed.seedRules(c, { APP_MODE: mode });
         // Edits stay; an empty ladder (new in the code) is filled; nothing the owner changed is reset.
         expect(await count("catalog.categories where freshness_days = 99")).toBe(edited[0]);
-        expect(await count("catalog.base_builds where status = 'not_offered' and redirect_task = 'gaming'")).toBe(edited[1]);
+        expect(await count("catalog.base_builds where status = 'not_offered' and redirect_task = 'gaming'")).toBe(
+          edited[1],
+        );
         expect(await count("catalog.base_build_items")).toBe(edited[2]);
         expect(await count("catalog.price_classes where key = 'gpu.rtx5050' and step >= 100")).toBe(1);
         expect(await count("catalog.ladders where code = 'gpu' and cardinality(steps) > 0")).toBe(1);

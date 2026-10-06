@@ -329,11 +329,9 @@ describe('who may send which event (ARCHITECTURE 4.9, column "who")', () => {
     try {
       const { orderId } = await createOrder(migrator);
       await transition(admin, orderId, "SEND_ESTIMATE");
-      const e = await pgError(
-        bot,
-        `select * from sales.apply_transition($1, '{"type":"EXPIRE"}', 'system', 'x')`,
-        [orderId],
-      );
+      const e = await pgError(bot, `select * from sales.apply_transition($1, '{"type":"EXPIRE"}', 'system', 'x')`, [
+        orderId,
+      ]);
       expect(e.message).toMatch(/actor_not_allowed/);
       expect((await transition(bot, orderId, "ACCEPT")).to).toBe("accepted");
     } finally {

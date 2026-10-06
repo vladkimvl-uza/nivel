@@ -60,8 +60,8 @@ describe("pages", () => {
     const slug = `touch-${uniq()}`;
     await upsertPage(db, { slug, kind: "faq", title: { uz: "A", ru: "А" }, body: { uz: "B", ru: "Б" } });
     const read = async () =>
-      (await db.$client.query<{ at: Date }>("select updated_at as at from content.pages where slug = $1", [slug])).rows[0]
-        ?.at;
+      (await db.$client.query<{ at: Date }>("select updated_at as at from content.pages where slug = $1", [slug]))
+        .rows[0]?.at;
     const first = await read();
     await db.$client.query("select pg_sleep(0.05)");
     await upsertPage(db, { slug, kind: "faq", title: { uz: "A2", ru: "А2" }, body: { uz: "B", ru: "Б" } });

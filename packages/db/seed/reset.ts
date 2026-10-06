@@ -40,11 +40,15 @@ export function assertResetAllowed(url: string, env: Record<string, string | und
   if (!LOCAL_HOSTS.has(parsed.hostname)) throw new ResetRefused(`host ${parsed.hostname} is not local`);
   const database = decodeURIComponent(parsed.pathname.slice(1));
   if (parsed.port === DEV_PORT) {
-    if (database !== "nivel") throw new ResetRefused(`database "${database}" on the development cluster must be "nivel"`);
+    if (database !== "nivel")
+      throw new ResetRefused(`database "${database}" on the development cluster must be "nivel"`);
   } else if (parsed.port === TEST_PORT) {
-    if (!database.endsWith("_test")) throw new ResetRefused(`database "${database}" on the test cluster must end with "_test"`);
+    if (!database.endsWith("_test"))
+      throw new ResetRefused(`database "${database}" on the test cluster must end with "_test"`);
   } else {
-    throw new ResetRefused(`port ${parsed.port || "(default)"} is not a cluster of this project (${DEV_PORT}, ${TEST_PORT})`);
+    throw new ResetRefused(
+      `port ${parsed.port || "(default)"} is not a cluster of this project (${DEV_PORT}, ${TEST_PORT})`,
+    );
   }
 }
 

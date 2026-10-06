@@ -98,7 +98,12 @@ describe("audit log", () => {
     const rows = await listAudit(db, "demo", "e1");
     expect(rows.map((r) => r.action)).toEqual(["x.b", "x.a"]);
     await expect(
-      guarded(() => db.update(auditLog).set({ action: "z" }).where(eq(auditLog.id, rows[0]?.id ?? ""))),
+      guarded(() =>
+        db
+          .update(auditLog)
+          .set({ action: "z" })
+          .where(eq(auditLog.id, rows[0]?.id ?? "")),
+      ),
     ).rejects.toMatchObject({
       code: "permission_denied",
     });

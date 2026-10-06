@@ -27,7 +27,9 @@ describe("sql/assemble.mjs", () => {
   it("matches the custom migration of the package: sql/ was not changed without regenerating it", () => {
     const name = readdirSync(MIGRATIONS).find((n) => n.endsWith("_wp06_sql.sql"));
     expect(name, "the custom migration *_wp06_sql.sql").toBeDefined();
-    const migration = readFileSync(join(MIGRATIONS, name ?? ""), "utf8").split("\r\n").join("\n");
+    const migration = readFileSync(join(MIGRATIONS, name ?? ""), "utf8")
+      .split("\r\n")
+      .join("\n");
     expect(migration, `run: node packages/db/sql/assemble.mjs packages/db/migrations/${name}`).toBe(assemble());
   });
 
