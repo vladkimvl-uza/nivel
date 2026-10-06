@@ -1,0 +1,11 @@
+# gitleaks reads this file from the repository root (pnpm gitleaks, a step of pnpm ci:local).
+# Default rules stay on; only narrow, reviewed false positives are allowlisted here.
+title = "Nivel gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Catalog class keys (e.g. classKey: \"fan.white_x3\") are identifiers, not secrets"
+regexTarget = "line"
+regexes = ['''classKey:\s*"[a-z0-9_]+\.[a-z0-9_]+"''']
