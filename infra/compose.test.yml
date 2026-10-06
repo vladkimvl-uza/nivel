@@ -41,5 +41,5 @@ services:
       GIT_CONFIG_VALUE_0: "*"
     volumes:
       - ..:/repo:ro
-    command: ["git", "/repo", "--no-banner", "--redact", "--log-level", "warn"]
+    command: ["git", "/repo", "--no-banner", "--redact", "--log-level", "warn", "--log-opts=HEAD"]
     mem_limit: 512m
