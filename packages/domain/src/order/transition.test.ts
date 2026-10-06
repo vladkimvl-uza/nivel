@@ -81,7 +81,13 @@ const SPEC: Spec[] = [
     actors: ["owner", "assistant"],
     ok: { money: FUNDS_OK },
   },
-  { from: ["purchasing"], event: "PURCHASE_DONE", to: "report_due", actors: ["owner"], ok: { purchasesComplete: true } },
+  {
+    from: ["purchasing"],
+    event: "PURCHASE_DONE",
+    to: "report_due",
+    actors: ["owner"],
+    ok: { purchasesComplete: true },
+  },
   { from: ["report_due"], event: "SEND_REPORT", to: "report_sent", actors: ["owner"], ok: { purchasesComplete: true } },
   { from: ["report_sent"], event: "OBJECTION", to: "report_sent", actors: ["customer"], ok: { report: {} } },
   { from: ["report_sent"], event: "REPORT_ACCEPTED", to: "report_sent", actors: ["customer"], ok: { report: {} } },
@@ -130,12 +136,8 @@ function eventFor(type: EventType, from: OrderStatus): OrderEvent {
   return EVENTS[type];
 }
 
-const run = (
-  patch: OrderPatch,
-  event: OrderEvent,
-  actor: Actor,
-  now: Date = NOW,
-): ReturnType<typeof transition> => transition(order(patch), event, actor, now, CAL, SETTINGS);
+const run = (patch: OrderPatch, event: OrderEvent, actor: Actor, now: Date = NOW): ReturnType<typeof transition> =>
+  transition(order(patch), event, actor, now, CAL, SETTINGS);
 
 describe("the transition table as data", () => {
   it("lists exactly the rows of ARCHITECTURE 4.9", () => {
@@ -1058,7 +1060,10 @@ describe("boundaries that must pass", () => {
   it.each([
     ["warn verdict", { quote: { compatVerdict: "warn" as const } }],
     ["incomplete verdict (owner checked it by hand)", { quote: { compatVerdict: "incomplete" as const } }],
-    ["free window estimate", { quote: { eligibility: { mode: "free_window_only" as const, minEstimate: sum(4_500_000) } } }],
+    [
+      "free window estimate",
+      { quote: { eligibility: { mode: "free_window_only" as const, minEstimate: sum(4_500_000) } } },
+    ],
     ["no validUntil yet (not confirmed)", { quote: { validUntil: undefined } }],
     ["validUntil in one millisecond", { quote: { validUntil: new Date(NOW.getTime() + 1) } }],
     ["stub offers (Р-25: the stub is allowed in an estimate)", { offer: { uz: "stub" as const, ru: "stub" as const } }],
@@ -1068,7 +1073,11 @@ describe("boundaries that must pass", () => {
 
   it("SEND_ESTIMATE for a podbor order accepts a podbor_only estimate", () => {
     const r = run(
-      { status: "estimate_draft", kind: "podbor", quote: { eligibility: { mode: "podbor_only", reason: "below_min" } } },
+      {
+        status: "estimate_draft",
+        kind: "podbor",
+        quote: { eligibility: { mode: "podbor_only", reason: "below_min" } },
+      },
       EVENTS.SEND_ESTIMATE,
       "owner",
     );
@@ -1076,7 +1085,11 @@ describe("boundaries that must pass", () => {
   });
 
   it("EXPIRE one millisecond after validUntil", () => {
-    const r = run({ status: "estimate_sent", quote: { validUntil: new Date(NOW.getTime() - 1) } }, EVENTS.EXPIRE, "system");
+    const r = run(
+      { status: "estimate_sent", quote: { validUntil: new Date(NOW.getTime() - 1) } },
+      EVENTS.EXPIRE,
+      "system",
+    );
     expect(r).toMatchObject({ ok: true, next: "estimate_expired" });
   });
 
@@ -1105,7 +1118,9 @@ describe("boundaries that must pass", () => {
   });
 
   it("FUNDS_RECEIVED with more than the limit is fine", () => {
-    expect(run({ status: "accepted", money: { fundsReceived: sum(12_000_000) } }, EVENTS.FUNDS_RECEIVED, "owner").ok).toBe(true);
+    expect(
+      run({ status: "accepted", money: { fundsReceived: sum(12_000_000) } }, EVENTS.FUNDS_RECEIVED, "owner").ok,
+    ).toBe(true);
   });
 
   it("START_PURCHASE: a first order of 14 999 999 needs no meeting, 15 000 000 with the meeting passes", () => {
@@ -1118,7 +1133,11 @@ describe("boundaries that must pass", () => {
     expect(run({ ...base, grandTotal: sum(14_999_999) }, EVENTS.START_PURCHASE, "owner").ok).toBe(true);
     expect(
       run(
-        { ...base, grandTotal: sum(15_000_000), flags: { feePrepaid: true, fundsReceived: true, firstOrderMeetingDone: true } },
+        {
+          ...base,
+          grandTotal: sum(15_000_000),
+          flags: { feePrepaid: true, fundsReceived: true, firstOrderMeetingDone: true },
+        },
         EVENTS.START_PURCHASE,
         "owner",
       ).ok,
@@ -1171,14 +1190,22 @@ describe("boundaries that must pass", () => {
   });
 
   it("CANCEL_SETTLED with the exact refund, with a bigger one (shop refunds) and with nothing owed", () => {
-    const exact: OrderPatch = { status: "cancelling", money: { ...FUNDS_OK, documentedLosses: sum(100_000), refunded: sum(1_200_000) } };
+    const exact: OrderPatch = {
+      status: "cancelling",
+      money: { ...FUNDS_OK, documentedLosses: sum(100_000), refunded: sum(1_200_000) },
+    };
     expect(run(exact, EVENTS.CANCEL_SETTLED, "owner").ok).toBe(true);
-    expect(run({ ...exact, money: { ...exact.money, refunded: sum(1_500_000) } }, EVENTS.CANCEL_SETTLED, "owner").ok).toBe(true);
+    expect(
+      run({ ...exact, money: { ...exact.money, refunded: sum(1_500_000) } }, EVENTS.CANCEL_SETTLED, "owner").ok,
+    ).toBe(true);
     expect(run({ status: "cancelling" }, EVENTS.CANCEL_SETTLED, "owner").ok).toBe(true);
     // Losses and receipts above the money received leave nothing to refund.
     expect(
       run(
-        { status: "cancelling", money: { fundsReceived: sum(1_000_000), receiptsTotal: sum(900_000), documentedLosses: sum(300_000) } },
+        {
+          status: "cancelling",
+          money: { fundsReceived: sum(1_000_000), receiptsTotal: sum(900_000), documentedLosses: sum(300_000) },
+        },
         EVENTS.CANCEL_SETTLED,
         "owner",
       ).ok,
@@ -1204,11 +1231,10 @@ describe("boundaries that must pass", () => {
 
   it("does not mutate the snapshot or the event", () => {
     const snapshot = order({ status: "estimate_sent" });
-    const copy = structuredClone(snapshot);
-    const event = structuredClone(EVENTS.ACCEPT);
+    const event = { ...EVENTS.ACCEPT, consentIds: [...EVENTS.ACCEPT.consentIds] };
+    const before = JSON.stringify([snapshot, event]);
     transition(snapshot, event, "customer", NOW, CAL, SETTINGS);
-    expect(snapshot).toEqual(copy);
-    expect(event).toEqual(EVENTS.ACCEPT);
+    expect(JSON.stringify([snapshot, event])).toBe(before);
   });
 
   it("uses the default quote fixture as the sanity check of the fixtures", () => {

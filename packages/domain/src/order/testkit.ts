@@ -42,7 +42,9 @@ export const SETTINGS: FeeSettings = {
   shelfLifeHours: { components: 24, furniture: 72 },
 };
 
-type QuotePatch = Partial<NonNullable<OrderSnapshot["quote"]>>;
+type QuoteShape = NonNullable<OrderSnapshot["quote"]>;
+/** Every field optional; `undefined` removes an optional field such as validUntil. */
+type QuotePatch = { [K in keyof QuoteShape]?: QuoteShape[K] | undefined };
 export interface OrderPatch {
   status?: OrderStatus;
   kind?: OrderSnapshot["kind"];
@@ -74,9 +76,15 @@ export const DEFAULT_QUOTE: NonNullable<OrderSnapshot["quote"]> = {
   hasNonReturnable: false,
 };
 
+function mergeQuote(patch: QuotePatch | undefined): QuoteShape {
+  const merged = { ...DEFAULT_QUOTE, ...patch } as QuotePatch;
+  if (merged.validUntil === undefined) delete merged.validUntil;
+  return merged as QuoteShape;
+}
+
 /** A production-mode PC order with published offers; every field can be patched. */
 export function order(patch: OrderPatch = {}): OrderSnapshot {
-  const quote = patch.quote === null ? undefined : { ...DEFAULT_QUOTE, ...patch.quote };
+  const quote: QuoteShape | undefined = patch.quote === null ? undefined : mergeQuote(patch.quote);
   const report =
     patch.report === null
       ? undefined
