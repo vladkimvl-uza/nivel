@@ -3,7 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { prepareStandalone } from "./e2e.mjs";
-import { appPort, isMain, loadRootEnv, ROOT, slotFromEnv } from "./lib/env.mjs";
+import { appPort, isGitWorktree, isMain, loadRootEnv, ROOT, slotFromEnv } from "./lib/env.mjs";
 
 const node = (script, ...args) => ({ cmd: process.execPath, args: [join(ROOT, "tools", script), ...args] });
 const pnpm = (...args) => ({ cmd: "pnpm", args, shell: true });
@@ -35,6 +35,21 @@ async function standaloneSmoke(app) {
   }
 }
 
+/**
+ * gitleaks reads the history inside a container that cannot follow a worktree's `.git` file: there it would scan
+ * nothing and still pass, so in a worktree the step says it is skipped. Branch commits are scanned at merge into main.
+ */
+function gitleaks() {
+  if (isGitWorktree()) {
+    console.log(
+      "  gitleaks: skipped in a worktree (the container cannot read .git/worktrees); scanned at merge into main",
+    );
+    return true;
+  }
+  const r = spawnSync("pnpm", ["run", "gitleaks"], { stdio: "inherit", cwd: ROOT, shell: true });
+  return r.status === 0;
+}
+
 export const STEPS = [
   ["node", node("check-node.mjs")],
   ["install", pnpm("install", "--frozen-lockfile")],
@@ -54,7 +69,7 @@ export const STEPS = [
   ["bundle-budget", node("check-bundle-budget.mjs")],
   ["e2e", node("e2e.mjs")],
   ["demo", node("check-demo.mjs")],
-  ["gitleaks", pnpm("run", "gitleaks")],
+  ["gitleaks", { fn: gitleaks }],
 ];
 
 async function runStep([name, step]) {

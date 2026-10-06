@@ -1,8 +1,12 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkNamespace, placeholders } from "../check-messages.mjs";
 import { checkNodeVersion } from "../check-node.mjs";
 import { checkPorts, isPortFree, slotPorts } from "../check-ports.mjs";
+import { isGitWorktree } from "../lib/env.mjs";
 import { globToRegExp } from "../lib/files.mjs";
 
 describe("check-node", () => {
@@ -58,5 +62,17 @@ describe("globs", () => {
     );
     expect(globToRegExp("packages/domain/src/**/types.ts").test("packages/domain/src/types.ts")).toBe(true);
     expect(globToRegExp("apps/worker/src/{main.ts,queues}/**").test("apps/worker/src/main.ts")).toBe(true);
+  });
+});
+
+describe("isGitWorktree", () => {
+  it("tells a worktree (.git is a file) from the main checkout (.git is a folder)", () => {
+    const wt = mkdtempSync(join(tmpdir(), "nivel-wt-"));
+    writeFileSync(join(wt, ".git"), "gitdir: C:/repo/.git/worktrees/wp-01\n");
+    expect(isGitWorktree(wt)).toBe(true);
+    const main = mkdtempSync(join(tmpdir(), "nivel-main-"));
+    mkdirSync(join(main, ".git"));
+    expect(isGitWorktree(main)).toBe(false);
+    expect(isGitWorktree(mkdtempSync(join(tmpdir(), "nivel-none-")))).toBe(false);
   });
 });

@@ -1,9 +1,18 @@
 // Shared helpers for tools: repo root, .env.local loading, slot and ports.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/** True in a git worktree: there `.git` is a file pointing at the main repository (the gitleaks container cannot follow it). */
+export function isGitWorktree(root = ROOT) {
+  try {
+    return statSync(join(root, ".git")).isFile();
+  } catch {
+    return false;
+  }
+}
 
 /** Parses a dotenv file into an object (no expansion, no multiline values). */
 export function parseEnvFile(path) {
