@@ -55,6 +55,10 @@ export interface PowerEstimate {
   peakW: number;
   recommendedPsuW: number;
   selectedPsuW?: number;
+  /**
+   * Headroom of the selected PSU over the peak: (selectedPsuW - peakW) / peakW in bp, floored, 0 when the PSU is below
+   * the peak, capped at 10 000 (a PSU of twice the peak or more). Absent without a PSU or with no peak (ADR-007, item 7).
+   */
   headroomBp?: Bp;
 }
 export interface CompatResult {

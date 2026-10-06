@@ -4,8 +4,10 @@
 // registered, and fails with NIVEL_STRICT_NAMESPACES=1, which is the check before the merge.
 
 import ruCommon from "../messages/ru/common.json" with { type: "json" };
+import ruCompat from "../messages/ru/compat.json" with { type: "json" };
 import ruQuote from "../messages/ru/quote.json" with { type: "json" };
 import uzCommon from "../messages/uz/common.json" with { type: "json" };
+import uzCompat from "../messages/uz/compat.json" with { type: "json" };
 import uzQuote from "../messages/uz/quote.json" with { type: "json" };
 import type { AppLocale } from "./locales.ts";
 import type { MessageTree } from "./messages-check.ts";
@@ -13,8 +15,8 @@ import type { MessageTree } from "./messages-check.ts";
 export type Messages = MessageTree;
 
 const catalog = {
-  uz: { common: uzCommon, quote: uzQuote },
-  ru: { common: ruCommon, quote: ruQuote },
+  uz: { common: uzCommon, compat: uzCompat, quote: uzQuote },
+  ru: { common: ruCommon, compat: ruCompat, quote: ruQuote },
 } satisfies Record<AppLocale, Record<string, MessageTree>>;
 
 export type Namespace = keyof (typeof catalog)["uz"];

@@ -1,0 +1,882 @@
+{
+  "compat.missing_data": {
+    "context": "any rule: a spec value the rule needs is unknown. {field} is already the display name of the field (compat.field.<category>.<field>, picked by the caller from the issue params field and category), not the technical key; the guillemets are part of the text",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.socket_mismatch": {
+    "context": "CPU_MB_SOCKET, block: the processor socket differs from the motherboard socket; values like AM5, LGA1700",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.chipset_unsupported": {
+    "context": "CPU_MB_CHIPSET, block: the chipset is not in the processor's list; {supported} is a comma-separated list of chipsets",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.bios_update_flashback": {
+    "context": "CPU_MB_BIOS, warn: the board ships an older BIOS than the processor needs, and the board has BIOS Flashback (update without a processor); BIOS Flashback is the button name and stays in Latin",
+    "maxLen": 240,
+    "status": "draft"
+  },
+  "compat.bios_update_seller": {
+    "context": "CPU_MB_BIOS, warn: as bios_update_flashback, but the board has no Flashback, so the seller has to update the BIOS before assembly",
+    "maxLen": 240,
+    "status": "draft"
+  },
+  "compat.no_video_output": {
+    "context": "CPU_NO_VIDEO, block: no integrated graphics in the processor and no video card in the build; no params",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.mem_type_board": {
+    "context": "MEM_TYPE, block: the memory type (DDR4 or DDR5) differs from the type of the board",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "compat.mem_type_cpu": {
+    "context": "MEM_TYPE, block: the processor does not support the memory type; {cpuTypes} is a list like DDR5 or DDR4, DDR5",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.mem_slots_exceeded": {
+    "context": "MEM_SLOTS, block: more memory modules than slots on the board; both are whole numbers",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.mem_capacity_exceeded": {
+    "context": "MEM_CAPACITY, block: total memory is above the maximum of the board, gigabytes",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "compat.mem_speed_reduced": {
+    "context": "MEM_SPEED, warn: the memory is faster than the board or the processor supports; MT/s is megatransfers per second (the usual unit of memory speed)",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.mem_cooler_clearance": {
+    "context": "MEM_COOLER_CLEARANCE, warn: memory modules taller than the clearance under the air cooler, millimetres",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.board_not_supported": {
+    "context": "MB_CASE_FORMFACTOR, block: the case does not take this board form factor (ATX, mATX, Mini-ITX, E-ATX); {supported} is a list",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.gpu_too_long": {
+    "context": "GPU_CASE_LENGTH, block: the card is longer than the case allows, millimetres",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.gpu_tight_fit": {
+    "context": "GPU_CASE_LENGTH, warn: the card fits, but the spare length (marginMm) is below the warning margin",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.gpu_slots_exceeded": {
+    "context": "GPU_SLOT_WIDTH, warn: the card is thicker than the expansion slots of the case; the card thickness can be fractional (3.5), so the text has no plural forms",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.cooler_socket_unsupported": {
+    "context": "COOLER_SOCKET, block: ICU select on {cooler}: air = air cooler, aio = liquid cooling, other = anything else; the select options must stay in Latin",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.cooler_too_tall": {
+    "context": "COOLER_CASE_HEIGHT, block: the air cooler is taller than the case allows, millimetres",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.cooler_tight_fit": {
+    "context": "COOLER_CASE_HEIGHT, warn: the cooler fits, but the spare height (marginMm) is below the warning margin",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.cooler_underpowered": {
+    "context": "COOLER_TDP, warn: the rated dissipation of the cooler is below the maximum power of the processor, watts",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.aio_no_mount": {
+    "context": "AIO_RADIATOR_MOUNT, block: the case has no mount for a radiator of this size (240, 280, 360, 420)",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.aio_too_thick": {
+    "context": "AIO_RADIATOR_THICKNESS, warn: the radiator with its fans is thicker than the mount allows, millimetres",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.psu_below_peak": {
+    "context": "PSU_WATTAGE, block: the rating of the power supply is below the estimated peak of the build, watts",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.psu_below_recommended": {
+    "context": "PSU_WATTAGE, warn: the rating covers the peak but is below the recommendation (peak x 1.3 rounded up to the series, or the card vendor figure)",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.psu_low_headroom": {
+    "context": "PSU_WATTAGE, warn: the headroom of the power supply over the estimated peak, (rating - peak) / peak, shown in whole percent, is below the threshold psuHeadroomWarnBp (minPct); with the default settings the recommendation itself gives a headroom of at least the threshold, so the warning fires only if the owner changes the multiplier or the threshold",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.psu_8pin_missing": {
+    "context": "PSU_GPU_CONNECTORS, block: the power supply has fewer 8-pin connectors than the card needs; whole numbers",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.psu_12v2x6_missing": {
+    "context": "PSU_GPU_CONNECTORS, block: the card needs 12V-2x6, the power supply has no native cable and the card has no adapter in the box",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.psu_12v2x6_adapter": {
+    "context": "PSU_GPU_CONNECTORS, warn: the card connects through the adapter from its own box because the power supply has too few native 12V-2x6 cables",
+    "maxLen": 220,
+    "status": "draft"
+  },
+  "compat.psu_form_factor_unsupported": {
+    "context": "PSU_CASE_FORMFACTOR, block: ATX, SFX or SFX-L power supply that the case does not take; {supported} is a list",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.psu_too_long": {
+    "context": "PSU_CASE_LENGTH, warn: the power supply is longer than the case allows, millimetres",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.m2_slots_exceeded": {
+    "context": "M2_SLOTS, block: more NVMe drives than M.2 slots on the board; whole numbers",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.m2_too_long": {
+    "context": "M2_LENGTH, block: the M.2 drive is longer than the slot allows, millimetres",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.m2_disables_sata": {
+    "context": "M2_SATA_SHARING, block: an occupied M.2 slot disables SATA ports and the remaining ports are fewer than the SATA drives",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.sata_ports_exceeded": {
+    "context": "SATA_PORTS, block: more SATA drives than ports on the board; whole numbers",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.argb_headers_short": {
+    "context": "ARGB_HEADERS, warn: more devices with addressable RGB lighting (5 V) than headers on the board",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.rgb_headers_short": {
+    "context": "ARGB_HEADERS, warn: more devices with plain RGB lighting (12 V) than headers on the board",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.fan_mounts_exceeded": {
+    "context": "FAN_HEADERS, block: more fans than fan mounts in the case; whole numbers",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.fan_headers_short": {
+    "context": "FAN_HEADERS, warn: more fans than fan headers on the board; a splitter solves it",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.no_wireless": {
+    "context": "WIFI_FOR_TASK, warn: ICU select on {task}: streaming = streaming, office = office work and study, other = any other task; the select options must stay in Latin",
+    "maxLen": 240,
+    "status": "draft"
+  },
+  "compat.monitors_wider_than_desk": {
+    "context": "DESK_WIDTH_MONITORS, block: the monitors placed side by side are wider than the desk top, millimetres",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.eye_distance_short": {
+    "context": "DESK_DEPTH_EYES, warn: the distance from the eyes to the screen is below the recommended minimum; the desk is too shallow for a monitor on its stand, millimetres",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "compat.eye_distance_long": {
+    "context": "DESK_DEPTH_EYES, warn: the distance from the eyes to the screen is above the recommended maximum; the desk is too deep for a monitor on its stand, millimetres",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.arm_vesa_unsupported": {
+    "context": "ARM_VESA, block: the VESA pattern of the monitor (like 100x100) is not in the list of the monitor arm; {armVesa} is a list",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.arm_monitor_no_vesa": {
+    "context": "ARM_VESA, block: the monitor has no VESA mount; no params",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "compat.arm_overload": {
+    "context": "ARM_LOAD, block: the monitor is heavier than the arm can carry, kilograms",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "compat.arm_underload": {
+    "context": "ARM_LOAD, warn: the monitor is lighter than the minimum load of the arm, so the arm cannot hold its position; kilograms",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.arm_diagonal_out_of_range": {
+    "context": "ARM_DIAGONAL, warn: the monitor diagonal is outside the range of the arm, inches; the dash is an en dash",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.arm_desk_thickness": {
+    "context": "ARM_DESK_THICKNESS, block: the desk top thickness is outside the range the arm clamps to, millimetres; the dash is an en dash",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.arm_clamp_over_leg": {
+    "context": "ARM_CLAMP_ZONE, warn: the clamp of the arm sits over a leg of the desk; xMm is the position along the desk, from..to is the leg zone, millimetres",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "compat.chair_rollback_short": {
+    "context": "CHAIR_ROLLBACK, warn: the free space behind the desk is below the roll-back zone of the chair, millimetres",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "compat.chair_user_height": {
+    "context": "CHAIR_USER_HEIGHT, warn: the height of the user is outside the range of the chair, centimetres; the dash is an en dash",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "compat.field.cpu.socket": {
+    "context": "name of the spec field socket of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.cpu.cores": {
+    "context": "name of the spec field cores of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.cpu.threads": {
+    "context": "name of the spec field threads of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.cpu.boostGhz": {
+    "context": "name of the spec field boostGhz of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.cpu.tdpW": {
+    "context": "name of the spec field tdpW of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.cpu.maxPowerW": {
+    "context": "name of the spec field maxPowerW of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.cpu.hasIgpu": {
+    "context": "name of the spec field hasIgpu of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.cpu.memTypes": {
+    "context": "name of the spec field memTypes of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.cpu.memMaxMts": {
+    "context": "name of the spec field memMaxMts of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.cpu.boxCooler": {
+    "context": "name of the spec field boxCooler of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.cpu.chipsets": {
+    "context": "name of the spec field chipsets of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.cpu.minBiosByChipset": {
+    "context": "name of the spec field minBiosByChipset of category cpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.mb.socket": {
+    "context": "name of the spec field socket of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.chipset": {
+    "context": "name of the spec field chipset of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.formFactor": {
+    "context": "name of the spec field formFactor of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.ramType": {
+    "context": "name of the spec field ramType of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.ramSlots": {
+    "context": "name of the spec field ramSlots of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.mb.ramMaxGb": {
+    "context": "name of the spec field ramMaxGb of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.mb.ramMaxMts": {
+    "context": "name of the spec field ramMaxMts of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.mb.m2": {
+    "context": "name of the spec field m2 of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.sataPorts": {
+    "context": "name of the spec field sataPorts of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.pcieX16Slots": {
+    "context": "name of the spec field pcieX16Slots of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.mb.fanHeaders": {
+    "context": "name of the spec field fanHeaders of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.mb.argb5vHeaders": {
+    "context": "name of the spec field argb5vHeaders of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.mb.rgb12vHeaders": {
+    "context": "name of the spec field rgb12vHeaders of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.mb.wifi": {
+    "context": "name of the spec field wifi of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.bluetooth": {
+    "context": "name of the spec field bluetooth of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.mb.biosFlashback": {
+    "context": "name of the spec field biosFlashback of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.mb.shippedBios": {
+    "context": "name of the spec field shippedBios of category mb; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ram.type": {
+    "context": "name of the spec field type of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ram.kitGb": {
+    "context": "name of the spec field kitGb of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.ram.modules": {
+    "context": "name of the spec field modules of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.ram.mts": {
+    "context": "name of the spec field mts of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ram.cl": {
+    "context": "name of the spec field cl of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ram.profile": {
+    "context": "name of the spec field profile of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.ram.heightMm": {
+    "context": "name of the spec field heightMm of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.ram.lighting": {
+    "context": "name of the spec field lighting of category ram; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ssd.iface": {
+    "context": "name of the spec field iface of category ssd; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.ssd.formFactor": {
+    "context": "name of the spec field formFactor of category ssd; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ssd.capacityGb": {
+    "context": "name of the spec field capacityGb of category ssd; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ssd.pcieGen": {
+    "context": "name of the spec field pcieGen of category ssd; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.ssd.tbw": {
+    "context": "name of the spec field tbw of category ssd; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.ssd.heatsinkHeightMm": {
+    "context": "name of the spec field heatsinkHeightMm of category ssd; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.gpu.chip": {
+    "context": "name of the spec field chip of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.gpu.vramGb": {
+    "context": "name of the spec field vramGb of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.gpu.lengthMm": {
+    "context": "name of the spec field lengthMm of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.gpu.heightMm": {
+    "context": "name of the spec field heightMm of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.gpu.slots": {
+    "context": "name of the spec field slots of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.gpu.power": {
+    "context": "name of the spec field power of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.gpu.adapterInBox": {
+    "context": "name of the spec field adapterInBox of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.gpu.tgpW": {
+    "context": "name of the spec field tgpW of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.gpu.vendorRecommendedPsuW": {
+    "context": "name of the spec field vendorRecommendedPsuW of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "compat.field.gpu.hwEncoders": {
+    "context": "name of the spec field hwEncoders of category gpu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.psu.watts": {
+    "context": "name of the spec field watts of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.psu.rating": {
+    "context": "name of the spec field rating of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.psu.formFactor": {
+    "context": "name of the spec field formFactor of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.psu.lengthMm": {
+    "context": "name of the spec field lengthMm of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.psu.modular": {
+    "context": "name of the spec field modular of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.psu.pcie8pin": {
+    "context": "name of the spec field pcie8pin of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.psu.native12v2x6": {
+    "context": "name of the spec field native12v2x6 of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.psu.atx3": {
+    "context": "name of the spec field atx3 of category psu; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.case.boards": {
+    "context": "name of the spec field boards of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.case.gpuMaxLenMm": {
+    "context": "name of the spec field gpuMaxLenMm of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.case.gpuMaxLenWithFrontRadMm": {
+    "context": "name of the spec field gpuMaxLenWithFrontRadMm of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "compat.field.case.coolerMaxHeightMm": {
+    "context": "name of the spec field coolerMaxHeightMm of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.case.radiators": {
+    "context": "name of the spec field radiators of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.case.psuFF": {
+    "context": "name of the spec field psuFF of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.case.psuMaxLenMm": {
+    "context": "name of the spec field psuMaxLenMm of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.case.expansionSlots": {
+    "context": "name of the spec field expansionSlots of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.case.fanMounts": {
+    "context": "name of the spec field fanMounts of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.case.fansIncluded": {
+    "context": "name of the spec field fansIncluded of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.case.dimsMm": {
+    "context": "name of the spec field dimsMm of category case; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.cooler_air.sockets": {
+    "context": "name of the spec field sockets of category cooler_air; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.cooler_air.heightMm": {
+    "context": "name of the spec field heightMm of category cooler_air; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.cooler_air.ramClearanceMm": {
+    "context": "name of the spec field ramClearanceMm of category cooler_air; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.cooler_air.tdpRatedW": {
+    "context": "name of the spec field tdpRatedW of category cooler_air; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.aio.sockets": {
+    "context": "name of the spec field sockets of category aio; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "compat.field.aio.radMm": {
+    "context": "name of the spec field radMm of category aio; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.aio.radThicknessWithFansMm": {
+    "context": "name of the spec field radThicknessWithFansMm of category aio; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.aio.tubeLenMm": {
+    "context": "name of the spec field tubeLenMm of category aio; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "compat.field.aio.pumpW": {
+    "context": "name of the spec field pumpW of category aio; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.fan.sizeMm": {
+    "context": "name of the spec field sizeMm of category fan; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.fan.count": {
+    "context": "name of the spec field count of category fan; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.fan.conn": {
+    "context": "name of the spec field conn of category fan; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.fan.argb": {
+    "context": "name of the spec field argb of category fan; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.monitor.diagIn": {
+    "context": "name of the spec field diagIn of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.monitor.aspect": {
+    "context": "name of the spec field aspect of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.monitor.resolution": {
+    "context": "name of the spec field resolution of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.monitor.hz": {
+    "context": "name of the spec field hz of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.monitor.panelWmm": {
+    "context": "name of the spec field panelWmm of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.monitor.panelHmm": {
+    "context": "name of the spec field panelHmm of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.monitor.depthWithStandMm": {
+    "context": "name of the spec field depthWithStandMm of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.monitor.standFootprintMm": {
+    "context": "name of the spec field standFootprintMm of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.monitor.weightNoStandKg": {
+    "context": "name of the spec field weightNoStandKg of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.monitor.vesa": {
+    "context": "name of the spec field vesa of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.monitor.curved": {
+    "context": "name of the spec field curved of category monitor; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.arm.reachMinMm": {
+    "context": "name of the spec field reachMinMm of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.arm.reachMaxMm": {
+    "context": "name of the spec field reachMaxMm of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.arm.poleHeightMm": {
+    "context": "name of the spec field poleHeightMm of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.arm.mount": {
+    "context": "name of the spec field mount of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.arm.topThicknessMinMm": {
+    "context": "name of the spec field topThicknessMinMm of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.arm.topThicknessMaxMm": {
+    "context": "name of the spec field topThicknessMaxMm of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.arm.vesa": {
+    "context": "name of the spec field vesa of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.arm.loadMinKg": {
+    "context": "name of the spec field loadMinKg of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.arm.loadMaxKg": {
+    "context": "name of the spec field loadMaxKg of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.arm.diagMinIn": {
+    "context": "name of the spec field diagMinIn of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.arm.diagMaxIn": {
+    "context": "name of the spec field diagMaxIn of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.arm.screens": {
+    "context": "name of the spec field screens of category arm; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.arm.placement": {
+    "context": "name of the position of the arm on the plan (pseudo-field placement, not a spec field); shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.desk.placement": {
+    "context": "name of the position of the desk on the plan (pseudo-field placement, not a spec field); shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.desk.topWmm": {
+    "context": "name of the spec field topWmm of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.desk.topDmm": {
+    "context": "name of the spec field topDmm of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.desk.heightMinMm": {
+    "context": "name of the spec field heightMinMm of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.desk.heightMaxMm": {
+    "context": "name of the spec field heightMaxMm of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.desk.topThicknessMm": {
+    "context": "name of the spec field topThicknessMm of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.desk.legZonesMm": {
+    "context": "name of the spec field legZonesMm of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.desk.cableCutout": {
+    "context": "name of the spec field cableCutout of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.desk.loadKg": {
+    "context": "name of the spec field loadKg of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.desk.motors": {
+    "context": "name of the spec field motors of category desk; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "compat.field.chair.baseDiamMm": {
+    "context": "name of the spec field baseDiamMm of category chair; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.chair.seatHeightMinMm": {
+    "context": "name of the spec field seatHeightMinMm of category chair; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.chair.seatHeightMaxMm": {
+    "context": "name of the spec field seatHeightMaxMm of category chair; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "compat.field.chair.rollbackZoneMm": {
+    "context": "name of the spec field rollbackZoneMm of category chair; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "compat.field.chair.userHeightCm": {
+    "context": "name of the spec field userHeightCm of category chair; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "compat.field.chair.userMaxKg": {
+    "context": "name of the spec field userMaxKg of category chair; shown in compat.missing_data in place of {field}; a lower case noun phrase inside a sentence, no final full stop; units in brackets",
+    "maxLen": 70,
+    "status": "draft"
+  }
+}

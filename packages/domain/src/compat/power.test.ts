@@ -116,8 +116,8 @@ describe("estimatePower: recommended PSU", () => {
   });
 });
 
-describe("estimatePower: selected PSU and headroom", () => {
-  it("reports the headroom against the PSU rating: 420 W peak on 750 W is 44 %", () => {
+describe("estimatePower: selected PSU and headroom over the peak", () => {
+  it("reports the headroom over the peak: 420 W peak on 750 W is 78 % (330 / 420)", () => {
     const b = build(
       makeProduct("cpu", "cpu", { maxPowerW: 100 }),
       makeProduct("gpu", "gpu", { tgpW: 270 }),
@@ -126,17 +126,51 @@ describe("estimatePower: selected PSU and headroom", () => {
     const p = estimatePower(b.lines, b.catalog, S);
     expect(p.peakW).toBe(420);
     expect(p.selectedPsuW).toBe(750);
-    expect(p.headroomBp).toBe(4400);
+    expect(p.headroomBp).toBe(7857);
+  });
+
+  it("is exactly 3000 bp when the PSU is 1.3 x the peak (500 W peak, 650 W PSU)", () => {
+    const b = build(makeProduct("gpu", "gpu", { tgpW: 450 }), makeProduct("psu", "psu", { watts: 650 }));
+    expect(estimatePower(b.lines, b.catalog, S)).toMatchObject({ peakW: 500, selectedPsuW: 650, headroomBp: 3000 });
   });
 
   it("floors the headroom to whole basis points", () => {
-    const b = build(makeProduct("gpu", "gpu", { tgpW: 249 }), makeProduct("psu", "psu", { watts: 650 })); // peak 299
-    expect(estimatePower(b.lines, b.catalog, S).headroomBp).toBe(Math.floor(((650 - 299) * 10_000) / 650));
+    const b = build(makeProduct("gpu", "gpu", { tgpW: 249 }), makeProduct("psu", "psu", { watts: 400 })); // peak 299
+    expect(estimatePower(b.lines, b.catalog, S).headroomBp).toBe(Math.floor(((400 - 299) * 10_000) / 299)); // 3377
   });
 
-  it("clamps the headroom to 0 when the PSU is below the peak", () => {
+  it("is 0 when the PSU equals the peak and clamped to 0 when the PSU is below it", () => {
+    const eq = build(makeProduct("gpu", "gpu", { tgpW: 249 }), makeProduct("psu", "psu", { watts: 299 }));
+    expect(estimatePower(eq.lines, eq.catalog, S).headroomBp).toBe(0);
     const b = build(makeProduct("gpu", "gpu", { tgpW: 600 }), makeProduct("psu", "psu", { watts: 550 }));
     expect(estimatePower(b.lines, b.catalog, S)).toMatchObject({ selectedPsuW: 550, headroomBp: 0 });
+  });
+
+  it("caps at 10 000 bp (Bp is 0..10 000): a PSU of twice the peak or more", () => {
+    const b = build(makeProduct("gpu", "gpu", { tgpW: 100 }), makeProduct("psu", "psu", { watts: 1200 })); // peak 150
+    expect(estimatePower(b.lines, b.catalog, S)).toMatchObject({ peakW: 150, headroomBp: 10_000 });
+    const exact = build(makeProduct("gpu", "gpu", { tgpW: 100 }), makeProduct("psu", "psu", { watts: 300 }));
+    expect(estimatePower(exact.lines, exact.catalog, S).headroomBp).toBe(10_000);
+  });
+
+  it("has no headroom when there is no peak to compare with (no PC component), but keeps the rating", () => {
+    const b = build(makeProduct("psu", "psu", { watts: 750 }));
+    expect(estimatePower(b.lines, b.catalog, S)).toEqual({ peakW: 0, recommendedPsuW: 0, selectedPsuW: 750 });
+  });
+
+  it("a PSU of the recommended wattage always has at least the warning headroom (property)", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 450 }), fc.integer({ min: 15, max: 600 }), (cpuW, gpuW) => {
+        const probe = build(makeProduct("cpu", "cpu", { maxPowerW: cpuW }), makeProduct("gpu", "gpu", { tgpW: gpuW }));
+        const { recommendedPsuW } = estimatePower(probe.lines, probe.catalog, S);
+        const b = build(
+          makeProduct("cpu", "cpu", { maxPowerW: cpuW }),
+          makeProduct("gpu", "gpu", { tgpW: gpuW }),
+          makeProduct("psu", "psu", { watts: recommendedPsuW }),
+        );
+        expect(estimatePower(b.lines, b.catalog, S).headroomBp ?? 0).toBeGreaterThanOrEqual(S.psuHeadroomWarnBp);
+      }),
+    );
   });
 
   it("omits both fields without a PSU or when its wattage is unknown", () => {

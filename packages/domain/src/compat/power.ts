@@ -19,9 +19,13 @@ export function ceilToSeries(watts: number, series: readonly number[]): number {
 }
 
 /**
- * Peak and recommended PSU (block 28, 3.4). Unknown (null) inputs count as 0, so the figures are a lower bound;
- * `missing` lists what was unknown and the PSU rule (it runs for any build with a processor or a card, PSU or not)
- * turns it into "incomplete". `estimatePower` has no place for the list: with unknown inputs its result is a lower bound.
+ * Peak and recommended PSU (block 28, 3.4). `headroomBp` is the headroom of the selected PSU over the peak,
+ * (rating - peak) / peak (ADR-007, item 7). `compat.psu_low_headroom` fires when the headroom over the peak is below
+ * the threshold `psuHeadroomWarnBp`; with the default settings the recommendation itself gives a headroom of at least
+ * the threshold, so the warning fires only if the owner changes the multiplier or the threshold.
+ * Unknown (null) inputs count as 0, so the figures are a lower bound; `missing` lists what was unknown and the PSU rule
+ * (it runs for any build with a processor or a card, PSU or not) turns it into "incomplete". `estimatePower` has no
+ * place for the list: with unknown inputs its result is a lower bound.
  */
 export function computePower(
   b: ResolvedBuild,
@@ -70,7 +74,10 @@ export function computePower(
   const psuWatts = psu ? specOf(psu.product, "psu")?.watts : undefined;
   if (psuWatts !== null && psuWatts !== undefined) {
     estimate.selectedPsuW = psuWatts;
-    estimate.headroomBp = bp(psuWatts > 0 ? Math.floor((Math.max(0, psuWatts - peak) * 10_000) / psuWatts) : 0);
+    // Headroom is over the peak: (PSU - peak) / peak, floored to whole bp, clamped to the Bp range 0..10 000
+    // (a PSU of twice the peak or more counts as 100 %). Without a peak there is nothing to compare: no figure.
+    if (peak > 0)
+      estimate.headroomBp = bp(Math.min(10_000, Math.floor((Math.max(0, psuWatts - peak) * 10_000) / peak)));
   }
   return { estimate, missing };
 }
