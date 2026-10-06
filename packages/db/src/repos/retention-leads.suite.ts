@@ -196,9 +196,13 @@ describe.each(["worker", "admin"] as const)("sales.purge_expired_leads as the %s
     expect((await customerRow(saved.id)).erased_at).toBeNull();
   });
 
-  it("does not erase a customer who is younger than the year though an old request is bound to him", async () => {
-    // The owner merged an old request of the site into a customer who came last week.
+  it("does not erase a customer who gave a consent within the year though an old request is bound to him", async () => {
+    // The owner merged an old request of the site into a customer who came last week and agreed to the processing.
     const fresh = await person("1 week");
+    await migrator.query(
+      "insert into ops.consents (customer_id, kind, granted, channel) values ($1, 'pd_processing', true, 'bot')",
+      [fresh.id],
+    );
     await lead(fresh.id, "20 months", { comment: "merged by hand" });
     await purge(client());
     expect((await customerRow(fresh.id)).erased_at).toBeNull();

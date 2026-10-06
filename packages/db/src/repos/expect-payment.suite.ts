@@ -1,3 +1,4 @@
+import { PAYMENT_KINDS, PAYMENT_METHODS, validatePayment } from "@nivel/domain/money";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { connectAs, createOrder, one, pgError } from "./testkit.ts";
@@ -228,6 +229,36 @@ describe.each(["worker", "bot"] as const)("sales.expect_payment as the %s role",
     );
     expect(e.code).toBe(DENIED);
     expect((await pgError(client(), "update sales.payments set amount_sum = 1")).code).toBe(DENIED);
+  });
+});
+
+describe("the pairs of sales.expect_payment are the pairs of the domain", () => {
+  it("accepts a kind with a way exactly when validatePayment accepts the pair, and writes the direction the domain names", async () => {
+    const o = await createOrder(migrator);
+    let amount = 1000;
+    for (const kind of PAYMENT_KINDS) {
+      for (const method of PAYMENT_METHODS) {
+        amount += 1;
+        const domain = (["in", "out"] as const).find((direction) => validatePayment({ kind, direction, method }).ok);
+        const call = worker.query(CALL, [o.orderId, kind, amount, method]);
+        if (domain === undefined) {
+          await expect(call, `${kind} by ${method}`).rejects.toThrow(/^invalid_payment:/);
+          continue;
+        }
+        await call;
+        const row = await one<{ direction: string }>(
+          migrator,
+          "select direction from sales.payments where order_id = $1 and kind = $2 and amount_sum = $3",
+          [o.orderId, kind, amount],
+        );
+        expect(row.direction, `${kind} by ${method}`).toBe(domain);
+      }
+    }
+  });
+
+  it("knows every kind and every way the domain names", async () => {
+    expect(PAYMENT_KINDS.length).toBe(9);
+    expect([...PAYMENT_METHODS].sort()).toEqual(["bank_transfer_ip", "bank_transfer_out", "merchant_card", "xolis_qr"]);
   });
 });
 

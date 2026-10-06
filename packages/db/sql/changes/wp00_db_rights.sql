@@ -481,8 +481,9 @@ CREATE TRIGGER leads_guard BEFORE UPDATE ON sales.leads
 --  - a request older than 12 months with no order: its comment and its contact (phone, name, Telegram name) are cleared;
 --  - the customer of such a request is made anonymous (erased_at; name, phone, Telegram id and name, address cleared;
 --    the passport secret and the subscriptions of that Telegram id removed) when he has no order, no request younger than
---    12 months, no configuration younger than 12 months, and is himself older than 12 months (an old request merged by
---    hand into a customer who came last week must not erase that customer).
+--    12 months, no configuration younger than 12 months and no consent younger than 12 months (whoever is active in the
+--    bot or on the site has given one: an old request merged by hand into a customer who came last week must not erase
+--    that customer).
 -- The journals are not touched: consents and audit rows keep the id of the customer, which says nothing without the row.
 -- Returns the number of requests it cleaned (their own data or their customer's). The moment is never later than the
 -- clock of the database; an earlier one is a dry run of the past (tests).
@@ -501,7 +502,6 @@ BEGIN
     INTO v_customers, v_telegram
     FROM sales.customers c
    WHERE c.erased_at IS NULL
-     AND c.created_at <= v_cut
      AND EXISTS (SELECT 1 FROM sales.leads l
                   WHERE l.customer_id = c.id AND l.created_at <= v_cut
                     AND NOT EXISTS (SELECT 1 FROM sales.orders o WHERE o.lead_id = l.id))
@@ -509,7 +509,8 @@ BEGIN
      AND NOT EXISTS (SELECT 1 FROM sales.leads l
                       WHERE l.customer_id = c.id
                         AND (l.created_at > v_cut OR EXISTS (SELECT 1 FROM sales.orders o WHERE o.lead_id = l.id)))
-     AND NOT EXISTS (SELECT 1 FROM sales.configurations cf WHERE cf.customer_id = c.id AND cf.created_at > v_cut);
+     AND NOT EXISTS (SELECT 1 FROM sales.configurations cf WHERE cf.customer_id = c.id AND cf.created_at > v_cut)
+     AND NOT EXISTS (SELECT 1 FROM ops.consents k WHERE k.customer_id = c.id AND k.at > v_cut);
 
   WITH due AS (
     SELECT l.id, l.customer_id FROM sales.leads l
@@ -563,7 +564,7 @@ DECLARE
   v_now timestamptz := least(coalesce(p_now, now()), now());
   v_ids uuid[];
 BEGIN
-  WITH links AS (
+  WITH links AS MATERIALIZED (
     SELECT q.order_id, x.file_id FROM sales.quotes q,
            LATERAL (VALUES (q.pdf_uz_file_id), (q.pdf_ru_file_id)) AS x (file_id) WHERE x.file_id IS NOT NULL
     UNION ALL
@@ -582,7 +583,7 @@ BEGIN
     UNION ALL
     SELECT b.order_id, x.file_id FROM sales.build_passports b,
            LATERAL (VALUES (b.pdf_uz_file_id), (b.pdf_ru_file_id)) AS x (file_id) WHERE x.file_id IS NOT NULL
-  ), ends AS (
+  ), ends AS MATERIALIZED (
     SELECT o.id, o.status,
            greatest(o.warranty_until,
                     (SELECT max(pu.vendor_warranty_until) FROM sales.purchases pu WHERE pu.order_id = o.id)::timestamptz)

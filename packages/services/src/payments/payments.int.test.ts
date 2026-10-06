@@ -4,7 +4,14 @@ import { convert, create as createLead } from "../leads/index.ts";
 import { dispatch } from "../orders/dispatch.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
 import { loadFeeSettings } from "../orders/settings.ts";
-import { acceptedOrder, customerActor, ownerActor, type TestOrder } from "../orders/test-support/flow.ts";
+import {
+  acceptConsents,
+  acceptedOrder,
+  customerActor,
+  ownerActor,
+  sentOrder,
+  type TestOrder,
+} from "../orders/test-support/flow.ts";
 import { createWorld, DAY, HOUR, newFile, pcLines, type World } from "../orders/test-support/world.ts";
 import { build, send } from "../quotes/index.ts";
 import { confirm, expect as expectPayment, reverse, voidPayment } from "./index.ts";
@@ -175,7 +182,16 @@ describe("payments.expect", () => {
   });
 
   it("journals the expectation in the audit log", async () => {
-    const o = await acceptedOrder(w);
+    // Accepted through the site, which writes no payment: the expectation is the owner's here, from the admin panel.
+    const o = await sentOrder(w);
+    const consentIds = await acceptConsents(w, o);
+    const accepted = await dispatch(
+      o.orderId,
+      { type: "ACCEPT", quoteId: o.quoteId, consentIds, channel: "site" },
+      customerActor(o),
+      w.web,
+    );
+    expect(accepted).toEqual({ ok: true, status: "accepted" });
     const id = await expectAdvance(o);
     const { rows } = await w.db.$client.query(
       "select actor, action, after from ops.audit_log where entity = 'sales.payments' and entity_id = $1",
@@ -188,6 +204,23 @@ describe("payments.expect", () => {
         after: { orderId: o.orderId, kind: "fee_advance", amountSum: advanceOf(o) },
       },
     ]);
+  });
+});
+
+describe("payments.expect after an acceptance through the bot", () => {
+  it("finds the expectation the bot wrote with the function of the database and writes no second one", async () => {
+    const o = await acceptedOrder(w); // the bot expected the advance and the money for the purchases itself
+    const before = await w.db.$client.query("select id, kind from sales.payments where order_id = $1 order by kind", [
+      o.orderId,
+    ]);
+    expect(before.rows.map((p) => p.kind)).toEqual(["fee_advance", "purchase_funds"]);
+    const advance = await expectAdvance(o);
+    const funds = await expectFunds(o);
+    expect([advance, funds]).toEqual(before.rows.map((p) => p.id));
+    const after = await w.db.$client.query("select count(*)::int as n from sales.payments where order_id = $1", [
+      o.orderId,
+    ]);
+    expect(after.rows[0].n).toBe(2);
   });
 });
 

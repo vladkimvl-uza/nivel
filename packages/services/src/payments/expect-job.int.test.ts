@@ -8,11 +8,13 @@ import {
   customerActor,
   ownerActor,
   paidOrder,
+  purchasedOrder,
   sentOrder,
   settledOrder,
   type TestOrder,
 } from "../orders/test-support/flow.ts";
 import { createWorld, type World } from "../orders/test-support/world.ts";
+import { generate as generateReport, send as sendReport } from "../reports/index.ts";
 import { expectFromJob } from "./index.ts";
 
 // The job `payment.expect` is queued by the site (it may not write payments). The worker runs it with this scenario: the
@@ -178,7 +180,40 @@ describe("payments.expectFromJob: the payments after the cancellation and the re
     expect(Object.keys(made).length).toBeGreaterThan(0);
   });
 
-  it("takes the refund of the remainder from the money of the order, once the report is out", async () => {
+  it("takes the refund of the remainder from the money of the order, not from the job, once the report is out", async () => {
+    const o = await purchasedOrder(w);
+    const report = await generateReport({ orderId: o.orderId }, ownerActor(w), w.admin);
+    const sent = await sendReport({ orderId: o.orderId, reportId: report.reportId }, ownerActor(w), w.admin);
+    expect(sent.ok).toBe(true);
+    // The admin side wrote the expectation with SEND_REPORT; void it to run the job as the worker would after the site's request.
+    const written = await paymentsOf(o.orderId);
+    const refund = written.find((p) => p.kind === "remainder_refund");
+    expect(refund?.amount).toBeGreaterThan(0);
+    await w.db.$client.query(
+      "update sales.payments set status = 'void' where order_id = $1 and kind = 'remainder_refund'",
+      [o.orderId],
+    );
+    await expect(
+      expectFromJob(
+        { orderId: o.orderId, paymentKind: "remainder_refund", amountSum: (refund?.amount ?? 0) + 1 },
+        w.worker,
+      ),
+    ).rejects.toMatchObject({ issues: [{ path: "amountSum", code: "amount_mismatch" }] });
+    const made = await expectFromJob({ orderId: o.orderId, paymentKind: "remainder_refund" }, w.worker);
+    expect(made.created).toBe(true);
+    const rows = await paymentsOf(o.orderId);
+    expect(rows.filter((p) => p.kind === "remainder_refund" && p.status === "expected")).toEqual([
+      {
+        kind: "remainder_refund",
+        direction: "out",
+        method: "bank_transfer_out",
+        status: "expected",
+        amount: refund?.amount,
+      },
+    ]);
+  });
+
+  it("finds nothing to expect for the remainder once it is returned", async () => {
     const o = await settledOrder(w);
     // The order is settled: the remainder has been returned, nothing is left to expect.
     await expect(
