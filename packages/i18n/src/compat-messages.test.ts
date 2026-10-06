@@ -161,6 +161,31 @@ const FIELD_KEYS = [
 ];
 const MESSAGE_KEYS = Object.keys(COMPAT_MESSAGE_KEYS);
 
+/**
+ * What a message can start with. A message that opens with `{name, select, a {...} b {...}}` starts with the text of
+ * each branch (a branch may open with another select), so every branch is a start of its own; any other message has
+ * one start, its own text. A plain `{name}` stays in the text as a placeholder.
+ */
+function starts(message: string): string[] {
+  const head = /^\{\s*\w+\s*,\s*select\s*,/.exec(message);
+  if (!head) return [message];
+  const out: string[] = [];
+  let pos = head[0].length;
+  for (;;) {
+    const branch = /^\s*[^\s{}]+\s*\{/.exec(message.slice(pos));
+    if (!branch) return out;
+    let depth = 1;
+    let end = pos + branch[0].length;
+    while (end < message.length && depth > 0) {
+      if (message[end] === "{") depth++;
+      else if (message[end] === "}") depth--;
+      end++;
+    }
+    out.push(...starts(message.slice(pos + branch[0].length, end - 1)));
+    pos = end;
+  }
+}
+
 describe("namespace compat", () => {
   it("is registered in the catalog and loads in both locales", () => {
     expect(namespaces).toContain("compat");
@@ -235,6 +260,29 @@ describe("namespace compat", () => {
 
   it("the Uzbek text of a key differs from its Russian text", () => {
     for (const [key, ru] of TEXTS.ru) expect(TEXTS.uz.get(key), key).not.toBe(ru);
+  });
+
+  it("every message starts with a capital letter or a placeholder in every select branch (not field names)", () => {
+    for (const locale of LOCALES) {
+      for (const key of MESSAGE_KEYS) {
+        for (const start of starts(TEXTS[locale].get(key) ?? "")) {
+          expect(start, `${locale} ${key}`).toMatch(/^(\p{Lu}|\{)/u);
+        }
+      }
+    }
+  });
+
+  it("the start check sees the branches of a select that opens a message", () => {
+    for (const locale of LOCALES) {
+      expect(starts(TEXTS[locale].get("compat.cooler_socket_unsupported") ?? ""), locale).toHaveLength(3);
+    }
+    expect(starts(TEXTS.uz.get("compat.no_wireless") ?? "")).toHaveLength(3);
+    expect(starts(TEXTS.ru.get("compat.no_wireless") ?? "")).toHaveLength(1);
+    expect(starts("{a, select, x {{n} bor} y {Bor {n, select, p {1} other {2}}} other {Yoʻq}}")).toEqual([
+      "{n} bor",
+      "Bor {n, select, p {1} other {2}}",
+      "Yoʻq",
+    ]);
   });
 });
 

@@ -38,7 +38,7 @@
     "rgb_headers_short": "RGB (12 V) yoritishli qurilmalar: {need}, platadagi ulagichlar: {have}. Tekshiring.",
     "fan_mounts_exceeded": "Ventilyatorlar: {need}, korpusdagi oʻrinlar: {have}.",
     "fan_headers_short": "Ventilyatorlar: {need}, platadagi ulagichlar: {have}: ajratgich (splitter) kerak boʻladi.",
-    "no_wireless": "{task, select, streaming {striming} office {ofis va oʻqish} other {tanlangan vazifa}} uchun platada Wi-Fi ham, Bluetooth ham yoʻq: tashqi adapter kerak boʻladi.",
+    "no_wireless": "{task, select, streaming {Striming} office {Ofis va oʻqish} other {Tanlangan vazifa}} uchun platada Wi-Fi ham, Bluetooth ham yoʻq: tashqi adapter kerak boʻladi.",
     "monitors_wider_than_desk": "Qatorga qoʻyilgan monitorlar {monitorsMm} mm joy egallaydi, stol usti kengligi {deskMm} mm.",
     "eye_distance_short": "Koʻzgacha masofa taxminan {eyeMm} mm, {minMm} mm dan boshlab tavsiya etiladi: stol taglikli monitor uchun juda sayoz.",
     "eye_distance_long": "Koʻzgacha masofa taxminan {eyeMm} mm, {maxMm} mm gacha tavsiya etiladi: stol taglikli monitor uchun juda chuqur.",
