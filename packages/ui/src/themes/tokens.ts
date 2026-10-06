@@ -54,8 +54,9 @@ export interface ThemeTokens {
   stamp: string;
   /** Refund to the customer in a sum table. */
   minus: string;
-  /** Warm spot behind documents: a lamp over the desk, not a glow (night only). */
+  /** Warm spot behind documents: a lamp over the desk, not a glow. Same image in both modes, visible at night only. */
   lampSpot: string;
+  lampOpacity: string;
   /** `<meta name="theme-color">`; not a CSS variable. */
   themeColor: string;
 }
@@ -95,7 +96,9 @@ export const themeTokens: Record<Theme, ThemeTokens> = {
     logoNight: "0",
     stamp: "#C8481A",
     minus: "#9C3A12",
-    lampSpot: "none",
+    lampSpot:
+      "radial-gradient(48% 52% at 50% 42%, rgba(255,196,130,.11), rgba(255,196,130,.04) 55%, rgba(255,196,130,0) 75%)",
+    lampOpacity: "0",
     themeColor: "#F1EFEA",
   },
   night: {
@@ -134,6 +137,7 @@ export const themeTokens: Record<Theme, ThemeTokens> = {
     minus: "#9C3A12",
     lampSpot:
       "radial-gradient(48% 52% at 50% 42%, rgba(255,196,130,.11), rgba(255,196,130,.04) 55%, rgba(255,196,130,0) 75%)",
+    lampOpacity: "1",
     themeColor: "#121110",
   },
 };

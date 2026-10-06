@@ -5,7 +5,7 @@ import { themes } from "./theming/ids.ts";
 
 type Role = Exclude<
   keyof ThemeTokens,
-  "docShadow" | "cardShadow" | "lampSpot" | "logoDay" | "logoNight" | "themeColor"
+  "docShadow" | "cardShadow" | "lampSpot" | "lampOpacity" | "logoDay" | "logoNight" | "themeColor"
 >;
 
 /** Text on its background; a translucent background is first laid over `under` (what the visitor actually sees). */
@@ -35,6 +35,7 @@ const TEXT_PAIRS: Pair[] = [
   { fg: "ink2", bg: "surface", note: "secondary text on a card" },
   { fg: "ink2", bg: "stage", note: "secondary text on the scene" },
   { fg: "ink2", bg: "chipBg", under: "bg", note: "secondary text in a chip" },
+  { fg: "ink2", bg: "chipBg", under: "stage", note: "visualization plaque over the scene" },
   { fg: "accentInk", bg: "bg", note: "tag and link in accent" },
   { fg: "accentInk", bg: "bg2", note: "tag on the band" },
   { fg: "accentInk", bg: "surface", note: "tag on a card" },

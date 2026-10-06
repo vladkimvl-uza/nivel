@@ -64,7 +64,13 @@ html[lang="uz-Latn"] {
   --logo-night: 0;
   --stamp: #c8481a;
   --minus: #9c3a12;
-  --lamp-spot: none;
+  --lamp-spot: radial-gradient(
+    48% 52% at 50% 42%,
+    rgba(255, 196, 130, 0.11),
+    rgba(255, 196, 130, 0.04) 55%,
+    rgba(255, 196, 130, 0) 75%
+  );
+  --lamp-opacity: 0;
 }
 
 [data-theme="night"] {
@@ -107,4 +113,5 @@ html[lang="uz-Latn"] {
     rgba(255, 196, 130, 0.04) 55%,
     rgba(255, 196, 130, 0) 75%
   );
+  --lamp-opacity: 1;
 }

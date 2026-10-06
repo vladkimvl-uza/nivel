@@ -95,9 +95,10 @@ describe("tokens", () => {
     expect(themeTokens.night.themeColor).toBe(themeTokens.night.bg);
   });
 
-  it("have no gradients or glows, except the lamp spot behind documents that exists only at night", () => {
-    expect(themeTokens.day.lampSpot).toBe("none");
+  it("have no gradients or glows, except the lamp spot behind documents, which is visible at night only", () => {
+    expect(themeTokens.day.lampSpot).toBe(themeTokens.night.lampSpot);
     expect(themeTokens.night.lampSpot).toMatch(/^radial-gradient\(/);
+    expect([themeTokens.day.lampOpacity, themeTokens.night.lampOpacity]).toEqual(["0", "1"]);
     for (const theme of themes) {
       for (const [role, value] of Object.entries(themeTokens[theme])) {
         if (role !== "lampSpot") expect(value, `${theme}.${role}`).not.toMatch(/gradient|blur|glow/i);
