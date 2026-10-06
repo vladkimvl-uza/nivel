@@ -324,7 +324,8 @@ describe('who may send which event (ARCHITECTURE 4.9, column "who")', () => {
     expect(e.message).toMatch(/actor_not_allowed/);
   });
 
-  it("lets the bot act for customers and the owner, never as the system", async () => {
+  // The bot as the owner or the assistant needs an account of that role: order-actors.suite.ts.
+  it("lets the bot act for customers, never as the system", async () => {
     const bot = await connectAs("BOT");
     try {
       const { orderId } = await createOrder(migrator);

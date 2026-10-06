@@ -150,11 +150,20 @@ export interface TransitionInput {
   orderId: string;
   /** An OrderEvent of packages/domain (its `type` selects the edge of the status graph). */
   event: { type: OrderEvent["type"] } & Record<string, unknown>;
+  /**
+   * Who acts. The bot as `owner` or `assistant` names the Telegram id of an active account of that role
+   * (ops.admin_users.telegram_user_id): the database checks it and raises actor_not_allowed for any other id. For the
+   * other roles the id is the caller's own reference (admin user id, customer, "system"); it must not be empty.
+   */
   actor: { kind: Actor; id: string };
   /** Status the caller read; a different current status raises stale_status (retry after a fresh read). */
   expectedFrom?: OrderStatus;
   guardSnapshot?: Record<string, unknown>;
-  /** Order columns to set together with the status (snake_case names, whitelisted by the function). */
+  /**
+   * Order columns to set together with the status (snake_case names). The function whitelists them by the pair
+   * (actor, event): a customer writes only the fields of its event (accepted_at and the offer versions with ACCEPT,
+   * handed_over_at and warranty_until with HANDOVER), and each of them once; the money fields are the owner's.
+   */
   changes?: Record<string, unknown>;
 }
 

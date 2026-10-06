@@ -1,5 +1,6 @@
 // Helpers for integration tests (WP-06). Every test file runs against its own throwaway database clone;
 // the harness (packages/testing) has already pointed all DATABASE_URL_* at it.
+import { createHash } from "node:crypto";
 import pg from "pg";
 import { createDb, type Db } from "../client.ts";
 
@@ -205,6 +206,32 @@ export async function transition(client: pg.Client, orderId: string, type: strin
   return { seq: r.out_seq, from: r.out_from, to: r.out_to };
 }
 
+/** The error apply_transition raises for a named actor and order fields; fails when the call succeeds. */
+export function applyError(
+  client: pg.Client,
+  orderId: string,
+  event: string,
+  kind: string,
+  changes: object,
+): Promise<pg.DatabaseError> {
+  return pgError(client, "select * from sales.apply_transition($1, $2::jsonb, $3, 'x', null, null, $4::jsonb)", [
+    orderId,
+    JSON.stringify({ type: event }),
+    kind,
+    JSON.stringify(changes),
+  ]);
+}
+
+/** Status and number of journal rows of an order: what a refused call must leave as it was. */
+export async function orderState(client: pg.Client, orderId: string): Promise<{ status: string; events: string }> {
+  return one(
+    client,
+    `select o.status, (select count(*)::text from sales.order_events e where e.order_id = o.id) as events
+       from sales.orders o where o.id = $1`,
+    [orderId],
+  );
+}
+
 /** Walks the regular path until the order reaches `status` (the first time it is reached). */
 export async function driveTo(client: pg.Client, orderId: string, status: string): Promise<void> {
   if (status === "estimate_draft") return;
@@ -213,6 +240,38 @@ export async function driveTo(client: pg.Client, orderId: string, status: string
     if (to === status) return;
   }
   throw new Error(`status ${status} is not on the regular path`);
+}
+
+/**
+ * An account of the admin panel. `telegramUserId` links it to a person of the owner's Telegram group: the bot acts
+ * for the owner and the assistant only as such an account (sales.apply_transition). Run as migrator or admin.
+ */
+export async function insertAdminUser(
+  client: pg.Client,
+  o: { role: "owner" | "assistant" | "translator" | "accountant"; telegramUserId?: number | null; active?: boolean },
+): Promise<{ id: string; telegramId: string | null }> {
+  const n = uniq();
+  const telegramUserId = o.telegramUserId === undefined ? 6_000_000_000 + n : o.telegramUserId;
+  const row = await one<{ id: string }>(
+    client,
+    `insert into ops.admin_users (email, password_hash, role, telegram_user_id, active)
+     values ($1, 'x', $2, $3, $4) returning id`,
+    [`${o.role}${n}@admin.example.test`, o.role, telegramUserId, o.active ?? true],
+  );
+  return { id: row.id, telegramId: telegramUserId === null ? null : String(telegramUserId) };
+}
+
+/** A stub offer version (content.legal_documents) that an order can point to. */
+export async function insertOfferStub(client: pg.Client, lang: "uz" | "ru" = "uz"): Promise<string> {
+  const n = uniq();
+  const body = `Offer stub ${n}`;
+  const row = await one<{ id: string }>(
+    client,
+    `insert into content.legal_documents (kind, version, lang, body_md, status, text_sha256, effective_from)
+     values ('offer', $1, $2, $3, 'stub', $4, '2026-11-01') returning id`,
+    [`t${n}`, lang, body, createHash("sha256").update(body, "utf8").digest("hex")],
+  );
+  return row.id;
 }
 
 /** One consent row of the order (the latest row of a kind wins). */
