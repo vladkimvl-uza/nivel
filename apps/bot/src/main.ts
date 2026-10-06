@@ -1,7 +1,7 @@
 // Telegram bot on grammY (ARCHITECTURE 7). WP-00: without BOT_TOKEN the bot stays disabled and serves /healthz only.
 import { autoRetry } from "@grammyjs/auto-retry";
 import { type RunnerHandle, run } from "@grammyjs/runner";
-import { appPort, loadEnv } from "@nivel/config";
+import { appPort, LOG_REDACT_PATHS, loadEnv } from "@nivel/config";
 import { pingDatabase } from "@nivel/db/health";
 import { Bot } from "grammy";
 import pino from "pino";
@@ -10,7 +10,7 @@ import { startHealthServer } from "./health.ts";
 const env = loadEnv("bot");
 const log = pino({
   name: "bot",
-  redact: ["phone", "name", "address", "passport", "initData", "authorization", "cookie"],
+  redact: [...LOG_REDACT_PATHS],
 });
 const port = Number(process.env.PORT) || appPort("bot", env.NIVEL_SLOT);
 

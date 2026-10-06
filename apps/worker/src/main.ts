@@ -1,5 +1,5 @@
 // Background jobs on pg-boss (ARCHITECTURE 9). WP-00: start the queue, register domains, serve /healthz.
-import { appPort, loadEnv } from "@nivel/config";
+import { appPort, LOG_REDACT_PATHS, loadEnv } from "@nivel/config";
 import { pingDatabase } from "@nivel/db/health";
 import { PgBoss } from "pg-boss";
 import pino from "pino";
@@ -7,7 +7,7 @@ import { startHealthServer } from "./health.ts";
 import { registerAll } from "./jobs/index.ts";
 
 const env = loadEnv("worker");
-const log = pino({ name: "worker", redact: ["phone", "name", "address", "passport", "authorization", "cookie"] });
+const log = pino({ name: "worker", redact: [...LOG_REDACT_PATHS] });
 const port = Number(process.env.PORT) || appPort("worker", env.NIVEL_SLOT);
 
 const boss = new PgBoss({

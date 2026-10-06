@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node ../../tools/dev-run.mjs worker -- node --watch src/main.ts",
+    "dev": "node ../../tools/dev-run.mjs worker -- node --watch-path=src --watch-path=../../packages src/main.ts",
     "start": "node ../../tools/dev-run.mjs worker -- node src/main.ts",
     "typecheck": "tsc --noEmit"
   },

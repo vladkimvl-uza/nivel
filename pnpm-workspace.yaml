@@ -69,8 +69,3 @@ allowBuilds:
 minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - next
-  # Pinned by ARCHITECTURE 1.1 but published less than 3 days before 05.10.2026.
-  # Exact-version exceptions; remove after 06.10.2026 (docs/arch/ADR-003).
-  - msw@3.0.2
-  - pg-boss@12.36.0
-  - pino@10.4.0
