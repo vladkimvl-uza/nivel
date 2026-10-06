@@ -30,7 +30,30 @@ const partsFormat = new Intl.DateTimeFormat("en-GB", {
 });
 
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
-const WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const WITH_OFFSET =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+
+function isCalendarDate(yyyy: string, mm: string, dd: string): boolean {
+  const probe = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)));
+  return (
+    probe.getUTCFullYear() === Number(yyyy) && probe.getUTCMonth() === Number(mm) - 1 && probe.getUTCDate() === Number(dd)
+  );
+}
+
+/** V8 silently rolls 2026-02-30T10:00Z over to March and 24:00 to the next day; here they are errors. */
+function assertRealTimestamp(value: string, m: RegExpExecArray): void {
+  const [, yyyy = "", mm = "", dd = "", hh = "", min = "", ss = "00", offH = "00", offM = "00"] = m;
+  if (
+    !isCalendarDate(yyyy, mm, dd) ||
+    Number(hh) > 23 ||
+    Number(min) > 59 ||
+    Number(ss) > 59 ||
+    Number(offH) > 23 ||
+    Number(offM) > 59
+  ) {
+    throw new RangeError(`"${value}" is not a real calendar date and time`);
+  }
+}
 
 interface Wall {
   dd: string;
@@ -46,19 +69,14 @@ function wallClock(value: Date | string, needTime: boolean): Wall {
     if (dateOnly) {
       if (needTime) throw new RangeError(`"${value}" has no time of day`);
       const [, yyyy, mm, dd] = dateOnly as unknown as [string, string, string, string];
-      const probe = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)));
-      if (
-        probe.getUTCFullYear() !== Number(yyyy) ||
-        probe.getUTCMonth() !== Number(mm) - 1 ||
-        probe.getUTCDate() !== Number(dd)
-      ) {
-        throw new RangeError(`"${value}" is not a calendar date`);
-      }
+      if (!isCalendarDate(yyyy, mm, dd)) throw new RangeError(`"${value}" is not a calendar date`);
       return { dd, mm, yyyy, hh: "00", min: "00" };
     }
-    if (!WITH_OFFSET.test(value)) {
+    const stamp = WITH_OFFSET.exec(value);
+    if (!stamp) {
       throw new RangeError(`"${value}" is not an ISO date (yyyy-mm-dd) or a timestamp with an explicit offset`);
     }
+    assertRealTimestamp(value, stamp);
   } else if (!(value instanceof Date)) {
     throw new TypeError("expected a Date or an ISO string");
   }

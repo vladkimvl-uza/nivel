@@ -128,6 +128,24 @@ describe("formatDate", () => {
     expect(() => formatDate(value, "uz")).toThrow(RangeError);
   });
 
+  it.each([
+    "2026-02-30T10:00:00+05:00",
+    "2026-04-31T10:00:00Z",
+    "2026-10-05T24:00:00Z",
+    "2026-10-05T10:60:00Z",
+    "2026-10-05T10:00:60Z",
+    "2026-10-05T10:00:00+24:00",
+    "2026-10-05T10:00:00+05:60",
+  ])("rejects the impossible timestamp %s instead of rolling it over", (value) => {
+    expect(() => formatDate(value, "uz")).toThrow(RangeError);
+    expect(() => formatTime(value, "uz")).toThrow(RangeError);
+  });
+
+  it("still accepts the last real second of a leap-day timestamp", () => {
+    expect(formatDate("2028-02-29T23:59:59+05:00", "uz")).toBe("29.02.2028");
+    expect(formatTime("2028-02-29T23:59:59+05:00", "uz")).toBe("23:59");
+  });
+
   it("rejects an invalid Date and non-date values", () => {
     expect(() => formatDate(new Date(Number.NaN), "uz")).toThrow(RangeError);
     expect(() => formatDate(123 as unknown as string, "uz")).toThrow(TypeError);
