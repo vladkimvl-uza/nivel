@@ -1,6 +1,6 @@
 /*
- * Primitives of the "Night and day" design system (DESIGN_SYSTEM section 3). Every color is a role from themes.css:
- * the same rules serve both modes. Document pieces (.nv-est, .nv-sums, stamps) are drawn for paper (.nv-paper).
+ * Primitives of the night design system (DESIGN_SYSTEM section 3). Every color is a role from themes.css:
+ * a second theme would need no rule here. Document pieces (.nv-est, .nv-sums, stamps) are drawn for paper (.nv-paper).
  */
 
 /* ---------- mark ---------- */
@@ -141,42 +141,6 @@
   pointer-events: none;
 }
 
-/* ---------- day/night segment ---------- */
-.nv-seg2 {
-  display: flex;
-  flex: none;
-  min-width: 0;
-  margin: 0;
-  padding: 2px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r1);
-}
-
-.nv-seg2 button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 36px;
-  height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 1px;
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-
-.nv-seg2 button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--bg);
-}
-
-.nv-tod svg {
-  width: 18px;
-  height: 18px;
-}
-
 /* ---------- money ---------- */
 .nv-money {
   font-size: inherit;
@@ -214,7 +178,7 @@
   }
 }
 
-/* night: a warm spot behind documents, a lamp over the desk; it does not touch text or frames */
+/* A warm spot behind documents, a lamp over the desk; it does not touch text or frames */
 .nv-lamp {
   position: relative;
   isolation: isolate;
@@ -227,8 +191,6 @@
   z-index: -1;
   pointer-events: none;
   background: var(--lamp-spot);
-  opacity: var(--lamp-opacity);
-  transition: opacity var(--dur-theme) var(--ease-io);
 }
 
 /* ---------- estimate table ---------- */

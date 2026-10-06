@@ -1,44 +1,28 @@
-# @nivel/ui — дизайн-система «Ночь и день»
+# @nivel/ui — дизайн-система «Ночная съёмка»
 
-Источник значений: `docs/design/day-night/DESIGN_SYSTEM.md` и прототип `index.html` рядом с ним. Решение владельца Р-18: две темы, `day` и `night`, одна студия в разное время суток.
+Источник значений: `docs/design/day-night/DESIGN_SYSTEM.md` (колонка ночи) и прототип `index.html` рядом с ним. Решение владельца от 06.10.2026 (Р-18, ADR-006): тема одна — ночь. Дневной версии нет; выбора по времени, переключателя и запоминания выбора тоже нет.
 
 ## Два входа: какой для какой среды
 
-- Ядро: `src/index.ts` (имя пакета `@nivel/ui`). Только `.ts`, без react и JSX: токены двух тем, `brand`, `sceneLight`, шрифты (`fontFaces`, `fontFile`), `formatAmount`/`formatBp`, логика выбора темы (`resolveTheme`, `themeByLocalTime`, контроллер), `themeInitScript()` как строка. Грузится в чистом Node (`node src/main.ts` у worker и bot, рендер PDF в `@nivel/pdf`) и в браузере. Тест `entries.test.ts` запускает его в отдельном процессе Node и следит, чтобы в графе ядра не появились `.tsx` и react.
-- React: `src/react.ts` (путь пакета `@nivel/ui/react`, нужна заявка интегратору, см. ниже). Примитивы, `ThemeProvider`, `useTheme`, `ThemeToggle`, `ThemeInitScript`. Только для кода, который собирает сборщик (Next.js с `transpilePackages`) или vitest; из worker, bot и pdf его не импортировать.
-- `apps/web` сейчас берёт из ядра `defaultTheme`; React-вход подключается после того, как интегратор откроет путь `./react`.
+- Ядро: `src/index.ts` (имя пакета `@nivel/ui`). Только `.ts`, без react и JSX: токены ночи (`themeTokens`), `brand`, `defaultTheme` (`"night"`), `sceneLight`, шрифты (`fontFaces`, `fontFile`), `formatAmount`/`formatBp`. Грузится в чистом Node (`node src/main.ts` у worker и bot, рендер PDF в `@nivel/pdf`) и в браузере. Тест `entries.test.ts` запускает его в отдельном процессе Node и следит, чтобы в графе ядра не появились `.tsx` и react.
+- React: `src/react.ts` (путь `@nivel/ui/react`). Примитивы: `Button`, `TextField`, `Select`, `Paper`, `EstimateTable`, `SumsTable`, `Stamp`, `RoundStamp`, `Tag`, `Badge`, `Money`. Только для кода, который собирает сборщик (Next.js с `transpilePackages`) или vitest; из worker, bot и pdf его не импортировать.
 
 ## Подключение (apps/web)
 
-- Стили: один раз в CSS приложения, `@import "…/packages/ui/src/styles/index.css"` относительным путём (после заявки интегратору, путь `@nivel/ui/styles.css`). Это темы, `@font-face`, база, примитивы. Компоненты пишут `var(--ink)`, `var(--bg)`, а не цвета.
-- Корень страницы: `<html lang={…} data-theme="day" suppressHydrationWarning>`. Сервер рисует `defaultTheme`, а скрипт в `<head>` меняет атрибут до гидратации, поэтому без `suppressHydrationWarning` React в режиме разработки сообщит о расхождении.
-- В `<head>`: `<ThemeInitScript nonce={…} />` (ставит тему и `<meta name="theme-color">` до первой отрисовки). Внутри `<body>`: `<ThemeProvider>`, переключатель `<ThemeToggle labels={…} />`. Выбор темы: `?theme=` из адреса, затем сохранённый выбор (`localStorage`, ключ `nv-theme`), затем местное время (07:00–19:00 — день).
-- Событие смены темы: `nv-theme` на `document` (константа `THEME_EVENT`), `detail` равен `{ theme, animate }`, как в DESIGN_SYSTEM 7.4. Тема первой отрисовки событием не объявляется: сцена читает `document.documentElement.dataset.theme` при старте и слушает событие дальше.
-- Слой документов: `Paper`, `EstimateTable`/`EstimateRow`, `SumsTable`, `Stamp`/`RoundStamp` (один раз на странице `StampInkDefs`), `Tag`, `Badge` (`demo`, `draft`, `visualization`, `sample`). Штампы `rect` и `RoundStamp` рассчитаны только на бумагу (`Paper`); малый штамп (`variant="small"`) вне бумаги берёт `--accent-ink`, на бумаге `--stamp`.
-- Вспомогательные классы: `.nv-lamp` (тёплое пятно лампы за блоком, сила задаётся ролью `--lamp-opacity`, днём пятна нет), `.nv-stamp--press` (оттиск штампа за 450 мс, при «уменьшить движение» отключён), `.nv-sr` (текст только для чтения с экрана).
+- Стили: один раз в CSS приложения `@import "@nivel/ui/styles.css"` (или относительным путём к `src/styles/index.css`). Это темы, `@font-face`, база, примитивы. Компоненты пишут `var(--ink)`, `var(--bg)`, а не цвета.
+- Корень страницы: `<html lang={…} data-theme={defaultTheme}>`. Сервер рисует `"night"`, скрипта и `suppressHydrationWarning` не нужно: атрибут не меняется. Страница без атрибута тоже ночная (`:root` и `[data-theme="night"]` — одно правило).
+- Атрибут `data-theme` оставлен намеренно: вторую тему можно вернуть, не трогая компоненты (член в `themes`, набор в `themeTokens`; правило в `themes.css` генератор допишет сам после `build-css.mjs`).
+- `<meta name="theme-color">` — значение `themeTokens.night.themeColor`.
+- Слой документов: `Paper`, `EstimateTable`/`EstimateRow`, `SumsTable`, `Stamp`/`RoundStamp` (один раз на странице `StampInkDefs`), `Tag`, `Badge` (`demo`, `draft`, `visualization`, `sample`). Документы лежат на «бумаге» `.nv-paper` внутри ночной страницы. Штампы `rect` и `RoundStamp` рассчитаны только на бумагу; малый штамп (`variant="small"`) вне бумаги берёт `--accent-ink`, на бумаге `--stamp`.
+- Вспомогательные классы: `.nv-lamp` (тёплое пятно лампы за блоком, всегда включено), `.nv-stamp--press` (оттиск штампа за 450 мс, при «уменьшить движение» отключён), `.nv-sr` (текст только для чтения с экрана).
 - Тексты (uz/ru) приходят из вызывающего кода: пакет переводов не содержит, обязательные подписи нельзя оставить пустыми.
-- Свет 3D-сцены для WP-21: `sceneLight` (ядро).
-- Шрифты для PDF: `fontFile(face, "ttf")` отдаёт имя файла в `fonts/`; путь к каталогу — через `import.meta.resolve("@nivel/ui/fonts/…")` после заявки интегратору.
-
-## Заявка интегратору: package.json пакета
-
-Файл не принадлежит WP-09 (OWNERSHIP). Нужные `exports`:
-
-```json
-{
-  ".": "./src/index.ts",
-  "./react": "./src/react.ts",
-  "./styles.css": "./src/styles/index.css",
-  "./themes.css": "./src/themes/themes.css",
-  "./fonts/*": "./fonts/*",
-  "./package.json": "./package.json"
-}
-```
+- Свет 3D-сцены для WP-21: `sceneLight` (ядро), только ночной набор. Первый экран сайта теперь видео владельца; экспорт оставлен на будущее.
+- Шрифты для PDF: `fontFile(face, "ttf")` отдаёт имя файла в `fonts/`; путь к каталогу — `import.meta.resolve("@nivel/ui/fonts/…")`.
 
 ## Что и где
 
-- `src/themes/tokens.ts` — все цвета двух тем (сырые цвета разрешены только в `themes/`); `themes.css` генерируется из него.
+- `src/themes/tokens.ts` — все цвета ночи и бумаги (сырые цвета разрешены только в `themes/`); `themes.css` генерируется из него; `src/themes/ids.ts` — `themes`, `defaultTheme`.
 - `src/fonts/catalog.ts` — девять начертаний; файлы woff2 (сайт) и TTF (PDF) в `fonts/`, лицензии OFL в `fonts/licenses/`.
 - После правки токенов или шрифтов: `pnpm exec node packages/ui/scripts/build-css.mjs` (тест падает, если CSS устарел).
-- Снимки Playwright двух тем не сделаны: каталог `e2e/` и `playwright.config.ts` принадлежат интегратору; нужна страница-витрина в `apps/web` или разрешение на `e2e/ui-*.spec.ts`. Пока обе темы проверены вручную в браузере на витрине примитивов.
-- Проверки: `pnpm test` (контраст пар токенов ≥ 4,5:1 в обеих темах, глифы U+02BB и U+02BC в каждом файле шрифта, все классы компонентов есть в CSS), `pnpm check:antilist`.
+- Снимки Playwright: каталог `e2e/` и `playwright.config.ts` принадлежат интегратору; страницы-витрины примитивов пока нет, снимки не сняты.
+- Проверки: `pnpm test` (контраст пар токенов ночи и бумаги ≥ 4,5:1; глифы U+02BB и U+02BC в каждом файле шрифта; все классы компонентов есть в CSS; в стилях нет `[data-theme="day"]`; `defaultTheme === "night"`), `pnpm check:antilist`.

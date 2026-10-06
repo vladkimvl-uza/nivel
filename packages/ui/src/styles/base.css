@@ -1,4 +1,4 @@
-/* Base of the "Night and day" design system. Colors come only from the roles of themes.css. */
+/* Base of the night design system. Colors come only from the roles of themes.css. */
 
 *,
 *::before,
@@ -57,31 +57,4 @@ button {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-/* The switch of the mode: only colors, only for the second that html.theme-shift is present (set by ThemeProvider). */
-html.theme-shift,
-html.theme-shift *,
-html.theme-shift *::before,
-html.theme-shift *::after {
-  --nv-shift:
-    background-color var(--dur-theme) var(--ease-io),
-    color var(--dur-theme) var(--ease-io),
-    border-color var(--dur-theme) var(--ease-io),
-    fill var(--dur-theme) var(--ease-io),
-    stroke var(--dur-theme) var(--ease-io),
-    box-shadow var(--dur-theme) var(--ease-io),
-    opacity var(--dur-theme) var(--ease-io);
-  /* biome-ignore lint/complexity/noImportantStyles: must beat the own transitions of every component */
-  transition: var(--nv-shift) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html.theme-shift,
-  html.theme-shift *,
-  html.theme-shift *::before,
-  html.theme-shift *::after {
-    /* biome-ignore lint/complexity/noImportantStyles: must beat the own transitions of every component */
-    transition: none !important;
-  }
 }

@@ -7,7 +7,7 @@ export function Mark() {
 }
 
 interface ButtonBase {
-  /** Solid by default (asphalt by day, paper at night); ghost has a frame. */
+  /** Solid by default (paper on the night page); ghost has a frame. */
   variant?: "primary" | "ghost" | undefined;
   size?: "md" | "sm" | undefined;
   /** The triangle before the label, for the main call to action. */

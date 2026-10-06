@@ -1,8 +1,9 @@
-// Colors of the two modes (DESIGN_SYSTEM 2.1 and 2.2). The only place besides themes.css with raw colors:
-// tools/check-antilist.mjs allows them in `themes/` and nowhere else. Components use var(--role).
-import type { Theme } from "../theming/ids.ts";
+// Colors of the night theme (DESIGN_SYSTEM 2.1 and 2.2); the second set was removed on 06.10.2026 (R-18).
+// The only place besides themes.css with raw colors: tools/check-antilist.mjs allows them in `themes/` and nowhere
+// else. Components use var(--role).
+import type { Theme } from "./ids.ts";
 
-/** Brand core of nivel-1: the same in both modes. */
+/** Brand core of nivel-1. */
 export const brand = {
   asphalt: "#1D1D1B",
   signal: "#D9501A",
@@ -11,7 +12,7 @@ export const brand = {
 } as const;
 
 /**
- * Roles of one mode. Most are DESIGN_SYSTEM 2.2 verbatim; `stamp`, `minus` and `lampSpot` are colors that the
+ * Roles of one theme. Most are DESIGN_SYSTEM 2.2 verbatim; `stamp`, `minus` and `lampSpot` are colors that the
  * prototype hard-codes (stamp ink, refund line, warm spot under documents), turned into roles so that no component
  * carries a raw color.
  */
@@ -47,60 +48,17 @@ export interface ThemeTokens {
   docLine: string;
   docShadow: string;
   cardShadow: string;
-  /** Opacity of the two logo versions inside the header: switching the mode does not reload the SVG. */
-  logoDay: string;
-  logoNight: string;
-  /** Ink of stamps on paper: darker at night, because the night paper is `#E9E3D7`. */
+  /** Ink of stamps on paper: tuned for the night paper `#E9E3D7`. */
   stamp: string;
   /** Refund to the customer in a sum table. */
   minus: string;
-  /** Warm spot behind documents: a lamp over the desk, not a glow. Same image in both modes, visible at night only. */
+  /** Warm spot behind documents: a lamp over the desk, not a glow. */
   lampSpot: string;
-  lampOpacity: string;
   /** `<meta name="theme-color">`; not a CSS variable. */
   themeColor: string;
 }
 
 export const themeTokens: Record<Theme, ThemeTokens> = {
-  day: {
-    bg: "#F1EFEA",
-    bg2: "#E9E5DD",
-    surface: "#FBF9F4",
-    stage: "#E4DDD2",
-    ink: "#1D1D1B",
-    ink2: "#5E574D",
-    ink3: "#8A867E",
-    line: "rgba(29,29,27,.14)",
-    line2: "rgba(29,29,27,.28)",
-    accent: "#D9501A",
-    accentInk: "#A53F17",
-    btnBg: "#1D1D1B",
-    btnInk: "#F1EFEA",
-    btnHover: "#000000",
-    hdrBg: "#F1EFEA",
-    chipBg: "rgba(241,239,234,.88)",
-    band: "rgba(216,203,182,.45)",
-    wood: "#6E4B2F",
-    woodInk: "#F1ECE3",
-    woodInk2: "#E2D6C4",
-    woodLine: "rgba(241,236,227,.24)",
-    foot: "#1D1D1B",
-    doc: "#FBF9F4",
-    doc2: "#F1EDE5",
-    docInk: "#1D1D1B",
-    docInk2: "#5E574D",
-    docLine: "rgba(29,29,27,.16)",
-    docShadow: "0 1px 0 rgba(29,29,27,.04),0 22px 44px -30px rgba(60,40,20,.45)",
-    cardShadow: "0 1px 0 rgba(29,29,27,.04),0 18px 40px -28px rgba(60,40,20,.35)",
-    logoDay: "1",
-    logoNight: "0",
-    stamp: "#C8481A",
-    minus: "#9C3A12",
-    lampSpot:
-      "radial-gradient(48% 52% at 50% 42%, rgba(255,196,130,.11), rgba(255,196,130,.04) 55%, rgba(255,196,130,0) 75%)",
-    lampOpacity: "0",
-    themeColor: "#F1EFEA",
-  },
   night: {
     bg: "#121110",
     bg2: "#171513",
@@ -131,13 +89,10 @@ export const themeTokens: Record<Theme, ThemeTokens> = {
     docLine: "rgba(29,29,27,.2)",
     docShadow: "0 2px 0 rgba(0,0,0,.4),0 40px 80px -24px rgba(0,0,0,.75)",
     cardShadow: "0 1px 0 rgba(0,0,0,.3),0 24px 48px -30px rgba(0,0,0,.8)",
-    logoDay: "0",
-    logoNight: "1",
     stamp: "#A93F17",
     minus: "#9C3A12",
     lampSpot:
       "radial-gradient(48% 52% at 50% 42%, rgba(255,196,130,.11), rgba(255,196,130,.04) 55%, rgba(255,196,130,0) 75%)",
-    lampOpacity: "1",
     themeColor: "#121110",
   },
 };

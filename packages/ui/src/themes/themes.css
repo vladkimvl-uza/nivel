@@ -17,7 +17,6 @@
   --dur-1: 0.15s;
   --dur-2: 0.3s;
   --dur-3: 0.6s;
-  --dur-theme: 0.9s;
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-stamp: cubic-bezier(0.2, 1.4, 0.4, 1);
@@ -28,51 +27,8 @@ html[lang="uz-Latn"] {
   --mono: "Noto Sans Mono", ui-monospace, Consolas, monospace;
 }
 
-/* Day is the default: a page without the attribute is day. */
+/* One rule per theme; the default theme also answers to :root, so a page without the attribute is night. */
 :root,
-[data-theme="day"] {
-  --bg: #f1efea;
-  --bg-2: #e9e5dd;
-  --surface: #fbf9f4;
-  --stage: #e4ddd2;
-  --ink: #1d1d1b;
-  --ink-2: #5e574d;
-  --ink-3: #8a867e;
-  --line: rgba(29, 29, 27, 0.14);
-  --line-2: rgba(29, 29, 27, 0.28);
-  --accent: #d9501a;
-  --accent-ink: #a53f17;
-  --btn-bg: #1d1d1b;
-  --btn-ink: #f1efea;
-  --btn-hover: #000000;
-  --hdr-bg: #f1efea;
-  --chip-bg: rgba(241, 239, 234, 0.88);
-  --band: rgba(216, 203, 182, 0.45);
-  --wood: #6e4b2f;
-  --wood-ink: #f1ece3;
-  --wood-ink-2: #e2d6c4;
-  --wood-line: rgba(241, 236, 227, 0.24);
-  --foot: #1d1d1b;
-  --doc: #fbf9f4;
-  --doc-2: #f1ede5;
-  --doc-ink: #1d1d1b;
-  --doc-ink-2: #5e574d;
-  --doc-line: rgba(29, 29, 27, 0.16);
-  --doc-shadow: 0 1px 0 rgba(29, 29, 27, 0.04), 0 22px 44px -30px rgba(60, 40, 20, 0.45);
-  --card-shadow: 0 1px 0 rgba(29, 29, 27, 0.04), 0 18px 40px -28px rgba(60, 40, 20, 0.35);
-  --logo-day: 1;
-  --logo-night: 0;
-  --stamp: #c8481a;
-  --minus: #9c3a12;
-  --lamp-spot: radial-gradient(
-    48% 52% at 50% 42%,
-    rgba(255, 196, 130, 0.11),
-    rgba(255, 196, 130, 0.04) 55%,
-    rgba(255, 196, 130, 0) 75%
-  );
-  --lamp-opacity: 0;
-}
-
 [data-theme="night"] {
   --bg: #121110;
   --bg-2: #171513;
@@ -103,8 +59,6 @@ html[lang="uz-Latn"] {
   --doc-line: rgba(29, 29, 27, 0.2);
   --doc-shadow: 0 2px 0 rgba(0, 0, 0, 0.4), 0 40px 80px -24px rgba(0, 0, 0, 0.75);
   --card-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 24px 48px -30px rgba(0, 0, 0, 0.8);
-  --logo-day: 0;
-  --logo-night: 1;
   --stamp: #a93f17;
   --minus: #9c3a12;
   --lamp-spot: radial-gradient(
@@ -113,5 +67,4 @@ html[lang="uz-Latn"] {
     rgba(255, 196, 130, 0.04) 55%,
     rgba(255, 196, 130, 0) 75%
   );
-  --lamp-opacity: 1;
 }

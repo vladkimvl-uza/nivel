@@ -14,7 +14,7 @@ for (const [path, lang, lead] of [
     expect(response?.status()).toBe(200);
     expect(response?.headers()["content-security-policy"]).toMatch(/script-src 'self' 'nonce-/);
     await expect(page.locator("html")).toHaveAttribute("lang", lang);
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Nivel");
     await expect(page.locator("p.lead")).toHaveText(lead);
     expect(errors).toEqual([]);

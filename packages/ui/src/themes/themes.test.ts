@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { normalizeCss } from "../test-support/css.ts";
-import { defaultTheme, themes } from "../theming/ids.ts";
+import { defaultTheme, themes } from "./ids.ts";
 import { buildThemesCss, cssVarName } from "./to-css.ts";
 import { brand, type ThemeTokens, themeTokens } from "./tokens.ts";
 
@@ -35,14 +35,27 @@ function declarations(css: string, selector: RegExp): Map<string, string> {
 const normalize = (v: string) =>
   v.replace(/#([0-9a-f])([0-9a-f])([0-9a-f])(?![0-9a-f])/g, "#$1$1$2$2$3$3").replace(/(?<!\d)\.(\d)/g, "0.$1");
 
-const DAY = /:root,\s*\[data-theme="day"\]\s*\{/;
+const NIGHT = /:root,\s*\[data-theme="night"\]\s*\{/;
 const ROOT = /:root\s*\{(?=\s*--asphalt)/;
-const NIGHT = /\[data-theme="night"\]\s*\{/;
+const PROTO_NIGHT = /\[data-theme="night"\]\s*\{/;
 
-describe("theme ids", () => {
-  it("are day and night; the default (before the visitor's local time is known) is day", () => {
-    expect(themes).toEqual(["day", "night"]);
-    expect(defaultTheme).toBe("day");
+/** Variables of the prototype that exist only to switch between day and night: the site has no switch (R-18, 06.10). */
+const SWITCH_ONLY = new Set(["--logo-day", "--logo-night", "--lamp-opacity", "--dur-theme"]);
+
+describe("theme ids (owner decision of 06.10.2026: night only)", () => {
+  it("has the single theme night, and it is the default", () => {
+    expect(themes).toEqual(["night"]);
+    expect(defaultTheme).toBe("night");
+  });
+
+  it("keeps the data-theme contract: the token map is keyed by theme, so a second theme can come back", () => {
+    expect(Object.keys(themeTokens)).toEqual([...themes]);
+  });
+
+  it("has one themes.css rule per theme, so a theme added to the list cannot silently fall back to night", () => {
+    const css = buildThemesCss();
+    for (const theme of themes) expect(css).toContain(`[data-theme="${theme}"]`);
+    expect(css.match(/\[data-theme="/g)?.length).toBe(themes.length);
   });
 });
 
@@ -51,22 +64,22 @@ describe("tokens", () => {
     expect(brand).toEqual({ asphalt: "#1D1D1B", signal: "#D9501A", signalDark: "#F06A30", paper: "#F1EFEA" });
   });
 
-  it("define exactly the same roles in both themes (modes change colors, not structure)", () => {
-    expect(Object.keys(themeTokens.night)).toEqual(Object.keys(themeTokens.day));
+  it("have no day set and no role that exists only for switching", () => {
+    expect(Object.keys(themeTokens)).not.toContain("day");
+    const roles = Object.keys(themeTokens.night);
+    for (const role of ["logoDay", "logoNight", "lampOpacity"]) expect(roles).not.toContain(role);
   });
 
   it("use only warm tones: no blue channel above the red one in any color", () => {
     const hex = /#([0-9a-f]{6})\b/gi;
-    for (const theme of themes) {
-      for (const [role, value] of Object.entries(themeTokens[theme])) {
-        for (const m of value.matchAll(hex)) {
-          const h = m[1] as string;
-          const [r, b] = [Number.parseInt(h.slice(0, 2), 16), Number.parseInt(h.slice(4, 6), 16)];
-          expect(b, `${theme}.${role} ${m[0]}`).toBeLessThanOrEqual(r);
-        }
-        for (const m of value.matchAll(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g)) {
-          expect(Number(m[3]), `${theme}.${role} ${m[0]}`).toBeLessThanOrEqual(Number(m[1]));
-        }
+    for (const [role, value] of Object.entries(themeTokens.night)) {
+      for (const m of value.matchAll(hex)) {
+        const h = m[1] as string;
+        const [r, b] = [Number.parseInt(h.slice(0, 2), 16), Number.parseInt(h.slice(4, 6), 16)];
+        expect(b, `night.${role} ${m[0]}`).toBeLessThanOrEqual(r);
+      }
+      for (const m of value.matchAll(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g)) {
+        expect(Number(m[3]), `night.${role} ${m[0]}`).toBeLessThanOrEqual(Number(m[1]));
       }
     }
   });
@@ -80,29 +93,20 @@ describe("tokens", () => {
     }
   });
 
-  it("keep documents paper in both modes, with dark ink", () => {
-    for (const theme of themes) {
-      expect(themeTokens[theme].docInk).toBe("#1D1D1B");
-    }
+  it("keep documents on paper with dark ink inside the night page", () => {
+    expect(themeTokens.night.docInk).toBe("#1D1D1B");
     expect(themeTokens.night.doc).toBe("#E9E3D7");
-    expect(themeTokens.day.doc).toBe("#FBF9F4");
+    expect(themeTokens.night.stamp).toBe("#A93F17");
   });
 
-  it("flip the logo and the theme-color meta with the mode", () => {
-    expect([themeTokens.day.logoDay, themeTokens.day.logoNight]).toEqual(["1", "0"]);
-    expect([themeTokens.night.logoDay, themeTokens.night.logoNight]).toEqual(["0", "1"]);
-    expect(themeTokens.day.themeColor).toBe(themeTokens.day.bg);
+  it("give the theme-color meta the page background", () => {
     expect(themeTokens.night.themeColor).toBe(themeTokens.night.bg);
   });
 
-  it("have no gradients or glows, except the lamp spot behind documents, which is visible at night only", () => {
-    expect(themeTokens.day.lampSpot).toBe(themeTokens.night.lampSpot);
+  it("have no gradients or glows, except the lamp spot behind documents", () => {
     expect(themeTokens.night.lampSpot).toMatch(/^radial-gradient\(/);
-    expect([themeTokens.day.lampOpacity, themeTokens.night.lampOpacity]).toEqual(["0", "1"]);
-    for (const theme of themes) {
-      for (const [role, value] of Object.entries(themeTokens[theme])) {
-        if (role !== "lampSpot") expect(value, `${theme}.${role}`).not.toMatch(/gradient|blur|glow/i);
-      }
+    for (const [role, value] of Object.entries(themeTokens.night)) {
+      if (role !== "lampSpot") expect(value, `night.${role}`).not.toMatch(/gradient|blur|glow/i);
     }
   });
 });
@@ -112,29 +116,39 @@ describe("themes.css", () => {
     expect(normalizeCss(themesCss)).toBe(normalizeCss(buildThemesCss()));
   });
 
-  it("switches by the data-theme attribute only, with day as the unattributed default", () => {
-    expect(themesCss).toMatch(DAY);
+  it('has no day theme: no [data-theme="day"] rule and no other theme name than night', () => {
+    expect(themesCss).not.toMatch(/\[data-theme="day"\]/);
+    expect(themesCss).not.toMatch(/data-theme="(?!night")/);
+    expect(buildThemesCss()).not.toMatch(/\[data-theme="day"\]/);
+  });
+
+  it("serves night through data-theme and to a page without the attribute", () => {
     expect(themesCss).toMatch(NIGHT);
+    expect(themesCss.match(/\[data-theme=/g)).toHaveLength(1);
     expect(themesCss).not.toMatch(/prefers-color-scheme/);
     expect(themesCss).not.toMatch(/\.(day|night|dark|light)\b/);
   });
 
-  it("declares the same variable names in day and night", () => {
-    const day = [...declarations(themesCss, DAY).keys()];
+  it("declares the role variables of night", () => {
     const night = [...declarations(themesCss, NIGHT).keys()];
-    expect(night).toEqual(day);
-    expect(day).toContain("--bg");
-    expect(day).toContain("--accent-ink");
-    expect(day).toContain("--doc-ink-2");
-    expect(day).not.toContain("--theme-color");
+    expect(night).toContain("--bg");
+    expect(night).toContain("--accent-ink");
+    expect(night).toContain("--doc-ink-2");
+    expect(night).toContain("--lamp-spot");
+    expect(night).not.toContain("--theme-color");
+    for (const name of SWITCH_ONLY) expect(night, name).not.toContain(name);
   });
 
   it("exposes one variable per token role", () => {
-    const day = declarations(themesCss, DAY);
-    for (const role of Object.keys(themeTokens.day)) {
+    const night = declarations(themesCss, NIGHT);
+    for (const role of Object.keys(themeTokens.night)) {
       if (role === "themeColor") continue;
-      expect(day.has(cssVarName(role)), role).toBe(true);
+      expect(night.has(cssVarName(role)), role).toBe(true);
     }
+  });
+
+  it("has no variable for switching (the day-night fade duration, the logo pair, the lamp opacity)", () => {
+    expect(themesCss).not.toMatch(/--dur-theme|--logo-(day|night)|--lamp-opacity/);
   });
 
   it("switches the mono font to Noto Sans Mono for Uzbek Latin", () => {
@@ -142,18 +156,18 @@ describe("themes.css", () => {
     expect(uz.get("--mono")).toContain("notosansmono");
   });
 
-  it("equals the values of the prototype index.html wherever the prototype defines a variable", () => {
-    for (const selector of [DAY, NIGHT]) {
-      const proto = declarations(prototype, selector);
-      const mine = declarations(themesCss, selector);
-      expect(proto.size).toBeGreaterThan(25);
-      for (const [name, value] of proto) {
-        expect(normalize(mine.get(name) ?? "<missing>"), `${selector} ${name}`).toBe(normalize(value));
-      }
+  it("equals the night values of the prototype index.html wherever the prototype defines a variable", () => {
+    const proto = declarations(prototype, PROTO_NIGHT);
+    const mine = declarations(themesCss, NIGHT);
+    expect(proto.size).toBeGreaterThan(25);
+    for (const [name, value] of proto) {
+      if (SWITCH_ONLY.has(name)) continue;
+      expect(normalize(mine.get(name) ?? "<missing>"), `night ${name}`).toBe(normalize(value));
     }
     const protoRoot = declarations(prototype, ROOT);
     const mineRoot = declarations(themesCss, ROOT);
     for (const [name, value] of protoRoot) {
+      if (SWITCH_ONLY.has(name)) continue;
       expect(normalize(mineRoot.get(name) ?? "<missing>"), name).toBe(normalize(value));
     }
   });
@@ -172,7 +186,7 @@ describe("cssVarName", () => {
 
 describe("type of a theme", () => {
   it("requires every role (compile-time check, runtime sanity)", () => {
-    const t: ThemeTokens = themeTokens.day;
+    const t: ThemeTokens = themeTokens.night;
     expect(Object.values(t).every((v) => typeof v === "string" && v.length > 0)).toBe(true);
   });
 });

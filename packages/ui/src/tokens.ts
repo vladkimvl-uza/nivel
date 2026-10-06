@@ -24,8 +24,8 @@ export const space = {
 export const radius = { r1: 2, r2: 3 } as const;
 
 export const motion = {
-  /** Milliseconds. `theme` is the page color change, `sceneTheme` the scene light change. */
-  dur: { fast: 150, base: 300, slow: 600, theme: 900, sceneTheme: 1200 },
+  /** Milliseconds. */
+  dur: { fast: 150, base: 300, slow: 600 },
   ease: {
     out: "cubic-bezier(.2,.7,.2,1)",
     io: "cubic-bezier(.65,0,.35,1)",
