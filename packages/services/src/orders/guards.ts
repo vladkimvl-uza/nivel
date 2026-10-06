@@ -2,10 +2,12 @@
 // payment, an act or a report; here the database says whether they exist, belong to this order and are what the table
 // requires. Run after the domain has accepted the event, so the order of the answers stays the one of the domain.
 import type { Executor } from "@nivel/db/repos";
+import { podborFee } from "@nivel/domain/fee";
 import type { GuardError, OrderEvent } from "@nivel/domain/order";
 import { verifyAcceptConsents } from "../consents/consents.ts";
 import { FUNDS_KINDS } from "../payments/pairs.ts";
 import { ValidationError } from "./errors.ts";
+import { loadFeeSettings } from "./settings.ts";
 import type { OrderRow, SnapshotInputs } from "./snapshot.ts";
 import { isUuid } from "./validate.ts";
 
@@ -187,7 +189,10 @@ export async function serviceGuard(env: GuardEnv, event: OrderEvent): Promise<Gu
     }
     case "PODBOR_DELIVERED": {
       const p = await paymentFacts(tx, event.paymentId);
-      return confirmedQrFee(p, order, "podbor_fee") ? undefined : "payments_incomplete";
+      if (!confirmedQrFee(p, order, "podbor_fee") || quote === undefined) return "payments_incomplete";
+      // The whole fee of the Podbor, as the domain counts it from the fee of the quote: a part of it does not deliver it.
+      const due = podborFee(quote.stored.totals.fee, await loadFeeSettings(tx));
+      return p.net >= due ? undefined : "payments_incomplete";
     }
     case "CANCEL_SETTLED": {
       // Every payment of the cancellation is confirmed or voided with a reason before the order is cancelled.

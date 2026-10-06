@@ -1,8 +1,12 @@
+import { podborFee } from "@nivel/domain/fee";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { convert, create as createLead } from "../leads/index.ts";
 import { dispatch } from "../orders/dispatch.ts";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
+import { loadFeeSettings } from "../orders/settings.ts";
 import { acceptedOrder, customerActor, ownerActor, type TestOrder } from "../orders/test-support/flow.ts";
-import { createWorld, DAY, HOUR, newFile, type World } from "../orders/test-support/world.ts";
+import { createWorld, DAY, HOUR, newFile, pcLines, type World } from "../orders/test-support/world.ts";
+import { build, send } from "../quotes/index.ts";
 import { confirm, expect as expectPayment, reverse, voidPayment } from "./index.ts";
 
 let w: World;
@@ -109,6 +113,41 @@ describe("payments.expect", () => {
     expect(rows[0].n).toBe(1);
   });
 
+  it("is repeatable after the payment is confirmed too: a paid advance is not expected a second time", async () => {
+    const o = await acceptedOrder(w);
+    const a = await expectAdvance(o);
+    await confirm({ paymentId: a, fiscalReceiptNo: "FR-AGAIN-1", payerIsCustomer: true }, owner(), w.admin);
+    expect(await expectAdvance(o)).toBe(a);
+    const funds = await expectFunds(o);
+    await confirm({ paymentId: funds, bankDocNo: "BD-AGAIN-1", payerIsCustomer: true }, owner(), w.admin);
+    expect(await expectFunds(o)).toBe(funds);
+    const { rows } = await w.db.$client.query(
+      "select count(*)::int as n from sales.payments where order_id = $1 and kind in ('fee_advance', 'purchase_funds')",
+      [o.orderId],
+    );
+    expect(rows[0].n).toBe(2);
+  });
+
+  it("expects the advance anew once the confirmed one has been reversed", async () => {
+    const o = await acceptedOrder(w);
+    const a = await expectAdvance(o);
+    await confirm({ paymentId: a, fiscalReceiptNo: "FR-REV-1", payerIsCustomer: true }, owner(), w.admin);
+    await reverse({ paymentId: a, reason: "wrong receipt", fiscalReceiptNo: "FR-REV-2" }, owner(), w.admin);
+    const again = await expectAdvance(o);
+    expect(again).not.toBe(a);
+  });
+
+  it("makes one expectation out of two requests at once", async () => {
+    const o = await acceptedOrder(w);
+    const [a, b] = await Promise.all([expectAdvance(o), expectAdvance(o)]);
+    expect(a).toBe(b);
+    const { rows } = await w.db.$client.query(
+      "select count(*)::int as n from sales.payments where order_id = $1 and kind = 'fee_advance'",
+      [o.orderId],
+    );
+    expect(rows[0].n).toBe(1);
+  });
+
   it("is a job of the owner in the admin role", async () => {
     const o = await acceptedOrder(w);
     await expect(
@@ -197,6 +236,30 @@ describe("payments.confirm", () => {
     await expect(confirm({ paymentId: other, bankDocNo: "x" }, owner(), w.admin)).rejects.toMatchObject({
       issues: [{ code: "payment_not_expected" }],
     });
+  });
+
+  it("refuses a time that is not a time with a validation error, not with a RangeError of the driver", async () => {
+    const o = await acceptedOrder(w);
+    const id = await expectAdvance(o);
+    for (const at of [new Date("x"), "2026-10-12" as never, 0 as never]) {
+      await expect(confirm({ paymentId: id, fiscalReceiptNo: "FR-3", at }, owner(), w.admin)).rejects.toMatchObject({
+        name: "ValidationError",
+        issues: [{ path: "at", code: "date_invalid" }],
+      });
+    }
+    expect((await paymentRow(id)).status).toBe("expected");
+  });
+
+  it("answers the second of two confirmations at once with a refusal, and the first one stands", async () => {
+    const o = await acceptedOrder(w);
+    const id = await expectAdvance(o);
+    const results = await Promise.allSettled([
+      confirm({ paymentId: id, fiscalReceiptNo: "FR-RACE-1", payerIsCustomer: true }, owner(), w.admin),
+      confirm({ paymentId: id, fiscalReceiptNo: "FR-RACE-2", payerIsCustomer: true }, owner(), w.admin),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const lost = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(lost.reason).toMatchObject({ name: "ValidationError", issues: [{ code: "payment_not_expected" }] });
   });
 
   it("refuses a time in the future and a payment that does not exist", async () => {
@@ -477,5 +540,58 @@ describe("the money events of the order", () => {
     expect(await start()).toEqual({ ok: false, error: "purchase_too_early" });
     w.clock.set(new Date("2026-10-13T10:00:00+05:00"));
     expect(await start()).toEqual({ ok: true, status: "purchasing" });
+  });
+});
+
+async function podborOrder(): Promise<{ orderId: string; customerId: string; fee: number }> {
+  const lead = await createLead(
+    { channel: "bot", scope: "podbor", customer: { telegramUserId: 7_600_000_000 + Math.floor(Math.random() * 1e6) } },
+    w.bot,
+  );
+  const order = await convert({ leadId: lead.leadId }, owner(), w.admin);
+  const quote = await build({ orderId: order.orderId, lines: pcLines(w), tasks: ["gaming"] }, owner(), w.admin);
+  const sent = await send({ orderId: order.orderId, quoteId: quote.quoteId }, owner(), w.admin);
+  expect(sent.ok).toBe(true);
+  const settings = await loadFeeSettings(w.db);
+  return { orderId: order.orderId, customerId: lead.customerId as string, fee: podborFee(quote.totals.fee, settings) };
+}
+
+describe("the Podbor fee", () => {
+  it("is expected in the amount the domain counts from the fee of the quote, and a caller's sum is not taken", async () => {
+    const o = await podborOrder();
+    expect(o.fee).toBeGreaterThan(0);
+    const a = await expectPayment({ orderId: o.orderId, kind: "podbor_fee" }, owner(), w.admin);
+    expect((await paymentRow(a.paymentId)).amount_sum).toBe(String(o.fee));
+    await expect(
+      expectPayment({ orderId: o.orderId, kind: "podbor_fee", amountSum: 1000 }, owner(), w.admin),
+    ).rejects.toMatchObject({ issues: [{ path: "amountSum", code: "amount_mismatch" }] });
+    expect(
+      (await expectPayment({ orderId: o.orderId, kind: "podbor_fee", amountSum: o.fee }, owner(), w.admin)).paymentId,
+    ).toBe(a.paymentId);
+  });
+
+  it("PODBOR_DELIVERED takes only a fee paid in full: a part of it does not deliver the Podbor", async () => {
+    const o = await podborOrder();
+    const { paymentId } = await expectPayment({ orderId: o.orderId, kind: "podbor_fee" }, owner(), w.admin);
+    await confirm({ paymentId, fiscalReceiptNo: "FR-PODBOR-1", payerIsCustomer: true }, owner(), w.admin);
+    await reverse(
+      { paymentId, reason: "returned in part", amountSum: Math.floor(o.fee / 2), fiscalReceiptNo: "FR-PODBOR-2" },
+      owner(),
+      w.admin,
+    );
+    expect(await dispatch(o.orderId, { type: "PODBOR_DELIVERED", paymentId }, owner(), w.admin)).toEqual({
+      ok: false,
+      error: "payments_incomplete",
+    });
+  });
+
+  it("PODBOR_DELIVERED passes with the fee paid in full", async () => {
+    const o = await podborOrder();
+    const { paymentId } = await expectPayment({ orderId: o.orderId, kind: "podbor_fee" }, owner(), w.admin);
+    await confirm({ paymentId, fiscalReceiptNo: "FR-PODBOR-3", payerIsCustomer: true }, owner(), w.admin);
+    expect(await dispatch(o.orderId, { type: "PODBOR_DELIVERED", paymentId }, owner(), w.admin)).toEqual({
+      ok: true,
+      status: "podbor_delivered",
+    });
   });
 });
