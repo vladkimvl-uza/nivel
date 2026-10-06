@@ -1,8 +1,9 @@
 // Sign-in, sessions and the own account (ARCHITECTURE 6.1, 10.1 A07). Pure logic over ports: storage, password hasher,
 // clock. Messages for people are Russian; the reasons returned to the screens are codes.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { AttemptLimiter } from "./attempts.ts";
 import { checkPasswordPolicy, type PasswordHasher, randomPassword } from "./password.ts";
-import { AUTH_POLICY, MS_PER_DAY, MS_PER_HOUR } from "./policy.ts";
+import { AUTH_POLICY, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from "./policy.ts";
 import type { Role } from "./roles.ts";
 import {
   generateRecoveryCodes,
@@ -36,7 +37,11 @@ export interface LoginInput {
 export type LoginResult =
   | { ok: true; token: string; user: SessionUser; usedRecoveryCode: boolean; recoveryLeft: number }
   | { ok: false; reason: "invalid" }
-  | { ok: false; reason: "locked"; lockedUntil: Date };
+  /**
+   * Too many failures from this source, or over all sources. Said the same for an e-mail that exists and one that does
+   * not, and without a date: a stranger learns nothing about the account from it.
+   */
+  | { ok: false; reason: "throttled" };
 
 export interface ProvisionInput {
   email: string;
@@ -95,6 +100,8 @@ export interface AuthService {
     userId: string,
     input: { password: string; code: string; ipHash?: string | null },
   ): Promise<{ ok: true; recoveryCodes: string[] } | { ok: false; reason: "invalid" | "locked" }>;
+  /** Lifts the lock of sign-ins over all sources (the command line of the owner who is locked out). */
+  unlock(email: string, actor: string): Promise<{ ok: true } | { ok: false; reason: "not_found" }>;
   setActive(
     id: string,
     active: boolean,
@@ -104,6 +111,7 @@ export interface AuthService {
 }
 
 const INVALID = { ok: false, reason: "invalid" } as const;
+const THROTTLED = { ok: false, reason: "throttled" } as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_LENGTH = 43; // 32 random bytes in base64url
 
@@ -113,7 +121,16 @@ export const normalizeEmail = (email: string): string => email.trim().toLowerCas
 export function createAuthService(deps: AuthServiceDeps): AuthService {
   const { store, hasher, dataKey, issuer } = deps;
   const now = deps.now ?? (() => new Date());
-  const lockRule = { lockAfter: AUTH_POLICY.lockAfterFailures, lockMinutes: AUTH_POLICY.lockMinutes };
+  const ceilingRule = { lockAfter: AUTH_POLICY.accountCeilingFailures, lockMinutes: AUTH_POLICY.lockMinutes };
+  const windowMs = AUTH_POLICY.lockMinutes * MS_PER_MINUTE;
+  // Counts of the process (attempts.ts). A sign-in counts per source (the address, for one e-mail) so that a stranger
+  // cannot keep the owner out with a few requests; the account has a higher ceiling over all sources (in the database,
+  // `claimAttempt`), and an e-mail without an active account has a ceiling of its own so that it answers the same way.
+  const sources = new AttemptLimiter({ lockAfter: AUTH_POLICY.lockAfterFailures, windowMs });
+  const absentAccounts = new AttemptLimiter({ lockAfter: AUTH_POLICY.accountCeilingFailures, windowMs });
+  // The sensitive changes inside a session count apart from the sign-ins: a stranger's failures do not stand next to
+  // the owner's typos, and the typos do not close the sign-in.
+  const sessionChecks = new AttemptLimiter({ lockAfter: AUTH_POLICY.lockAfterFailures, windowMs }, 1_000);
   const limits = {
     idleMs: AUTH_POLICY.idleHours * MS_PER_HOUR,
     absoluteMs: AUTH_POLICY.absoluteDays * MS_PER_DAY,
@@ -137,9 +154,19 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     sessionExpiresAt: expiresAt,
   });
 
+  const journalLock = (account: AdminAccount, until: Date, ipHash: string | null, scope: string) =>
+    audit({
+      actor: actorOf(account),
+      action: "auth.locked",
+      entity: "ops.admin_users",
+      entityId: account.id,
+      after: { until: until.toISOString(), scope },
+      ipHash,
+    });
+
   /**
-   * Journals the failure of an attempt that was claimed before it was checked (`claimAttempt`). The date until which the
-   * account is locked when this attempt was the last allowed one, otherwise null.
+   * Journals the failure of an attempt that was claimed before it was checked. The date until which the account is
+   * locked when this attempt was the last allowed one, otherwise null.
    */
   async function journalFailure(
     account: AdminAccount,
@@ -147,6 +174,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     reason: string,
     ipHash: string | null,
     state: { failedLogins: number; lockedUntil: Date | null },
+    scope: string,
   ): Promise<Date | null> {
     const at = now();
     await audit({
@@ -158,25 +186,8 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       ipHash,
     });
     if (!state.lockedUntil || state.lockedUntil <= at) return null;
-    await audit({
-      actor: actorOf(account),
-      action: "auth.locked",
-      entity: "ops.admin_users",
-      entityId: account.id,
-      after: { until: state.lockedUntil.toISOString() },
-      ipHash,
-    });
+    await journalLock(account, state.lockedUntil, ipHash, scope);
     return state.lockedUntil;
-  }
-
-  async function fail(
-    account: AdminAccount,
-    reason: string,
-    ipHash: string | null,
-    state: { failedLogins: number; lockedUntil: Date | null },
-  ): Promise<LoginResult> {
-    const lockedUntil = await journalFailure(account, "auth.login_failed", reason, ipHash, state);
-    return lockedUntil ? { ok: false, reason: "locked", lockedUntil } : INVALID;
   }
 
   /**
@@ -219,9 +230,13 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
 
   /**
    * The attempt of a sensitive change inside a live session, taken the way a sign-in takes it: before anything is
-   * checked, in one statement of the database. A stolen session then cannot guess the password or the code without
-   * limit, and requests that arrive together cannot check more than the rule allows. A locked account gives nothing.
-   * When the lock falls, the sessions of the account end (a stolen one does not outlive it).
+   * checked, in one step. A stolen session then cannot guess the password or the code without limit, and requests that
+   * arrive together cannot check more than the rule allows. A locked account gives nothing. When the lock falls, the
+   * sessions of the account end (a stolen one does not outlive it).
+   *
+   * The count is cleared only by the second factor (`finish("full")`). A check of the password alone
+   * (`finish("password")`) gives its own attempt back and never lifts a lock: a right password proves nothing about
+   * whoever holds the session.
    */
   async function takeAttempt(
     userId: string,
@@ -231,27 +246,54 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         ok: true;
         account: AdminAccount;
         failed(reason: string): Promise<"invalid" | "locked">;
-        passed(): Promise<void>;
+        finish(proof: "full" | "password"): Promise<"ok" | "locked">;
       }
     | { ok: false; reason: "invalid" | "locked" }
   > {
     const account = await store.findById(userId);
     if (!account?.active) return { ok: false, reason: "invalid" };
-    const at = now();
-    const claim = await store.claimAttempt(account.id, lockRule, at);
+    const claim = sessionChecks.claim(account.id, now());
     if (!claim.claimed) {
-      return { ok: false, reason: claim.lockedUntil && claim.lockedUntil > at ? "locked" : "invalid" };
+      if (claim.journal) {
+        await audit({
+          actor: actorOf(account),
+          action: "auth.reverify_blocked",
+          entity: "ops.admin_users",
+          entityId: account.id,
+          after: { until: claim.lockedUntil.toISOString() },
+          ipHash,
+        });
+      }
+      return { ok: false, reason: "locked" };
     }
+    const closedByThisAttempt = claim.lockedUntil !== null;
     return {
       ok: true,
       account,
       async failed(reason) {
-        const lockedUntil = await journalFailure(account, "auth.reverify_failed", reason, ipHash, claim);
+        const lockedUntil = await journalFailure(
+          account,
+          "auth.reverify_failed",
+          reason,
+          ipHash,
+          { failedLogins: claim.count, lockedUntil: claim.lockedUntil },
+          "session",
+        );
         if (!lockedUntil) return "invalid";
         await store.deleteSessionsOf(account.id);
         return "locked";
       },
-      passed: () => store.resetFailures(account.id),
+      async finish(proof) {
+        if (proof === "full") sessionChecks.reset(claim);
+        else if (!closedByThisAttempt) sessionChecks.release(claim);
+        if (!sessionChecks.isLocked(account.id, now())) return "ok";
+        // Locked: by this attempt (its password alone cannot lift it) or by others that were counted while it was checked.
+        if (closedByThisAttempt && claim.lockedUntil) {
+          await journalLock(account, claim.lockedUntil, ipHash, "session");
+          await store.deleteSessionsOf(account.id);
+        }
+        return "locked";
+      },
     };
   }
 
@@ -270,7 +312,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     }
     const factor = await checkSecondFactor(taken.account, input.code, false);
     if (!factor.ok) return { ok: false, reason: await taken.failed(factor.reason) };
-    await taken.passed();
+    if ((await taken.finish("full")) === "locked") return { ok: false, reason: "locked" };
     return { ok: true, account: taken.account };
   }
 
@@ -281,51 +323,82 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       if (email === "" || input.password === "" || input.code.trim() === "" || tooLong) return INVALID;
       if ([...input.password].length > AUTH_POLICY.maxPasswordLength) return INVALID;
 
-      const account = await store.findByEmail(email);
-      if (!account) {
-        await hasher.verify(await dummyHash(), input.password);
+      // Three claims are taken before anything is checked, so that requests that arrive together cannot check more
+      // than the rules allow: the source (this address, for this e-mail: decided without looking at the account, so it
+      // is the same for an e-mail that exists and one that does not), then the account over all sources.
+      const at = now();
+      const emailKey = sha256(email).slice(0, 32);
+      const source = sources.claim(`${emailKey}|${input.ipHash ?? "-"}`, at);
+      if (!source.claimed) {
+        if (source.journal) {
+          await audit({
+            actor: "anonymous",
+            action: "auth.login_blocked",
+            entity: "ops.admin_users",
+            entityId: null,
+            after: { reason: "source", emailHash: emailKey.slice(0, 16), until: source.lockedUntil.toISOString() },
+            ipHash: input.ipHash,
+          });
+        }
+        return THROTTLED;
+      }
+      const sourceClosed = source.lockedUntil !== null;
+      const answerFor = (accountClosed: boolean) => (sourceClosed || accountClosed ? THROTTLED : INVALID);
+      const journalSource = async (account: AdminAccount | null, ref: string | null) => {
+        if (!source.lockedUntil) return;
         await audit({
-          actor: "anonymous",
-          action: "auth.login_failed",
+          actor: account ? actorOf(account) : "anonymous",
+          action: "auth.login_throttled",
           entity: "ops.admin_users",
-          entityId: null,
-          after: { reason: "unknown_email", emailHash: sha256(email).slice(0, 16) },
+          entityId: ref,
+          after: { until: source.lockedUntil.toISOString(), ...(account ? {} : { emailHash: emailKey.slice(0, 16) }) },
           ipHash: input.ipHash,
         });
-        return INVALID;
+      };
+
+      const account = await store.findByEmail(email);
+      if (!account?.active) {
+        // No account to sign in to: the same count, the same wait and the same words as for one that exists.
+        const ghost = absentAccounts.claim(emailKey, at);
+        await hasher.verify(await dummyHash(), input.password);
+        await audit({
+          actor: account ? actorOf(account) : "anonymous",
+          action: "auth.login_failed",
+          entity: "ops.admin_users",
+          entityId: account?.id ?? null,
+          after: account ? { reason: "inactive" } : { reason: "unknown_email", emailHash: emailKey.slice(0, 16) },
+          ipHash: input.ipHash,
+        });
+        await journalSource(account, account?.id ?? null);
+        return answerFor(!ghost.claimed || ghost.lockedUntil !== null);
       }
 
-      const at = now();
-      if (account.lockedUntil && account.lockedUntil > at) {
-        return { ok: false, reason: "locked", lockedUntil: account.lockedUntil };
-      }
-      if (!account.active) {
+      const claim = await store.claimAttempt(account.id, ceilingRule, at);
+      if (!claim.claimed) {
         await hasher.verify(await dummyHash(), input.password);
         await audit({
           actor: actorOf(account),
-          action: "auth.login_failed",
+          action: "auth.login_blocked",
           entity: "ops.admin_users",
           entityId: account.id,
-          after: { reason: "inactive" },
+          after: { reason: "account", until: claim.lockedUntil?.toISOString() ?? null },
           ipHash: input.ipHash,
         });
-        return INVALID;
+        return THROTTLED;
       }
-
-      // The attempt is taken before anything is checked: requests that arrive together read the same account, and only
-      // the claim in the database decides how many of them may check a password and a code.
-      const claim = await store.claimAttempt(account.id, lockRule, at);
-      if (!claim.claimed) {
-        return claim.lockedUntil && claim.lockedUntil > at
-          ? { ok: false, reason: "locked", lockedUntil: claim.lockedUntil }
-          : INVALID;
-      }
-      if (!(await hasher.verify(account.passwordHash, input.password)))
-        return fail(account, "wrong_password", input.ipHash, claim);
+      const fail = async (reason: string): Promise<LoginResult> => {
+        const lockedUntil = await journalFailure(account, "auth.login_failed", reason, input.ipHash, claim, "account");
+        // The account is locked over all sources: sessions that are left end with it (a lock does not depend on the way it came).
+        if (lockedUntil) await store.deleteSessionsOf(account.id);
+        await journalSource(account, account.id);
+        return answerFor(lockedUntil !== null);
+      };
+      if (!(await hasher.verify(account.passwordHash, input.password))) return fail("wrong_password");
       const factor = await checkSecondFactor(account, input.code, true);
-      if (!factor.ok) return fail(account, factor.reason, input.ipHash, claim);
+      if (!factor.ok) return fail(factor.reason);
 
-      await store.resetFailures(account.id);
+      await store.resetFailures(account.id, { failedLogins: claim.failedLogins, locked: claim.lockedUntil !== null });
+      sources.reset(source);
       const token = randomBytes(32).toString("base64url");
       const expiresAt = new Date(at.getTime() + limits.idleMs);
       await store.createSession({
@@ -428,8 +501,8 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       if (!(await hasher.verify(account.passwordHash, input.current))) {
         return { ok: false, reason: await taken.failed("wrong_password") };
       }
-      // The current password is right: this series ends, whatever the answer about the new one is.
-      await taken.passed();
+      // The password alone proves nothing about whoever holds the session: it gives the attempt back, but lifts no lock.
+      if ((await taken.finish("password")) === "locked") return { ok: false, reason: "locked" };
       const problems = checkPasswordPolicy(input.next, { email: account.email });
       if (input.next === input.current) problems.push("Новый пароль совпадает со старым.");
       if (problems.length > 0) return { ok: false, reason: "policy", problems };
@@ -490,6 +563,14 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         ipHash: input.ipHash ?? null,
       });
       return { ok: true, recoveryCodes: codes };
+    },
+
+    async unlock(email, actor) {
+      const account = await store.findByEmail(normalizeEmail(email));
+      if (!account) return { ok: false, reason: "not_found" };
+      await store.resetFailures(account.id);
+      await audit({ actor, action: "auth.unlocked", entity: "ops.admin_users", entityId: account.id });
+      return { ok: true };
     },
 
     async setActive(id, active, actor) {

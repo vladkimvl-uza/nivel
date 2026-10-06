@@ -28,12 +28,6 @@ const MESSAGES = {
   locked: `Слишком много неудачных попыток. Повторите через ${AUTH_POLICY.lockMinutes} минут.`,
 } as const;
 
-const TASHKENT_TIME = new Intl.DateTimeFormat("ru-RU", {
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Asia/Tashkent",
-});
-
 function text(data: FormData, name: string): string {
   const v = data.get(name);
   return typeof v === "string" ? v : "";
@@ -49,12 +43,8 @@ export async function signInAction(_previous: LoginState, data: FormData): Promi
     ...info,
   });
   if (!result.ok) {
-    if (result.reason === "locked") {
-      return {
-        error: `Вход заблокирован до ${TASHKENT_TIME.format(result.lockedUntil)} (Ташкент): слишком много неудачных попыток. Попробуйте позже.`,
-      };
-    }
-    return { error: MESSAGES.invalid };
+    // Without a date and the same for every e-mail: the answer must not tell a stranger whether the account exists.
+    return { error: result.reason === "throttled" ? MESSAGES.locked : MESSAGES.invalid };
   }
   await startSession(result.token);
   redirect(homeFor(result.user.role));

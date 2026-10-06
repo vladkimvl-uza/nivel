@@ -7,19 +7,21 @@
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { createNodeArgon2Hasher } from "./password.ts";
+import { AUTH_POLICY } from "./policy.ts";
 import { isRole, ROLES } from "./roles.ts";
 import { parseDataKey } from "./secrets.ts";
 import { type AuthService, createAuthService } from "./service.ts";
 
 const USAGE = `Использование:
-  create-user --email <e-mail> --role <${ROLES.join("|")}> [--password <пароль от 14 знаков>] [--telegram <id>]`;
+  create-user --email <e-mail> --role <${ROLES.join("|")}> [--password <пароль от 14 знаков>] [--telegram <id>]
+  unlock --email <e-mail>   снять блокировку входа по всем источникам (она и так кончается через ${AUTH_POLICY.lockMinutes} минут)`;
 
 export async function runCli(
   argv: readonly string[],
   deps: { service: AuthService; print: (line: string) => void },
 ): Promise<number> {
   const [command, ...rest] = argv;
-  if (command !== "create-user") {
+  if (command !== "create-user" && command !== "unlock") {
     deps.print(USAGE);
     return 2;
   }
@@ -34,6 +36,15 @@ export async function runCli(
     strict: false,
   });
   const email = typeof values.email === "string" ? values.email : "";
+  if (command === "unlock") {
+    if (email === "") {
+      deps.print(USAGE);
+      return 2;
+    }
+    const unlocked = await deps.service.unlock(email, "cli");
+    deps.print(unlocked.ok ? `Блокировка входа для ${email.trim().toLowerCase()} снята.` : "Такой учётной записи нет.");
+    return unlocked.ok ? 0 : 1;
+  }
   const role = values.role;
   if (email === "" || !isRole(role)) {
     deps.print(USAGE);

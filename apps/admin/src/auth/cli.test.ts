@@ -66,3 +66,20 @@ describe("create-user", () => {
     expect(await runCli([], { service, print })).toBe(2);
   });
 });
+
+describe("unlock", () => {
+  it("lifts the lock of an account, journaled, and refuses an unknown e-mail", async () => {
+    const { service, store, out, print } = setup();
+    await runCli(["create-user", "--email", "o@nivel.uz", "--role", "owner"], { service, print });
+    const account = [...store.accounts.values()][0];
+    if (!account) throw new Error("no account");
+    account.failedLogins = 20;
+    account.lockedUntil = new Date(Date.now() + 600_000);
+    out.length = 0;
+    expect(await runCli(["unlock", "--email", "O@nivel.uz"], { service, print })).toBe(0);
+    expect(account).toMatchObject({ failedLogins: 0, lockedUntil: null });
+    expect(store.audit.at(-1)).toMatchObject({ action: "auth.unlocked", actor: "cli", entityId: account.id });
+    expect(await runCli(["unlock", "--email", "nobody@nivel.uz"], { service, print })).toBe(1);
+    expect(await runCli(["unlock"], { service, print })).toBe(2);
+  });
+});

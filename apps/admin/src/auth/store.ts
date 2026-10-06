@@ -57,10 +57,11 @@ export interface AuthStore {
   findById(id: string): Promise<AdminAccount | null>;
   createAccount(a: NewAccount): Promise<void>;
   /**
-   * Takes one attempt (a sign-in, or a sensitive change inside a session) before the password is checked, in one statement: an account that is locked (the lock has
-   * not run out) gives nothing; otherwise the count goes up by one (from zero after a lock that has run out) and the
-   * account is locked when the count reaches `lockAfter`. Concurrent requests therefore cannot check more passwords
-   * than the rule allows. A right sign-in then clears the claim with `resetFailures`.
+   * Takes one sign-in attempt on the account (the ceiling over all sources, see AUTH_POLICY) before the password is
+   * checked, in one statement: an account that is locked (the lock has not run out) gives nothing; otherwise the count
+   * goes up by one (from zero after a lock that has run out) and the account is locked when the count reaches
+   * `lockAfter`. Concurrent requests therefore cannot check more passwords than the rule allows. A right sign-in then
+   * clears the claim with `resetFailures`.
    */
   claimAttempt(
     id: string,
@@ -69,7 +70,12 @@ export interface AuthStore {
   ): Promise<
     { claimed: true; failedLogins: number; lockedUntil: Date | null } | { claimed: false; lockedUntil: Date | null }
   >;
-  resetFailures(id: string): Promise<void>;
+  /**
+   * Clears the count and the lock. With `expected` (the claim a request made) only when nothing was counted since: a
+   * request that was slow cannot erase the failures that other requests made while it was checking. Without it, always
+   * (the command line, for the owner who is locked out).
+   */
+  resetFailures(id: string, expected?: { failedLogins: number; locked: boolean }): Promise<void>;
   /** Replaces the sealed bundle only when it still is `expected`: two sign-ins cannot both spend one recovery code. */
   replaceTotpBundle(id: string, expected: string | null, next: string): Promise<boolean>;
   setPasswordHash(id: string, hash: string): Promise<void>;

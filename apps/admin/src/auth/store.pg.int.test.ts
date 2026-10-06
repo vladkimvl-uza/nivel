@@ -45,8 +45,13 @@ async function newUser(email: string, role: "owner" | "assistant" = "owner") {
   return { ...r, code: () => generateTotp(secret, clock()) };
 }
 
-const login = (email: string, password: string, code: string) =>
-  service.login({ email, password, code, ipHash: "h".repeat(8), ua: "int" });
+const login = (email: string, password: string, code: string, ipHash = "h".repeat(8)) =>
+  service.login({ email, password, code, ipHash, ua: "int" });
+
+/** Failed sign-ins from `n` different sources: the account ceiling counts over all of them (one source is closed at five). */
+async function failFromManySources(email: string, n: number) {
+  for (let i = 0; i < n; i += 1) await login(email, WRONG, "000000", `source-${email}-${i}`);
+}
 
 async function auditActions(entityId: string): Promise<string[]> {
   const { rows } = await db.$client.query<{ action: string }>(
@@ -79,45 +84,57 @@ describe("sign-in on PostgreSQL", () => {
     expect(rows[0]?.totp_secret_enc).not.toContain(u.totpSecret);
   });
 
-  it("locks after five failures for 15 minutes by the database clock of the lock and releases it later", async () => {
+  it("closes one source after five failures, and locks the account over all sources after twenty, for 15 minutes", async () => {
     const u = await newUser("owner-3@nivel.test");
     for (let i = 0; i < 4; i += 1)
       expect(await login("owner-3@nivel.test", WRONG, "000000")).toEqual({ ok: false, reason: "invalid" });
-    const fifth = await login("owner-3@nivel.test", WRONG, "000000");
-    expect(fifth).toMatchObject({ ok: false, reason: "locked" });
-    // Even the right credentials are refused while the lock lasts.
-    expect(await login("owner-3@nivel.test", PASSWORD, u.code())).toMatchObject({ ok: false, reason: "locked" });
+    expect(await login("owner-3@nivel.test", WRONG, "000000")).toEqual({ ok: false, reason: "throttled" });
+    // The source is closed, the account is not: the owner from another address gets in.
+    const home = await login("owner-3@nivel.test", PASSWORD, u.recoveryCodes[0] ?? "", "home-address");
+    expect(home.ok).toBe(true);
+    if (!home.ok) return;
+    await failFromManySources("owner-3@nivel.test", 20);
+    // The lock over all sources ended the session that was left, and the right credentials are refused while it lasts.
+    expect(await service.authenticate(home.token)).toBeNull();
+    expect(await login("owner-3@nivel.test", PASSWORD, u.code(), "home-address")).toEqual({
+      ok: false,
+      reason: "throttled",
+    });
     const { rows } = await db.$client.query<{ failed_logins: number; minutes: number }>(
       "select failed_logins, extract(epoch from locked_until - now()) / 60 as minutes from ops.admin_users where id = $1",
       [u.id],
     );
-    expect(rows[0]?.failed_logins).toBe(5);
+    expect(rows[0]?.failed_logins).toBe(20);
     expect(Number(rows[0]?.minutes)).toBeGreaterThan(14);
     expect(Number(rows[0]?.minutes)).toBeLessThanOrEqual(15);
     // The lock runs out (moved into the past): the owner can sign in again.
     await db.$client.query("update ops.admin_users set locked_until = now() - interval '1 minute' where id = $1", [
       u.id,
     ]);
-    expect((await login("owner-3@nivel.test", PASSWORD, u.code())).ok).toBe(true);
-    expect(await auditActions(u.id)).toContain("auth.locked");
+    expect((await login("owner-3@nivel.test", PASSWORD, u.code(), "home-address")).ok).toBe(true);
+    const actions = await auditActions(u.id);
+    expect(actions).toContain("auth.locked");
+    expect(actions).toContain("auth.login_throttled");
   });
 
-  it("twenty sign-ins at once count five attempts, not twenty: the attempt is claimed in one statement", async () => {
+  it("forty sign-ins at once from forty sources count twenty attempts, not forty: the attempt is claimed in one statement", async () => {
     const u = await newUser("burst@nivel.test");
-    const results = await Promise.all(Array.from({ length: 20 }, () => login("burst@nivel.test", PASSWORD, "000000")));
+    const results = await Promise.all(
+      Array.from({ length: 40 }, (_, i) => login("burst@nivel.test", PASSWORD, "000000", `burst-source-${i}`)),
+    );
     expect(results.every((r) => !r.ok)).toBe(true);
     const { rows } = await db.$client.query<{ failed_logins: number }>(
       "select failed_logins from ops.admin_users where id = $1",
       [u.id],
     );
-    expect(rows[0]?.failed_logins).toBe(5);
-    expect((await auditActions(u.id)).filter((a) => a === "auth.login_failed")).toHaveLength(5);
-    expect(await login("burst@nivel.test", PASSWORD, u.code())).toMatchObject({ ok: false, reason: "locked" });
+    expect(rows[0]?.failed_logins).toBe(20);
+    expect((await auditActions(u.id)).filter((a) => a === "auth.login_failed")).toHaveLength(20);
+    expect(await login("burst@nivel.test", PASSWORD, u.code())).toEqual({ ok: false, reason: "throttled" });
   });
 
   it("claims again from one once the lock has run out", async () => {
     const u = await newUser("burst-2@nivel.test");
-    for (let i = 0; i < 5; i += 1) await login("burst-2@nivel.test", WRONG, "000000");
+    await failFromManySources("burst-2@nivel.test", 20);
     await db.$client.query("update ops.admin_users set locked_until = now() - interval '1 minute' where id = $1", [
       u.id,
     ]);
@@ -127,6 +144,35 @@ describe("sign-in on PostgreSQL", () => {
       [u.id],
     );
     expect(rows[0]).toEqual({ failed_logins: 1, locked_until: null });
+  });
+
+  it("a clear with the claim that was made does nothing when more was counted since", async () => {
+    const u = await newUser("reset-1@nivel.test");
+    const rule = { lockAfter: 20, lockMinutes: 15 };
+    const first = await store().claimAttempt(u.id, rule, clock());
+    if (!first.claimed) throw new Error("expected a claim");
+    await store().claimAttempt(u.id, rule, clock());
+    await store().resetFailures(u.id, { failedLogins: first.failedLogins, locked: false });
+    expect((await store().findById(u.id))?.failedLogins).toBe(2);
+    await store().resetFailures(u.id, { failedLogins: 2, locked: false });
+    expect((await store().findById(u.id))?.failedLogins).toBe(0);
+    await store().claimAttempt(u.id, rule, clock());
+    await store().resetFailures(u.id);
+    expect((await store().findById(u.id))?.failedLogins).toBe(0);
+  });
+
+  it("a session of a locked account is refused, and works again when the lock has run out", async () => {
+    const u = await newUser("locked-session@nivel.test");
+    const r = await login("locked-session@nivel.test", PASSWORD, u.code());
+    if (!r.ok) throw new Error("expected success");
+    await db.$client.query("update ops.admin_users set locked_until = now() + interval '10 minutes' where id = $1", [
+      u.id,
+    ]);
+    expect(await service.authenticate(r.token)).toBeNull();
+    await db.$client.query("update ops.admin_users set locked_until = now() - interval '1 minute' where id = $1", [
+      u.id,
+    ]);
+    expect(await service.authenticate(r.token)).not.toBeNull();
   });
 
   it("a session ends by idleness and by the absolute limit", async () => {

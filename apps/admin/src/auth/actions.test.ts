@@ -71,13 +71,13 @@ describe("sign in", () => {
     expect(jar.has(SESSION_COOKIE)).toBe(false);
   });
 
-  it("tells the lock and the time in Tashkent after the fifth failure", async () => {
+  it("tells the wait after the fifth failure from one source, with no date and the same for any e-mail", async () => {
     await newAccount("o@nivel.test");
     let state = {};
     for (let i = 0; i < 5; i += 1) {
       state = await actions.signInAction({}, form({ email: "o@nivel.test", password: "x".repeat(20), code: "000000" }));
     }
-    expect((state as { error: string }).error).toMatch(/^Вход заблокирован до \d{2}:\d{2} \(Ташкент\)/);
+    expect((state as { error: string }).error).toBe("Слишком много неудачных попыток. Повторите через 15 минут.");
   });
 
   it("signs out: the cookie goes, the session is ended, the journal has it", async () => {

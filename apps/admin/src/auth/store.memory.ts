@@ -53,8 +53,9 @@ export class MemoryAuthStore implements AuthStore {
     return { claimed: true as const, failedLogins: a.failedLogins, lockedUntil: a.lockedUntil };
   }
 
-  async resetFailures(id: string) {
+  async resetFailures(id: string, expected?: { failedLogins: number; locked: boolean }) {
     const a = this.mustGet(id);
+    if (expected && (a.failedLogins !== expected.failedLogins || (a.lockedUntil !== null) !== expected.locked)) return;
     a.failedLogins = 0;
     a.lockedUntil = null;
   }
@@ -101,6 +102,7 @@ export class MemoryAuthStore implements AuthStore {
     if (hardEnd <= now.getTime()) return null;
     const account = this.accounts.get(s.userId);
     if (!account?.active) return null;
+    if (account.lockedUntil && account.lockedUntil > now) return null;
     s.lastSeenAt = now;
     s.expiresAt = new Date(Math.min(now.getTime() + limits.idleMs, hardEnd));
     return { account, expiresAt: s.expiresAt };

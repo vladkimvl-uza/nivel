@@ -1,9 +1,17 @@
 // Access policy of the admin (ARCHITECTURE 6.1, 10.1 A07): every number here is a decision of the owner or of the
 // architecture, kept in one place so that tests and screens read the same value.
 export const AUTH_POLICY = {
-  /** A wrong password or a wrong code counts; the fifth failure locks the account. */
+  /**
+   * A wrong password or a wrong code counts; the fifth failure from one source (the address, for one e-mail) closes
+   * the sign-in from that source, and the fifth failure of a sensitive change inside a session locks those changes.
+   */
   lockAfterFailures: 5,
   lockMinutes: 15,
+  /**
+   * Over all sources together: the account is locked (its sessions end) after this many failed sign-ins. Higher than
+   * the limit of one source, so that a stranger from one address cannot keep the owner out (a distributed guess still stops).
+   */
+  accountCeilingFailures: 20,
   /** A session ends after 8 hours without a request (sliding) ... */
   idleHours: 8,
   /** ... and in any case after 7 days since the sign-in. */

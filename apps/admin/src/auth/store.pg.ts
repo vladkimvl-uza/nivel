@@ -100,8 +100,16 @@ export function createPgAuthStore(db: Db): AuthStore {
       return { claimed: false as const, lockedUntil: current.rows[0]?.locked_until ?? null };
     },
 
-    async resetFailures(id) {
-      await ops.resetFailedLogins(db, id);
+    async resetFailures(id, expected) {
+      if (!expected) {
+        await ops.resetFailedLogins(db, id);
+        return;
+      }
+      await query(
+        `update ops.admin_users set failed_logins = 0, locked_until = null
+          where id = $1 and failed_logins = $2::int and (locked_until is not null) = $3::boolean`,
+        [id, expected.failedLogins, expected.locked],
+      );
     },
 
     async replaceTotpBundle(id, expected, next) {
@@ -148,7 +156,7 @@ export function createPgAuthStore(db: Db): AuthStore {
     },
 
     async touchSession(tokenSha256, now, limits) {
-      // One statement: the session is alive, its account is active; the idle expiry slides, the absolute one does not.
+      // One statement: the session is alive, its account is active and not locked; the idle expiry slides, the absolute one does not.
       const { rows } = await query<AccountRow & { session_expires_at: Date }>(
         `update ops.admin_sessions s
             set last_seen_at = $2::timestamptz,
@@ -158,6 +166,7 @@ export function createPgAuthStore(db: Db): AuthStore {
           where s.token_sha256 = $1
             and u.id = s.user_id
             and u.active
+            and (u.locked_until is null or u.locked_until <= $2::timestamptz)
             and s.expires_at > $2::timestamptz
             and s.created_at + make_interval(secs => $4::float8) > $2::timestamptz
         returning s.expires_at as session_expires_at,

@@ -112,36 +112,30 @@ describe("sign-in", () => {
     expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(0);
   });
 
-  it("locks the account for 15 minutes on the fifth failure and tells until when", async () => {
+  it("closes the sign-in from the source for 15 minutes on the fifth failure, and says it without a date", async () => {
     for (let i = 1; i <= 4; i += 1) {
       expect(await attempt(h, { password: WRONG })).toEqual({ ok: false, reason: "invalid" });
       expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(i);
     }
-    const fifth = await attempt(h, { code: "111111" });
-    expect(fifth.ok).toBe(false);
-    if (fifth.ok) return;
-    if (fifth.reason !== "locked") throw new Error("expected the lock");
-    expect(fifth.lockedUntil).toEqual(new Date(T0.getTime() + 15 * MS_PER_MINUTE));
+    expect(await attempt(h, { code: "111111" })).toEqual({ ok: false, reason: "throttled" });
   });
 
-  it("keeps a locked account out even with the right password and code, and does not extend the lock", async () => {
+  it("keeps the source out even with the right password and code, and does not extend the closing", async () => {
     for (let i = 0; i < 5; i += 1) await attempt(h, { password: WRONG });
     h.clock.advance(14 * MS_PER_MINUTE);
-    const during = await attempt(h);
-    expect(during).toMatchObject({ ok: false, reason: "locked" });
-    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(5);
-    expect(h.store.accounts.get(h.user.id)?.lockedUntil).toEqual(new Date(T0.getTime() + 15 * MS_PER_MINUTE));
+    expect(await attempt(h)).toEqual({ ok: false, reason: "throttled" });
+    // The refused try did not push the end away: 15 minutes after the fifth failure the source is let in.
+    h.clock.advance(MS_PER_MINUTE + 1000);
+    expect((await attempt(h)).ok).toBe(true);
   });
 
   it("lets in again after the 15 minutes and starts the count from zero", async () => {
     for (let i = 0; i < 5; i += 1) await attempt(h, { password: WRONG });
     h.clock.advance(15 * MS_PER_MINUTE + 1);
-    // One failure after the lock must not lock again at once (the stored count was 5).
-    expect(await attempt(h, { password: WRONG })).toEqual({ ok: false, reason: "invalid" });
-    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(1);
-    const ok = await attempt(h);
-    expect(ok.ok).toBe(true);
-    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(0);
+    // One failure after the closing must not close again at once (the count was 5).
+    for (let i = 0; i < 4; i += 1)
+      expect(await attempt(h, { password: WRONG })).toEqual({ ok: false, reason: "invalid" });
+    expect(await attempt(h, { password: WRONG })).toEqual({ ok: false, reason: "throttled" });
   });
 
   it("a successful sign-in clears earlier failures", async () => {
@@ -182,15 +176,18 @@ describe("sign-in", () => {
       ),
     );
     expect(checked).toBe(AUTH_POLICY.lockAfterFailures);
-    expect(results.filter((r) => !r.ok && r.reason === "locked").length).toBeGreaterThanOrEqual(15);
+    expect(results.filter((r) => !r.ok && r.reason === "throttled").length).toBeGreaterThanOrEqual(15);
     expect(store.accounts.get(made.id)?.failedLogins).toBe(AUTH_POLICY.lockAfterFailures);
     expect(store.audit.filter((a) => a.action === "auth.login_failed")).toHaveLength(AUTH_POLICY.lockAfterFailures);
   });
 
-  it("the fifth attempt, if it is right, gets in and clears the claim it made", async () => {
+  it("the fifth attempt, if it is right, gets in and clears the claims it made", async () => {
     for (let i = 0; i < 4; i += 1) await attempt(h, { password: WRONG });
     expect((await attempt(h)).ok).toBe(true);
     expect(h.store.accounts.get(h.user.id)).toMatchObject({ failedLogins: 0, lockedUntil: null });
+    // The count of the source is clear as well: four more failures do not close it.
+    for (let i = 0; i < 4; i += 1)
+      expect(await attempt(h, { password: WRONG })).toEqual({ ok: false, reason: "invalid" });
   });
 
   it("does not let a switched-off account in", async () => {
@@ -215,14 +212,14 @@ describe("sign-in", () => {
     expect((await attempt(h, { code: h.codeNow() })).ok).toBe(true);
   });
 
-  it("journals sign-ins, failures and the lock without any secret in the journal", async () => {
+  it("journals sign-ins, failures and the closing of the source without any secret in the journal", async () => {
     await attempt(h, { password: WRONG });
     await attempt(h);
     for (let i = 0; i < 5; i += 1) await attempt(h, { password: WRONG });
     const actions = h.store.audit.map((a) => a.action);
     expect(actions).toContain("auth.login_failed");
     expect(actions).toContain("auth.login");
-    expect(actions).toContain("auth.locked");
+    expect(actions).toContain("auth.login_throttled");
     const dump = JSON.stringify(h.store.audit);
     expect(dump).not.toContain(PASSWORD);
     expect(dump).not.toContain(WRONG);
@@ -420,10 +417,11 @@ describe("account", () => {
     expect(await tryBind({ code: "000000" })).toEqual({ ok: false, reason: "invalid" });
     expect(await tryBind({ code: "" })).toEqual({ ok: false, reason: "invalid" });
     expect(h.store.accounts.get(h.user.id)?.telegramUserId).toBeNull();
-    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBeGreaterThanOrEqual(2);
     expect(h.store.audit.map((a) => a.action)).not.toContain("auth.telegram_bound");
     // A recovery code is not a fresh code of the app: it opens the way in, not this change.
     expect(await tryBind({ code: h.user.recoveryCodes[0] ?? "" })).toEqual({ ok: false, reason: "invalid" });
+    // Four failures so far: the fifth locks.
+    expect(await tryBind({ code: "000000" })).toEqual({ ok: false, reason: "locked" });
   });
 });
 
@@ -546,7 +544,6 @@ describe("the lock covers the checks inside a live session (bind Telegram, recov
   it("refuses the sixth try without checking anything, even with the right password and code", async () => {
     const h = await setup();
     await lockedByBinding(h);
-    expect(h.store.accounts.get(h.user.id)?.lockedUntil).not.toBeNull();
     const before = h.verifyCount();
     h.clock.advance(31_000);
     expect(await bindWith(h)).toEqual({ ok: false, reason: "locked" });
@@ -587,20 +584,20 @@ describe("the lock covers the checks inside a live session (bind Telegram, recov
     const h = await setup();
     await lockedByBinding(h);
     h.clock.advance(AUTH_POLICY.lockMinutes * MS_PER_MINUTE + 1000);
-    expect(await bindWith(h, { code: "000000" })).toEqual({ ok: false, reason: "invalid" });
-    const account = h.store.accounts.get(h.user.id);
-    expect(account?.failedLogins).toBe(1);
-    expect(account?.lockedUntil).toBeNull();
+    for (let i = 0; i < 4; i += 1)
+      expect(await bindWith(h, { code: "000000" })).toEqual({ ok: false, reason: "invalid" });
+    expect(await bindWith(h, { code: "000000" })).toEqual({ ok: false, reason: "locked" });
   });
 
   it("clears the count after a right answer, and records the address in the journal of the change", async () => {
     const h = await setup();
     await bindWith(h, { code: "000000" });
     await bindWith(h, { password: WRONG });
-    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(2);
     h.clock.advance(31_000);
     expect(await bindWith(h)).toEqual({ ok: true, telegramUserId: 123456789 });
-    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(0);
+    // The count started again: four failures more are not yet the lock.
+    for (let i = 0; i < 4; i += 1)
+      expect(await bindWith(h, { code: "000000" })).toEqual({ ok: false, reason: "invalid" });
     expect(h.store.audit.find((a) => a.action === "auth.telegram_bound")?.ipHash).toBe("iphash");
   });
 
@@ -629,7 +626,11 @@ describe("the lock covers the checks inside a live session (bind Telegram, recov
 
   it("does not count a refused new password as a failure of the current one", async () => {
     const h = await setup();
-    await h.service.changePassword(h.user.id, { current: PASSWORD, next: "short" });
-    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(0);
+    for (let i = 0; i < 8; i += 1) {
+      expect(await h.service.changePassword(h.user.id, { current: PASSWORD, next: "short" })).toMatchObject({
+        ok: false,
+        reason: "policy",
+      });
+    }
   });
 });
