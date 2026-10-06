@@ -15,3 +15,6 @@ test-results/
 .data/
 next-env.d.ts
 .pnpm-store/
+
+# hero video prototype: owner/stock media stays out of the public repo
+docs/design/hero-video/media/

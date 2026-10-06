@@ -1,0 +1,116 @@
+{
+ "project": "Nivel — первый экран, ночной режим, монтаж v2",
+ "date": "2026-10-06",
+ "owner_instruction": "«используй эти ролики»; «без дневной версии»",
+ "timeline": {
+  "frames": 351,
+  "dur": 14.04,
+  "spans": [
+   [
+    0,
+    96
+   ],
+   [
+    88,
+    198
+   ],
+   [
+    190,
+    265
+   ],
+   [
+    257,
+    351
+   ]
+  ],
+  "cuts_mid_s": [
+   3.68,
+   7.76,
+   10.44
+  ],
+  "dissolves": [
+   [
+    3.52,
+    3.84
+   ],
+   [
+    7.6,
+    7.92
+   ],
+   [
+    10.28,
+    10.6
+   ]
+  ]
+ },
+ "segments": [
+  {
+   "step": "01 Подбор",
+   "source": "14203522 кадры 205–300 (clean142-new.mp4 0–95)",
+   "notes": "экраны: screens.html (без шапки сайта), левый экран притушен, свечение, зерно"
+  },
+  {
+   "step": "02 Закупка",
+   "source": "Pexels 11537353, 0,7–7,9 с → 4,4 с",
+   "notes": "перевод в ночь (nightmatch.py); нужно согласие владельца"
+  },
+  {
+   "step": "03 Сборка и тест",
+   "source": "13075121 кадры 100–220 (30 к/с) → 3,0 с",
+   "notes": "отражение по горизонтали, поворот 3,2°, увеличение 1,32, виньетка; дисплей помпы размыт по трекингу; brand: маска вентиляторов → тёплый белый"
+  },
+  {
+   "step": "04 Сетап",
+   "source": "14203522 кадры 300–393 (clean142-new.mp4 95–188)",
+   "notes": "как 01; телефон: пауза на экране, затем панорама на колонку и корпус"
+  }
+ ],
+ "excluded": {
+  "14098235": "дымка на стекле на месте вычтенного JINX, фиолетовый неон",
+  "13576746": "мутный кадр"
+ },
+ "encoding": "H.264 High, CRF 27, без B-кадров, GOP 6, faststart, без звука; телефон 720×1280 из окна 608×1080",
+ "scripts": [
+  "render142b.py",
+  "casefx.py",
+  "seg_case.py",
+  "seg_cpu.py",
+  "assemble.py",
+  "encode.sh",
+  "screens.html",
+  "scr.cjs",
+  "test/shoot.mjs"
+ ],
+ "files": {
+  "nivel-night-brand-1280.mp4": 2617831,
+  "nivel-night-brand-1920.mp4": 4832066,
+  "nivel-night-brand-m.mp4": 2370130,
+  "nivel-night-orig-1280.mp4": 2817533,
+  "nivel-night-orig-1920.mp4": 5204323,
+  "nivel-night-orig-m.mp4": 2514245,
+  "step01-brand-1280.webp": 37572,
+  "step01-brand-1920.webp": 63786,
+  "step01-brand-m.webp": 25702,
+  "step01-orig-1280.webp": 40878,
+  "step01-orig-1920.webp": 69284,
+  "step01-orig-m.webp": 27768,
+  "step02-brand-1280.webp": 22348,
+  "step02-brand-1920.webp": 37942,
+  "step02-brand-m.webp": 17978,
+  "step02-orig-1280.webp": 24312,
+  "step02-orig-1920.webp": 40650,
+  "step02-orig-m.webp": 18650,
+  "step03-brand-1280.webp": 22968,
+  "step03-brand-1920.webp": 36524,
+  "step03-brand-m.webp": 29172,
+  "step03-orig-1280.webp": 25096,
+  "step03-orig-1920.webp": 40278,
+  "step03-orig-m.webp": 31654,
+  "step04-brand-1280.webp": 33918,
+  "step04-brand-1920.webp": 53778,
+  "step04-brand-m.webp": 21920,
+  "step04-orig-1280.webp": 36674,
+  "step04-orig-1920.webp": 59158,
+  "step04-orig-m.webp": 24592
+ }
+}

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="uz-Latn"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Brygada+1918:wght@500&family=Fira+Sans:wght@400;500&family=Noto+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* экраны для замены в роликах: только конфигуратор и смета, без шапки сайта, крупный шрифт */
+*{box-sizing:border-box}
+html,body{margin:0;background:#141311;color:#EDE8DF;font-family:"Fira Sans",sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:"Noto Sans Mono",monospace;font-variant-numeric:tabular-nums}
+.disp{font-family:"Brygada 1918",serif;font-weight:500}
+#main{width:1280px;height:720px;display:grid;grid-template-columns:1fr 1.08fr;gap:0;padding:44px 52px}
+#main .l{padding-right:44px;border-right:1px solid #2E2B27;display:flex;flex-direction:column}
+.k{font-size:20px;color:#9C9488;margin:0 0 14px}
+.k b{color:#F06A30;font-weight:500;margin-right:10px}
+.h{font-size:40px;margin:0 0 22px;line-height:1.05}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:40px}
+.chip{font-size:22px;padding:10px 18px;border:1px solid #3A3631;color:#CFC8BC}
+.chip.on{background:#EDE8DF;color:#171614;border-color:#EDE8DF}
+.big{font-size:96px;line-height:1;margin:6px 0 24px}
+.big small{font-size:28px;color:#9C9488;margin-left:12px}
+.bar{height:4px;background:#3A3631;position:relative;margin:0 0 14px}
+.bar i{position:absolute;left:0;top:0;bottom:0;width:33%;background:#EDE8DF}
+.bar u{position:absolute;left:33%;top:-14px;width:5px;height:32px;background:#EDE8DF;margin-left:-2px}
+.ticks{display:flex;justify-content:space-between;font-size:19px;color:#9C9488}
+#main .r{padding-left:44px;display:flex;flex-direction:column}
+.rh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.tag{font-size:17px;color:#F06A30;border:1px solid #F06A30;padding:3px 9px}
+.sub{font-size:18px;color:#9C9488;margin:0 0 14px}
+table{width:100%;border-collapse:collapse}
+td{font-size:23px;padding:11px 0;border-bottom:1px dashed #34302B}
+td.p{text-align:right;white-space:nowrap}
+.tot{display:flex;justify-content:space-between;align-items:baseline;margin-top:auto;padding-top:18px;border-top:2px solid #EDE8DF}
+.tot .disp{font-size:34px}
+.tot .mono{font-size:40px}
+/* левый вертикальный экран: спокойный, крупный, мало текста (под ним заголовок сайта) */
+#left{width:800px;height:900px;padding:70px 64px;display:flex;flex-direction:column}
+#left .k{font-size:28px}
+#left .h{font-size:56px;margin-bottom:46px}
+#left .row{display:flex;justify-content:space-between;font-size:34px;padding:20px 0;border-bottom:1px dashed #34302B;color:#CFC8BC}
+#left .tot{margin-top:auto}
+#left .tot .disp{font-size:46px}
+#left .tot .mono{font-size:52px}
+#left .bt{margin-top:34px;background:#EDE8DF;color:#171614;font-size:30px;padding:24px;text-align:center;font-weight:500}
+#left .bt b{color:#D9501A;margin-right:12px}
+</style></head><body>
+<div id="main">
+  <div class="l">
+    <p class="k"><b>1</b>Vazifa</p>
+    <div class="chips"><span class="chip on">Oʻyinlar</span><span class="chip">3D va video</span><span class="chip">Dasturlash</span><span class="chip">Oʻqish</span></div>
+    <p class="k"><b>2</b>Byudjet</p>
+    <div class="big disp">27<small class="mono">mln soʻm</small></div>
+    <div class="bar"><i></i><u></u></div>
+    <div class="ticks mono"><span>11 mln</span><span>36</span><span>60 mln</span></div>
+  </div>
+  <div class="r">
+    <div class="rh"><span class="h disp" style="font-size:36px;margin:0">Oʻyin kompyuteri, 2K</span><span class="tag mono">misol</span></div>
+    <p class="sub mono">narxlar 05.10.2026 holatiga</p>
+    <table>
+      <tr><td>Ryzen 7 9700X</td><td class="p mono">4 300 000</td></tr>
+      <tr><td>RTX 5070 12 GB</td><td class="p mono">9 650 000</td></tr>
+      <tr><td>32 GB DDR5-6000</td><td class="p mono">4 950 000</td></tr>
+      <tr><td>Ona plata B650</td><td class="p mono">2 400 000</td></tr>
+      <tr><td>SSD 2 TB NVMe</td><td class="p mono">2 100 000</td></tr>
+    </table>
+    <div class="tot"><span class="disp">Jami</span><span class="mono">29 830 000</span></div>
+  </div>
+</div>
+<div id="left">
+  <p class="k mono">Smeta · misol</p>
+  <p class="h disp">Oʻyin kompyuteri, 2K</p>
+  <div class="row"><span>Qismlar</span><span class="mono">26,83 mln</span></div>
+  <div class="row"><span>Ish haqi</span><span class="mono">3 mln</span></div>
+  <div class="row"><span>Sinov</span><span class="mono">8 soat</span></div>
+  <div class="tot"><span class="disp">Jami</span><span class="mono">29,83 mln</span></div>
+  <div class="bt"><b>▼</b>Telegramda olish</div>
+</div>
+</body></html>
