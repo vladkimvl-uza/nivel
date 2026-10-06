@@ -19,9 +19,11 @@ export const PERMISSIONS = {
   "settings.calendar.write": ["owner"],
   "settings.flags.write": ["owner"],
   "journal.read": ["owner", "accountant"],
+  // The catalog feeds prices and the fee: the assistant looks, the owner changes (ARCHITECTURE 6.1: the assistant's
+  // list is orders, purchases, assembly, passport, warranty).
   "catalog.read": ["owner", "assistant", "accountant"],
-  "catalog.write": ["owner", "assistant"],
-  "catalog.import": ["owner", "assistant"],
+  "catalog.write": ["owner"],
+  "catalog.import": ["owner"],
   "upload.write": ["owner", "assistant"],
   "users.manage": ["owner"],
   /** Own account: password, Telegram id, recovery codes. */

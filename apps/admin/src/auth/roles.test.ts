@@ -31,8 +31,10 @@ describe("roles", () => {
     expect(can("translator", "account.self")).toBe(true);
   });
 
-  it("the assistant works with the catalog and uploads but does not manage people or the journal", () => {
-    expect(can("assistant", "catalog.write")).toBe(true);
+  it("the assistant reads the catalog and uploads files but does not change it, manage people or read the journal", () => {
+    expect(can("assistant", "catalog.read")).toBe(true);
+    expect(can("assistant", "catalog.write")).toBe(false);
+    expect(can("assistant", "catalog.import")).toBe(false);
     expect(can("assistant", "upload.write")).toBe(true);
     expect(can("assistant", "users.manage")).toBe(false);
     expect(can("assistant", "journal.read")).toBe(false);
