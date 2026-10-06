@@ -1,0 +1,297 @@
+{
+  "$comment": "WP-06: money rules the database enforces as the second line of defence (ARCHITECTURE 3.4). Run against the real database by packages/db/src/money-cases.int.test.ts. When WP-01 lands packages/testing/fixtures/money-cases.json, the integrator wires its shared cases into the same runner.",
+  "paymentPairs": [
+    {
+      "name": "advance by Xolis QR with a receipt",
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "receipt": "R-100",
+      "ok": true
+    },
+    {
+      "name": "advance by merchant card with a receipt",
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "confirmed",
+      "receipt": "R-101",
+      "ok": true
+    },
+    {
+      "name": "advance expected, no receipt yet",
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "receipt": null,
+      "ok": true
+    },
+    {
+      "name": "advance confirmed without a receipt",
+      "kind": "fee_advance",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_fee_chk"
+    },
+    {
+      "name": "final fee by bank transfer",
+      "kind": "fee_final",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_fee_chk"
+    },
+    {
+      "name": "extra fee paid out",
+      "kind": "fee_extra",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_fee_chk"
+    },
+    {
+      "name": "podbor fee by Xolis QR with a receipt",
+      "kind": "podbor_fee",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "confirmed",
+      "receipt": "R-102",
+      "ok": true
+    },
+    {
+      "name": "purchase funds by transfer to the sole proprietor",
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "confirmed",
+      "receipt": null,
+      "ok": true
+    },
+    {
+      "name": "purchase top-up by transfer to the sole proprietor",
+      "kind": "purchase_topup",
+      "direction": "in",
+      "method": "bank_transfer_ip",
+      "status": "confirmed",
+      "receipt": null,
+      "ok": true
+    },
+    {
+      "name": "purchase funds through the QR (streams must not mix)",
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "xolis_qr",
+      "status": "expected",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_purchase_funds_chk"
+    },
+    {
+      "name": "purchase funds by merchant card",
+      "kind": "purchase_funds",
+      "direction": "in",
+      "method": "merchant_card",
+      "status": "expected",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_purchase_funds_chk"
+    },
+    {
+      "name": "purchase funds going out",
+      "kind": "purchase_funds",
+      "direction": "out",
+      "method": "bank_transfer_ip",
+      "status": "expected",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_purchase_funds_chk"
+    },
+    {
+      "name": "remainder refund by outgoing transfer",
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "confirmed",
+      "receipt": null,
+      "ok": true
+    },
+    {
+      "name": "fee refund by outgoing transfer",
+      "kind": "fee_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "receipt": null,
+      "ok": true
+    },
+    {
+      "name": "funds refund by outgoing transfer",
+      "kind": "funds_refund",
+      "direction": "out",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "receipt": null,
+      "ok": true
+    },
+    {
+      "name": "funds refund coming in",
+      "kind": "funds_refund",
+      "direction": "in",
+      "method": "bank_transfer_out",
+      "status": "expected",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_refund_chk"
+    },
+    {
+      "name": "remainder refund through the QR",
+      "kind": "remainder_refund",
+      "direction": "out",
+      "method": "xolis_qr",
+      "status": "expected",
+      "receipt": null,
+      "ok": false,
+      "constraint": "payments_refund_chk"
+    }
+  ],
+  "purchaseLimit": [
+    {
+      "name": "purchases exactly at the limit",
+      "limit": 10000000,
+      "funds": 10000000,
+      "purchases": [6000000, 4000000],
+      "overrunConsent": "none",
+      "ok": true
+    },
+    {
+      "name": "one sum over the limit without consent",
+      "limit": 10000000,
+      "funds": 11000000,
+      "purchases": [10000001],
+      "overrunConsent": "none",
+      "ok": false,
+      "error": "limit_exceeded"
+    },
+    {
+      "name": "over the limit with a granted consent and enough funds",
+      "limit": 10000000,
+      "funds": 11000000,
+      "purchases": [10500000],
+      "overrunConsent": "granted",
+      "ok": true
+    },
+    {
+      "name": "over the limit, consent withdrawn later",
+      "limit": 10000000,
+      "funds": 11000000,
+      "purchases": [10500000],
+      "overrunConsent": "withdrawn",
+      "ok": false,
+      "error": "limit_exceeded"
+    },
+    {
+      "name": "over the limit with consent but beyond the funds",
+      "limit": 10000000,
+      "funds": 10000000,
+      "purchases": [10500000],
+      "overrunConsent": "granted",
+      "ok": false,
+      "error": "funds_exceeded"
+    },
+    {
+      "name": "within the limit but beyond the funds (no own money)",
+      "limit": 10000000,
+      "funds": 5000000,
+      "purchases": [5000001],
+      "overrunConsent": "none",
+      "ok": false,
+      "error": "funds_exceeded"
+    },
+    {
+      "name": "second purchase crosses the funds",
+      "limit": 10000000,
+      "funds": 7000000,
+      "purchases": [4000000, 3000001],
+      "overrunConsent": "none",
+      "ok": false,
+      "error": "funds_exceeded"
+    },
+    {
+      "name": "no funds received at all",
+      "limit": 10000000,
+      "funds": 0,
+      "purchases": [1],
+      "overrunConsent": "none",
+      "ok": false,
+      "error": "funds_exceeded"
+    }
+  ],
+  "reconcile": [
+    { "name": "nothing received, nothing spent", "funds": 0, "purchases": [], "refunds": [], "losses": 0, "ok": true },
+    {
+      "name": "all spent on receipts",
+      "funds": 10000000,
+      "purchases": [6000000, 4000000],
+      "refunds": [],
+      "losses": 0,
+      "ok": true
+    },
+    {
+      "name": "remainder refunded",
+      "funds": 10000000,
+      "purchases": [7000000],
+      "refunds": [3000000],
+      "losses": 0,
+      "ok": true
+    },
+    {
+      "name": "documented loss covers the difference",
+      "funds": 10000000,
+      "purchases": [7000000],
+      "refunds": [2500000],
+      "losses": 500000,
+      "ok": true
+    },
+    {
+      "name": "remainder not refunded yet",
+      "funds": 10000000,
+      "purchases": [7000000],
+      "refunds": [],
+      "losses": 0,
+      "ok": false
+    },
+    {
+      "name": "refund one sum short",
+      "funds": 10000000,
+      "purchases": [7000000],
+      "refunds": [2999999],
+      "losses": 0,
+      "ok": false
+    },
+    {
+      "name": "refund one sum too much",
+      "funds": 10000000,
+      "purchases": [7000000],
+      "refunds": [3000001],
+      "losses": 0,
+      "ok": false
+    },
+    {
+      "name": "loss without documents is not counted",
+      "funds": 10000000,
+      "purchases": [7000000],
+      "refunds": [2500000],
+      "losses": 0,
+      "ok": false
+    }
+  ]
+}
