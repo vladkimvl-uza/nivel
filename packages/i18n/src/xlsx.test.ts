@@ -361,3 +361,91 @@ function excelLikeBook(sheets: FakeSheet[], sharedStrings?: string, order?: stri
   if (sharedStrings) entries.push({ name: "xl/sharedStrings.xml", data: text(sharedStrings) });
   return writeZip(entries);
 }
+
+// ---- hostile files (the translator's file is external input) ------------------------------------------------------
+
+const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const bookWith = (sheetData: string) =>
+  excelLikeBook([{ name: "T", xml: `<worksheet xmlns="${MAIN_NS}"><sheetData>${sheetData}</sheetData></worksheet>` }]);
+
+/** Points the central-directory entry `index` at the local header of entry 0 (two names, one stream). */
+function aliasEntry(zip: Buffer, index: number): Buffer {
+  const copy = Buffer.from(zip);
+  const offsets: number[] = [];
+  for (let i = 0; i + 4 <= copy.length; i++) if (copy.readUInt32LE(i) === 0x02014b50) offsets.push(i);
+  const first = copy.readUInt32LE((offsets[0] as number) + 42);
+  copy.writeUInt32LE(first, (offsets[index] as number) + 42);
+  return copy;
+}
+
+describe("readXlsx on hostile files", () => {
+  const started = () => performance.now();
+
+  it.each([
+    [
+      "a column far beyond Excel's last one (XFD)",
+      '<row r="1"><c r="ZZZZZZZZZZ1" t="inlineStr"><is><t>x</t></is></c></row>',
+    ],
+    ["a column just after XFD", '<row r="1"><c r="XFE1" t="inlineStr"><is><t>x</t></is></c></row>'],
+    ["a row index beyond 32 bits", '<row r="4294967295"><c r="A1" t="inlineStr"><is><t>x</t></is></c></row>'],
+    ["a row just after Excel's last one", '<row r="1048577"><c r="A1" t="inlineStr"><is><t>x</t></is></c></row>'],
+    ["a row index of zero", '<row r="0"><c r="A1" t="inlineStr"><is><t>x</t></is></c></row>'],
+  ])("refuses %s quickly", (_name, rows) => {
+    const t0 = started();
+    expect(() => readXlsx(bookWith(rows))).toThrow(/Excel allows|row index|column index/);
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
+
+  it("accepts the last cell Excel can hold (XFD1048576)", () => {
+    const out = readXlsx(bookWith('<row r="1048576"><c r="XFD1048576" t="inlineStr"><is><t>end</t></is></c></row>'));
+    expect(out[0]?.rows).toHaveLength(1_048_576);
+    expect(out[0]?.rows[1_048_575]?.[16_383]).toBe("end");
+  });
+
+  it("fails fast with an error on tens of thousands of unclosed <row> tags instead of scanning quadratically", () => {
+    const t0 = started();
+    expect(() => readXlsx(bookWith("<row>".repeat(60_000)))).toThrow(/unclosed|malformed/i);
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
+
+  it("fails fast on unclosed <c> tags inside a row", () => {
+    const t0 = started();
+    expect(() => readXlsx(bookWith(`<row r="1">${'<c r="A1">'.repeat(60_000)}</row>`))).toThrow(/unclosed|malformed/i);
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
+
+  it("fails fast on a start tag that never ends", () => {
+    const t0 = started();
+    expect(() => readXlsx(bookWith(`<row ${'a="1" '.repeat(60_000)}`))).toThrow(/unclosed|malformed/i);
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
+
+  it("refuses archives whose entries overlap (one stream under several names)", () => {
+    const zip = writeZip([
+      { name: "a.xml", data: text("<a>".repeat(2000)) },
+      { name: "b.xml", data: text("<b>".repeat(2000)) },
+      { name: "c.xml", data: text("<c>".repeat(2000)) },
+    ]);
+    expect(() => readZip(aliasEntry(zip, 1))).toThrow(/overlap/);
+  });
+
+  it("limits the total size of everything unpacked, not only each entry", () => {
+    const zip = writeZip(
+      Array.from({ length: 4 }, (_, i) => ({ name: `f${i}`, data: Buffer.alloc(100_000, 0x61 + i) })),
+    );
+    expect(() => readZip(zip, { maxTotalBytes: 250_000 })).toThrow(/total/);
+    expect(readZip(zip, { maxTotalBytes: 400_000 }).size).toBe(4);
+  });
+
+  it("refuses an archive with more entries than a workbook can have", () => {
+    const zip = writeZip(Array.from({ length: 300 }, (_, i) => ({ name: `f${i}`, data: text("x") })));
+    expect(() => readZip(zip)).toThrow(/entries/);
+  });
+
+  it("does not need a closing tag for self-closing parts of a normal file", () => {
+    const out = readXlsx(
+      bookWith('<row r="1"><c r="A1" s="1"/><c r="B1" t="inlineStr"><is><t>ok</t></is></c></row><row r="2"/>'),
+    );
+    expect(out[0]?.rows).toEqual([[null, "ok"]]);
+  });
+});

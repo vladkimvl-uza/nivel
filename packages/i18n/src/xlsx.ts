@@ -35,7 +35,9 @@ const SIG_END = 0x06054b50;
 const DOS_DATE_1980 = (0 << 9) | (1 << 5) | 1; // 1980-01-01: fixed so that equal input gives equal bytes
 const UTF8_FLAG = 0x0800;
 const DEFAULT_ENTRY_LIMIT = 64 * 1024 * 1024;
-const MAX_ENTRIES = 10_000;
+// A workbook has about ten parts; a few hundred is generous. More is a sign of a hostile file.
+const MAX_ENTRIES = 256;
+const DEFAULT_TOTAL_LIMIT = 128 * 1024 * 1024;
 
 /** Writes a ZIP archive. Deterministic: no clock, entries in the given order. */
 export function writeZip(entries: readonly ZipEntry[], options: { compress?: boolean } = {}): Buffer {
@@ -95,8 +97,14 @@ export function writeZip(entries: readonly ZipEntry[], options: { compress?: boo
 }
 
 /** Reads a ZIP archive into name → bytes. Verifies sizes and CRC; refuses encryption, ZIP64 and oversized entries. */
-export function readZip(buf: Buffer, options: { maxEntryBytes?: number } = {}): Map<string, Buffer> {
+export function readZip(
+  buf: Buffer,
+  options: { maxEntryBytes?: number; maxTotalBytes?: number } = {},
+): Map<string, Buffer> {
   const limit = options.maxEntryBytes ?? DEFAULT_ENTRY_LIMIT;
+  const totalLimit = options.maxTotalBytes ?? DEFAULT_TOTAL_LIMIT;
+  let total = 0;
+  const taken: [number, number][] = [];
   let end = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 0xffff); i--) {
     if (buf.readUInt32LE(i) === SIG_END) {
@@ -135,16 +143,27 @@ export function readZip(buf: Buffer, options: { maxEntryBytes?: number } = {}): 
       throw new Error(`corrupt ZIP: bad local header of "${name}"`);
     const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
     if (start + csize > buf.length) throw new Error(`corrupt ZIP: "${name}" is truncated`);
+    for (const [from, to] of taken) {
+      if (local < to && from < start + csize) throw new Error(`corrupt ZIP: "${name}" overlaps another entry`);
+    }
+    taken.push([local, start + csize]);
+    const remaining = totalLimit - total;
+    if (remaining <= 0) throw new Error(`ZIP unpacks to more than the total limit of ${totalLimit} bytes`);
+    const room = Math.min(limit, remaining);
     const raw = buf.subarray(start, start + csize);
     let data: Buffer;
     if (method === 0) {
       data = raw;
     } else if (method === 8) {
       try {
-        data = inflateRawSync(raw, { maxOutputLength: limit });
+        data = inflateRawSync(raw, { maxOutputLength: room });
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") {
-          throw new Error(`ZIP entry "${name}" is larger than the limit of ${limit} bytes`);
+          throw new Error(
+            room < limit
+              ? `ZIP unpacks to more than the total limit of ${totalLimit} bytes`
+              : `ZIP entry "${name}" is larger than the limit of ${limit} bytes`,
+          );
         }
         throw new Error(`corrupt ZIP: cannot inflate "${name}"`);
       }
@@ -152,6 +171,8 @@ export function readZip(buf: Buffer, options: { maxEntryBytes?: number } = {}): 
       throw new Error(`ZIP entry "${name}" uses unsupported compression method ${method}`);
     }
     if (data.length > limit) throw new Error(`ZIP entry "${name}" is larger than the limit of ${limit} bytes`);
+    if (data.length > remaining) throw new Error(`ZIP unpacks to more than the total limit of ${totalLimit} bytes`);
+    total += data.length;
     if (data.length !== usize) throw new Error(`corrupt ZIP: size of "${name}" does not match`);
     if (crc32(data) !== crc) throw new Error(`corrupt ZIP: CRC mismatch in "${name}"`);
     files.set(name, data);
@@ -331,6 +352,8 @@ export function writeXlsx(sheets: readonly SheetData[]): Buffer {
 // ---- reader -------------------------------------------------------------------------------------------------------
 
 const ATTR = /([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+const MAX_ROW = 1_048_576;
+const MAX_COL = 16_384;
 
 function attributes(source: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -338,12 +361,80 @@ function attributes(source: string): Record<string, string> {
   return out;
 }
 
+interface XmlElement {
+  /** Offsets of the whole element in the source: `start` at "<", `end` after the closing ">". */
+  start: number;
+  end: number;
+  attrs: string;
+  inner: string;
+}
+
+/**
+ * Elements with the given local name (any namespace prefix), in document order, found in one linear pass. The files come
+ * from outside, so this avoids lazy regular expressions: on an unclosed tag they rescan the rest of the file for every
+ * opening tag, which takes quadratic time. An element that is not closed is an error.
+ */
+function* elements(xml: string, local: string): Generator<XmlElement> {
+  let pos = 0;
+  for (;;) {
+    const lt = xml.indexOf("<", pos);
+    if (lt < 0 || lt + 1 >= xml.length) return;
+    const lead = xml[lt + 1];
+    if (lead === "/" || lead === "?" || lead === "!") {
+      pos = lt + 1;
+      continue;
+    }
+    let nameEnd = lt + 1;
+    while (nameEnd < xml.length && !" \t\r\n/>".includes(xml[nameEnd] as string)) nameEnd++;
+    const qname = xml.slice(lt + 1, nameEnd);
+    if (qname.slice(qname.lastIndexOf(":") + 1) !== local) {
+      pos = nameEnd;
+      continue;
+    }
+    let tagEnd = nameEnd;
+    let quote = "";
+    for (; tagEnd < xml.length; tagEnd++) {
+      const ch = xml[tagEnd] as string;
+      if (quote) {
+        if (ch === quote) quote = "";
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+      } else if (ch === ">") {
+        break;
+      }
+    }
+    if (tagEnd >= xml.length) throw new Error(`malformed XML: unclosed start tag <${qname}>`);
+    if (xml[tagEnd - 1] === "/") {
+      yield { start: lt, end: tagEnd + 1, attrs: xml.slice(nameEnd, tagEnd - 1), inner: "" };
+      pos = tagEnd + 1;
+      continue;
+    }
+    const closing = `</${qname}`;
+    let close = xml.indexOf(closing, tagEnd + 1);
+    while (close >= 0 && !" \t\r\n>".includes(xml[close + closing.length] ?? "")) {
+      close = xml.indexOf(closing, close + 1);
+    }
+    if (close < 0) throw new Error(`malformed XML: unclosed element <${qname}>`);
+    const closeEnd = xml.indexOf(">", close);
+    if (closeEnd < 0) throw new Error(`malformed XML: unclosed end tag </${qname}>`);
+    yield { start: lt, end: closeEnd + 1, attrs: xml.slice(nameEnd, tagEnd), inner: xml.slice(tagEnd + 1, close) };
+    pos = closeEnd + 1;
+  }
+}
+
+const firstElement = (xml: string, local: string): XmlElement | undefined => elements(xml, local).next().value;
+
 /** Text of an element body: all <t> runs, without phonetic (<rPh>) text. */
 function collectText(inner: string): string {
-  const plain = inner.replace(/<(?:\w+:)?rPh\b[\s\S]*?<\/(?:\w+:)?rPh>/g, "");
+  let plain = "";
+  let from = 0;
+  for (const ph of elements(inner, "rPh")) {
+    plain += inner.slice(from, ph.start);
+    from = ph.end;
+  }
+  plain += inner.slice(from);
   let out = "";
-  for (const m of plain.matchAll(/<(?:\w+:)?t\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?t>)/g))
-    out += decodeText(m[1] ?? "");
+  for (const t of elements(plain, "t")) out += decodeText(t.inner);
   return out;
 }
 
@@ -355,36 +446,55 @@ function columnIndex(letters: string): number {
 
 function parseSharedStrings(xml: string): string[] {
   const out: string[] = [];
-  for (const m of xml.matchAll(/<(?:\w+:)?si\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?si>)/g))
-    out.push(collectText(m[1] ?? ""));
+  for (const si of elements(xml, "si")) out.push(collectText(si.inner));
   return out;
 }
 
+function checkRow(index: number, what: string): number {
+  if (!Number.isInteger(index) || index < 0 || index >= MAX_ROW) {
+    throw new Error(`sheet is larger than Excel allows: row index ${what} is outside 1..${MAX_ROW}`);
+  }
+  return index;
+}
+
+function checkColumn(letters: string): number {
+  const col = letters.length > 3 ? Number.POSITIVE_INFINITY : columnIndex(letters);
+  if (col >= MAX_COL) {
+    throw new Error(`sheet is larger than Excel allows: column ${letters.slice(0, 12)} is after XFD`);
+  }
+  return col;
+}
+
 function parseSheet(xml: string, shared: readonly string[]): XlsxCell[][] {
-  const rows: XlsxCell[][] = [];
+  // Rows by index in a Map: an index in the file must not decide how much memory is spent before it is checked.
+  const rows = new Map<number, XlsxCell[]>();
   let nextRow = 0;
-  for (const rowMatch of xml.matchAll(/<(?:\w+:)?row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?row>)/g)) {
-    const rowAttrs = attributes(rowMatch[1] ?? "");
-    const rowIndex = rowAttrs.r ? Number.parseInt(rowAttrs.r, 10) - 1 : nextRow;
+  let lastRow = -1;
+  for (const rowEl of elements(xml, "row")) {
+    const rowAttrs = attributes(rowEl.attrs);
+    const rowIndex = checkRow(
+      rowAttrs.r ? Number.parseInt(rowAttrs.r, 10) - 1 : nextRow,
+      rowAttrs.r ?? String(nextRow + 1),
+    );
     nextRow = rowIndex + 1;
-    const cells: XlsxCell[] = rows[rowIndex] ?? [];
+    const cells: XlsxCell[] = rows.get(rowIndex) ?? [];
     let nextCol = 0;
-    for (const cellMatch of (rowMatch[2] ?? "").matchAll(/<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g)) {
-      const attrs = attributes(cellMatch[1] ?? "");
+    for (const cellEl of elements(rowEl.inner, "c")) {
+      const attrs = attributes(cellEl.attrs);
       const ref = attrs.r ? /^([A-Z]+)\d+$/.exec(attrs.r) : null;
-      const col = ref ? columnIndex(ref[1] as string) : nextCol;
+      const col = ref ? checkColumn(ref[1] as string) : checkColumn(columnName(nextCol));
       nextCol = col + 1;
-      const inner = cellMatch[2] ?? "";
-      const v = /<(?:\w+:)?v\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?v>)/.exec(inner);
-      const raw = v ? decodeText(v[1] ?? "") : null;
+      const inner = cellEl.inner;
+      const v = firstElement(inner, "v");
+      const raw = v ? decodeText(v.inner) : null;
       let value: XlsxCell = null;
       switch (attrs.t) {
         case "s":
           value = raw === null ? null : (shared[Number.parseInt(raw, 10)] ?? null);
           break;
         case "inlineStr": {
-          const is = /<(?:\w+:)?is\b[^>]*?>([\s\S]*?)<\/(?:\w+:)?is>/.exec(inner);
-          value = is ? collectText(is[1] ?? "") : null;
+          const is = firstElement(inner, "is");
+          value = is ? collectText(is.inner) : null;
           break;
         }
         case "str":
@@ -405,11 +515,12 @@ function parseSheet(xml: string, shared: readonly string[]): XlsxCell[][] {
       while (cells.length < col) cells.push(null);
       cells[col] = value;
     }
-    rows[rowIndex] = cells;
+    rows.set(rowIndex, cells);
+    lastRow = Math.max(lastRow, rowIndex);
   }
   const dense: XlsxCell[][] = [];
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i] ?? [];
+  for (let i = 0; i <= lastRow; i++) {
+    const row = rows.get(i) ?? [];
     while (row.length > 0 && row[row.length - 1] === null) row.pop();
     dense.push(row);
   }
@@ -429,14 +540,14 @@ function resolveTarget(target: string): string {
 }
 
 /** Reads every sheet of a workbook into rows of cells (dates arrive as spreadsheet numbers; formulas as their cached text). */
-export function readXlsx(buf: Buffer, options: { maxEntryBytes?: number } = {}): XlsxSheet[] {
+export function readXlsx(buf: Buffer, options: { maxEntryBytes?: number; maxTotalBytes?: number } = {}): XlsxSheet[] {
   const files = readZip(buf, options);
   const text = (name: string) => files.get(name)?.toString("utf8");
   const workbook = text("xl/workbook.xml");
   if (workbook === undefined) throw new Error("not an xlsx workbook: xl/workbook.xml is missing");
   const relTargets = new Map<string, { target: string; type: string }>();
-  for (const m of (text("xl/_rels/workbook.xml.rels") ?? "").matchAll(/<(?:\w+:)?Relationship\b([^>]*?)\/?>/g)) {
-    const a = attributes(m[1] ?? "");
+  for (const rel of elements(text("xl/_rels/workbook.xml.rels") ?? "", "Relationship")) {
+    const a = attributes(rel.attrs);
     if (a.Id && a.Target) relTargets.set(a.Id, { target: a.Target, type: a.Type ?? "" });
   }
   const sstRel = [...relTargets.values()].find((r) => r.type.endsWith("/sharedStrings"));
@@ -444,8 +555,8 @@ export function readXlsx(buf: Buffer, options: { maxEntryBytes?: number } = {}):
   const shared = sstXml === undefined ? [] : parseSharedStrings(sstXml);
 
   const sheets: XlsxSheet[] = [];
-  for (const m of workbook.matchAll(/<(?:\w+:)?sheet\b([^>]*?)\/?>/g)) {
-    const a = attributes(m[1] ?? "");
+  for (const sheetEl of elements(workbook, "sheet")) {
+    const a = attributes(sheetEl.attrs);
     const ridKey = Object.keys(a).find((k) => k === "id" || k.endsWith(":id"));
     const rid = ridKey ? a[ridKey] : undefined;
     const rel = rid ? relTargets.get(rid) : undefined;
