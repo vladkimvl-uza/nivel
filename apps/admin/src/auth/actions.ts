@@ -6,8 +6,15 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { homeFor } from "../nav/nav.ts";
-import { withAudit } from "./audit.ts";
-import { endSession, forbiddenMessage, requestInfo, requireActionUser, startSession } from "./next.ts";
+import {
+  endSession,
+  forbiddenMessage,
+  guardAction,
+  NOT_ALLOWED,
+  requestInfo,
+  requireActionUser,
+  startSession,
+} from "./next.ts";
 import { AUTH_POLICY, SESSION_COOKIE } from "./policy.ts";
 import { isRole } from "./roles.ts";
 import { getRuntime } from "./runtime.ts";
@@ -149,42 +156,34 @@ export interface CreateUserState {
 }
 
 export async function createUserAction(_previous: CreateUserState, data: FormData): Promise<CreateUserState> {
-  const runtime = getRuntime();
-  const info = await requestInfo();
-  try {
-    const owner = await requireActionUser("users.manage");
-    const role = text(data, "role");
-    if (!isRole(role)) return { ok: false, message: "Выберите роль." };
-    const result = await withAudit(
-      runtime.audit,
-      { actor: `admin:${owner.id}`, action: "auth.user_create", entity: "ops.admin_users", ipHash: info.ipHash },
-      async () => ({
-        value: await runtime.auth.provisionUser({ email: text(data, "email"), role, actor: `admin:${owner.id}` }),
-      }),
-    );
-    if (!result.ok) return { ok: false, message: result.problems.join(" ") };
-    revalidatePath("/users");
-    return {
-      ok: true,
-      message:
-        "Учётная запись создана. Передайте данные человеку лично: пароль, ключ приложения и коды показаны один раз.",
-      created: {
-        email: result.email,
-        password: result.password,
-        totpSecret: result.totpSecret,
-        totpUri: result.totpUri,
-        recoveryCodes: result.recoveryCodes,
-      },
-    };
-  } catch (error) {
-    const denied = forbiddenMessage(error);
-    if (denied) return { ok: false, message: denied };
-    throw error;
-  }
+  const owner = await guardAction("users.manage", "auth.user_create", "ops.admin_users");
+  if (!owner) return { ok: false, message: NOT_ALLOWED };
+  const role = text(data, "role");
+  if (!isRole(role)) return { ok: false, message: "Выберите роль." };
+  const result = await getRuntime().auth.provisionUser({
+    email: text(data, "email"),
+    role,
+    actor: `admin:${owner.id}`,
+  });
+  if (!result.ok) return { ok: false, message: result.problems.join(" ") };
+  revalidatePath("/users");
+  return {
+    ok: true,
+    message:
+      "Учётная запись создана. Передайте данные человеку лично: пароль, ключ приложения и коды показаны один раз.",
+    created: {
+      email: result.email,
+      password: result.password,
+      totpSecret: result.totpSecret,
+      totpUri: result.totpUri,
+      recoveryCodes: result.recoveryCodes,
+    },
+  };
 }
 
 export async function setUserActiveAction(data: FormData): Promise<void> {
-  const owner = await requireActionUser("users.manage");
+  const owner = await guardAction("users.manage", "auth.user_switch", "ops.admin_users");
+  if (!owner) return;
   await getRuntime().auth.setActive(text(data, "id"), text(data, "active") === "true", owner);
   revalidatePath("/users");
 }
