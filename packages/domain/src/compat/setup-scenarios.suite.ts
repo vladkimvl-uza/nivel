@@ -45,7 +45,7 @@ type SetupRuleId = Extract<
 
 const stand = setupParts; // desk, monitor on its stand, chair
 const arm = (o: Parameters<typeof setupParts>[0] = {}) => setupParts({ ...o, withArm: true }); // monitor on the arm
-const onDesk = { arm: { xMm: 700, yMm: 0 } }; // clamp in the middle of the desk, away from the legs
+const onDesk = { desk: { xMm: 0, yMm: 0 }, arm: { xMm: 700, yMm: 0 } }; // clamp in the middle of the desk, away from the legs
 
 export const SETUP_SCENARIOS: Record<SetupRuleId, SetupScenario> = {
   DESK_WIDTH_MONITORS: {
@@ -221,7 +221,7 @@ export const SETUP_SCENARIOS: Record<SetupRuleId, SetupScenario> = {
       {
         name: "clamp at 50 mm from the left edge, over the leg zone 0 to 100 mm",
         parts: arm(),
-        placement: { arm: { xMm: 50, yMm: 0 } },
+        placement: { desk: { xMm: 0, yMm: 0 }, arm: { xMm: 50, yMm: 0 } },
         key: "compat.arm_clamp_over_leg",
         severity: "warn",
         params: { xMm: 50, fromMm: 0, toMm: 100 },
@@ -243,6 +243,13 @@ export const SETUP_SCENARIOS: Record<SetupRuleId, SetupScenario> = {
         parts: arm(),
         placement: { desk: { xMm: 0, yMm: 0 } },
         product: "arm",
+        field: "placement",
+      },
+      {
+        name: "desk placement (the arm is placed, the desk is not)",
+        parts: arm(),
+        placement: { arm: { xMm: 700, yMm: 0 } },
+        product: "desk",
         field: "placement",
       },
       {

@@ -12,9 +12,9 @@ export const deskWidthMonitors = setupRule({
     let monitorsMm = 0;
     for (const m of itemsOf(b, "monitor")) monitorsMm += (p.need(m, "monitor", "panelWmm") ?? 0) * m.qty;
     const deskMm = p.need(desk, "desk", "topWmm");
-    if (p.incomplete || deskMm === undefined) return p.result([]);
-    if (monitorsMm <= deskMm) return [];
-    return [
+    // unknown widths count as 0: the sum is a lower bound, so an excess is certain even then
+    if (deskMm === undefined || monitorsMm <= deskMm) return p.result([]);
+    return p.result([
       issue(
         "DESK_WIDTH_MONITORS",
         "block",
@@ -23,6 +23,6 @@ export const deskWidthMonitors = setupRule({
         { monitorsMm, deskMm },
         { category: "desk", filter: { topWmmMin: monitorsMm } },
       ),
-    ];
+    ]);
   },
 });

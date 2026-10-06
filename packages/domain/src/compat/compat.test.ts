@@ -7,6 +7,7 @@ import {
   checkSetup,
   compatApi,
   DEFAULT_COMPAT_SETTINGS,
+  defaultCompatSettings,
   estimatePower,
   MAX_LINE_QTY,
   MAX_LINES,
@@ -339,6 +340,17 @@ describe("checkSetup", () => {
     const r = plan(parts);
     expect(r.missingData).toContainEqual({ productId: "arm", field: "screens" });
     expect(r.verdict).toBe("incomplete");
+  });
+});
+
+describe("defaultCompatSettings", () => {
+  it("returns an equal copy that can be changed without touching the frozen defaults", () => {
+    const copy = defaultCompatSettings();
+    expect(copy).toEqual(DEFAULT_COMPAT_SETTINGS);
+    expect(() => copy.psuSeriesW.push(1300)).not.toThrow();
+    expect(() => copy.eyeDistanceMm.sort()).not.toThrow();
+    expect(DEFAULT_COMPAT_SETTINGS.psuSeriesW).toEqual([550, 650, 750, 850, 1000, 1200]);
+    expect(Object.isFrozen(DEFAULT_COMPAT_SETTINGS.psuSeriesW)).toBe(true);
   });
 });
 

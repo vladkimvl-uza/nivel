@@ -4,9 +4,9 @@ import type { CompatIssue } from "../types.ts";
 
 /**
  * A clamp cannot sit over a leg zone of the desk (frame, leg, crossbar). `plan.placement` holds room coordinates keyed
- * by product id (left-back corner, x to the right); the clamp position is the arm x minus the desk x (0 when the desk is
- * not placed). Without any placement there is nothing to check; with a placement that lacks the arm, "placement" is
- * reported as missing. An arm that mounts through a hole (`grommet`) is checked as fine.
+ * by product id (left-back corner, x to the right); the clamp position is the arm x minus the desk x. Without any placement
+ * there is nothing to check; a placement that lacks the arm or (for a clamp arm) the desk reports "placement" of that
+ * product as missing, a desk is never silently taken for x = 0. An arm that mounts through a hole (`grommet`) is checked as fine.
  */
 export const armClampZone = setupRule({
   id: "ARM_CLAMP_ZONE",
@@ -17,7 +17,7 @@ export const armClampZone = setupRule({
     if (!desk || !placement) return [];
     const p = new Probe("ARM_CLAMP_ZONE");
     const zones = p.need(desk, "desk", "legZonesMm");
-    const deskX = placement[desk.product.id]?.xMm ?? 0;
+    const deskAt = placement[desk.product.id];
     const found: CompatIssue[] = [];
     for (const arm of itemsOf(b, "arm")) {
       const mount = p.need(arm, "arm", "mount");
@@ -27,8 +27,12 @@ export const armClampZone = setupRule({
         p.missing(arm, "placement");
         continue;
       }
+      if (!deskAt) {
+        p.missing(desk, "placement");
+        continue;
+      }
       if (zones === undefined) continue;
-      const xMm = at.xMm - deskX;
+      const xMm = at.xMm - deskAt.xMm;
       const zone = zones.find((z) => xMm >= z.fromMm && xMm <= z.toMm);
       if (zone) {
         found.push(

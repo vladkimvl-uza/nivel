@@ -80,6 +80,61 @@ describe("COOLER_CASE_HEIGHT boundaries", () => {
   });
 });
 
+describe("a certain violation is not hidden by an unrelated unknown value", () => {
+  const withUnknownKit = (rule: RuleId, parts: Part[]) => {
+    const r = run(parts);
+    const found = r.issues.filter((i) => i.ruleId === rule);
+    return { r, blocks: found.filter((i) => i.severity === "block").map((i) => i.messageKey) };
+  };
+  it("MEM_SLOTS: the known modules already exceed the slots", () => {
+    const parts = pcBuild({
+      mb: { ramSlots: 2 },
+      ram: { modules: 4 },
+      add: [makeProduct("ram", "ram-b", { modules: null })],
+    });
+    const { r, blocks } = withUnknownKit("MEM_SLOTS", parts);
+    expect(blocks).toEqual(["compat.mem_slots_exceeded"]);
+    expect(r.missingData).toContainEqual({ productId: "ram-b", field: "modules" });
+    expect(r.verdict).toBe("block");
+  });
+  it("MEM_SLOTS: a lower bound that still fits stays incomplete, not blocked", () => {
+    const parts = pcBuild({ add: [makeProduct("ram", "ram-b", { modules: null })] });
+    const { r, blocks } = withUnknownKit("MEM_SLOTS", parts);
+    expect(blocks).toEqual([]);
+    expect(r.verdict).toBe("incomplete");
+  });
+  it("MEM_CAPACITY: the known kits already exceed the board maximum", () => {
+    const parts = pcBuild({
+      mb: { ramMaxGb: 24 },
+      ram: { kitGb: 32 },
+      add: [makeProduct("ram", "ram-b", { kitGb: null })],
+    });
+    const { r, blocks } = withUnknownKit("MEM_CAPACITY", parts);
+    expect(blocks).toEqual(["compat.mem_capacity_exceeded"]);
+    expect(r.missingData).toContainEqual({ productId: "ram-b", field: "kitGb" });
+  });
+  it("PSU_GPU_CONNECTORS: a missing 12V-2x6 cable is certain although another card's power data is unknown", () => {
+    const parts = pcBuild({
+      gpu: { power: [{ conn: "12V-2x6", count: 1 }], adapterInBox: false },
+      psu: { native12v2x6: 0 },
+      add: [makeProduct("gpu", "gpu-b", { power: null })],
+    });
+    const { r, blocks } = withUnknownKit("PSU_GPU_CONNECTORS", parts);
+    expect(blocks).toEqual(["compat.psu_12v2x6_missing"]);
+    expect(r.missingData).toContainEqual({ productId: "gpu-b", field: "power" });
+  });
+  it("PSU_GPU_CONNECTORS: with an unknown adapter flag the severity cannot be told, so only the gap is reported", () => {
+    const parts = pcBuild({
+      gpu: { power: [{ conn: "12V-2x6", count: 1 }], adapterInBox: null },
+      psu: { native12v2x6: 0 },
+    });
+    const { r, blocks } = withUnknownKit("PSU_GPU_CONNECTORS", parts);
+    expect(blocks).toEqual([]);
+    expect(r.missingData).toContainEqual({ productId: "gpu", field: "adapterInBox" });
+    expect(r.verdict).toBe("incomplete");
+  });
+});
+
 describe("PSU_WATTAGE boundaries (block 28, 3.4)", () => {
   const withPsu = (watts: number, gpu = {}, cpu = {}) => pcBuild({ psu: { watts }, gpu, cpu });
   const psu = (parts: Part[]) => keys(of(parts, "PSU_WATTAGE"));

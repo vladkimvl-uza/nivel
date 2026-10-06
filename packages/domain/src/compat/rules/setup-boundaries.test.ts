@@ -24,6 +24,21 @@ describe("DESK_WIDTH_MONITORS", () => {
   });
 });
 
+describe("DESK_WIDTH_MONITORS: a certain violation is not hidden by an unknown monitor width", () => {
+  it("the known monitors already exceed the desk", () => {
+    const parts = setupParts({ desk: { topWmm: 600 }, add: [makeProduct("monitor", "monitor-b", { panelWmm: null })] });
+    const r = run(parts);
+    expect(of(parts, "DESK_WIDTH_MONITORS").filter((i) => i.severity === "block")).toHaveLength(1);
+    expect(r.missingData).toContainEqual({ productId: "monitor-b", field: "panelWmm" });
+    expect(r.verdict).toBe("block");
+  });
+  it("a lower bound that still fits stays incomplete", () => {
+    const parts = setupParts({ add: [makeProduct("monitor", "monitor-b", { panelWmm: null })] });
+    expect(run(parts).verdict).toBe("incomplete");
+    expect(of(parts, "DESK_WIDTH_MONITORS").filter((i) => i.severity === "block")).toEqual([]);
+  });
+});
+
 describe("DESK_DEPTH_EYES", () => {
   const eyes = (topDmm: number) => keys(of(setupParts({ desk: { topDmm } }), "DESK_DEPTH_EYES"));
   it("500 mm and 760 mm to the eyes are both fine; one millimetre outside warns", () => {
@@ -108,7 +123,9 @@ describe("arm rules", () => {
 
   describe("ARM_CLAMP_ZONE", () => {
     const at = (xMm: number, extra: Record<string, { xMm: number; yMm: number }> = {}) =>
-      of(setupParts({ withArm: true }), "ARM_CLAMP_ZONE", { placement: { arm: { xMm, yMm: 0 }, ...extra } });
+      of(setupParts({ withArm: true }), "ARM_CLAMP_ZONE", {
+        placement: { desk: { xMm: 0, yMm: 0 }, arm: { xMm, yMm: 0 }, ...extra },
+      });
     it("the edges of a leg zone are inside it", () => {
       expect(at(0)).toHaveLength(1);
       expect(at(100)).toHaveLength(1);
@@ -124,6 +141,15 @@ describe("arm rules", () => {
     it("an arm for both mounts is a clamp arm", () => {
       const parts = setupParts({ withArm: true, arm: { mount: "both" } });
       expect(of(parts, "ARM_CLAMP_ZONE", { placement: { arm: { xMm: 50, yMm: 0 } } })).toHaveLength(1);
+    });
+    it("a placed arm on a desk that is not placed is missing data, not a desk at x = 0", () => {
+      const parts = setupParts({ withArm: true });
+      const r = run(parts, { placement: { arm: { xMm: 850, yMm: 0 } } });
+      expect(r.verdict).toBe("incomplete");
+      expect(r.missingData).toContainEqual({ productId: "desk", field: "placement" });
+      expect(r.issues.filter((i) => i.ruleId === "ARM_CLAMP_ZONE").map((i) => i.messageKey)).toEqual([
+        "compat.missing_data",
+      ]);
     });
     it("a missing placement object is 'not placed yet': the rule does not run", () => {
       expect(run(setupParts({ withArm: true })).checkedRules).not.toContain("ARM_CLAMP_ZONE");

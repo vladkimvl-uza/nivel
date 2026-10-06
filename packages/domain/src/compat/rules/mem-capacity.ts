@@ -14,9 +14,9 @@ export const memCapacity = pcRule({
     let totalGb = 0;
     for (const ram of itemsOf(b, "ram")) totalGb += (p.need(ram, "ram", "kitGb") ?? 0) * ram.qty;
     const maxGb = p.need(mb, "mb", "ramMaxGb");
-    if (p.incomplete || maxGb === undefined) return p.result([]);
-    if (totalGb <= maxGb) return [];
+    // unknown kits count as 0: the sum is a lower bound, so an excess is certain even then
+    if (maxGb === undefined || totalGb <= maxGb) return p.result([]);
     const ids = [...itemsOf(b, "ram").map((r) => r.product.id), mb.product.id];
-    return [issue("MEM_CAPACITY", "block", ids, "compat.mem_capacity_exceeded", { totalGb, maxGb })];
+    return p.result([issue("MEM_CAPACITY", "block", ids, "compat.mem_capacity_exceeded", { totalGb, maxGb })]);
   },
 });

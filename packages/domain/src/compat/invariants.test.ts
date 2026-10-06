@@ -36,7 +36,7 @@ function fullSetup(): { parts: Part[]; plan: Omit<SetupPlan, "lines"> } {
     parts: setupParts({ withArm: true, qty: { monitor: 2 } }),
     plan: {
       room: { widthMm: 3000, depthMm: 2500, userHeightCm: 175 },
-      placement: { arm: { xMm: 700, yMm: 0 } },
+      placement: { desk: { xMm: 0, yMm: 0 }, arm: { xMm: 700, yMm: 0 } },
     },
   };
 }

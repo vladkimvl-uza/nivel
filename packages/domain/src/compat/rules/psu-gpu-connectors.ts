@@ -18,7 +18,8 @@ export const psuGpuConnectors = pcRule({
     let need12 = 0;
     const ids8: ProductId[] = [];
     const ids12: ProductId[] = [];
-    let allHaveAdapter = true;
+    let allHaveAdapter = true; // no card of the 12V-2x6 kind is known to lack the adapter
+    let adapterUnknown = false;
     for (const gpu of itemsOf(b, "gpu")) {
       const power = p.need(gpu, "gpu", "power");
       if (power === undefined) continue;
@@ -30,7 +31,8 @@ export const psuGpuConnectors = pcRule({
         ids12.push(gpu.product.id);
         need12 += n12 * gpu.qty;
         const adapter = p.need(gpu, "gpu", "adapterInBox");
-        if (adapter !== true) allHaveAdapter = false;
+        if (adapter === undefined) adapterUnknown = true;
+        else if (!adapter) allHaveAdapter = false;
       }
     }
     const found: CompatIssue[] = [];
@@ -51,7 +53,9 @@ export const psuGpuConnectors = pcRule({
     }
     if (need12 > 0) {
       const have = p.need(psu, "psu", "native12v2x6");
-      if (have !== undefined && need12 > have && !p.incomplete) {
+      // Unknown power data of another card only makes the count a lower bound, so the excess is certain. Unknown adapter
+      // flags leave the severity open (warn with an adapter, block without) unless some card is known to lack one.
+      if (have !== undefined && need12 > have && (!allHaveAdapter || !adapterUnknown)) {
         const ids = [psu.product.id, ...ids12];
         found.push(
           allHaveAdapter
