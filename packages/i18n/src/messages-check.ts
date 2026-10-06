@@ -1,6 +1,6 @@
 // Consistency of one message namespace: same keys in uz and ru, meta for every key, same ICU arguments, limits from meta
 // (ARCHITECTURE 5.2). Used by tools/check-messages.mjs and by the translator import.
-import { checkIcuSyntax, placeholderSignature } from "./icu.ts";
+import { checkIcuSyntax, placeholderSignature, placeholdersCompatible } from "./icu.ts";
 
 export interface MetaEntry {
   context: string;
@@ -87,7 +87,7 @@ export function checkNamespace(
       }
       if (/\$|\bUSD\b/.test(text)) out.push(`${ns}: ${lang} "${k}" mentions dollars; prices are in sums only`);
     }
-    if (ruText !== undefined && icuOk && placeholderSignature(uzText).join() !== placeholderSignature(ruText).join()) {
+    if (ruText !== undefined && icuOk && !placeholdersCompatible(uzText, ruText)) {
       out.push(
         `${ns}: key "${k}" placeholders differ: uz {${placeholderSignature(uzText).join(", ")}} vs ru {${placeholderSignature(ruText).join(", ")}}`,
       );

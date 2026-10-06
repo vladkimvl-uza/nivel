@@ -59,8 +59,26 @@ describe("checkNamespace", () => {
   it("compares ICU placeholders including their types", () => {
     const names = checkNamespace("s", { a: "Salom {name}" }, { a: "Привет" }, { a: meta() }).join("\n");
     expect(names).toContain('key "a" placeholders differ: uz {name:argument} vs ru {}');
-    const types = checkNamespace("s", { a: "{n, number} ta" }, { a: "{n} шт." }, { a: meta() }).join("\n");
-    expect(types).toContain('key "a" placeholders differ: uz {n:number} vs ru {n:argument}');
+    const types = checkNamespace("s", { a: "{n, date} ta" }, { a: "{n} шт." }, { a: meta() }).join("\n");
+    expect(types).toContain('key "a" placeholders differ: uz {n:date} vs ru {n:argument}');
+    const select = checkNamespace("s", { a: "{n, select, other {x}}" }, { a: "{n}" }, { a: meta() }).join("\n");
+    expect(select).toContain('key "a" placeholders differ: uz {n:select} vs ru {n:argument}');
+  });
+
+  it('accepts a plain Uzbek number for a Russian plural: "{count} ta" is the natural Uzbek (ICU compatibility)', () => {
+    const ru = { a: "{count, plural, one {# товар} few {# товара} many {# товаров} other {# товара}}" };
+    for (const uz of ["{count} ta mahsulot", "{count, number} ta mahsulot", "{count, selectordinal, other {#-chi}}"]) {
+      expect(checkNamespace("s", { a: uz }, ru, { a: meta(100) }), uz).toEqual([]);
+    }
+    expect(checkNamespace("s", { a: "{count} ta" }, { a: "{count} шт." }, { a: meta() })).toEqual([]);
+  });
+
+  it("still rejects a renamed number or a number turned into another type", () => {
+    const ru = { a: "{count, plural, one {# товар} other {# товара}}" };
+    expect(checkNamespace("s", { a: "{soni} ta" }, ru, { a: meta() }).join("\n")).toContain("placeholders differ");
+    expect(checkNamespace("s", { a: "{count, date} ta" }, ru, { a: meta() }).join("\n")).toContain(
+      "placeholders differ: uz {count:date} vs ru {count:plural}",
+    );
   });
 
   it("accepts different plural categories in uz and ru", () => {

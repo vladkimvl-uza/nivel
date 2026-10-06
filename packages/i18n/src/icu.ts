@@ -190,6 +190,25 @@ export function placeholderSignature(message: string): string[] {
   return [...new Set(run(message).args.map((a) => `${a.name}:${a.type}`))].sort();
 }
 
+/**
+ * Types of one numeric argument that the uz and ru texts may swap: Uzbek does not decline the noun after a number, so
+ * "{count} ta mahsulot" is the natural translation of a Russian {count, plural, ...}.
+ */
+const NUMBER_LIKE = new Set(["argument", "number", "plural", "selectordinal"]);
+
+/**
+ * Like placeholderSignature, but {n}, {n, number}, {n, plural, ...} and {n, selectordinal, ...} all read "n:numeric".
+ * date, time and select stay strict: they need other values from the code.
+ */
+export function compatibleSignature(message: string): string[] {
+  return [...new Set(run(message).args.map((a) => `${a.name}:${NUMBER_LIKE.has(a.type) ? "numeric" : a.type}`))].sort();
+}
+
+/** True when two messages (uz and ru) ask the code for the same arguments, numeric types being interchangeable. */
+export function placeholdersCompatible(a: string, b: string): boolean {
+  return compatibleSignature(a).join() === compatibleSignature(b).join();
+}
+
 const NUMERIC = new Set(["number", "plural", "selectordinal"]);
 const DATED = new Set(["date", "time"]);
 

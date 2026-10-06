@@ -1,6 +1,13 @@
 import { createTranslator } from "use-intl/core";
 import { describe, expect, it } from "vitest";
-import { checkIcuSyntax, placeholderSignature, placeholders, sampleValues } from "./icu.ts";
+import {
+  checkIcuSyntax,
+  compatibleSignature,
+  placeholderSignature,
+  placeholders,
+  placeholdersCompatible,
+  sampleValues,
+} from "./icu.ts";
 
 describe("placeholders", () => {
   it("returns sorted argument names", () => {
@@ -48,6 +55,59 @@ describe("placeholderSignature", () => {
     const uz = "{count, plural, one {# ta} other {# ta}}";
     const ru = "{count, plural, one {# шт.} few {# шт.} many {# шт.} other {# шт.}}";
     expect(placeholderSignature(uz)).toEqual(placeholderSignature(ru));
+  });
+});
+
+describe("compatibleSignature and placeholdersCompatible", () => {
+  const ruPlural = "{count, plural, one {# товар} few {# товара} many {# товаров} other {# товара}}";
+
+  it("puts {n}, {n, number}, {n, plural, ...} and {n, selectordinal, ...} of one name into one numeric class", () => {
+    expect(compatibleSignature("{count}")).toEqual(["count:numeric"]);
+    expect(compatibleSignature("{count, number}")).toEqual(["count:numeric"]);
+    expect(compatibleSignature(ruPlural)).toEqual(["count:numeric"]);
+    expect(compatibleSignature("{count, selectordinal, one {#-chi} other {#-chi}}")).toEqual(["count:numeric"]);
+  });
+
+  it("keeps date, time and select apart, with their own type", () => {
+    expect(compatibleSignature("{d, date, short} {t, time} {g, select, a {x} other {y}}")).toEqual([
+      "d:date",
+      "g:select",
+      "t:time",
+    ]);
+  });
+
+  it("accepts the natural Uzbek '{count} ta ...' for a Russian plural (Uzbek does not decline the noun after a number)", () => {
+    expect(placeholdersCompatible("{count} ta mahsulot", ruPlural)).toBe(true);
+    expect(placeholdersCompatible("{count, number} ta mahsulot", ruPlural)).toBe(true);
+    expect(placeholdersCompatible("{count, plural, one {# ta} other {# ta}}", ruPlural)).toBe(true);
+    expect(placeholdersCompatible("{count, selectordinal, other {#-chi}}", ruPlural)).toBe(true);
+  });
+
+  it("is symmetric", () => {
+    expect(placeholdersCompatible(ruPlural, "{count} ta mahsulot")).toBe(true);
+    expect(placeholdersCompatible("{count} ta", "{count, date}")).toBe(false);
+    expect(placeholdersCompatible("{count, date}", "{count} ta")).toBe(false);
+  });
+
+  it("stays strict for the other types", () => {
+    expect(placeholdersCompatible("{d, date}", "{d}")).toBe(false);
+    expect(placeholdersCompatible("{d, time}", "{d, date}")).toBe(false);
+    expect(placeholdersCompatible("{g, select, other {x}}", "{g}")).toBe(false);
+    expect(placeholdersCompatible("{d, date}", "{d, date}")).toBe(true);
+  });
+
+  it("stays strict for names: a different, missing or extra argument is not compatible", () => {
+    expect(placeholdersCompatible("{soni} ta", ruPlural)).toBe(false);
+    expect(placeholdersCompatible("ta mahsulot", ruPlural)).toBe(false);
+    expect(placeholdersCompatible("{count} {extra}", "{count, plural, other {#}}")).toBe(false);
+  });
+
+  it("treats a name used both as a plain argument and as a plural like one numeric argument", () => {
+    expect(placeholdersCompatible("{n} ta, {n, plural, other {#}}", "{n, plural, one {#} other {#}}")).toBe(true);
+  });
+
+  it("returns false for an argument that is used as a number in one message and as a date in the other part", () => {
+    expect(placeholdersCompatible("{n} {n, date}", "{n, plural, other {#}}")).toBe(false);
   });
 });
 

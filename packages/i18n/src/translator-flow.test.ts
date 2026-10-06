@@ -76,6 +76,18 @@ describe("export", () => {
     expect(sheets.map((s) => s.name)).toEqual([TRANSLATIONS_SHEET, "Памятка", "Glossary"]);
   });
 
+  it("explains in the guide that a number may be written as {count} ta for a Russian plural, and which types stay strict", () => {
+    const guide =
+      buildExportSheets(catalog, glossary)[1]
+        ?.rows.map((r) => String(r[0]))
+        .join(" ") ?? "";
+    expect(guide).toContain("{count} ta");
+    expect(guide).toContain("{count, number}");
+    expect(guide).toContain("selectordinal");
+    expect(guide).not.toContain("импорт считает разными");
+    expect(guide).toMatch(/date.*time.*select|дата.*время.*select/s);
+  });
+
   it("writes the header and one row per key: namespace, key, context, limit, ru, uz, status, screenshot", () => {
     const sheet = buildExportSheets(catalog, glossary)[0];
     expect(sheet?.rows[0]).toEqual([...TRANSLATION_COLUMNS]);
@@ -403,9 +415,34 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
   });
 
   it("shows the types when only the type of a placeholder differs", () => {
-    const { report } = run((wb) => wb.set("site", "hello", "uz", "Hi {name, number}"));
+    const { report } = run((wb) => wb.set("site", "hello", "uz", "Hi {name, date}"));
     expect(report.errors).toEqual([
-      "row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {name:number}",
+      "row 5: site:hello placeholders differ from ru: ru {name:argument}, uz {name:date}",
+    ]);
+  });
+
+  it("accepts a plain number for a Russian plural: {count} ta ... is the natural Uzbek", () => {
+    const root = newRoot();
+    const wb = open(exportTranslations(root));
+    wb.set("site", "hero.count", "uz", "{count} ta mahsulot");
+    const report = importTranslations(root, wb.save());
+    expect(report.errors).toEqual([]);
+    expect(report.changes.map((c) => `${c.namespace}:${c.key}`)).toEqual(["site:hero.count"]);
+    expect((readJson(root, "uz", "site") as { hero: { count: string } }).hero.count).toBe("{count} ta mahsulot");
+  });
+
+  it("accepts {count, number} and selectordinal for a Russian plural, and rejects a renamed or date-typed one", () => {
+    for (const ok of ["{count, number} ta mahsulot", "{count, selectordinal, other {#-chi}}"]) {
+      const { report } = run((wb) => wb.set("site", "hero.count", "uz", ok));
+      expect(report.errors, ok).toEqual([]);
+    }
+    const renamed = run((wb) => wb.set("site", "hero.count", "uz", "{soni} ta mahsulot"));
+    expect(renamed.report.errors).toEqual([
+      "row 4: site:hero.count placeholders differ from ru: ru {count:plural}, uz {soni:argument}",
+    ]);
+    const date = run((wb) => wb.set("site", "hero.count", "uz", "{count, date} ta"));
+    expect(date.report.errors).toEqual([
+      "row 4: site:hero.count placeholders differ from ru: ru {count:plural}, uz {count:date}",
     ]);
   });
 
