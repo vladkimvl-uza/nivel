@@ -4,7 +4,8 @@
 // - Messages: a result carries only `messageKey` (`compat.*`, registry in message-keys.ts) and `params`; texts live in
 //   packages/i18n. Quantities for the user (percent of headroom, mm, W) are plain numbers.
 // - Unknown data: a spec value that is `null` and that the rule needs gives a warn `compat.missing_data` (params `field`,
-//   `category`), an entry in `missingData` and verdict `incomplete`; it is never read as "fine". An optional (`?`) field
+//   `category`), an entry in `missingData` and verdict `incomplete`; it is never read as "fine". To show the field by its
+//   name, the caller passes `t(fieldNameKey(category, field))` as `field` into `compat.missing_data` (see message-keys.ts). An optional (`?`) field
 //   that is absent means "not applicable / no constraint" (no BIOS floor, monitor without VESA, mount without a
 //   thickness limit); the exceptions are documented in the rule file.
 // - A rule runs only when the build contains the parts it compares (`checkedRules`): a configurator can call the check
@@ -23,7 +24,13 @@ import { assertSinglePcParts, resolveBuild } from "./resolve.ts";
 import { PC_RULES, SETUP_RULES } from "./rules/index.ts";
 import type { CompatApi, CompatResult, CompatSettings, PowerEstimate, SetupPlan, Task } from "./types.ts";
 
-export { COMPAT_MESSAGE_KEYS, MESSAGE_KEY_PREFIX, type MessageKeySpec } from "./message-keys.ts";
+export {
+  COMPAT_MESSAGE_KEYS,
+  FIELD_NAME_KEY_PREFIX,
+  fieldNameKey,
+  MESSAGE_KEY_PREFIX,
+  type MessageKeySpec,
+} from "./message-keys.ts";
 export { MAX_LINE_QTY, MAX_LINES } from "./resolve.ts";
 export { MISSING_DATA_KEY, type PcRuleDef, type SetupRuleDef } from "./rule-kit.ts";
 export { DEFAULT_COMPAT_SETTINGS, defaultCompatSettings } from "./settings.ts";

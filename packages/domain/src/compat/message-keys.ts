@@ -2,6 +2,25 @@ import type { RuleId } from "./types.ts";
 
 export const MESSAGE_KEY_PREFIX = "compat.";
 
+/** Prefix of the keys that name a spec field: `compat.field.<category>.<field>`. */
+export const FIELD_NAME_KEY_PREFIX = "compat.field.";
+
+/**
+ * Key of the display name of a spec field (namespace `compat`, texts in packages/i18n). Convention for
+ * `compat.missing_data`, whose params are `{ field, category }` (the technical names, e.g. "tgpW" of "gpu"): the caller
+ * shows the name of the field, not the technical key, by passing it into the message:
+ *
+ *   const label = t(fieldNameKey(issue.params.category, issue.params.field));
+ *   t(issue.messageKey, { ...issue.params, field: label });
+ *
+ * `compat.field.*` has a name for every field of `SpecMap` and for the plan position "placement" of an arm and a desk
+ * (the only field a rule reports that is not a spec field; tests keep the dictionary in step). For a key that does not
+ * exist, check with `t.has(key)` first and show the technical name instead of failing.
+ */
+export function fieldNameKey(category: string, field: string): string {
+  return `${FIELD_NAME_KEY_PREFIX}${category}.${field}`;
+}
+
 export interface MessageKeySpec {
   /** Rule that raises the key; "*" for keys shared by all rules. */
   rule: RuleId | "*";
@@ -11,7 +30,8 @@ export interface MessageKeySpec {
 
 /**
  * Every `messageKey` the rules can return, with the params that go with it. Texts are not here: `packages/i18n`
- * (namespace `common`, WP-08) owns them; the Russian drafts are in packages/testing/fixtures/wp-03/compat-message-keys.json.
+ * (namespace `compat`: messages/{ru,uz,meta}/compat.json) owns them; t(issue.messageKey, issue.params) works as it is.
+ * The first Russian drafts are in packages/testing/fixtures/wp-03/compat-message-keys.json (the request that preceded the texts).
  * A test keeps this table, the rules and that file in step.
  */
 export const COMPAT_MESSAGE_KEYS: Readonly<Record<string, MessageKeySpec>> = {

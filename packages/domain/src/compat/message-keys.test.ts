@@ -3,7 +3,7 @@
 // (packages/testing/fixtures/wp-03/compat-message-keys.json with a Russian draft per key).
 import { describe, expect, it } from "vitest";
 import { checkCompatibility, checkSetup } from "./index.ts";
-import { COMPAT_MESSAGE_KEYS, MESSAGE_KEY_PREFIX } from "./message-keys.ts";
+import { COMPAT_MESSAGE_KEYS, FIELD_NAME_KEY_PREFIX, fieldNameKey, MESSAGE_KEY_PREFIX } from "./message-keys.ts";
 import { MISSING_DATA_KEY } from "./rule-kit.ts";
 import { PC_SCENARIOS } from "./scenarios.suite.ts";
 import { roomOf, SETUP_SCENARIOS } from "./setup-scenarios.suite.ts";
@@ -22,6 +22,24 @@ interface DraftRow {
   ru: string;
 }
 const draft: DraftRow[] = JSON.parse(Object.values(fixtureFiles)[0] ?? "[]");
+
+const nameFiles = import.meta.glob("../../../i18n/messages/{ru,uz}/compat.json", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+});
+/** Names of the compat.field.* keys present in the messages of one locale. */
+function fieldNames(locale: "ru" | "uz"): Set<string> {
+  const raw = Object.entries(nameFiles).find(([path]) => path.includes(`/${locale}/`))?.[1] ?? "{}";
+  const out = new Set<string>();
+  const walk = (node: unknown, path: string) => {
+    if (node && typeof node === "object") {
+      for (const [k, v] of Object.entries(node)) walk(v, path ? `${path}.${k}` : k);
+    } else if (path.startsWith(FIELD_NAME_KEY_PREFIX)) out.add(path);
+  };
+  walk(JSON.parse(raw as string), "");
+  return out;
+}
 
 /** Every issue the scenario tables provoke, with the rule that raised it. */
 function emitted(): CompatIssue[] {
@@ -106,5 +124,34 @@ describe("request to WP-08: compat-message-keys.json", () => {
         expect(d.ru, `${d.key} should mention {${p}}`).toMatch(new RegExp(`\\{${p}[,}]`));
       }
     }
+  });
+});
+
+describe("compat.missing_data: the field is shown by its name (convention compat.field.<category>.<field>)", () => {
+  const missing = emitted().filter((i) => i.messageKey === MISSING_DATA_KEY);
+
+  it("fieldNameKey builds the key of the name from the params of the issue", () => {
+    expect(FIELD_NAME_KEY_PREFIX).toBe("compat.field.");
+    expect(fieldNameKey("gpu", "tgpW")).toBe("compat.field.gpu.tgpW");
+  });
+
+  it("every no-data issue carries a category and a field that has a name in ru and in uz", () => {
+    expect(missing.length).toBeGreaterThan(40);
+    for (const locale of ["ru", "uz"] as const) {
+      const names = fieldNames(locale);
+      expect(names.size, locale).toBeGreaterThan(100);
+      for (const i of missing) {
+        const { field, category } = i.params;
+        expect(typeof category, `${i.ruleId} params ${JSON.stringify(i.params)}`).toBe("string");
+        expect(typeof field, `${i.ruleId} params ${JSON.stringify(i.params)}`).toBe("string");
+        expect(names.has(fieldNameKey(String(category), String(field))), `${locale} ${category}.${field}`).toBe(true);
+      }
+    }
+  });
+
+  it("the category of the issue is the category of the product it points at", () => {
+    const seen = new Set(missing.map((i) => String(i.params.category)));
+    expect(seen.size).toBeGreaterThan(8);
+    for (const i of missing) expect(i.productIds, i.ruleId).toHaveLength(1);
   });
 });
