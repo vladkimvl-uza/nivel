@@ -28,7 +28,7 @@ describe("parseCsv", () => {
   });
 
   it("accepts Windows line ends, a BOM, a missing final newline and blank lines", () => {
-    const r = parseCsv("﻿a;b\r\n1;2\r\n\r\n3;4");
+    const r = parseCsv("\uFEFFa;b\r\n1;2\r\n\r\n3;4");
     expect(r).toMatchObject({ ok: true, delimiter: ";", header: ["a", "b"] });
     if (r.ok)
       expect(r.rows.map((row) => row.cells)).toEqual([

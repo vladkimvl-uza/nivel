@@ -186,6 +186,8 @@ export interface Resource<T extends z.ZodType> {
   labelFor(path: string[]): string;
   /** Whether the field at `path` is shown for `value` (hidden fields and unmet conditions are not). */
   visible(path: string[], value: unknown): boolean;
+  /** Dotted names of the fields not shown for `value`: the hidden ones and those whose condition does not hold. */
+  hiddenNames(value: unknown): string[];
   list(actor: SessionUser, query: Record<string, string | undefined>): Promise<ListPage<z.infer<T>>>;
   get(actor: SessionUser, id: string): Promise<StoredRecord<z.infer<T>> | null>;
   formModel(value: unknown): FormModel<z.infer<T>>;
@@ -435,6 +437,8 @@ export function defineResource<T extends z.ZodType>(def: ResourceDef<T>): Resour
     can,
     labelFor,
     visible: (path, value) => isShown(nameOf(path), value),
+    hiddenNames: (value) =>
+      [...new Set([...hidden, ...Object.keys(def.form?.conditional ?? {})])].filter((name) => !isShown(name, value)),
 
     async list(actor, query) {
       need(actor, "read");

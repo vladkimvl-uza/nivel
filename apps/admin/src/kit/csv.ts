@@ -36,7 +36,7 @@ export function detectDelimiter(text: string): string {
 
 export function parseCsv(input: string): CsvParse {
   if (input.length > MAX_CSV_BYTES) return { ok: false, error: "Файл больше 1 МБ." };
-  const text = input.replace(/^﻿/, "");
+  const text = input.replace(/^\uFEFF/, "");
   if (text.trim() === "") return { ok: false, error: "Файл пуст." };
   const delimiter = detectDelimiter(text);
 
@@ -113,12 +113,17 @@ export function parseCsv(input: string): CsvParse {
  * CSV text for download. A cell that starts with = + - @ or a tab/CR would be run as a formula by a spreadsheet
  * (OWASP "CSV injection"): it is written with a leading apostrophe. Plain numbers may stay as they are.
  */
-export function toCsv(rows: readonly (readonly string[])[], opts: { allowNumbers?: boolean } = {}): string {
+export function toCsv(
+  rows: readonly (readonly string[])[],
+  opts: { allowNumbers?: boolean; delimiter?: string } = {},
+): string {
+  const delimiter = opts.delimiter ?? ",";
   const guard = (cell: string): string => {
     if (!/^[=+\-@\t\r]/.test(cell)) return cell;
     if (opts.allowNumbers && /^-?\d+([.,]\d+)?$/.test(cell)) return cell;
     return `'${cell}`;
   };
-  const quote = (cell: string): string => (/[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell);
-  return rows.map((row) => `${row.map((c) => quote(guard(c))).join(",")}\r\n`).join("");
+  const quote = (cell: string): string =>
+    /["\r\n]/.test(cell) || cell.includes(delimiter) ? `"${cell.replace(/"/g, '""')}"` : cell;
+  return rows.map((row) => `${row.map((c) => quote(guard(c))).join(delimiter)}\r\n`).join("");
 }

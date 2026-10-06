@@ -109,7 +109,7 @@ describe("sign-in", () => {
     const fifth = await attempt(h, { code: "111111" });
     expect(fifth.ok).toBe(false);
     if (fifth.ok) return;
-    expect(fifth.reason).toBe("locked");
+    if (fifth.reason !== "locked") throw new Error("expected the lock");
     expect(fifth.lockedUntil).toEqual(new Date(T0.getTime() + 15 * MS_PER_MINUTE));
   });
 
@@ -156,8 +156,8 @@ describe("sign-in", () => {
 
   it("does not accept the same TOTP code twice, but accepts the next period", async () => {
     const code = h.codeNow();
-    expect((await attempt(h, { code })).ok).toBe(true);
-    expect(await attempt(h, { code })).toEqual({ ok: false, reason: "invalid" });
+    expect((await attempt(h, { code: code ?? "" })).ok).toBe(true);
+    expect(await attempt(h, { code: code ?? "" })).toEqual({ ok: false, reason: "invalid" });
     h.clock.advance(30_000);
     expect((await attempt(h, { code: h.codeNow() })).ok).toBe(true);
   });
@@ -188,7 +188,7 @@ describe("recovery codes", () => {
       expect(first.usedRecoveryCode).toBe(true);
       expect(first.recoveryLeft).toBe(9);
     }
-    expect(await attempt(h, { code })).toEqual({ ok: false, reason: "invalid" });
+    expect(await attempt(h, { code: code ?? "" })).toEqual({ ok: false, reason: "invalid" });
     expect(h.store.audit.map((a) => a.action)).toContain("auth.recovery_used");
   });
 
@@ -205,9 +205,9 @@ describe("recovery codes", () => {
     if (!fresh.ok) return;
     expect(fresh.recoveryCodes).toHaveLength(10);
     h.clock.advance(60_000);
-    expect(await attempt(h, { code: h.user.recoveryCodes[0] })).toEqual({ ok: false, reason: "invalid" });
+    expect(await attempt(h, { code: h.user.recoveryCodes[0] ?? "" })).toEqual({ ok: false, reason: "invalid" });
     h.clock.advance(60_000);
-    expect((await attempt(h, { code: fresh.recoveryCodes[0] })).ok).toBe(true);
+    expect((await attempt(h, { code: fresh.recoveryCodes[0] ?? "" })).ok).toBe(true);
   });
 
   it("does not regenerate without the right password or the right code", async () => {

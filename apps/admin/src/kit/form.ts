@@ -307,7 +307,6 @@ export interface IssueLike {
   code: string;
   path: PropertyKey[];
   message: string;
-  [key: string]: unknown;
 }
 
 const plural = (n: number, one: string, few: string, many: string): string => {
@@ -318,7 +317,9 @@ const plural = (n: number, one: string, few: string, many: string): string => {
   return many;
 };
 
-function describeIssue(issue: IssueLike): string {
+function describeIssue(base: IssueLike): string {
+  // Zod issues carry different extra fields per code; they are read by name below.
+  const issue = base as IssueLike & Record<string, unknown>;
   switch (issue.code) {
     case "invalid_type": {
       if (/received (undefined|null)/.test(issue.message)) return "Обязательное поле.";

@@ -133,9 +133,9 @@ describe("saveUpload", () => {
   });
 
   it("knows the kinds and their retention classes", () => {
-    expect(UPLOAD_KINDS.receipt.retentionClass).toBe("tax_5y");
-    expect(UPLOAD_KINDS.esf.retentionClass).toBe("tax_5y");
-    expect(UPLOAD_KINDS.part_photo.containsPd).toBe(false);
+    expect(UPLOAD_KINDS.receipt?.retentionClass).toBe("tax_5y");
+    expect(UPLOAD_KINDS.esf?.retentionClass).toBe("tax_5y");
+    expect(UPLOAD_KINDS.part_photo?.containsPd).toBe(false);
   });
 });
 

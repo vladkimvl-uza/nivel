@@ -44,12 +44,13 @@ export function can(role: Role, permission: Permission): boolean {
 /** Thrown when a signed-in person asks for something the role does not allow; screens show it as 403. */
 export class ForbiddenError extends Error {
   readonly code = "forbidden";
-  constructor(
-    readonly role: Role | null,
-    readonly needed: string,
-  ) {
+  readonly role: Role | null;
+  readonly needed: string;
+  constructor(role: Role | null, needed: string) {
     super(`forbidden: ${role ?? "anonymous"} may not ${needed}`);
     this.name = "ForbiddenError";
+    this.role = role;
+    this.needed = needed;
   }
 }
 
