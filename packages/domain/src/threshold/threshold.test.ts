@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bp, type Sum, sum } from "../money/index.ts";
+import { type Bp, bp, type Sum, sum } from "../money/index.ts";
 import { forAll, shuffle } from "../money/testkit.ts";
 import {
   DEFAULT_THRESHOLD_SETTINGS,
@@ -135,6 +135,15 @@ describe("thresholdStatus", () => {
     expect(at(790_000_000)).toEqual([6000, 7000]);
     expect(at(900_000_000)).toEqual([6000, 7000, 8000, 9000]);
     expect(at(1_000_000_000)).toEqual([6000, 7000, 8000, 9000, 10_000]);
+  });
+
+  it("takes a read-only list of alerts without a cast and does not change it (WP-00, ADR-007 item 1)", () => {
+    const alerts: readonly Bp[] = Object.freeze([bp(9000), bp(6000)]);
+    const s: ThresholdSettings = settings({ alertsBp: alerts });
+    expect(thresholdStatus([entry("receipt", 950_000_000)], S(0), 2026, s).crossedAlerts).toEqual([6000, 9000]);
+    expect(alerts).toEqual([9000, 6000]);
+    // @ts-expect-error the list in the contract is read-only
+    expect(() => s.alertsBp.push(bp(1))).toThrow(TypeError);
   });
 
   it("sorts and de-duplicates configured alerts", () => {

@@ -4,9 +4,9 @@ import type { DealEntry, ThresholdApi, ThresholdSettings, ThresholdStatus } from
 export type * from "./types.ts";
 
 /** Default threshold: 1 bn sum a year (NK art. 461, 462 part 9), lower-bound proportion, alerts at 60 to 100 % (ARCHITECTURE 4.8). */
-export const DEFAULT_THRESHOLD_SETTINGS: ThresholdSettings = Object.freeze({
+export const DEFAULT_THRESHOLD_SETTINGS: Readonly<ThresholdSettings> = Object.freeze({
   annualLimit: sum(1_000_000_000),
-  alertsBp: Object.freeze([bp(6000), bp(7000), bp(8000), bp(9000), bp(10_000)]) as Bp[],
+  alertsBp: Object.freeze([bp(6000), bp(7000), bp(8000), bp(9000), bp(10_000)]),
   proportion: "without_registration_day",
 });
 
