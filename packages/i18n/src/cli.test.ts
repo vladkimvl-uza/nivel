@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeUz } from "@nivel/domain/text";
 import { describe, expect, it } from "vitest";
 import { runExport, runImport, runNewLatin } from "./cli.ts";
 import { botFixture, makeRoot, readJson, siteFixture, tempDir } from "./flow-fixtures.ts";
@@ -153,7 +154,42 @@ describe("runImport", () => {
     expect(runImport(["x.xlsx", "--wat"], io())).toBe(2);
   });
 
-  it.todo("after the WP-02 merge: --normalize without a stub calls the real normalizeUz from @nivel/domain");
+  it("--normalize with the real normalizeUz from @nivel/domain fixes oʻ, gʻ and tutuq on import", () => {
+    const root = makeRoot({
+      bot: {
+        uz: { start: "Boshlash", help: "Yordam" },
+        ru: { start: "Начать", help: "Помощь" },
+        meta: {
+          start: { context: "Button /start", maxLen: 40, status: "draft" },
+          help: { context: "Button /help", maxLen: 40, status: "draft" },
+        },
+      },
+    });
+    const file = exported(root);
+    const wb = readXlsx(readFileSync(file));
+    const rows = wb[0]?.rows as unknown[][];
+    const uz = (rows[0] as string[]).indexOf("uz");
+    const key = (rows[0] as string[]).indexOf("key");
+    for (const row of rows.slice(1)) {
+      row[uz] = row[key] === "start" ? "O'zbekcha boshlash" : "Ma'lumot va yordam";
+    }
+    writeFileSync(file, writeXlsx(wb.map((s) => ({ name: s.name, rows: s.rows }))));
+    const o = io();
+    expect(runImport([file, "--root", root, "--normalize"], o, { normalizeUz })).toBe(0);
+    expect(readJson(root, "uz", "bot")).toEqual({ start: `Oʻzbekcha boshlash`, help: "Maʼlumot va yordam" });
+    expect(o.err).toContain("warning: row 2: bot:start uz apostrophes normalized");
+  });
+
+  it("without --normalize the same apostrophes are refused, nothing is written", () => {
+    const root = makeRoot({ bot: botFixture });
+    const file = exported(root);
+    const wb = readXlsx(readFileSync(file));
+    (wb[0]?.rows[1] as unknown[])[5] = "o'zbek";
+    writeFileSync(file, writeXlsx(wb.map((s) => ({ name: s.name, rows: s.rows }))));
+    const o = io();
+    expect(runImport([file, "--root", root], o, { normalizeUz })).toBe(1);
+    expect(readJson(root, "uz", "bot")).toEqual({ start: "Boshlash" });
+  });
 });
 
 describe("runNewLatin", () => {

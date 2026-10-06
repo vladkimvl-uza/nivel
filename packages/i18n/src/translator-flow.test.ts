@@ -1,5 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { normalizeUz } from "@nivel/domain/text";
 import { describe, expect, it } from "vitest";
 import { botFixture, makeRoot, readJson, readText, siteFixture } from "./flow-fixtures.ts";
 import { parseGlossary } from "./glossary.ts";
@@ -497,8 +498,8 @@ describe("import: checks (keys, placeholders, limit, apostrophes, glossary)", ()
   });
 });
 
-describe("import: normalization hook (normalizeUz comes from WP-02)", () => {
-  // Stand-in with the contract of ARCHITECTURE 4.12; the real function is tested after the WP-02 merge.
+describe("import: normalization hook", () => {
+  // Stand-in with the contract of ARCHITECTURE 4.12 for the hook tests; the real normalizeUz (WP-02) is used in the last two tests.
   const fake = (s: string) => s.replace(/([oOgG])['‘’`ʼ]/g, `$1${O}`).replace(/(?<=\p{L})['’]/gu, T);
 
   it("fixes apostrophes in changed rows before the checks and reports it", () => {
@@ -523,9 +524,24 @@ describe("import: normalization hook (normalizeUz comes from WP-02)", () => {
     expect(calls).toBe(0);
   });
 
-  it.todo(
-    "after the WP-02 merge: the import runs the real normalizeUz from @nivel/domain (oʻ, gʻ to U+02BB, other apostrophes to U+02BC)",
-  );
+  it("runs the real normalizeUz from @nivel/domain (oʻ, gʻ to U+02BB, other apostrophes to U+02BC)", () => {
+    const root = newRoot();
+    const wb = open(exportTranslations(root));
+    wb.set("site", "hello", "uz", "g'oya, ma'no {name}");
+    const report = importTranslations(root, wb.save(), { normalize: normalizeUz });
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toEqual(["row 5: site:hello uz apostrophes normalized"]);
+    expect((readJson(root, "uz", "site") as { hello: string }).hello).toBe(`g${O}oya, ma${T}no {name}`);
+  });
+
+  it("the real normalizeUz leaves a correct text unchanged: no warning, no change", () => {
+    const root = newRoot();
+    const wb = open(exportTranslations(root));
+    wb.set("site", "hello", "uz", `g${O}oya, ma${T}no {name}`);
+    const report = importTranslations(root, wb.save(), { normalize: normalizeUz });
+    expect(report.warnings).toEqual([]);
+    expect(report.changes).toHaveLength(1);
+  });
 });
 
 describe("import: broken input files", () => {
