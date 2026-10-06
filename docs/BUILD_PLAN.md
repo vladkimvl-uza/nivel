@@ -164,7 +164,7 @@ pnpm ci:local                        # full local CI
 
 - Выпуск: R0 (для сметы владельца), обязателен к R1. Фаза 2. Владеет: `packages/domain/src/{compat,catalog}/**`, `packages/contracts/src/catalog/**` (zod-схемы характеристик).
 - Зависит от: WP-00. Контракты: `checkCompatibility`, `checkSetup`, `estimatePower`, zod `ProductSpecsSchema` по категориям.
-- Делает: 28 правил ПК и 9 правил сетапа (4.4) по файлу на правило; `missingData` и вердикт `incomplete`; ключи сообщений `compat.*` (тексты — заявка в WP-08 пространство `common`).
+- Делает: 28 правил ПК и 9 правил сетапа (4.4) по файлу на правило; `missingData` и вердикт `incomplete`; ключи сообщений `compat.*` (тексты — в пространстве `compat`: `packages/i18n/messages/{uz,ru,meta}/compat.json`).
 - Приёмка: на каждое правило — «нельзя», «проверьте», «нет данных»; эталонные пары блока 15, 3.2; оценка БП по блоку 28, 3.4 (RTX 5070 → не ниже 650 Вт).
 - Тесты: vitest; набор заведомо несовместимых сборок с ожидаемыми `ruleId`; покрытие ≥ 90 %.
 
