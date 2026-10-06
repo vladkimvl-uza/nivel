@@ -15,6 +15,20 @@
       "when": 1791204131801,
       "tag": "20261005124211_extensions_roles_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791264802038,
+      "tag": "20261006053322_wp06_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791264806092,
+      "tag": "20261006053326_wp06_sql",
+      "breakpoints": true
     }
   ]
 }
