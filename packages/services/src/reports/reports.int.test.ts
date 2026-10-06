@@ -197,6 +197,42 @@ describe("the answer of the customer to the report", () => {
     expect(await accept({ orderId: o.orderId }, customerActor(o), w.bot)).toEqual({ ok: true, status: "report_sent" });
   });
 
+  it("an objection with the same words after the answer of the owner opens the report again, and the term does not accept it", async () => {
+    const { o } = await sentReport();
+    const text = "Savol bor"; // the bot sends the text of the button as a constant
+    expect(await object({ orderId: o.orderId, text }, customerActor(o), w.bot)).toEqual({
+      ok: true,
+      status: "report_sent",
+    });
+    await resolveObjection({ orderId: o.orderId, note: "Shown the receipt" }, owner(), w.admin);
+    // The same press again is a new objection: the first one was answered.
+    expect(await object({ orderId: o.orderId, text }, customerActor(o), w.bot)).toEqual({
+      ok: true,
+      status: "report_sent",
+    });
+    const journal = await w.db.$client.query(
+      "select count(*)::int as n from sales.order_events where order_id = $1 and event->>'type' = 'OBJECTION'",
+      [o.orderId],
+    );
+    expect(journal.rows[0].n).toBe(2);
+    expect(await accept({ orderId: o.orderId }, customerActor(o), w.bot)).toEqual({
+      ok: false,
+      error: "report_objection_open",
+    });
+    // A double click before the answer is still one objection.
+    expect(await object({ orderId: o.orderId, text }, customerActor(o), w.bot)).toEqual({
+      ok: true,
+      status: "report_sent",
+    });
+    const again = await w.db.$client.query(
+      "select count(*)::int as n from sales.order_events where order_id = $1 and event->>'type' = 'OBJECTION'",
+      [o.orderId],
+    );
+    expect(again.rows[0].n).toBe(2);
+    await resolveObjection({ orderId: o.orderId, note: "Answered again" }, owner(), w.admin);
+    expect(await accept({ orderId: o.orderId }, customerActor(o), w.bot)).toEqual({ ok: true, status: "report_sent" });
+  });
+
   it("the open objection does not depend on how the journal stamps compare to the process clock", async () => {
     // The journal is stamped by the database (DEFAULT now()), the resolution by the clock of the process. Here the clock
     // of the process is behind the clock of the database; the answer of the owner must close the objection all the same.

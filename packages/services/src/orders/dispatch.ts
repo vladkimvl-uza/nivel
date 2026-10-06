@@ -24,7 +24,7 @@ import { lockBy } from "./lock.ts";
 import { markQuoteAccepted } from "./quote-accept.ts";
 import { type Runtime, runtimeOf } from "./runtime.ts";
 import { loadCalendar, loadFeeSettings } from "./settings.ts";
-import { assembleSnapshot, loadSnapshotInputs, type OrderRow } from "./snapshot.ts";
+import { assembleSnapshot, loadSnapshotInputs, type OrderRow, resolvedAfterSeqOf } from "./snapshot.ts";
 import { assertUuid } from "./validate.ts";
 import { loadWebInputs, webHead } from "./web.ts";
 
@@ -122,15 +122,19 @@ interface JournalRow {
  * The window of the journal an event belongs to: from the last event that changed the status. An event that repeats one
  * of the window by the same actor is a repeat (the same click, a retry after a lost answer); the same event in an older
  * window (a second REVISE after a new estimate) is a new one. `anchor` is the number of the first event of the window.
+ * `answeredThrough` is the number of the last event the owner has answered (an objection to the report): the status does
+ * not change when the customer objects, so the answer is what ends the window of that event; the same words said again
+ * after the answer are a new objection, said twice before it - one.
  */
 export function windowOf(
   journal: readonly JournalRow[],
   digest: string,
   actor: ActorRef,
+  answeredThrough = 0,
 ): { anchor: number; repeat: boolean } {
   const anchor = journal.filter((e) => e.fromStatus !== e.toStatus).reduce((m, e) => Math.max(m, e.seq), 0);
   const repeat = journal
-    .filter((e) => e.seq >= anchor)
+    .filter((e) => e.seq >= anchor && e.seq > answeredThrough)
     .some(
       (e) => e.actorKind === actor.kind && e.actorId === actor.id && eventDigest(eventIdentity(e.event)) === digest,
     );
@@ -168,6 +172,15 @@ export async function dispatchInTx(
   let anchor = 0;
   if (!web) {
     const journal = await sales.listOrderEvents(tx, orderId);
+    let answeredThrough = 0;
+    if (event.type === "OBJECTION") {
+      const report = await tx.query.commissionReports.findFirst({
+        columns: { objection: true },
+        where: (t, { eq }) => eq(t.orderId, orderId),
+        orderBy: (t, { desc }) => desc(t.version),
+      });
+      answeredThrough = resolvedAfterSeqOf(report?.objection) ?? 0;
+    }
     const w = windowOf(
       journal.map((j) => ({
         seq: j.seq,
@@ -179,6 +192,7 @@ export async function dispatchInTx(
       })),
       digest,
       actor,
+      answeredThrough,
     );
     if (w.repeat) return { ok: true, status: order.status };
     anchor = w.anchor;

@@ -57,4 +57,16 @@ describe("windowOf: when an event is a repeat", () => {
     const incoming = { type: "CANCEL", point: "before_accept", reason: "x", settlement: { feeEarned: 0 } };
     expect(windowOf(journal, digest(incoming), owner).repeat).toBe(true);
   });
+
+  it("is new when the same objection comes after the owner answered the earlier one", () => {
+    const customer = { kind: "customer" as const, id: "c-1" };
+    const journal = [
+      row(1, { type: "SEND_REPORT", reportId: "r" }, "report_due", "report_sent"),
+      row(2, { type: "OBJECTION", text: "Savol bor" }, "report_sent", "report_sent", customer),
+    ];
+    const d = digest({ type: "OBJECTION", text: "Savol bor" });
+    expect(windowOf(journal, d, customer)).toEqual({ anchor: 1, repeat: true });
+    expect(windowOf(journal, d, customer, 1)).toEqual({ anchor: 1, repeat: true });
+    expect(windowOf(journal, d, customer, 2)).toEqual({ anchor: 1, repeat: false });
+  });
 });
