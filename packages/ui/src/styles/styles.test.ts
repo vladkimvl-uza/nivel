@@ -224,9 +224,9 @@ describe("documents", () => {
 });
 
 describe("index.css", () => {
-  it("imports themes, fonts, base and primitives, in that order", () => {
+  it("imports themes, fonts, base, primitives and logo, in that order", () => {
     const imports = [...indexCss.matchAll(/@import\s+"([^"]+)"/g)].map((m) => m[1]);
-    expect(imports).toEqual(["../themes/themes.css", "./fonts.css", "./base.css", "./primitives.css"]);
+    expect(imports).toEqual(["../themes/themes.css", "./fonts.css", "./base.css", "./primitives.css", "./logo.css"]);
   });
 });
 
