@@ -13,7 +13,7 @@ import { testRuntime } from "../../queues/test-support/runtime.ts";
 import { createWorld, theRow, type World } from "../../queues/test-support/world.ts";
 import { QUEUE } from "../outbox/routes.ts";
 import { scheduledDepsOf } from "./register.ts";
-import { sweepLeadReminders } from "./reminders.ts";
+import { leadReminderStart, sweepLeadReminders } from "./reminders.ts";
 import { handleScheduled } from "./scheduled.ts";
 import { sweepDeemed, sweepExpiry } from "./terms.ts";
 
@@ -209,7 +209,8 @@ describe("the requests nobody has answered", () => {
     // The hours of answers: Monday to Saturday 10:00-19:00. Take the first such half hour after the request was made.
     const [made] = await q<{ created_at: Date }>("select created_at from sales.leads where id = $1", [waiting.leadId]);
     const cal = createWorkCalendar([], { from: "10:00", to: "19:00" });
-    let now = new Date(theRow(made ? [made] : []).created_at.getTime() + 20 * 60_000);
+    // twenty minutes after the 15 minutes began to count, at a moment of the hours of answers (whatever time of day this runs)
+    let now = new Date(leadReminderStart(cal, theRow(made ? [made] : []).created_at).getTime() + 20 * 60_000);
     while (!cal.isResponseHours(now)) now = new Date(now.getTime() + 30 * 60_000);
     w.clock.set(now);
 
@@ -249,7 +250,8 @@ describe("the requests nobody has answered", () => {
     );
     const [made] = await q<{ created_at: Date }>("select created_at from sales.leads where id = $1", [lead.leadId]);
     const plain = createWorkCalendar([], { from: "10:00", to: "19:00" });
-    let first = new Date(theRow(made ? [made] : []).created_at.getTime() + 20 * 60_000);
+    const created = theRow(made ? [made] : []).created_at;
+    let first = new Date(leadReminderStart(plain, created).getTime() + 20 * 60_000);
     while (!plain.isResponseHours(first)) first = new Date(first.getTime() + 30 * 60_000);
     const holiday = isoDateInTashkent(first);
     await ops.setSetting(
@@ -262,8 +264,10 @@ describe("the requests nobody has answered", () => {
     w.clock.set(first); // inside the usual hours, but the owner has made this day a holiday
     expect((await sweepLeadReminders(deps)).reminded).toBe(0);
     const withHoliday = createWorkCalendar([holiday], { from: "10:00", to: "19:00" });
-    let next = new Date(first.getTime() + 30 * 60_000);
+    // the 15 minutes of a request that came on a day off count from the opening of the next working day
+    let next = new Date(leadReminderStart(withHoliday, created).getTime() + 20 * 60_000);
     while (!withHoliday.isResponseHours(next)) next = new Date(next.getTime() + 30 * 60_000);
+    expect(isoDateInTashkent(next)).not.toBe(holiday);
     w.clock.set(next);
     expect((await sweepLeadReminders(deps)).reminded).toBeGreaterThanOrEqual(1);
     expect(await outboxOf(`lead:${lead.leadId}:no_answer_15m`)).toHaveLength(1);

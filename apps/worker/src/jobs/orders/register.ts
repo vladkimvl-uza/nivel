@@ -5,6 +5,7 @@ import { type WorkerRuntime, workerContext } from "../../queues/runtime.ts";
 import { loadCalendar } from "../../queues/settings.ts";
 import { QUEUE } from "../outbox/routes.ts";
 import type { JobContext } from "../types.ts";
+import { createPgEsfReader, handleEsfReminders } from "./esf.ts";
 import { sweepLeadReminders } from "./reminders.ts";
 import { handleScheduled, type ScheduledDeps } from "./scheduled.ts";
 import { createPgOrdersStore } from "./store.ts";
@@ -31,12 +32,19 @@ export function scheduledDepsOf(rt: WorkerRuntime): ScheduledDeps {
 }
 
 /**
- * Domain "orders" (ARCHITECTURE 9): orders.estimate.expiry and orders.reminders every five minutes, and orders.scheduled, the queue
+ * Domain "orders" (ARCHITECTURE 9): orders.estimate.expiry and orders.reminders (the report accepted by the term, requests without an
+ * answer, the ESF of purchases) every five minutes, and orders.scheduled, the queue
  * the outbox sends the jobs of the order calendar to. Owner — WP-14.
  */
 export async function register(raw: JobContext): Promise<void> {
   const ctx = workerContext(raw);
   const deps = scheduledDepsOf(ctx.runtime);
+  const esf = {
+    now: deps.now,
+    log: deps.log,
+    esfDue: createPgEsfReader(ctx.runtime.db),
+    enqueue: (input: ops.OutboxInput) => ops.enqueueOutbox(ctx.runtime.db, input),
+  };
 
   await registerQueue(ctx, {
     name: QUEUE.ordersScheduled,
@@ -56,8 +64,8 @@ export async function register(raw: JobContext): Promise<void> {
     name: ORDERS_QUEUE.reminders,
     cron: "*/5 * * * *",
     handler: async () => {
-      // The two sweeps are independent: a failure of one must not hide the other, and it is still a failure of the job.
-      const results = await Promise.allSettled([sweepDeemed(deps), sweepLeadReminders(deps)]);
+      // The sweeps are independent: a failure of one must not hide the others, and it is still a failure of the job.
+      const results = await Promise.allSettled([sweepDeemed(deps), sweepLeadReminders(deps), handleEsfReminders(esf)]);
       const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
       if (failed.length > 0) throw failed[0]?.reason;
     },

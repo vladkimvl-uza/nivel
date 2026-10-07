@@ -138,6 +138,21 @@ describe("the texts of the owner (Russian: the owner reads the admin panel in Ru
     expect(r.render("reminder.aftercare", "ru", { number: "NV-2026-0007", days: 7 })).toContain("7");
   });
 
+  it("tells the overdue terms of a warranty case, the end of the warranty of a shop, the ESF, the maintenance", () => {
+    expect(r.render("reminder.warranty_sla", "ru", { caseNumber: "G-2026-0003", kind: "reply" })).toBe(
+      "Гарантийный случай G-2026-0003: срок ответа клиенту прошёл (1 рабочий день).",
+    );
+    expect(r.render("reminder.warranty_sla", "ru", { caseNumber: "G-2026-0003", kind: "diagnosis" })).toContain(
+      "диагностики",
+    );
+    expect(r.render("reminder.warranty_sla", "ru", { caseNumber: "G-2026-0003", kind: "fix" })).toContain("устранения");
+    expect(r.render("reminder.vendor_warranty", "ru", { number: "NV-2026-0007", until: "2026-11-11", items: 2 })).toBe(
+      "Заказ NV-2026-0007: гарантия магазина на 2 поз. заканчивается 11.11.2026. Если есть проблемы с этими позициями, обращайтесь в магазин до этой даты.",
+    );
+    expect(r.render("reminder.esf_due", "ru", { number: "NV-2026-0007", dueDate: "2026-10-22" })).toContain("ЭСФ");
+    expect(r.render("reminder.maintenance", "ru", { number: "NV-2026-0007", months: 6 })).toContain("профилактик");
+  });
+
   it("builds the digest of the errors of the day", () => {
     const text = r.render("ops.digest", "ru", {
       items: [

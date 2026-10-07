@@ -39,6 +39,9 @@ const MISSING = {
   },
 } as const;
 
+/** 2026-11-11 as 11.11.2026; anything else as it is. */
+const ruDate = (iso: string): string => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-").reverse().join(".") : iso);
+
 type Template = (p: Params, lang: Lang) => string;
 
 const TEMPLATES: Record<string, Template> = {
@@ -69,6 +72,24 @@ const TEMPLATES: Record<string, Template> = {
     `Заказ ${text(p.number)}: подошёл срок возврата остатка. Проверьте перевод и подтвердите его.`,
 
   "reminder.aftercare": (p) => `Заказ ${text(p.number)}: через ${whole(p.days)} дн. после сдачи — позвоните клиенту.`,
+
+  "reminder.warranty_sla": (p) => {
+    const term: Record<string, string> = {
+      reply: "срок ответа клиенту прошёл (1 рабочий день)",
+      diagnosis: "срок диагностики прошёл (2 рабочих дня)",
+      fix: "срок устранения прошёл",
+    };
+    return `Гарантийный случай ${text(p.caseNumber)}: ${term[text(p.kind)] ?? "срок прошёл"}.`;
+  },
+
+  "reminder.vendor_warranty": (p) =>
+    `Заказ ${text(p.number)}: гарантия магазина на ${whole(p.items)} поз. заканчивается ${ruDate(text(p.until))}. Если есть проблемы с этими позициями, обращайтесь в магазин до этой даты.`,
+
+  "reminder.esf_due": (p) =>
+    `Заказ ${text(p.number)}: срок ЭСФ по закупке — ${ruDate(text(p.dueDate))}. Проверьте, что ЭСФ получена и подписана.`,
+
+  "reminder.maintenance": (p) =>
+    `Заказ ${text(p.number)}: прошло ${whole(p.months)} мес. после сдачи — предложите клиенту профилактику.`,
 
   "threshold.alert": (p) => {
     const level = whole(p.levelBp);

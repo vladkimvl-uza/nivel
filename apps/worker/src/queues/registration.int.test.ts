@@ -65,6 +65,9 @@ const QUEUES = [
   "ops.selfcheck",
   "ops.error_digest",
   "ops.fee_scale.promote",
+  "warranty.sla",
+  "warranty.vendor_expiry",
+  "aftercare",
 ];
 
 describe("registration with the rights of nivel_worker", () => {
@@ -113,6 +116,9 @@ describe("the schedules, in the calendar of Tashkent, on a fake clock", () => {
     ["orders.reminders", "*/5 * * * *", ["2026-10-12T00:05:00+05:00", "2026-10-12T00:10:00+05:00"]],
     ["orders.estimate.expiry", "*/5 * * * *", ["2026-10-12T00:05:00+05:00", "2026-10-12T00:10:00+05:00"]],
     ["outbox.relay", "* * * * *", ["2026-10-12T00:01:00+05:00", "2026-10-12T00:02:00+05:00"]],
+    ["warranty.sla", "*/15 * * * *", ["2026-10-12T00:15:00+05:00", "2026-10-12T00:30:00+05:00"]],
+    ["warranty.vendor_expiry", "0 9 * * *", ["2026-10-12T09:00:00+05:00", "2026-10-13T09:00:00+05:00"]],
+    ["aftercare", "0 10 * * *", ["2026-10-12T10:00:00+05:00", "2026-10-13T10:00:00+05:00"]],
   ];
 
   it.each(cases)("%s runs on %s", async (name, cron, expected) => {
