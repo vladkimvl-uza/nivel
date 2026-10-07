@@ -1,0 +1,82 @@
+{
+  "common.brand": {
+    "context": "footer line of every page of every document",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "common.page": {
+    "context": "page number in the footer: page of pages",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "common.watermark": {
+    "context": "diagonal watermark of a sample document: the same bilingual text in both languages (stub offer or demo data)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "common.notice_stub": {
+    "context": "footer notice while the offer of the order is a placeholder (R-25)",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "common.notice_demo": {
+    "context": "footer notice on a document built on demo data",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "common.pending": {
+    "context": "placeholder for a requisite of the sole proprietor that does not exist yet (the IP is not registered): 'after registration'",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "requisites.title": {
+    "context": "heading of the block with the account of the sole proprietor",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "requisites.note": {
+    "context": "line under the requisites: the money for purchases goes to the account of the IP only",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "requisites.holder": {
+    "context": "requisite: payee",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.inn": {
+    "context": "requisite: taxpayer number",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.bank": {
+    "context": "requisite: bank",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.account": {
+    "context": "requisite: settlement account",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.mfo": {
+    "context": "requisite: bank code",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.purpose": {
+    "context": "label before the purpose of the payment",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "requisites.purpose_default": {
+    "context": "standard purpose of the payment when the owner has not written his own; {number} is the number of the order; 'without VAT' at the end",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "requisites.fee_channel": {
+    "context": "line under the requisites: the fee is paid by QR Xolis with a receipt, a different flow of money",
+    "maxLen": 100,
+    "status": "draft"
+  }
+}

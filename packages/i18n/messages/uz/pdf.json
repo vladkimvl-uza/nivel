@@ -1,0 +1,22 @@
+{
+  "common": {
+    "brand": "Nivel · Toshkent · nivel.uz",
+    "page": "{page} / {total}",
+    "watermark": "NAMUNA / ОБРАЗЕЦ",
+    "notice_stub": "Oferta-zagʻlushka: hujjat imzolash uchun emas va oferta hisoblanmaydi.",
+    "notice_demo": "Namuna: hujjat demo-maʼlumotlar asosida tuzilgan.",
+    "pending": "roʻyxatdan oʻtgach"
+  },
+  "requisites": {
+    "title": "Xarid uchun mablagʻ rekvizitlari",
+    "note": "Xarid uchun mablagʻ faqat YaTT hisob raqamiga pul oʻtkazish yoʻli bilan qabul qilinadi.",
+    "holder": "Oluvchi",
+    "inn": "STIR",
+    "bank": "Bank",
+    "account": "Hisob raqami",
+    "mfo": "MFO",
+    "purpose": "Toʻlov maqsadi",
+    "purpose_default": "Komitent mablagʻlari xarid uchun, {number} buyurtma shartnomasi boʻyicha. QQSsiz",
+    "fee_channel": "Xizmat haqi bu hisob raqamiga emas, QR Xolis orqali, chek bilan toʻlanadi."
+  }
+}
