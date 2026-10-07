@@ -58,9 +58,9 @@ describe("the contact columns of sales.leads", () => {
     expect(row).toEqual({ contact_phone: "+998901234567", contact_name: "Aziz", contact_username: "aziz_t" });
   });
 
-  it("are empty for a request that has a customer", async () => {
+  it("are empty for a request that has a customer (the bot names him; the site may not, see hardening.suite)", async () => {
     const o = await createOrder(migrator);
-    const id = await insertLead(web, { customerId: o.customerId });
+    const id = await insertLead(bot, { customerId: o.customerId });
     expect(await one(migrator, "select contact_phone from sales.leads where id = $1", [id])).toEqual({
       contact_phone: null,
     });

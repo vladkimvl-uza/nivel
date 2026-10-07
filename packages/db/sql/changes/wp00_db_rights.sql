@@ -9,17 +9,33 @@
 --   sales.warranty_fund_state  four aggregates of the warranty fund for the contribution at HANDOVER, for every role
 --   sales.purge_expired_leads  the 12-month erasure of requests that did not become an order
 --   ops.purge_expired_files  the retention classes of files; returns the storage keys to delete from the disk
---   sales.guard_lead         a request is bound to a customer once, by the admin panel only; its day is never rewritten
+--   sales.guard_lead         a request is bound to a customer once, by the admin panel only; its day is never rewritten;
+--                            the site and the bot write a request with the day of the database
 --   sales.guard_customer     the bot gives a Telegram id to a customer that has none and never changes it afterwards
---   ops.guard_file           the class (never shorter), the day, the kind, the key and the hash of a file are not rewritten
+--   ops.guard_file           the class (never shorter), the id, the day, the kind, the key and the hash of a file are not rewritten
+--   search_path              every function of the application schemas pins it (the guards no longer use the operators of the
+--                            caller); the application roles lose TEMP on the database
 --   sales.guard_quote, sales.guard_payment  let the file purge empty a link to a file that has expired, nothing else
 
+-- ---- the functions do not take the search_path of the caller ------------------------------------------------------
+-- A guard is a plain function: the operators it uses (=, <, IS DISTINCT FROM) were looked up in the search_path of
+-- whoever ran the statement. The worker may create a schema (pg-boss needs CREATE on the database) and an operator in it,
+-- put the schema first in its path and make "x IS DISTINCT FROM y" say "not distinct" for the guard. The same for a
+-- temporary table named pg_proc, which ops.in_owner_context read instead of the catalog. So the path is pinned: first the
+-- catalog, the temporary schema last. The functions that are written below pin it themselves; the loop at the end of the
+-- file pins the rest (the base migration is not touched), and the test of packages/db fails for a function without it.
+CREATE OR REPLACE FUNCTION ops.in_owner_context(p_flag text, p_owner_of regproc) RETURNS boolean
+LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp AS $$
+  SELECT coalesce(pg_catalog.current_setting(p_flag, true), '') = 'on'
+     AND current_user = (SELECT pg_catalog.pg_get_userbyid(p.proowner) FROM pg_catalog.pg_proc p WHERE p.oid = p_owner_of)
+$$;
+--> statement-breakpoint
 -- ---- the file purge may empty the link of a document to an expired file -----------------------------------------
 -- The quotes are immutable after `sent` and the payments are a journal, yet a PDF or a statement that has outlived its
 -- retention class must leave the database. Only ops.purge_expired_files() (the flag is set inside it and the caller is
 -- the owner of that function, see ops.in_owner_context) may do it, and only by setting a link to NULL.
 CREATE OR REPLACE FUNCTION sales.guard_quote() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
   v_movable text[] := ARRAY['status', 'accepted_at', 'acceptance', 'pdf_uz_file_id', 'pdf_ru_file_id'];
 BEGIN
@@ -60,7 +76,7 @@ END
 $$;
 --> statement-breakpoint
 CREATE OR REPLACE FUNCTION sales.guard_payment() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
   v_confirmable text[] := ARRAY[
     'status', 'fiscal_receipt_no', 'bank_doc_no', 'payer_is_customer', 'third_party_statement_file_id',
@@ -476,9 +492,29 @@ $$;
 -- status, the first answer) but never its customer; the worker cannot update requests at all. The day of a request
 -- (created_at) is the start of its 12 months (sales.purge_expired_leads) and is never rewritten by a role of the
 -- application: the bot can update its requests, and a day it could move would make any request due, or never due.
+-- The same holds at INSERT, where the site and the bot would write the day themselves: they get the day of the database
+-- (a request dated in the past would make its customer due for the erasure at once), and open the request as `new`.
+-- The site may name only a customer it made in the same transaction (it reads the ids of all customers and could attach
+-- a request to anyone: to erase him with an old day, or to keep him alive with a fresh one). The bot finds the customer
+-- by his Telegram id or phone and names him: that is its work, the same trust as sales.sign_act.
 CREATE FUNCTION sales.guard_lead() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
 BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF session_user IN ('nivel_web', 'nivel_bot') THEN
+      NEW.created_at := now();
+      IF NEW.status IS DISTINCT FROM 'new' THEN
+        RAISE EXCEPTION 'actor_not_allowed: % opens a request as new, not as %', session_user, NEW.status
+          USING ERRCODE = 'insufficient_privilege';
+      END IF;
+      IF session_user = 'nivel_web' AND NEW.customer_id IS NOT NULL AND NOT EXISTS (
+           SELECT 1 FROM sales.customers c WHERE c.id = NEW.customer_id AND c.created_at = now()) THEN
+        RAISE EXCEPTION 'actor_not_allowed: % may name only a customer it made in the same transaction', session_user
+          USING ERRCODE = 'insufficient_privilege';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
   IF NEW.created_at IS DISTINCT FROM OLD.created_at AND session_user <> 'nivel_migrator' THEN
     RAISE EXCEPTION 'immutable: the day of request % is written once', OLD.number USING ERRCODE = 'check_violation';
   END IF;
@@ -496,7 +532,7 @@ BEGIN
 END
 $$;
 --> statement-breakpoint
-CREATE TRIGGER leads_guard BEFORE UPDATE ON sales.leads
+CREATE TRIGGER leads_guard BEFORE INSERT OR UPDATE ON sales.leads
   FOR EACH ROW EXECUTE FUNCTION sales.guard_lead();
 --> statement-breakpoint
 -- ---- the Telegram id of a customer is given once ---------------------------------------------------------------------
@@ -505,7 +541,7 @@ CREATE TRIGGER leads_guard BEFORE UPDATE ON sales.leads
 -- never changes or clears it: whoever holds the credentials of the bot cannot make a customer "be" another person to
 -- sign an act in his name. The erasure of a customer clears the id as the worker or the admin panel (not as the bot).
 CREATE FUNCTION sales.guard_customer() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
 BEGIN
   IF session_user = 'nivel_bot' AND OLD.telegram_user_id IS NOT NULL
      AND NEW.telegram_user_id IS DISTINCT FROM OLD.telegram_user_id THEN
@@ -523,19 +559,22 @@ CREATE TRIGGER customers_guard BEFORE UPDATE ON sales.customers
 -- ops.purge_expired_files() judges a file by its class and its day and then removes links of journals that nobody else
 -- may touch. The worker and the admin panel write ops.files (they register the files), so the inputs of the decision
 -- must not be theirs to change: the class may be lengthened (a lead file that becomes a document of an order, a file
--- that is published) and never shortened; the day, the kind, the key and the hash are written once. The migrator
+-- that is published) and never shortened; the id, the day, the kind, the key and the hash are written once. The migrator
 -- (fixtures, repairs by hand) is not bound.
 CREATE FUNCTION ops.guard_file() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
   v_rank jsonb := '{"ai_90d": 1, "lead_12m": 2, "order_warranty_plus_3y": 3, "tax_5y": 3, "media": 4}';
 BEGIN
   IF session_user = 'nivel_migrator' THEN
     RETURN NEW;
   END IF;
-  IF NEW.created_at IS DISTINCT FROM OLD.created_at OR NEW.kind IS DISTINCT FROM OLD.kind
+  -- The id too: the files that a JSON of an order names (the evidence of a paper act, the photos of a passport) are
+  -- linked by it alone, with no foreign key, so a file with a new id would be judged by its class and not by the order.
+  IF NEW.id IS DISTINCT FROM OLD.id OR NEW.created_at IS DISTINCT FROM OLD.created_at
+     OR NEW.kind IS DISTINCT FROM OLD.kind
      OR NEW.storage_key IS DISTINCT FROM OLD.storage_key OR NEW.sha256 IS DISTINCT FROM OLD.sha256 THEN
-    RAISE EXCEPTION 'immutable: the day, the kind, the storage key and the hash of a file are written once'
+    RAISE EXCEPTION 'immutable: the id, the day, the kind, the storage key and the hash of a file are written once'
       USING ERRCODE = 'check_violation';
   END IF;
   IF (v_rank ->> NEW.retention_class)::integer < (v_rank ->> OLD.retention_class)::integer THEN
@@ -750,6 +789,33 @@ BEGIN
   RETURN QUERY
     WITH gone AS (DELETE FROM ops.files f WHERE f.id = ANY (v_ids) RETURNING f.storage_key)
     SELECT g.storage_key FROM gone g;
+END
+$$;
+--> statement-breakpoint
+-- ---- the rest of the functions pin the search_path, and nobody makes a temporary table ---------------------------------
+-- The functions of the base migration (the triggers of the journals, the guards of the orders, the CHECK helpers of the
+-- catalog) were made without it. ALTER keeps their bodies and their rights. Functions of an extension are not ours.
+DO $$
+DECLARE
+  f regprocedure;
+BEGIN
+  FOR f IN
+    SELECT p.oid::regprocedure
+      FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname IN ('ops', 'catalog', 'pricing', 'sales', 'content', 'ai', 'bot') AND p.prokind = 'f'
+       AND NOT coalesce(p.proconfig @> ARRAY['search_path=pg_catalog, pg_temp'], false)
+       AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
+  LOOP
+    EXECUTE format('ALTER FUNCTION %s SET search_path = pg_catalog, pg_temp', f);
+  END LOOP;
+END
+$$;
+--> statement-breakpoint
+-- The temporary schema is searched before the catalog for tables: a role that could make one named like a catalog table
+-- would stand in for it in every query that does not name the schema. The application has no temporary table.
+DO $$
+BEGIN
+  EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM PUBLIC', current_database());
 END
 $$;
 --> statement-breakpoint

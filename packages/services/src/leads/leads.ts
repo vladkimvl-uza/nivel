@@ -97,6 +97,11 @@ function validate(input: CreateLeadInput, rt: Runtime): ValidationIssue[] {
   if (input.comment !== undefined && (typeof input.comment !== "string" || input.comment.length > 2000)) {
     bad("comment", "text_invalid", "comment must be a text of at most 2000 characters");
   }
+  if (rt.role === "web" && input.customerId !== undefined) {
+    // The site reads the ids of all customers: a request it attaches to one of them would erase him (a day in the past) or
+    // keep him alive (a fresh one). The database refuses it too (sales.guard_lead); the site names a customer it makes.
+    bad("customerId", "customer_id_not_allowed", "the site does not name a customer by id");
+  }
   if (input.customerId === undefined && input.customer === undefined) {
     bad("customer", "customer_missing", "a lead needs a customer or a customer id");
   }

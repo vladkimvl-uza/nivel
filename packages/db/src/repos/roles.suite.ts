@@ -89,6 +89,8 @@ describe("nivel_web", () => {
 
   it("creates customers, leads, configurations, consents and outbox rows, and reads only safe columns back", async () => {
     const n = uniq();
+    // The site names only a customer it made in the same transaction (sales.guard_lead).
+    await web.query("begin");
     const customer = await one<{ id: string }>(
       web,
       "insert into sales.customers (display_name, telegram_user_id, lang) values ('Web guest', $1, 'uz') returning id",
@@ -99,6 +101,7 @@ describe("nivel_web", () => {
       "insert into sales.leads (number, customer_id, channel, scope) values ($1, $2, 'web', 'pc') returning number",
       [`L-2026-${7000 + n}`, customer.id],
     );
+    await web.query("commit");
     expect(lead.number).toMatch(/^L-2026-/);
     await web.query("insert into sales.configurations (public_code, kind, created_via) values ($1, 'pc', 'web')", [
       `WB${String(n).padStart(6, "0")}`,

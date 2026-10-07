@@ -143,6 +143,13 @@ describe("leads.create", () => {
     ).rejects.toMatchObject({ issues: [{ path: "customer.telegramUserId", code: "telegram_id_not_allowed" }] });
   });
 
+  it("refuses a customer id from the site: it reads the ids of all customers and a request must not be attached to one of them", async () => {
+    const bot = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
+    await expect(
+      create({ channel: "web", scope: "pc", customerId: bot.customerId as string }, w.web),
+    ).rejects.toMatchObject({ issues: [{ path: "customerId", code: "customer_id_not_allowed" }] });
+  });
+
   it("gives one customer to two requests that come at once with the same new Telegram id or phone, for every role that can look", async () => {
     for (const rt of [w.bot, w.admin]) {
       const id = newTelegram();
