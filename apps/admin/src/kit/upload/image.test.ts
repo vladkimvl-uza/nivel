@@ -1,3 +1,4 @@
+import { crc32 } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
   createSharpSanitizer,
@@ -134,7 +135,7 @@ describe("sanitizeImage: JPEG", () => {
   it("does not take the bytes FF D9 inside a table of a later scan for the end of the picture", async () => {
     // A progressive-style file: scan, a quantisation table that holds FF D9 as two values, a second scan, EOI, junk.
     const scan = [0xff, 0xda, 0, 8, 1, 1, 0, 0, 63, 0, 0x12, 0x34, 0xff, 0x00, 0x56];
-    const table = segment(0xdb, [0, 0xff, 0xd9, 3, 4]);
+    const table = segment(0xdb, [0, 0xff, 0xd9, ...new Array(62).fill(3)]);
     const comment = segment(0xfe, ascii("SECRET-COMMENT-BETWEEN-SCANS"));
     const head = jpegWith(JFIF).subarray(0, -2);
     const original = Buffer.concat([
@@ -189,7 +190,7 @@ describe("sanitizeImage: JPEG", () => {
     expect(plain.ok && readJpegOrientation(plain.data)).toBeNull();
   });
 
-  it("keeps the colour profile (needed to show the colours right) and drops other APP2 data", async () => {
+  it("drops the colour profile (a block of tags and text that no list can tell from data) and other APP2 data", async () => {
     // A profile as a camera writes it: the size in its header is its size, the signature `acsp` is at byte 36.
     const profile = Buffer.alloc(128);
     profile.writeUInt32BE(profile.length, 0);
@@ -198,7 +199,8 @@ describe("sanitizeImage: JPEG", () => {
     const icc = segment(0xe2, [...ascii("ICC_PROFILE"), 0, 1, 1, ...profile]);
     const r = await sanitizeImage(jpegWith(JFIF, icc));
     if (!r.ok) throw new Error(r.error);
-    expect(r.data.toString("latin1")).toContain("PROFILEBYTES");
+    expect(r.data.toString("latin1")).not.toContain("PROFILEBYTES");
+    expect(r.removed).toContain("icc");
     const other = await sanitizeImage(
       jpegWith(JFIF, segment(0xe2, [...ascii("ICC_PROFILE"), 0, 1, 1, ...ascii("NOT-A-PROFILE")])),
     );
@@ -224,11 +226,13 @@ describe("sanitizeImage: JPEG", () => {
 });
 
 describe("sanitizeImage: PNG and WebP", () => {
-  const crc = Buffer.alloc(4);
   const chunk = (type: string, data: Buffer) => {
     const len = Buffer.alloc(4);
     len.writeUInt32BE(data.length);
-    return Buffer.concat([len, Buffer.from(type, "latin1"), data, crc]);
+    const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
   };
   const png = (...chunks: Buffer[]) =>
     Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), ...chunks]);
@@ -252,7 +256,7 @@ describe("sanitizeImage: PNG and WebP", () => {
     expect(text).not.toContain("tEXt");
     expect(text).toContain("IDAT");
     expect(text).toContain("pHYs");
-    expect(text.endsWith("IEND\0\0\0\0")).toBe(true);
+    expect(r.data.subarray(-8).toString("hex")).toBe("49454e44ae426082");
     expect(r.removed).toEqual(expect.arrayContaining(["tEXt", "eXIf", "tIME"]));
   });
 

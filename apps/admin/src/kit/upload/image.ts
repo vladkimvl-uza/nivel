@@ -2,14 +2,24 @@
 // IPTC; the owner's customers must not receive that and the site must never publish it (ARCHITECTURE 6.1, 10.2).
 // This file removes it without decoding the picture: the container is read segment by segment (JPEG), chunk by chunk
 // (PNG, WebP) and everything that is not needed to show the picture is left out; the pixel data is copied byte for byte.
-// What stays is decided by a list of what is allowed (tables, frame headers, a colour profile that is a profile and
-// nothing more), never by a list of what is known to be bad: a marker or a chunk that this file does not know is dropped.
+// What stays is decided by a list of what is allowed, never by a list of what is known to be bad: a marker or a chunk
+// that this file does not know is dropped, and what is kept must have the exact shape of its kind (a table, a header, a
+// service chunk is as long as its structure says, comes once, stands in its place) so that no kept part has room for
+// a payload of its own. A colour profile is never kept: it is a block of tags and text that no list can tell from data
+// (the colours are then read as sRGB, which for a photo of a receipt or of a part is no loss).
+//
+// What this does not do, and cannot without decoding the picture: the bytes inside the entropy-coded data of a JPEG, the
+// tail of the last partition of a WebP frame and the compressed data of a PNG are copied as they are. Someone who builds
+// a file to carry data through can put it there. This is a cleaner of the photos that a phone makes, not a proof against
+// a file made to defeat it; where that is needed the picture must be re-encoded (sharp, as for a turned JPEG).
 //
 // sharp (catalog, `allowBuilds`) re-encodes: it reads the HEIF family (an iPhone HEIC when the build of libvips has the
 // HEVC codec, an AVIF always), applies the EXIF turn to the pixels and writes a JPEG with no metadata at all.
 // `createSharpSanitizer(sharp)` is the fallback of `sanitizeImage`: it takes what this file cannot read, and a JPEG that
 // carries a turn (the plain cleaner would keep a tag with the turn; sharp turns the pixels and keeps nothing).
 // Without sharp `sanitizeImage` works alone.
+
+import { crc32 } from "node:zlib";
 
 export type SanitizeResult =
   | { ok: true; data: Buffer; mime: string; ext: string; removed: string[] }
@@ -94,6 +104,78 @@ function readSegments(buf: Buffer): { segments: Segment[]; scanStart: number } |
 const SCAN_KEEP = new Set([0xc4, 0xcc, 0xdb, 0xdd, 0xdc, 0xda]);
 
 /**
+ * How many of each kind a picture may have. A real file has a few (a progressive one has tables before some of its
+ * scans); each is of an exact shape, but a thousand of them would be a thousand places for a table of arbitrary numbers.
+ */
+const TABLE_BUDGET: ReadonlyMap<number, number> = new Map([
+  [0xdb, 16],
+  [0xc4, 64],
+  [0xcc, 8],
+  [0xdd, 8],
+  [0xdc, 4],
+]);
+
+/** Takes one of the kind from the budget; false when there is none left. */
+function takeFromBudget(budget: Map<number, number>, marker: number): boolean {
+  const left = (budget.get(marker) ?? 0) - 1;
+  budget.set(marker, left);
+  return left >= 0;
+}
+
+/**
+ * Whether the payload of a segment is of the exact shape that its marker has (the shapes a JPEG decoder insists on: a
+ * length that is not the one of the structure is an error in libjpeg, and a file that has it is not a picture).
+ */
+function hasExactShape(marker: number, p: Buffer): boolean {
+  if (marker === 0xdb) {
+    // DQT: tables of (precision and number, then 64 values of 1 or 2 bytes), nothing else.
+    let pos = 0;
+    while (pos < p.length) {
+      const pq = (p[pos] ?? 0) >> 4;
+      if (pq > 1 || ((p[pos] ?? 0) & 15) > 3) return false;
+      pos += 1 + 64 * (pq + 1);
+    }
+    return p.length > 0 && pos === p.length;
+  }
+  if (marker === 0xc4) {
+    // DHT: tables of (class and number, 16 counts, as many symbols as the counts add up to), nothing else.
+    let pos = 0;
+    while (pos < p.length) {
+      const tc = (p[pos] ?? 0) >> 4;
+      if (tc > 1 || ((p[pos] ?? 0) & 15) > 3 || pos + 17 > p.length) return false;
+      let symbols = 0;
+      for (let i = 1; i <= 16; i += 1) symbols += p[pos + i] ?? 0;
+      if (symbols > 256) return false;
+      pos += 17 + symbols;
+    }
+    return p.length > 0 && pos === p.length;
+  }
+  if (marker === 0xcc) {
+    // DAC: pairs of (class and number, value), at most one pair for each of the 16 + 16 tables.
+    if (p.length === 0 || p.length % 2 !== 0 || p.length > 64) return false;
+    for (let pos = 0; pos < p.length; pos += 2) {
+      const index = p[pos] ?? 0;
+      const value = p[pos + 1] ?? 0;
+      if (index > 0x1f) return false;
+      if (index < 0x10 ? (value & 15) > value >> 4 : value < 1 || value > 63) return false;
+    }
+    return true;
+  }
+  if (marker === 0xdd || marker === 0xdc) return p.length === 2;
+  if (marker === 0xda) {
+    // SOS: the number of components, a pair for each, then the three bytes of the spectral selection.
+    const n = p[0] ?? 0;
+    return n >= 1 && n <= 4 && p.length === 4 + 2 * n;
+  }
+  if (isFrameHeader(marker)) {
+    // SOF: precision, height, width, the number of components, three bytes for each.
+    const n = p[5] ?? 0;
+    return n >= 1 && p.length === 6 + 3 * n;
+  }
+  return false;
+}
+
+/**
  * The picture data from the first scan to the end-of-image marker. Entropy-coded data never holds FF followed by
  * anything but 00 or RSTn, so the first real marker after a scan is read as such; the tables between scans are kept
  * (they may hold the bytes FF D9), every other segment between scans (APPn, comments, JPGn, reserved markers) is dropped. Whatever follows the end-of-image
@@ -103,7 +185,11 @@ const SCAN_KEEP = new Set([0xc4, 0xcc, 0xdb, 0xdd, 0xdc, 0xda]);
  * metadata block with a length that no reader would accept but a lenient one would). Null when the file holds more
  * metadata segments between scans than any picture does.
  */
-function readScanData(buf: Buffer, start: number): { data: Buffer; trailer: boolean; dropped: Set<string> } | null {
+function readScanData(
+  buf: Buffer,
+  start: number,
+  budget: Map<number, number>,
+): { data: Buffer; trailer: boolean; dropped: Set<string> } | null {
   // One buffer, written once: the result is never longer than the input (plus the closing marker).
   const out = Buffer.allocUnsafe(buf.length + 2);
   let written = 0;
@@ -152,7 +238,11 @@ function readScanData(buf: Buffer, start: number): { data: Buffer; trailer: bool
     const length = buf.readUInt16BE(m + 1);
     if (length < 2 || m + 1 + length > buf.length) return closeAt(pos);
     const end = m + 1 + length;
-    if (!SCAN_KEEP.has(marker)) {
+    if (SCAN_KEEP.has(marker)) {
+      // What stays has the shape of its structure and is not repeated without end; otherwise this is not a picture.
+      if (!hasExactShape(marker, buf.subarray(m + 3, end))) return null;
+      if (marker !== 0xda && !takeFromBudget(budget, marker)) return null;
+    } else {
       droppedCount += 1;
       if (droppedCount > MAX_DROPPED_BETWEEN_SCANS) return null;
       flush(pos);
@@ -218,13 +308,6 @@ function orientationOnlyExif(orientation: number): Buffer {
   return Buffer.concat([head, payload]);
 }
 
-/** A colour profile that is one: the size in its header is its size, and the signature of the format is in place. */
-function isPlausibleIccProfile(profile: Buffer): boolean {
-  return (
-    profile.length >= 128 && profile.readUInt32BE(0) === profile.length && profile.toString("latin1", 36, 40) === "acsp"
-  );
-}
-
 /** Frame headers (SOF0..SOF15 but DHT, JPG, DAC) and the tables that a decoder needs before the first scan. */
 const isFrameHeader = (marker: number) =>
   marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
@@ -247,6 +330,10 @@ function cleanJpeg(input: Buffer): SanitizeResult {
   const removed = new Set<string>();
   let orientation: number | null = null;
   let afterJfif = 0;
+  let sawJfif = false;
+  let sawAdobe = false;
+  let sawFrame = false;
+  const budget = new Map(TABLE_BUDGET);
 
   // Allow-list: what is kept is named here; every other segment (a marker this file does not know, an APPn that is not
   // one of the three below, anything with a payload of an unexpected shape) is dropped.
@@ -254,11 +341,18 @@ function cleanJpeg(input: Buffer): SanitizeResult {
     const drop = (name: string) => void removed.add(name);
     const marker = s.marker;
     if (isFrameHeader(marker) || HEADER_TABLES.has(marker)) {
+      // Of the shape of its structure, and not repeated without end (one frame header: a second one is an error).
+      if (!hasExactShape(marker, s.payload)) return fail(CORRUPT);
+      if (isFrameHeader(marker)) {
+        if (sawFrame) return fail(CORRUPT);
+        sawFrame = true;
+      } else if (!takeFromBudget(budget, marker)) return fail(CORRUPT);
       kept.push(s.bytes);
     } else if (marker === 0xe0) {
-      // JFIF: the header only (14 bytes), never what follows it (a thumbnail or anything else).
-      const jfif = jfifHeader(s.payload);
+      // JFIF: the header only (14 bytes), once, never what follows it (a thumbnail or anything else).
+      const jfif = sawJfif ? null : jfifHeader(s.payload);
       if (jfif) {
+        sawJfif = true;
         kept.push(jfif.bytes);
         if (afterJfif === 0) afterJfif = kept.length;
         if (jfif.hadThumbnail) drop("thumbnail");
@@ -274,21 +368,16 @@ function cleanJpeg(input: Buffer): SanitizeResult {
         drop("xmp");
       } else drop("app1");
     } else if (marker === 0xe2) {
-      // ICC: a profile that fits in one segment and is a profile (what a camera writes); the pieces of a long one and
-      // anything that only carries the name are dropped, the colours are then read as sRGB.
-      const isIcc =
-        startsWith(s.payload, "ICC_PROFILE\0") &&
-        s.payload[12] === 1 &&
-        s.payload[13] === 1 &&
-        isPlausibleIccProfile(s.payload.subarray(14));
-      if (isIcc) kept.push(s.bytes);
-      else drop(startsWith(s.payload, "MPF\0") ? "mpf" : "app2");
+      // A colour profile is never kept (see the head of this file); the colours are read as sRGB.
+      drop(startsWith(s.payload, "ICC_PROFILE\0") ? "icc" : startsWith(s.payload, "MPF\0") ? "mpf" : "app2");
     } else if (marker === 0xed) {
       drop("iptc");
     } else if (marker === 0xee) {
-      // Adobe colour transform, exactly its 12 bytes: without it a CMYK file shows wrong colours.
-      if (startsWith(s.payload, "Adobe") && s.payload.length === 12) kept.push(s.bytes);
-      else drop("app");
+      // Adobe colour transform, exactly its 12 bytes, once: without it a CMYK file shows wrong colours.
+      if (!sawAdobe && startsWith(s.payload, "Adobe") && s.payload.length === 12) {
+        sawAdobe = true;
+        kept.push(s.bytes);
+      } else drop("app");
     } else if (marker === 0xfe) {
       drop("comment");
     } else if (marker >= 0xe3 && marker <= 0xef) {
@@ -299,7 +388,7 @@ function cleanJpeg(input: Buffer): SanitizeResult {
   }
 
   if (orientation !== null && orientation > 1) kept.splice(afterJfif, 0, orientationOnlyExif(orientation));
-  const scan = readScanData(input, parsed.scanStart);
+  const scan = readScanData(input, parsed.scanStart, budget);
   if (!scan) return fail(CORRUPT);
   if (scan.trailer) removed.add("trailer");
   for (const name of scan.dropped) removed.add(name);
@@ -310,27 +399,66 @@ function cleanJpeg(input: Buffer): SanitizeResult {
 // ---- PNG ----------------------------------------------------------------------------------------------------------
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-/** Chunks needed to show the picture (and its colours); text, time and EXIF are not among them. */
-const PNG_KEEP = new Set([
-  "IHDR",
-  "PLTE",
-  "IDAT",
-  "IEND",
-  "tRNS",
-  "gAMA",
-  "cHRM",
-  "sRGB",
-  "iCCP",
-  "sBIT",
-  "bKGD",
-  "pHYs",
-]);
+/**
+ * The service chunks that stay (the colour profile iCCP is not among them, see the head of this file; text, time and EXIF
+ * are not either). Each stays only if it is before the picture data, comes once, has the length of its kind for the
+ * colour type of the picture, and a right checksum; otherwise it is dropped.
+ */
+const PNG_SERVICE = new Set(["gAMA", "cHRM", "sRGB", "sBIT", "bKGD", "pHYs", "tRNS"]);
+/** Service chunks that must stand before the palette. */
+const PNG_BEFORE_PALETTE = new Set(["gAMA", "cHRM", "sRGB", "sBIT"]);
+/** The depths that each colour type may have (gray, RGB, palette, gray with alpha, RGB with alpha). */
+const PNG_DEPTHS: Record<number, readonly number[]> = {
+  0: [1, 2, 4, 8, 16],
+  2: [8, 16],
+  3: [1, 2, 4, 8],
+  4: [8, 16],
+  6: [8, 16],
+};
+const PNG_SBIT_LENGTH: Record<number, number> = { 0: 1, 2: 3, 3: 3, 4: 2, 6: 4 };
+
+interface PngState {
+  colour: number;
+  depth: number;
+  /** Entries of the palette, 0 while there is none. */
+  palette: number;
+  seen: Set<string>;
+}
+
+/** The length and the values that a service chunk of this kind must have here. */
+function pngServiceShapeOk(type: string, data: Buffer, st: PngState): boolean {
+  switch (type) {
+    case "gAMA":
+      return data.length === 4;
+    case "cHRM":
+      return data.length === 32;
+    case "sRGB":
+      return data.length === 1 && (data[0] ?? 9) <= 3;
+    case "pHYs":
+      return data.length === 9 && (data[8] ?? 9) <= 1;
+    case "sBIT": {
+      if (data.length !== PNG_SBIT_LENGTH[st.colour]) return false;
+      const most = st.colour === 3 ? 8 : st.depth;
+      return [...data].every((v) => v >= 1 && v <= most);
+    }
+    case "bKGD":
+      if (st.colour === 3) return data.length === 1 && st.palette > 0 && (data[0] ?? 255) < st.palette;
+      return data.length === (st.colour === 0 || st.colour === 4 ? 2 : 6);
+    case "tRNS":
+      if (st.colour === 3) return st.palette > 0 && data.length >= 1 && data.length <= st.palette;
+      return (st.colour === 0 && data.length === 2) || (st.colour === 2 && data.length === 6);
+    default:
+      return false;
+  }
+}
 
 function cleanPng(input: Buffer): SanitizeResult {
   const out: Buffer[] = [PNG_SIGNATURE];
   const removed = new Set<string>();
+  const st: PngState = { colour: -1, depth: 0, palette: 0, seen: new Set() };
   let pos = 8;
   let sawEnd = false;
+  let sawData = false;
   let first = true;
   let count = 0;
   while (pos < input.length) {
@@ -341,17 +469,62 @@ function cleanPng(input: Buffer): SanitizeResult {
     const type = input.subarray(pos + 4, pos + 8).toString("latin1");
     const end = pos + 12 + length;
     if (end > input.length) return fail(CORRUPT);
+    const data = input.subarray(pos + 8, end - 4);
+    const crcOk = input.readUInt32BE(end - 4) === crc32(input.subarray(pos + 4, end - 4));
     if (first && type !== "IHDR") return fail(CORRUPT);
     first = false;
-    if (PNG_KEEP.has(type)) out.push(input.subarray(pos, end));
-    else removed.add(type);
-    pos = end;
-    if (type === "IEND") {
+    if (type === "IHDR") {
+      // 13 bytes: size, depth, colour type, and the three methods that exist (0, 0, and 0 or 1 for the interlace).
+      if (st.colour >= 0 || length !== 13 || !crcOk) return fail(CORRUPT);
+      st.depth = data[8] ?? 0;
+      st.colour = data[9] ?? -1;
+      if (
+        !PNG_DEPTHS[st.colour]?.includes(st.depth) ||
+        data.readUInt32BE(0) === 0 ||
+        data.readUInt32BE(4) === 0 ||
+        data[10] !== 0 ||
+        data[11] !== 0 ||
+        (data[12] ?? 2) > 1
+      ) {
+        return fail(CORRUPT);
+      }
+      out.push(input.subarray(pos, end));
+    } else if (type === "PLTE") {
+      // A palette is what the picture is made of (colour type 3) or a hint (2, 6); one that is not one is not a picture.
+      const entries = length / 3;
+      const valid =
+        crcOk &&
+        !sawData &&
+        !st.seen.has("PLTE") &&
+        (st.colour === 2 || st.colour === 3 || st.colour === 6) &&
+        Number.isInteger(entries) &&
+        entries >= 1 &&
+        entries <= Math.min(256, 2 ** st.depth);
+      if (!valid) return fail(CORRUPT);
+      st.seen.add("PLTE");
+      st.palette = entries;
+      out.push(input.subarray(pos, end));
+    } else if (type === "IDAT") {
+      if (!crcOk) return fail(CORRUPT);
+      sawData = true;
+      out.push(input.subarray(pos, end));
+    } else if (type === "IEND") {
+      if (length !== 0 || !crcOk) return fail(CORRUPT);
+      out.push(input.subarray(pos, end));
       sawEnd = true;
       break;
+    } else if (PNG_SERVICE.has(type)) {
+      const inPlace = !sawData && !st.seen.has(type) && !(PNG_BEFORE_PALETTE.has(type) && st.seen.has("PLTE")) && crcOk;
+      if (inPlace && pngServiceShapeOk(type, data, st)) {
+        st.seen.add(type);
+        out.push(input.subarray(pos, end));
+      } else removed.add(type);
+    } else {
+      removed.add(type);
     }
+    pos = end;
   }
-  if (!sawEnd) return fail(CORRUPT);
+  if (!sawEnd || !sawData) return fail(CORRUPT);
   return { ok: true, data: Buffer.concat(out), mime: "image/png", ext: "png", removed: [...removed] };
 }
 
@@ -389,15 +562,50 @@ function riffChunk(type: string, payload: Buffer): Buffer {
 /** The type of a dropped chunk for the journal: four letters, or "other" for anything that is not plain text. */
 const chunkName = (type: string) => (/^[A-Za-z0-9 ]{4}$/.test(type) ? type.trim().toLowerCase() : "other");
 
-/** Chunks that show the picture: lossy and lossless frames, the alpha plane, the colour profile, the animation. */
-const WEBP_KEEP = new Set(["VP8 ", "VP8L", "VP8X", "ALPH", "ICCP", "ANIM", "ANMF"]);
-/** Inside an animation frame only the picture of the frame. */
-const WEBP_FRAME_KEEP = new Set(["VP8 ", "VP8L", "ALPH"]);
+/** Chunks that show the picture: lossy and lossless frames, the alpha plane, the animation (not the colour profile). */
+const WEBP_KEEP = new Set(["VP8 ", "VP8L", "VP8X", "ALPH", "ANIM", "ANMF"]);
 const WEBP_FLAG_ICC = 0x20;
 const WEBP_FLAG_EXIF = 0x08;
 const WEBP_FLAG_XMP = 0x04;
 /** The flags that exist: ICC, alpha, EXIF, XMP, animation (bit 0 and the two high bits are reserved). */
 const WEBP_FLAGS_MASK = 0x3e;
+
+/**
+ * One picture, in the order a decoder reads it: an alpha plane (once, only before a lossy picture) and then the lossy or
+ * the lossless picture. A second picture or alpha plane is dropped (a decoder takes the first and ignores the rest, so
+ * the rest is only room for data).
+ */
+function pictureReader(removed: Set<string>) {
+  let alpha: RiffChunk | null = null;
+  let done = false;
+  return {
+    get done() {
+      return done;
+    },
+    /** The chunks to write for this one (none while the alpha plane waits for its picture, or when it is dropped). */
+    feed(chunk: RiffChunk): Buffer[] {
+      if (chunk.type === "ALPH") {
+        if (done || alpha) removed.add("alph");
+        else alpha = chunk;
+        return [];
+      }
+      if (done) {
+        removed.add(chunkName(chunk.type));
+        return [];
+      }
+      done = true;
+      const out: Buffer[] = [];
+      if (alpha && chunk.type === "VP8 ") out.push(riffChunk("ALPH", alpha.payload));
+      else if (alpha) removed.add("alph");
+      alpha = null;
+      out.push(riffChunk(chunk.type, chunk.payload));
+      return out;
+    },
+    finish() {
+      if (alpha) removed.add("alph");
+    },
+  };
+}
 
 function cleanWebp(input: Buffer): SanitizeResult {
   if (input.length < 20) return fail(CORRUPT);
@@ -407,43 +615,64 @@ function cleanWebp(input: Buffer): SanitizeResult {
   if (!chunks) return fail(CORRUPT);
   const kept: Buffer[] = [];
   const removed = new Set<string>();
+  const still = pictureReader(removed);
   let headerAt = -1;
   let dropIccFlag = false;
-  for (const { type, payload } of chunks) {
-    if (!WEBP_KEEP.has(type)) {
+  let sawAnim = false;
+  let frames = 0;
+  for (const [index, { type, payload }] of chunks.entries()) {
+    if (type === "ICCP") {
+      // A colour profile is never kept (see the head of this file): the colours are read as sRGB.
+      removed.add("iccp");
+      dropIccFlag = true;
+    } else if (!WEBP_KEEP.has(type)) {
       removed.add(chunkName(type));
     } else if (type === "VP8X") {
-      // Ten bytes: the flags (without EXIF and XMP), three reserved bytes (zero), the size of the canvas.
-      if (payload.length < 10) return fail(CORRUPT);
-      const head = Buffer.alloc(10);
-      head[0] = (payload[0] ?? 0) & WEBP_FLAGS_MASK & ~(WEBP_FLAG_EXIF | WEBP_FLAG_XMP);
-      payload.copy(head, 4, 4, 10);
-      headerAt = kept.push(riffChunk(type, head)) - 1;
-    } else if (type === "ICCP") {
-      if (isPlausibleIccProfile(payload)) kept.push(riffChunk(type, payload));
+      // Only as the first chunk, once. Ten bytes: the flags (without EXIF and XMP), three reserved bytes (zero), the size of the canvas.
+      if (index !== 0) removed.add("vp8x");
       else {
-        removed.add("iccp");
-        dropIccFlag = true;
+        if (payload.length < 10) return fail(CORRUPT);
+        const head = Buffer.alloc(10);
+        head[0] = (payload[0] ?? 0) & WEBP_FLAGS_MASK & ~(WEBP_FLAG_EXIF | WEBP_FLAG_XMP);
+        payload.copy(head, 4, 4, 10);
+        headerAt = kept.push(riffChunk(type, head)) - 1;
       }
     } else if (type === "ANIM") {
-      kept.push(riffChunk(type, payload.subarray(0, 6)));
+      // Once, in a file that has the extended header and no still picture.
+      if (headerAt < 0 || sawAnim || still.done) removed.add("anim");
+      else {
+        sawAnim = true;
+        kept.push(riffChunk(type, payload.subarray(0, 6)));
+      }
     } else if (type === "ANMF") {
-      // The position, size and time of the frame (16 bytes, reserved bits clear) and the picture of the frame.
+      if (headerAt < 0 || still.done) {
+        removed.add("anmf");
+        continue;
+      }
+      // The position, size and time of the frame (16 bytes, reserved bits clear) and the one picture of the frame.
       const nested = payload.length >= 16 ? readRiffChunks(payload, 16, payload.length) : null;
       if (!nested) return fail(CORRUPT);
       const head = Buffer.from(payload.subarray(0, 16));
       head[15] = (head[15] ?? 0) & 0x03;
       const frame: Buffer[] = [head];
+      const inFrame = pictureReader(removed);
       for (const inner of nested) {
-        if (WEBP_FRAME_KEEP.has(inner.type)) frame.push(riffChunk(inner.type, inner.payload));
+        if (inner.type === "ALPH" || inner.type === "VP8 " || inner.type === "VP8L") frame.push(...inFrame.feed(inner));
         else removed.add(chunkName(inner.type));
       }
+      inFrame.finish();
+      if (!inFrame.done) return fail(CORRUPT);
+      frames += 1;
       kept.push(riffChunk(type, Buffer.concat(frame)));
+    } else if (frames > 0) {
+      // A picture that stands beside frames.
+      removed.add(chunkName(type));
     } else {
-      kept.push(riffChunk(type, payload));
+      kept.push(...still.feed({ type, payload }));
     }
   }
-  if (kept.length === 0) return fail(CORRUPT);
+  still.finish();
+  if (!still.done && frames === 0) return fail(CORRUPT);
   if (dropIccFlag && headerAt >= 0) {
     const header = kept[headerAt];
     if (header) header[8] = (header[8] ?? 0) & ~WEBP_FLAG_ICC;

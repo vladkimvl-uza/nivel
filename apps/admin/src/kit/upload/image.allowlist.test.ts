@@ -101,10 +101,11 @@ describe("JPEG: only what is on the list stays", () => {
     expect(longer.data.includes(Buffer.from(adobe))).toBe(false);
   });
 
-  it("keeps a colour profile that is one, and drops one that only wears the name", async () => {
+  it("drops a colour profile, whether it is one or only wears the name", async () => {
     const good = iccProfile();
-    const kept = await clean(jpegWith(JFIF, iccSegment(good)));
-    expect(kept.data.includes(good)).toBe(true);
+    const dropped = await clean(jpegWith(JFIF, iccSegment(good)));
+    expect(dropped.data.includes(good)).toBe(false);
+    expect(dropped.removed).toContain("icc");
 
     // A tail after the profile (the size in the header is shorter than the segment), a profile that is not one, a piece
     // of a long profile: none of them is kept.
@@ -123,7 +124,7 @@ describe("JPEG: only what is on the list stays", () => {
 
   it("drops what a later scan brings that is not a table: APPn, JPGn, reserved markers and comments", async () => {
     const scan = [0xff, 0xda, 0, 8, 1, 1, 0, 0, 63, 0, 0x12, 0x34, 0xff, 0x00, 0x56];
-    const table = segment(0xdb, [0, 1, 2, 3, 4]);
+    const table = segment(0xdb, [0, ...new Array(64).fill(7)]);
     const head = jpegWith(JFIF).subarray(0, -2);
     const between = [
       ...segment(0xf0, leakBytes),
@@ -209,13 +210,13 @@ describe("WebP: only what is on the list stays", () => {
     expect(r.data.readUInt32LE(4)).toBe(r.data.length - 8);
   });
 
-  it("keeps a colour profile that is one and drops one that is not, with its flag", async () => {
+  it("drops a colour profile, one that is one and one that is not, with its flag", async () => {
     const good = iccProfile();
     const kept = await clean(
       webp(wchunk("VP8X", vp8x(0x20)), wchunk("ICCP", good), wchunk("VP8 ", Buffer.from("pic!"))),
     );
-    expect(kept.data.includes(good)).toBe(true);
-    expect(kept.data[kept.data.indexOf("VP8X") + 8]).toBe(0x20);
+    expect(kept.data.includes(good)).toBe(false);
+    expect(kept.data[kept.data.indexOf("VP8X") + 8]).toBe(0);
 
     const bad = await clean(
       webp(

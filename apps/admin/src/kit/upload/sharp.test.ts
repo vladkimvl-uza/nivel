@@ -200,4 +200,51 @@ describe("photos from a phone through the real sharp", () => {
     expect(data.toString("latin1")).not.toContain("SECRET-MAKE");
     expect((await sharp(data).metadata()).orientation).toBe(6);
   });
+
+  it("keeps real pictures of every kind that sharp makes whole: the strict shapes refuse nothing a real encoder writes", async (ctx) => {
+    const sharp = needSharp(ctx);
+    const noise = (width: number, height: number, channels: 3 | 4) => {
+      const raw = Buffer.alloc(width * height * channels);
+      for (let i = 0; i < raw.length; i += 1) raw[i] = (i * 37 + (i >> 3) * 11) & 255;
+      return sharp(raw, { raw: { width, height, channels } });
+    };
+    const rgb = () => noise(64, 48, 3);
+    const rgba = () => noise(64, 48, 4);
+    const files: Record<string, Promise<Buffer>> = {
+      "jpeg baseline": rgb().jpeg({ quality: 80 }).toBuffer(),
+      "jpeg progressive": rgb().jpeg({ progressive: true }).toBuffer(),
+      "jpeg 4:4:4": rgb().jpeg({ chromaSubsampling: "4:4:4" }).toBuffer(),
+      "jpeg grey": rgb().greyscale().jpeg().toBuffer(),
+      "jpeg optimised": rgb().jpeg({ optimiseCoding: true, mozjpeg: true }).toBuffer(),
+      "png rgb": rgb().png().toBuffer(),
+      "png rgba": rgba().png().toBuffer(),
+      "png grey": rgb().greyscale().png().toBuffer(),
+      "png palette": rgb().png({ palette: true, colours: 16 }).toBuffer(),
+      "png palette 4 bit": rgb().png({ palette: true, colours: 4 }).toBuffer(),
+      "png interlaced": rgb().png({ progressive: true }).toBuffer(),
+      "png 16 bit": rgb().toColourspace("rgb16").png().toBuffer(),
+      "webp lossy": rgb().webp({ quality: 70 }).toBuffer(),
+      "webp lossless": rgb().webp({ lossless: true }).toBuffer(),
+      "webp alpha": rgba().webp().toBuffer(),
+      "webp lossless alpha": rgba().webp({ lossless: true }).toBuffer(),
+      "webp animated": sharp(
+        Buffer.from(Array.from({ length: 32 * 32 * 3 * 3 }, (_, i) => (i * 7 + Math.floor(i / 3072) * 80) & 255)),
+        {
+          raw: { width: 32, height: 96, channels: 3, pageHeight: 32 },
+        },
+      )
+        .webp({ loop: 0, delay: [100, 100, 100] })
+        .toBuffer(),
+    };
+    for (const [name, made] of Object.entries(files)) {
+      const original = await made;
+      const r = await sanitizeImage(original);
+      if (!r.ok) throw new Error(`${name}: ${r.error}`);
+      const before = await sharp(original, { animated: true }).raw().toBuffer({ resolveWithObject: true });
+      const after = await sharp(r.data, { animated: true }).raw().toBuffer({ resolveWithObject: true });
+      expect(after.info, name).toEqual(before.info);
+      expect(after.data.equals(before.data), name).toBe(true);
+      if (name === "webp animated") expect(r.data.includes(Buffer.from("ANMF")), name).toBe(true);
+    }
+  });
 });
