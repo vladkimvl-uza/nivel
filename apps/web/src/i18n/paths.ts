@@ -27,19 +27,31 @@ export function alternatesFor(path: string): Alternates {
 
 export interface SitemapEntry {
   url: string;
-  lastModified: Date;
+  lastModified?: Date;
   alternates: Alternates;
+}
+
+/** The public address of the site from the environment (`PUBLIC_BASE_URL`): its origin, or null when it is not an http(s) address. */
+export function publicBaseOf(raw: string | undefined): string | null {
+  const text = raw?.trim();
+  if (!text) return null;
+  try {
+    const url = new URL(text);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.origin : null;
+  } catch {
+    return null;
+  }
 }
 
 const trimBase = (base: string): string => base.replace(/\/+$/, "");
 
 /** One entry for every path and language, Uzbek first, with absolute hreflang addresses. */
-export function sitemapFor(base: string, lastModified: Date): SitemapEntry[] {
+export function sitemapFor(base: string, lastModified?: Date): SitemapEntry[] {
   const origin = trimBase(base);
   return PUBLIC_PATHS.flatMap((path) =>
     locales.map((locale) => ({
       url: `${origin}/${locale}${path}`,
-      lastModified,
+      ...(lastModified ? { lastModified } : {}),
       alternates: {
         languages: Object.fromEntries(
           Object.entries(alternatesFor(path).languages).map(([lang, href]) => [lang, `${origin}${href}`]),

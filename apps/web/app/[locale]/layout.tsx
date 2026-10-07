@@ -7,7 +7,7 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { ReactNode } from "react";
-import { alternatesFor } from "../../src/i18n/paths.ts";
+import { alternatesFor, publicBaseOf } from "../../src/i18n/paths.ts";
 import { MOTION_COOKIE, readMotionPrefs } from "../../src/i18n/site/prefs.ts";
 import "./globals.css";
 
@@ -75,7 +75,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const t = await getTranslations({ locale, namespace: "site.meta" });
-  const base = process.env.PUBLIC_BASE_URL;
+  // A typo in the environment must not turn every page into a 500: without a valid address there is no metadataBase.
+  const base = publicBaseOf(process.env.PUBLIC_BASE_URL);
   return {
     ...(base ? { metadataBase: new URL(base) } : {}),
     title: { default: t("title"), template: "%s — Nivel" },
@@ -118,6 +119,8 @@ export default async function LocaleLayout({
       lang={htmlLang[locale]}
       data-theme={defaultTheme}
       className={`${FONT_CLASSES}${prefs.reduced ? " is-reduced" : ""}`}
+      // the inline script below adds js (and is-reduced) to class before React hydrates
+      suppressHydrationWarning
       data-nonce-present={nonce ? "1" : "0"}
     >
       <head>

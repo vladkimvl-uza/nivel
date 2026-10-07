@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alternatesFor, PUBLIC_PATHS, robotsFor, sitemapFor } from "./paths.ts";
+import { alternatesFor, PUBLIC_PATHS, publicBaseOf, robotsFor, sitemapFor } from "./paths.ts";
 
 describe("PUBLIC_PATHS", () => {
   it("lists the home page, the legal pages and the requisites, with neutral Latin paths", () => {
@@ -56,6 +56,35 @@ describe("sitemapFor", () => {
 
   it("does not double the slash of the base", () => {
     expect(sitemapFor("https://nivel.uz///", at)[0]?.url).toBe("https://nivel.uz/uz");
+  });
+});
+
+describe("publicBaseOf", () => {
+  it("takes the origin of a good address, without the path and the closing slash", () => {
+    expect(publicBaseOf("https://nivel.uz")).toBe("https://nivel.uz");
+    expect(publicBaseOf("https://nivel.uz/")).toBe("https://nivel.uz");
+    expect(publicBaseOf(" http://localhost:3500/x/y ")).toBe("http://localhost:3500");
+  });
+
+  it.each([
+    undefined,
+    "",
+    "   ",
+    "nivel.uz",
+    "ftp://nivel.uz",
+    "javascript:alert(1)",
+    "http://",
+    "https://exa mple.uz",
+  ])("gives nothing for %j, so that a typo in the environment cannot turn every page into an error", (raw) => {
+    expect(publicBaseOf(raw)).toBeNull();
+  });
+});
+
+describe("sitemapFor without a date", () => {
+  it("leaves lastmod out: the page does not know when its text changed, and a made-up date would mislead the crawler", () => {
+    const entries = sitemapFor("https://nivel.uz");
+    expect(entries).toHaveLength(PUBLIC_PATHS.length * 2);
+    for (const e of entries) expect("lastModified" in e).toBe(false);
   });
 });
 

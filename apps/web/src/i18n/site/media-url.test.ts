@@ -2,9 +2,14 @@ import { describe, expect, it } from "vitest";
 import { internalMediaPath, mediaBaseOf, mediaUrl } from "./media-url.ts";
 
 describe("mediaBaseOf", () => {
-  it("takes a path or an https address from MEDIA_BASE_URL and cuts the closing slash", () => {
+  it("takes a path of the site from MEDIA_BASE_URL and cuts the closing slash", () => {
     expect(mediaBaseOf({ MEDIA_BASE_URL: "/m/" })).toBe("/m");
-    expect(mediaBaseOf({ MEDIA_BASE_URL: "https://cdn.example/media/" })).toBe("https://cdn.example/media");
+  });
+
+  it("does not take the address of another host: the policy of the page would block every picture and clip from it", () => {
+    for (const raw of ["https://cdn.example/media/", "http://cdn.example/m"]) {
+      expect(mediaBaseOf({ MEDIA_BASE_URL: raw })).toBe("/media");
+    }
   });
 
   it("falls back to /media for nothing, for text that is not an address and for a dangerous one", () => {
