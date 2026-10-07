@@ -21,7 +21,8 @@ const NV_TYPES = {
   text: { fmt: "@", mono: false, align: "left" },
   long: { fmt: "@", mono: false, align: "left", wrap: true },
   list: { fmt: "@", mono: false, align: "left" },
-  flag: { fmt: "General", mono: false, align: "center" },
+  // No number format: a checkbox needs none, and "General" is not a pattern of the Sheets API guide
+  flag: { fmt: "", mono: false, align: "center" },
   url: { fmt: "@", mono: false, align: "left" },
   mono: { fmt: "@", mono: true, align: "left" },
 };

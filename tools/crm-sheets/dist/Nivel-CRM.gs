@@ -2058,7 +2058,8 @@ const NV_TYPES = {
   text: { fmt: "@", mono: false, align: "left" },
   long: { fmt: "@", mono: false, align: "left", wrap: true },
   list: { fmt: "@", mono: false, align: "left" },
-  flag: { fmt: "General", mono: false, align: "center" },
+  // No number format: a checkbox needs none, and "General" is not a pattern of the Sheets API guide
+  flag: { fmt: "", mono: false, align: "center" },
   url: { fmt: "@", mono: false, align: "left" },
   mono: { fmt: "@", mono: true, align: "left" },
 };
@@ -3408,6 +3409,54 @@ function nvEnsureCapacity(sheetKey, neededRow) {
   if (typeof nvStyleBody === "function") nvStyleBody(sheetKey, have + 1, have + add);
 }
 
+/**
+ * Number formats of one column of rows, a format per row; null leaves the row alone (a checkbox, a heading: no format is
+ * the automatic one, and "General" is not a pattern of the API). Rows with the same format go in one call.
+ */
+function nvSetFormatRuns(sheet, firstRow, col, formats) {
+  let i = 0;
+  while (i < formats.length) {
+    if (!formats[i]) {
+      i += 1;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < formats.length && formats[j + 1] === formats[i]) j += 1;
+    sheet.getRange(firstRow + i, col, j - i + 1, 1).setNumberFormat(formats[i]);
+    i = j + 1;
+  }
+}
+
+/**
+ * Writes a matrix in which a string that starts with = is one of our formulas (already in the notation of the API). The
+ * reference of setValues only says that such a string "is interpreted as a formula"; setFormulas is the call that is
+ * documented for formulas, so values go in by setValues and each run of formulas of a row by setFormulas.
+ */
+function nvWriteMatrix(range, matrix) {
+  const isFormula = (v) => typeof v === "string" && v.charAt(0) === "=";
+  if (!matrix.some((row) => row.some(isFormula))) {
+    range.setValues(matrix);
+    return;
+  }
+  const sheet = range.getSheet();
+  const row0 = range.getRow();
+  const col0 = range.getColumn();
+  range.setValues(matrix.map((row) => row.map((v) => (isFormula(v) ? "" : v))));
+  matrix.forEach((row, i) => {
+    let j = 0;
+    while (j < row.length) {
+      if (!isFormula(row[j])) {
+        j += 1;
+        continue;
+      }
+      let k = j;
+      while (k + 1 < row.length && isFormula(row[k + 1])) k += 1;
+      sheet.getRange(row0 + i, col0 + j, 1, k - j + 1).setFormulas([row.slice(j, k + 1)]);
+      j = k + 1;
+    }
+  });
+}
+
 /** The text of a cell as a trimmed string. */
 function nvStr(v) {
   return v === null || v === undefined ? "" : String(v).trim();
@@ -3516,7 +3565,8 @@ function nvStyleBody(sheetKey, fromRow, toRow) {
   ).forEach((run) => {
     const t = NV_TYPES[run.col.type];
     const r = sh.getRange(fromRow, first + run.from, n, run.to - run.from + 1);
-    r.setNumberFormat(run.col.fmt || t.fmt);
+    const fmt = run.col.fmt || t.fmt;
+    if (fmt) r.setNumberFormat(fmt);
     r.setHorizontalAlignment(t.align);
     if (t.mono) r.setFontFamily(NV_FONT_MONO);
     if (t.wrap) r.setWrap(true);
@@ -4600,8 +4650,11 @@ function nvBuildSettings() {
   const missing = params.filter((x) => !known[x.def.name]);
   if (missing.length === params.length) {
     // A new book: the whole block in two calls (the text cells get the text format first, so "10:00" stays text)
-    sh.getRange(L.firstRow, NV_SET_COLS.value, layout.length, 1).setNumberFormats(
-      layout.map((x) => [!x.isGroup && (x.def.type === "time" || x.def.type === "text") ? "@" : "General"]),
+    nvSetFormatRuns(
+      sh,
+      L.firstRow,
+      NV_SET_COLS.value,
+      layout.map((x) => (!x.isGroup && (x.def.type === "time" || x.def.type === "text") ? "@" : null)),
     );
     const matrix = layout.map((x) => {
       const r = x.def;
@@ -4609,7 +4662,7 @@ function nvBuildSettings() {
       const value = r.type === "formula" ? r.formula : r.value;
       return [r.label, value, r.unit, r.name, r.source, today];
     });
-    sh.getRange(L.firstRow, NV_SET_COLS.label, layout.length, 6).setValues(matrix);
+    nvWriteMatrix(sh.getRange(L.firstRow, NV_SET_COLS.label, layout.length, 6), matrix);
   } else {
     // A later run: only the settings that are not there yet (the owner's values stay)
     missing.forEach((item) => {
@@ -4722,15 +4775,18 @@ function nvStyleSettings() {
   values.setFontFamily(NV_FONT_MONO).setFontWeight("bold");
   values.setHorizontalAlignments(layout.map((x) => [!x.isGroup && x.def.type === "bool" ? "center" : "right"]));
   values.setFontColors(layout.map((x) => [!x.isGroup && x.def.readonly ? T.text2 : T.text]));
-  values.setNumberFormats(
+  nvSetFormatRuns(
+    sh,
+    first,
+    NV_SET_COLS.value,
     layout.map((x) => {
-      if (x.isGroup) return ["General"];
+      if (x.isGroup) return null;
       const t = x.def.type;
-      if (t === "bp" || t === "int" || t === "formula") return ["#,##0"];
-      if (t === "sum") return [NV_FMT.sum];
-      if (t === "date") return [NV_FMT.date];
-      if (t === "time" || t === "text") return ["@"];
-      return ["General"];
+      if (t === "bp" || t === "int" || t === "formula") return "#,##0";
+      if (t === "sum") return NV_FMT.sum;
+      if (t === "date") return NV_FMT.date;
+      if (t === "time" || t === "text") return "@";
+      return null;
     }),
   );
   values.setDataValidations(
@@ -4904,7 +4960,7 @@ function nvBuildTable(sheetKey) {
 
   // Header row: the title, or the MAP formula of a calculated column
   const heads = def.cols.map((c) => (c.calc ? nvApiFormula(nvCalcFormula(sheetKey, c)) : c.title));
-  sh.getRange(L.headerRow, L.firstCol, 1, def.cols.length).setValues([heads]);
+  nvWriteMatrix(sh.getRange(L.headerRow, L.firstCol, 1, def.cols.length), [heads]);
 
   // Caption: the counters of the sheet and a short remark
   const cap = nvResolveCaption(sheetKey, def.caption);
@@ -5867,7 +5923,8 @@ function nvBuildData() {
   });
   const block = (r1, r2, c1, c2) => {
     if (r2 < r1) return;
-    sh.getRange(r1, c1, r2 - r1 + 1, c2 - c1 + 1).setValues(
+    nvWriteMatrix(
+      sh.getRange(r1, c1, r2 - r1 + 1, c2 - c1 + 1),
       matrix.slice(r1 - 1, r2).map((row) => row.slice(c1 - 1, c2)),
     );
   };
@@ -5984,7 +6041,10 @@ function nvBuildThreshold() {
   sh.getRange(L.headerRow, NV_TH.months.col, 1, 12).setValues([NV_TH_MONTH_HEAD]);
   sh.getRange(L.headerRow, NV_TH.other.col, 1, 4).setValues([NV_TH_OTHER_HEAD]);
   const yearRows = nvThresholdYearRows();
-  sh.getRange(NV_TH.year.first, 2, yearRows.length, 2).setValues(yearRows.map((r) => [r[0], nvApiFormula(r[1])]));
+  nvWriteMatrix(
+    sh.getRange(NV_TH.year.first, 2, yearRows.length, 2),
+    yearRows.map((r) => [r[0], nvApiFormula(r[1])]),
+  );
   yearRows.forEach((r, i) => {
     nvSetName(ss, r[2], sh.getRange(NV_TH.year.first + i, 3));
   });
@@ -6048,8 +6108,8 @@ function nvBuildThreshold() {
     );
     dueRows.push([nvApiFormula("=DATE(YEAR(E" + r + "); MONTH(E" + r + ")+1; 15)")]);
   }
-  sh.getRange(NV_TH.months.first, 5, 12, 8).setValues(monthRows);
-  sh.getRange(NV_TH.months.first, 14, 12, 1).setValues(dueRows);
+  nvWriteMatrix(sh.getRange(NV_TH.months.first, 5, 12, 8), monthRows);
+  nvWriteMatrix(sh.getRange(NV_TH.months.first, 14, 12, 1), dueRows);
   const tr = NV_TH.months.total;
   sh.getRange(tr, 5).setValue("Итого");
   ["F", "G", "H", "I", "J", "L", "M"].forEach((l) => {
@@ -7621,29 +7681,30 @@ function nvStylePanel() {
   sh.hideColumns(15, maxCols - 14);
   // Rows
   const H = P.heights;
-  sh.setRowHeight(1, H.top);
-  sh.setRowHeight(2, H.head);
-  sh.setRowHeight(3, H.controls);
-  sh.setRowHeight(4, H.gap);
+  // The grid of the panel is the design: the heights are forced, so that a long caption never makes a row taller
+  sh.setRowHeightsForced(1, 1, H.top);
+  sh.setRowHeightsForced(2, 1, H.head);
+  sh.setRowHeightsForced(3, 1, H.controls);
+  sh.setRowHeightsForced(4, 1, H.gap);
   P.tileTop.forEach((r0) => {
-    sh.setRowHeight(r0, H.label);
-    sh.setRowHeight(r0 + 1, H.value);
-    sh.setRowHeight(r0 + 2, H.line);
-    sh.setRowHeight(r0 + 3, H.spark);
-    sh.setRowHeight(r0 + 4, H.gap);
+    sh.setRowHeightsForced(r0, 1, H.label);
+    sh.setRowHeightsForced(r0 + 1, 1, H.value);
+    sh.setRowHeightsForced(r0 + 2, 1, H.line);
+    sh.setRowHeightsForced(r0 + 3, 1, H.spark);
+    sh.setRowHeightsForced(r0 + 4, 1, H.gap);
   });
-  sh.setRowHeight(19, 22);
+  sh.setRowHeightsForced(19, 1, 22);
   P.headings.forEach((h) => {
-    sh.setRowHeight(h.row, H.heading);
+    sh.setRowHeightsForced(h.row, 1, H.heading);
   });
-  sh.setRowHeights(21, 14, H.chart);
-  sh.setRowHeight(35, H.gap);
-  sh.setRowHeights(36, 14, H.chart);
-  sh.setRowHeight(50, H.gap);
-  sh.setRowHeights(52, 14, H.chart);
-  sh.setRowHeight(66, H.gap);
-  sh.setRowHeights(67, 14, H.chart);
-  sh.setRowHeights(81, 1, H.gap);
+  sh.setRowHeightsForced(21, 14, H.chart);
+  sh.setRowHeightsForced(35, 1, H.gap);
+  sh.setRowHeightsForced(36, 14, H.chart);
+  sh.setRowHeightsForced(50, 1, H.gap);
+  sh.setRowHeightsForced(52, 14, H.chart);
+  sh.setRowHeightsForced(66, 1, H.gap);
+  sh.setRowHeightsForced(67, 14, H.chart);
+  sh.setRowHeightsForced(81, 1, H.gap);
   // Header
   const title = sh.getRange("C2:G2");
   title
@@ -9327,6 +9388,24 @@ function nvActor() {
   return me && me.toLowerCase() === owner.toLowerCase() ? "owner" : "assistant";
 }
 
+/**
+ * The value to put back after a refused edit. e.oldValue is the text of the old cell: setValue reads a leading = as a
+ * formula, and "+998…" or "-5" as a number, so the text goes in through the same escape as any text from outside. A
+ * number-like text goes back as a number into a cell that is not in the text format (a negative sum stays a sum).
+ */
+function nvRestoreValue(range, oldValue) {
+  if (oldValue === undefined || oldValue === null) return "";
+  if (typeof oldValue !== "string") return oldValue;
+  let textCell = false;
+  try {
+    textCell = range.getNumberFormat() === "@";
+  } catch (e) {
+    textCell = false;
+  }
+  if (!textCell && /^[+-]?\d+(\.\d+)?$/.test(oldValue)) return Number(oldValue);
+  return nvSafeText(oldValue);
+}
+
 const NV_NUMBERED = {
   leads: { prefix: "L", year: true },
   orders: { prefix: "NV", year: true },
@@ -9600,7 +9679,7 @@ function nvGuardPlatformField(sheetKey, colKey, rowNo, e) {
   if (answer === "YES") return true;
   nvWithLock(() => {
     nvInvalidate();
-    e.range.setValue(e.oldValue === undefined ? "" : e.oldValue);
+    e.range.setValue(nvRestoreValue(e.range, e.oldValue));
   });
   nvToast(
     answer === "NO_UI"
@@ -9661,7 +9740,7 @@ function nvOnEditCached(e) {
       // A number is issued by the script: a hand-typed number is taken back.
       if (NV_NUMBERED[sheetKey] && c0 <= keyCol && keyCol <= c1) {
         if (single) {
-          range.setValue(e.oldValue === undefined ? "" : e.oldValue);
+          range.setValue(nvRestoreValue(range, e.oldValue));
           nvToast("Номер выдаёт скрипт: ручная правка отклонена", "Номера");
           return null;
         }
@@ -10940,10 +11019,9 @@ function nvCleanWebhookJournal(now) {
   const def = NV_SCHEMA.webhook;
   const first = NV_LAYOUT.firstRow;
   sh.getRange(first, NV_LAYOUT.firstCol, old.length + keep.length, def.cols.length).clearContent();
-  if (keep.length)
-    sh.getRange(first, NV_LAYOUT.firstCol, keep.length, def.cols.length).setValues(
-      keep.map((r) => def.cols.map((c) => (r[c.key] === undefined ? "" : r[c.key]))),
-    );
+  // The kept rows are read back as values: text that started with = + - or @ lost its apostrophe on the way, so it is
+  // written through the same escape as every other text from outside (setValues reads a leading = as a formula)
+  if (keep.length) nvWriteRowsMatrix("webhook", first, keep);
   return old.length;
 }
 
@@ -14150,6 +14228,32 @@ const NV_SELFCHECK_FEE = [
   [60000000, 6000000],
 ];
 
+/**
+ * A formula in a form that does not depend on how Sheets spells it back: no blanks and no quotes round sheet names
+ * outside text, capitals everywhere outside text (the reference of getFormulas does not promise the same spelling).
+ */
+function nvFormulaSpelling(formula) {
+  const f = String(formula || "");
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < f.length; i++) {
+    const ch = f[i];
+    if (inString) {
+      out += ch;
+      if (ch === '"') {
+        if (f[i + 1] === '"') {
+          out += '"';
+          i++;
+        } else inString = false;
+      }
+    } else if (ch === '"') {
+      inString = true;
+      out += ch;
+    } else if (!/\s/.test(ch) && ch !== "'") out += ch.toUpperCase();
+  }
+  return out;
+}
+
 function nvCheckRow(name, result, details) {
   return { check: name, result: result, details: details || "", time: nvNow() };
 }
@@ -14180,7 +14284,7 @@ function nvSelfCheckRows() {
     def.cols.forEach((c, i) => {
       if (c.calc) {
         const expected = nvApiFormula(nvCalcFormula(key, c));
-        if (forms[i] !== expected) formulaBad.push(def.title + "!" + c.title);
+        if (nvFormulaSpelling(forms[i]) !== nvFormulaSpelling(expected)) formulaBad.push(def.title + "!" + c.title);
       } else if (vals[i] !== c.title) headerBad.push(def.title + ": «" + vals[i] + "» вместо «" + c.title + "»");
     });
   });
@@ -14464,20 +14568,21 @@ function nvStylePhone() {
   sh.setColumnWidth(4, P.gutter);
   sh.setColumnWidth(P.helperCol, P.gutter);
   sh.hideColumns(P.helperCol);
-  sh.setRowHeight(1, P.heights.top);
-  sh.setRowHeight(2, P.heights.title);
-  sh.setRowHeight(3, P.heights.caption);
-  sh.setRowHeight(4, P.heights.gap);
+  // The tiles are a fixed grid: forced heights, so that a big number never makes its row taller than the others
+  sh.setRowHeightsForced(1, 1, P.heights.top);
+  sh.setRowHeightsForced(2, 1, P.heights.title);
+  sh.setRowHeightsForced(3, 1, P.heights.caption);
+  sh.setRowHeightsForced(4, 1, P.heights.gap);
   sh.getRange(2, 2).setRichTextValue(nvTitleRich("Сейчас", T, 18));
   sh.getRange(3, 2).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2).setWrap(false);
   const rules = [];
   P.keys.forEach((key, i) => {
     const tile = NV_TILES.find((t) => t.key === key);
     const r = nvPhoneRow(i);
-    sh.setRowHeight(r, P.heights.label);
-    sh.setRowHeight(r + 1, P.heights.value);
-    sh.setRowHeight(r + 2, P.heights.line);
-    sh.setRowHeight(r + 3, P.heights.gap);
+    sh.setRowHeightsForced(r, 1, P.heights.label);
+    sh.setRowHeightsForced(r + 1, 1, P.heights.value);
+    sh.setRowHeightsForced(r + 2, 1, P.heights.line);
+    sh.setRowHeightsForced(r + 3, 1, P.heights.gap);
     const block = sh.getRange(r, 2, 3, 2);
     block.setBackground(T.surface);
     sh.getRange(r, 2, 1, 2)

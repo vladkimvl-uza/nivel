@@ -97,7 +97,10 @@ function nvBuildThreshold() {
   sh.getRange(L.headerRow, NV_TH.months.col, 1, 12).setValues([NV_TH_MONTH_HEAD]);
   sh.getRange(L.headerRow, NV_TH.other.col, 1, 4).setValues([NV_TH_OTHER_HEAD]);
   const yearRows = nvThresholdYearRows();
-  sh.getRange(NV_TH.year.first, 2, yearRows.length, 2).setValues(yearRows.map((r) => [r[0], nvApiFormula(r[1])]));
+  nvWriteMatrix(
+    sh.getRange(NV_TH.year.first, 2, yearRows.length, 2),
+    yearRows.map((r) => [r[0], nvApiFormula(r[1])]),
+  );
   yearRows.forEach((r, i) => {
     nvSetName(ss, r[2], sh.getRange(NV_TH.year.first + i, 3));
   });
@@ -161,8 +164,8 @@ function nvBuildThreshold() {
     );
     dueRows.push([nvApiFormula("=DATE(YEAR(E" + r + "); MONTH(E" + r + ")+1; 15)")]);
   }
-  sh.getRange(NV_TH.months.first, 5, 12, 8).setValues(monthRows);
-  sh.getRange(NV_TH.months.first, 14, 12, 1).setValues(dueRows);
+  nvWriteMatrix(sh.getRange(NV_TH.months.first, 5, 12, 8), monthRows);
+  nvWriteMatrix(sh.getRange(NV_TH.months.first, 14, 12, 1), dueRows);
   const tr = NV_TH.months.total;
   sh.getRange(tr, 5).setValue("Итого");
   ["F", "G", "H", "I", "J", "L", "M"].forEach((l) => {

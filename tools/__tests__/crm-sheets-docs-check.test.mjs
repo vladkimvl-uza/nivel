@@ -427,3 +427,175 @@ describe("group 6: google.script.run in the sidebars always has a failure handle
     expect(calls.map((c) => typeof c.fail)).toEqual(["function"]);
   });
 });
+
+describe("group 2: text from outside never turns into a formula when the code writes it back", () => {
+  const cellOf = (p, sheetName, row, col) => p.env.ss.getSheetByName(sheetName).getRange(row, col);
+
+  it("the monthly cleaning of the webhook journal rewrites the kept rows as text (before: =… became a formula)", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.call("nvAppendRows", "webhook", [
+      { received: p.date("2025-01-05T10:00:00+05:00"), eventId: "old", type: "x", result: "Принято" },
+      {
+        received: p.date("2026-09-20T10:00:00+05:00"),
+        eventId: "keep",
+        type: "=HYPERLINK(\"http://x\",\"y\")",
+        error: "+998901234567",
+        summary: "=1+1",
+        result: "Принято",
+      },
+      { received: p.date("2026-09-21T10:00:00+05:00"), eventId: "keep2", type: "-5", summary: "@name", result: "Принято" },
+    ]);
+    expect(p.call("nvCleanWebhookJournal", p.call("nvNow"))).toBe(1);
+    const rows = p.call("nvReadTable", "webhook");
+    expect(rows.map((r) => r.eventId)).toEqual(["keep", "keep2"]);
+    const col = (key) => 2 + JSON.parse(p.run("JSON.stringify(NV_SCHEMA.webhook.cols.map((c) => c.key))")).indexOf(key);
+    for (const [row, key, text] of [
+      [6, "type", '=HYPERLINK("http://x","y")'],
+      [6, "summary", "=1+1"],
+      [6, "error", "+998901234567"],
+      [7, "type", "-5"],
+      [7, "summary", "@name"],
+    ]) {
+      const cell = cellOf(p, "Журнал вебхука", row, col(key));
+      expect(cell.getFormula(), `${key} of row ${row} became a formula`).toBe("");
+      expect(cell.getValue()).toBe(text);
+    }
+  });
+});
+
+describe("group 2: a refused edit puts the old value back as it was", () => {
+  const edit = (p, sheetName, row, col, value, oldValue) => {
+    const range = p.env.ss.getSheetByName(sheetName).getRange(row, col);
+    range.setValue(value);
+    p.call("nvOnEdit", { range, value, oldValue, source: p.env.ss });
+    return range;
+  };
+  const colOf = (p, key, col) =>
+    2 + JSON.parse(p.run(`JSON.stringify(NV_SCHEMA.${key}.cols.map((c) => c.key))`)).indexOf(col);
+  function platformLead(p) {
+    const num = p.call(
+      "nvCreateLead",
+      { channel: "Telegram-бот", scope: "ПК", name: "От платформы" },
+      { number: "L-2026-0300", src: "Платформа" },
+    );
+    return p.call("nvReadTable", "leads").find((l) => l.num === num)._row;
+  }
+
+  it("the old text '=HYPERLINK(...)' of a platform field comes back as text, not as a formula (before: a formula)", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const row = platformLead(p);
+    const text = '=HYPERLINK("http://x","y")';
+    p.env.alertAnswers.push("NO");
+    const range = edit(p, "Заявки", row, colOf(p, "leads", "name"), "Другое имя", text);
+    expect(range.getFormula()).toBe("");
+    expect(range.getValue()).toBe(text);
+  });
+
+  it("'+998…' and '@name' in a text cell stay text", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const row = platformLead(p);
+    for (const text of ["+998901234567", "@name"]) {
+      p.env.alertAnswers.push("NO");
+      const range = edit(p, "Заявки", row, colOf(p, "leads", "tg"), "новый", text);
+      expect(range.getFormula()).toBe("");
+      expect(range.getValue()).toBe(text);
+    }
+  });
+
+  it("nvRestoreValue: a number stays a number in a number cell, text goes in as text", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const leads = p.env.ss.getSheetByName("Заявки");
+    const sumCell = leads.getRange(6, colOf(p, "leads", "budget"));
+    const tgCell = leads.getRange(6, colOf(p, "leads", "tg"));
+    expect(p.call("nvRestoreValue", sumCell, "-5000")).toBe(-5000);
+    expect(p.call("nvRestoreValue", sumCell, "12000")).toBe(12000);
+    expect(p.call("nvRestoreValue", sumCell, "=1+1")).toBe("'=1+1");
+    expect(p.call("nvRestoreValue", tgCell, "+998901234567")).toBe("'+998901234567");
+    expect(p.call("nvRestoreValue", tgCell, "-5000")).toBe("'-5000");
+    expect(p.call("nvRestoreValue", sumCell, undefined)).toBe("");
+    expect(p.call("nvRestoreValue", sumCell, 42)).toBe(42);
+  });
+
+  it("a hand-typed number is taken back with the old number", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const num = p.call("nvCreateLead", { channel: "Сайт", scope: "ПК", name: "Тест" });
+    const row = p.call("nvReadTable", "leads").find((l) => l.num === num)._row;
+    const range = edit(p, "Заявки", row, colOf(p, "leads", "num"), "L-9999", num);
+    expect(range.getValue()).toBe(num);
+  });
+});
+
+describe("group 2: formulas are written with setFormula/setFormulas, not as text through setValues", () => {
+  it("no formula of the built book was put in by setValues (their notation is not documented for it)", () => {
+    const offenders = [];
+    for (const sh of built.env.ss.sheets)
+      for (const [k, cell] of sh.cells) if (cell.f && cell.fvia !== "formula") offenders.push(`${sh.name}!${k}`);
+    expect(offenders.slice(0, 10), `${offenders.length} cells`).toEqual([]);
+  });
+
+  it("the mock refuses setFormulas with a value that is not a formula", () => {
+    const sh = built.env.ss.getSheetByName("Панель");
+    expect(() => sh.getRange("A1:B1").setFormulas([["=1", "text"]])).toThrow(/not a formula/);
+    expect(() => sh.getRange("A1").setFormula(5)).toThrow(/match the method signature/);
+  });
+});
+
+describe("group 2: the self-check compares formulas the way Sheets may spell them", () => {
+  const row = (p) => p.call("nvSelfCheckRows").find((r) => r.check === "Формулы в заголовках не стёрты");
+
+  it("formulas as written: OK", () => {
+    expect(row(built).result).toBe("ОК");
+  });
+
+  it("formulas handed back without blanks, without quotes round sheet names, with capitals: still OK (before: all failed)", () => {
+    built.env.normalizeFormulas = true;
+    try {
+      expect(row(built).result).toBe("ОК");
+    } finally {
+      built.env.normalizeFormulas = false;
+    }
+  });
+
+  it("a really changed formula is still found", () => {
+    const sh = built.env.ss.getSheetByName("Заказы");
+    const cell = sh.getRange(5, 2 + JSON.parse(built.run("JSON.stringify(NV_SCHEMA.orders.cols.map((c) => !!c.calc))")).indexOf(true));
+    const old = cell.getFormula();
+    cell.setFormula("=1+1");
+    try {
+      expect(row(built).result).toBe("Ошибка");
+    } finally {
+      cell.setFormula(old);
+    }
+  });
+});
+
+describe("group 2: number formats and row heights as the reference documents them", () => {
+  it("the mock refuses 'General': it is not a pattern of the Sheets API guide", () => {
+    const sh = built.env.ss.getSheetByName("Панель");
+    expect(() => sh.getRange("A1").setNumberFormat("General")).toThrow(/Invalid number format/);
+    expect(() => sh.getRange("A1").setNumberFormats([["General"]])).toThrow(/Invalid number format/);
+    sh.getRange("A1").setNumberFormat("#,##0");
+    sh.getRange("A1").setNumberFormat("dd.mm.yyyy hh:mm");
+    sh.getRange("A1").setNumberFormat("@");
+    sh.getRange("A1").setNumberFormat('0.0" %"');
+  });
+
+  it("no cell of the built book carries General; checkbox columns carry no format", () => {
+    for (const sh of built.env.ss.sheets)
+      for (const [, cell] of sh.cells) if (cell.nf !== undefined) expect(cell.nf).not.toMatch(/general/i);
+  });
+
+  it("the fixed grids of the panel and of the phone sheet have forced row heights", () => {
+    for (const name of ["Панель", "Телефон"]) {
+      const sh = built.env.ss.getSheetByName(name);
+      const loose = [...sh.rowH.keys()].filter((r) => !sh.rowForced.has(r));
+      expect(loose, `${name}: rows with growing height`).toEqual([]);
+      expect(sh.rowH.size).toBeGreaterThan(20);
+    }
+  });
+});

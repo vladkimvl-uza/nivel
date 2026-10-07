@@ -854,7 +854,8 @@ function nvBuildData() {
   });
   const block = (r1, r2, c1, c2) => {
     if (r2 < r1) return;
-    sh.getRange(r1, c1, r2 - r1 + 1, c2 - c1 + 1).setValues(
+    nvWriteMatrix(
+      sh.getRange(r1, c1, r2 - r1 + 1, c2 - c1 + 1),
       matrix.slice(r1 - 1, r2).map((row) => row.slice(c1 - 1, c2)),
     );
   };

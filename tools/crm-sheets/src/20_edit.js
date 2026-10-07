@@ -36,6 +36,24 @@ function nvActor() {
   return me && me.toLowerCase() === owner.toLowerCase() ? "owner" : "assistant";
 }
 
+/**
+ * The value to put back after a refused edit. e.oldValue is the text of the old cell: setValue reads a leading = as a
+ * formula, and "+998…" or "-5" as a number, so the text goes in through the same escape as any text from outside. A
+ * number-like text goes back as a number into a cell that is not in the text format (a negative sum stays a sum).
+ */
+function nvRestoreValue(range, oldValue) {
+  if (oldValue === undefined || oldValue === null) return "";
+  if (typeof oldValue !== "string") return oldValue;
+  let textCell = false;
+  try {
+    textCell = range.getNumberFormat() === "@";
+  } catch (e) {
+    textCell = false;
+  }
+  if (!textCell && /^[+-]?\d+(\.\d+)?$/.test(oldValue)) return Number(oldValue);
+  return nvSafeText(oldValue);
+}
+
 const NV_NUMBERED = {
   leads: { prefix: "L", year: true },
   orders: { prefix: "NV", year: true },
@@ -309,7 +327,7 @@ function nvGuardPlatformField(sheetKey, colKey, rowNo, e) {
   if (answer === "YES") return true;
   nvWithLock(() => {
     nvInvalidate();
-    e.range.setValue(e.oldValue === undefined ? "" : e.oldValue);
+    e.range.setValue(nvRestoreValue(e.range, e.oldValue));
   });
   nvToast(
     answer === "NO_UI"
@@ -370,7 +388,7 @@ function nvOnEditCached(e) {
       // A number is issued by the script: a hand-typed number is taken back.
       if (NV_NUMBERED[sheetKey] && c0 <= keyCol && keyCol <= c1) {
         if (single) {
-          range.setValue(e.oldValue === undefined ? "" : e.oldValue);
+          range.setValue(nvRestoreValue(range, e.oldValue));
           nvToast("Номер выдаёт скрипт: ручная правка отклонена", "Номера");
           return null;
         }

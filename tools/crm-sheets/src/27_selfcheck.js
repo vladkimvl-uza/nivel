@@ -16,6 +16,32 @@ const NV_SELFCHECK_FEE = [
   [60000000, 6000000],
 ];
 
+/**
+ * A formula in a form that does not depend on how Sheets spells it back: no blanks and no quotes round sheet names
+ * outside text, capitals everywhere outside text (the reference of getFormulas does not promise the same spelling).
+ */
+function nvFormulaSpelling(formula) {
+  const f = String(formula || "");
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < f.length; i++) {
+    const ch = f[i];
+    if (inString) {
+      out += ch;
+      if (ch === '"') {
+        if (f[i + 1] === '"') {
+          out += '"';
+          i++;
+        } else inString = false;
+      }
+    } else if (ch === '"') {
+      inString = true;
+      out += ch;
+    } else if (!/\s/.test(ch) && ch !== "'") out += ch.toUpperCase();
+  }
+  return out;
+}
+
 function nvCheckRow(name, result, details) {
   return { check: name, result: result, details: details || "", time: nvNow() };
 }
@@ -46,7 +72,7 @@ function nvSelfCheckRows() {
     def.cols.forEach((c, i) => {
       if (c.calc) {
         const expected = nvApiFormula(nvCalcFormula(key, c));
-        if (forms[i] !== expected) formulaBad.push(def.title + "!" + c.title);
+        if (nvFormulaSpelling(forms[i]) !== nvFormulaSpelling(expected)) formulaBad.push(def.title + "!" + c.title);
       } else if (vals[i] !== c.title) headerBad.push(def.title + ": «" + vals[i] + "» вместо «" + c.title + "»");
     });
   });

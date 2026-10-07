@@ -557,10 +557,9 @@ function nvCleanWebhookJournal(now) {
   const def = NV_SCHEMA.webhook;
   const first = NV_LAYOUT.firstRow;
   sh.getRange(first, NV_LAYOUT.firstCol, old.length + keep.length, def.cols.length).clearContent();
-  if (keep.length)
-    sh.getRange(first, NV_LAYOUT.firstCol, keep.length, def.cols.length).setValues(
-      keep.map((r) => def.cols.map((c) => (r[c.key] === undefined ? "" : r[c.key]))),
-    );
+  // The kept rows are read back as values: text that started with = + - or @ lost its apostrophe on the way, so it is
+  // written through the same escape as every other text from outside (setValues reads a leading = as a formula)
+  if (keep.length) nvWriteRowsMatrix("webhook", first, keep);
   return old.length;
 }
 

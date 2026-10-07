@@ -63,20 +63,21 @@ function nvStylePhone() {
   sh.setColumnWidth(4, P.gutter);
   sh.setColumnWidth(P.helperCol, P.gutter);
   sh.hideColumns(P.helperCol);
-  sh.setRowHeight(1, P.heights.top);
-  sh.setRowHeight(2, P.heights.title);
-  sh.setRowHeight(3, P.heights.caption);
-  sh.setRowHeight(4, P.heights.gap);
+  // The tiles are a fixed grid: forced heights, so that a big number never makes its row taller than the others
+  sh.setRowHeightsForced(1, 1, P.heights.top);
+  sh.setRowHeightsForced(2, 1, P.heights.title);
+  sh.setRowHeightsForced(3, 1, P.heights.caption);
+  sh.setRowHeightsForced(4, 1, P.heights.gap);
   sh.getRange(2, 2).setRichTextValue(nvTitleRich("Сейчас", T, 18));
   sh.getRange(3, 2).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2).setWrap(false);
   const rules = [];
   P.keys.forEach((key, i) => {
     const tile = NV_TILES.find((t) => t.key === key);
     const r = nvPhoneRow(i);
-    sh.setRowHeight(r, P.heights.label);
-    sh.setRowHeight(r + 1, P.heights.value);
-    sh.setRowHeight(r + 2, P.heights.line);
-    sh.setRowHeight(r + 3, P.heights.gap);
+    sh.setRowHeightsForced(r, 1, P.heights.label);
+    sh.setRowHeightsForced(r + 1, 1, P.heights.value);
+    sh.setRowHeightsForced(r + 2, 1, P.heights.line);
+    sh.setRowHeightsForced(r + 3, 1, P.heights.gap);
     const block = sh.getRange(r, 2, 3, 2);
     block.setBackground(T.surface);
     sh.getRange(r, 2, 1, 2)

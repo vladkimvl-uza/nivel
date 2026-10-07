@@ -92,7 +92,8 @@ function nvStyleBody(sheetKey, fromRow, toRow) {
   ).forEach((run) => {
     const t = NV_TYPES[run.col.type];
     const r = sh.getRange(fromRow, first + run.from, n, run.to - run.from + 1);
-    r.setNumberFormat(run.col.fmt || t.fmt);
+    const fmt = run.col.fmt || t.fmt;
+    if (fmt) r.setNumberFormat(fmt);
     r.setHorizontalAlignment(t.align);
     if (t.mono) r.setFontFamily(NV_FONT_MONO);
     if (t.wrap) r.setWrap(true);

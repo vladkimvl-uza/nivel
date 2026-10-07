@@ -48,6 +48,77 @@ export function parseA1(a1, maxRows, maxCols) {
 
 const key = (r, c) => `${r},${c}`;
 
+/**
+ * The patterns of setNumberFormat are those of the Sheets API guide on number formats: 0 # ? . , % E / : text in quotes,
+ * @, the instructions in [ ], and the letters of dates and times. A word such as General is not one of them: the
+ * reference does not say that it means "automatic", so the mock refuses it.
+ */
+function checkNumberFormat(f) {
+  if (typeof f !== "string")
+    throw new Error("Exception: The parameters (" + typeof f + ") don't match the method signature for SpreadsheetApp.Range.setNumberFormat.");
+  const rest = f
+    .replace(/"[^"]*"/g, "")
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/\\./g, "");
+  const bad = /[^ymdhsEeaApPMDHSY0-9#?.,%/:;@_*()$+<>=!&~^ -]/.exec(rest);
+  if (bad) throw new Error("Exception: Invalid number format pattern " + JSON.stringify(f) + " (unexpected " + JSON.stringify(bad[0]) + ")");
+}
+
+/**
+ * Google may hand a formula back in its own spelling: the reference of getFormulas says only "formulas (A1 notation)".
+ * With env.normalizeFormulas the mock imitates that: no blanks outside text, no quotes round sheet names, function names
+ * in capitals. Code that compares a formula it wrote with one it read back must survive this.
+ */
+function respell(f) {
+  let out = "";
+  let inString = false;
+  let code = "";
+  const flush = () => {
+    out += code.replace(/'/g, "").replace(/[A-Za-z_.]+(?=\()/g, (m) => m.toUpperCase());
+    code = "";
+  };
+  for (const ch of f) {
+    if (inString) {
+      out += ch;
+      if (ch === '"') inString = false;
+    } else if (ch === '"') {
+      flush();
+      out += ch;
+      inString = true;
+    } else if (!/\s/.test(ch)) code += ch;
+  }
+  flush();
+  return out;
+}
+
+/**
+ * What a cell does with a value written by setValue/setValues: the value is read as if typed. A string that starts with =
+ * is a formula; a leading apostrophe makes the rest text; in a cell with the text format (@) a string stays text;
+ * otherwise a string that looks like a number or TRUE/FALSE becomes a number or a boolean ("+998901234567" is a number).
+ */
+function writeInput(cell, v) {
+  delete cell.f;
+  if (v === null || v === undefined) {
+    cell.v = "";
+  } else if (typeof v !== "string") {
+    cell.v = v;
+  } else if (v.startsWith("=")) {
+    cell.f = v;
+    cell.v = "";
+    cell.fvia = "value";
+  } else if (v.startsWith("'")) {
+    cell.v = v.slice(1);
+  } else if (cell.nf === "@") {
+    cell.v = v;
+  } else if (/^[+-]?\d+(\.\d+)?$/.test(v)) {
+    cell.v = Number(v);
+  } else if (/^(true|false)$/i.test(v)) {
+    cell.v = v.toLowerCase() === "true";
+  } else {
+    cell.v = v;
+  }
+}
+
 class DataValidationBuilder {
   constructor() {
     this._p = { allowInvalid: true, dropdown: true };
@@ -293,7 +364,7 @@ class Range {
       const row = [];
       for (let c = 0; c < this.numCols; c++) {
         const cell = this.sheet.cells.get(key(this.row + r, this.col + c));
-        row.push(cell?.f ? cell.f : "");
+        row.push(cell?.f ? (this.sheet.owner.env.normalizeFormulas ? respell(cell.f) : cell.f) : "");
       }
       out.push(row);
     }
@@ -313,16 +384,8 @@ class Range {
       if (!Array.isArray(row) || row.length !== this.numCols) {
         throw new Error(`setValues: expected ${this.numCols} columns in row ${i} of ${this.getA1Notation()}`);
       }
-      const v = row[j];
       const cell = this._cell(r, c);
-      if (typeof v === "string" && v.startsWith("=")) {
-        cell.f = v;
-        cell.v = "";
-      } else {
-        // A leading apostrophe makes the value text and is not part of it
-        cell.v = v === null ? "" : typeof v === "string" && v.startsWith("'") ? v.slice(1) : v;
-        delete cell.f;
-      }
+      writeInput(cell, row[j]);
       delete cell.rich;
     });
     this.sheet.owner._touch(this.sheet, this);
@@ -331,28 +394,40 @@ class Range {
   setValue(v) {
     this._each((r, c) => {
       const cell = this._cell(r, c);
-      if (typeof v === "string" && v.startsWith("=")) {
-        cell.f = v;
-        cell.v = "";
-      } else {
-        cell.v = v === null ? "" : typeof v === "string" && v.startsWith("'") ? v.slice(1) : v;
-        delete cell.f;
-      }
+      writeInput(cell, v);
       delete cell.rich;
     });
     this.sheet.owner._touch(this.sheet, this);
     return this;
   }
   setFormula(f) {
+    if (typeof f !== "string" || !f.startsWith("="))
+      throw new Error("Exception: The parameters (" + typeof f + ") don't match the method signature for SpreadsheetApp.Range.setFormula.");
     this._each((r, c) => {
       const cell = this._cell(r, c);
       cell.f = f;
       cell.v = "";
+      cell.fvia = "formula";
     });
+    this.sheet.owner._touch(this.sheet, this);
     return this;
   }
   setFormulas(m) {
-    return this.setValues(m);
+    if (!Array.isArray(m) || m.length !== this.numRows)
+      throw new Error("setFormulas: expected " + this.numRows + " rows in " + this.getA1Notation());
+    this._each((r, c, i, j) => {
+      if (!Array.isArray(m[i]) || m[i].length !== this.numCols)
+        throw new Error("setFormulas: expected " + this.numCols + " columns in row " + i + " of " + this.getA1Notation());
+      const f = m[i][j];
+      if (typeof f !== "string" || !f.startsWith("="))
+        throw new Error("setFormulas: " + JSON.stringify(f) + " is not a formula (cell " + colToLetter(c) + r + ")");
+      const cell = this._cell(r, c);
+      cell.f = f;
+      cell.v = "";
+      cell.fvia = "formula";
+    });
+    this.sheet.owner._touch(this.sheet, this);
+    return this;
   }
   setRichTextValue(rt) {
     this._each((r, c) => {
@@ -397,9 +472,15 @@ class Range {
     return this._set("note", undefined);
   }
   setNumberFormat(f) {
+    checkNumberFormat(f);
     return this._set("nf", f);
   }
+  getNumberFormat() {
+    // Automatic format of Sheets, as the reference of getNumberFormat shows it
+    return this.sheet.cells.get(key(this.row, this.col))?.nf || "0.###############";
+  }
   setNumberFormats(m) {
+    if (Array.isArray(m)) m.forEach((row) => Array.isArray(row) && row.forEach(checkNumberFormat));
     return this._setMatrix("nf", m);
   }
   setBackground(c) {
@@ -665,6 +746,7 @@ class Sheet {
     this.maxCols = MAX_COLS;
     this.colW = new Map();
     this.rowH = new Map();
+    this.rowForced = new Set();
     this.hiddenCols = new Set();
     this.hiddenRows = new Set();
     this.frozenRows = 0;
@@ -787,16 +869,27 @@ class Sheet {
     for (let i = 0; i < n; i++) this.colW.set(c + i, w);
     return this;
   }
+  // setRowHeight(s): "By default, rows grow to fit cell contents" (the reference); setRowHeightsForced fixes the height
   setRowHeight(r, h) {
-    this.rowH.set(r, h);
-    return this;
+    return this.setRowHeights(r, 1, h);
   }
   setRowHeights(r, n, h) {
-    for (let i = 0; i < n; i++) this.rowH.set(r + i, h);
+    if (!Number.isInteger(r) || !Number.isInteger(n) || typeof h !== "number")
+      throw new Error("Exception: The parameters do not match the method signature for SpreadsheetApp.Sheet.setRowHeights.");
+    for (let i = 0; i < n; i++) {
+      this.rowH.set(r + i, h);
+      this.rowForced.delete(r + i);
+    }
     return this;
   }
   setRowHeightsForced(r, n, h) {
-    return this.setRowHeights(r, n, h);
+    if (!Number.isInteger(r) || !Number.isInteger(n) || typeof h !== "number")
+      throw new Error("Exception: The parameters do not match the method signature for SpreadsheetApp.Sheet.setRowHeightsForced.");
+    for (let i = 0; i < n; i++) {
+      this.rowH.set(r + i, h);
+      this.rowForced.add(r + i);
+    }
+    return this;
   }
   setFrozenRows(n) {
     this.frozenRows = n;
@@ -1230,6 +1323,7 @@ class Env {
     // Switches of the tests: the Sheets service answers with an error; getSpreadsheetTheme() returns null
     this.sheetsFail = false;
     this.noTheme = false;
+    this.normalizeFormulas = false;
     this.deprecatedFields = [];
     // Writes not yet flushed at the moment a lock is released: the reference of Lock advises flush() before releaseLock()
     this.dirty = false;

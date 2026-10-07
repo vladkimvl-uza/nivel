@@ -32,8 +32,11 @@ function nvBuildSettings() {
   const missing = params.filter((x) => !known[x.def.name]);
   if (missing.length === params.length) {
     // A new book: the whole block in two calls (the text cells get the text format first, so "10:00" stays text)
-    sh.getRange(L.firstRow, NV_SET_COLS.value, layout.length, 1).setNumberFormats(
-      layout.map((x) => [!x.isGroup && (x.def.type === "time" || x.def.type === "text") ? "@" : "General"]),
+    nvSetFormatRuns(
+      sh,
+      L.firstRow,
+      NV_SET_COLS.value,
+      layout.map((x) => (!x.isGroup && (x.def.type === "time" || x.def.type === "text") ? "@" : null)),
     );
     const matrix = layout.map((x) => {
       const r = x.def;
@@ -41,7 +44,7 @@ function nvBuildSettings() {
       const value = r.type === "formula" ? r.formula : r.value;
       return [r.label, value, r.unit, r.name, r.source, today];
     });
-    sh.getRange(L.firstRow, NV_SET_COLS.label, layout.length, 6).setValues(matrix);
+    nvWriteMatrix(sh.getRange(L.firstRow, NV_SET_COLS.label, layout.length, 6), matrix);
   } else {
     // A later run: only the settings that are not there yet (the owner's values stay)
     missing.forEach((item) => {
@@ -154,15 +157,18 @@ function nvStyleSettings() {
   values.setFontFamily(NV_FONT_MONO).setFontWeight("bold");
   values.setHorizontalAlignments(layout.map((x) => [!x.isGroup && x.def.type === "bool" ? "center" : "right"]));
   values.setFontColors(layout.map((x) => [!x.isGroup && x.def.readonly ? T.text2 : T.text]));
-  values.setNumberFormats(
+  nvSetFormatRuns(
+    sh,
+    first,
+    NV_SET_COLS.value,
     layout.map((x) => {
-      if (x.isGroup) return ["General"];
+      if (x.isGroup) return null;
       const t = x.def.type;
-      if (t === "bp" || t === "int" || t === "formula") return ["#,##0"];
-      if (t === "sum") return [NV_FMT.sum];
-      if (t === "date") return [NV_FMT.date];
-      if (t === "time" || t === "text") return ["@"];
-      return ["General"];
+      if (t === "bp" || t === "int" || t === "formula") return "#,##0";
+      if (t === "sum") return NV_FMT.sum;
+      if (t === "date") return NV_FMT.date;
+      if (t === "time" || t === "text") return "@";
+      return null;
     }),
   );
   values.setDataValidations(

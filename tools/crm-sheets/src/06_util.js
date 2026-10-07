@@ -442,6 +442,54 @@ function nvEnsureCapacity(sheetKey, neededRow) {
   if (typeof nvStyleBody === "function") nvStyleBody(sheetKey, have + 1, have + add);
 }
 
+/**
+ * Number formats of one column of rows, a format per row; null leaves the row alone (a checkbox, a heading: no format is
+ * the automatic one, and "General" is not a pattern of the API). Rows with the same format go in one call.
+ */
+function nvSetFormatRuns(sheet, firstRow, col, formats) {
+  let i = 0;
+  while (i < formats.length) {
+    if (!formats[i]) {
+      i += 1;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < formats.length && formats[j + 1] === formats[i]) j += 1;
+    sheet.getRange(firstRow + i, col, j - i + 1, 1).setNumberFormat(formats[i]);
+    i = j + 1;
+  }
+}
+
+/**
+ * Writes a matrix in which a string that starts with = is one of our formulas (already in the notation of the API). The
+ * reference of setValues only says that such a string "is interpreted as a formula"; setFormulas is the call that is
+ * documented for formulas, so values go in by setValues and each run of formulas of a row by setFormulas.
+ */
+function nvWriteMatrix(range, matrix) {
+  const isFormula = (v) => typeof v === "string" && v.charAt(0) === "=";
+  if (!matrix.some((row) => row.some(isFormula))) {
+    range.setValues(matrix);
+    return;
+  }
+  const sheet = range.getSheet();
+  const row0 = range.getRow();
+  const col0 = range.getColumn();
+  range.setValues(matrix.map((row) => row.map((v) => (isFormula(v) ? "" : v))));
+  matrix.forEach((row, i) => {
+    let j = 0;
+    while (j < row.length) {
+      if (!isFormula(row[j])) {
+        j += 1;
+        continue;
+      }
+      let k = j;
+      while (k + 1 < row.length && isFormula(row[k + 1])) k += 1;
+      sheet.getRange(row0 + i, col0 + j, 1, k - j + 1).setFormulas([row.slice(j, k + 1)]);
+      j = k + 1;
+    }
+  });
+}
+
 /** The text of a cell as a trimmed string. */
 function nvStr(v) {
   return v === null || v === undefined ? "" : String(v).trim();

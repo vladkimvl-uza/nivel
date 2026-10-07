@@ -232,29 +232,30 @@ function nvStylePanel() {
   sh.hideColumns(15, maxCols - 14);
   // Rows
   const H = P.heights;
-  sh.setRowHeight(1, H.top);
-  sh.setRowHeight(2, H.head);
-  sh.setRowHeight(3, H.controls);
-  sh.setRowHeight(4, H.gap);
+  // The grid of the panel is the design: the heights are forced, so that a long caption never makes a row taller
+  sh.setRowHeightsForced(1, 1, H.top);
+  sh.setRowHeightsForced(2, 1, H.head);
+  sh.setRowHeightsForced(3, 1, H.controls);
+  sh.setRowHeightsForced(4, 1, H.gap);
   P.tileTop.forEach((r0) => {
-    sh.setRowHeight(r0, H.label);
-    sh.setRowHeight(r0 + 1, H.value);
-    sh.setRowHeight(r0 + 2, H.line);
-    sh.setRowHeight(r0 + 3, H.spark);
-    sh.setRowHeight(r0 + 4, H.gap);
+    sh.setRowHeightsForced(r0, 1, H.label);
+    sh.setRowHeightsForced(r0 + 1, 1, H.value);
+    sh.setRowHeightsForced(r0 + 2, 1, H.line);
+    sh.setRowHeightsForced(r0 + 3, 1, H.spark);
+    sh.setRowHeightsForced(r0 + 4, 1, H.gap);
   });
-  sh.setRowHeight(19, 22);
+  sh.setRowHeightsForced(19, 1, 22);
   P.headings.forEach((h) => {
-    sh.setRowHeight(h.row, H.heading);
+    sh.setRowHeightsForced(h.row, 1, H.heading);
   });
-  sh.setRowHeights(21, 14, H.chart);
-  sh.setRowHeight(35, H.gap);
-  sh.setRowHeights(36, 14, H.chart);
-  sh.setRowHeight(50, H.gap);
-  sh.setRowHeights(52, 14, H.chart);
-  sh.setRowHeight(66, H.gap);
-  sh.setRowHeights(67, 14, H.chart);
-  sh.setRowHeights(81, 1, H.gap);
+  sh.setRowHeightsForced(21, 14, H.chart);
+  sh.setRowHeightsForced(35, 1, H.gap);
+  sh.setRowHeightsForced(36, 14, H.chart);
+  sh.setRowHeightsForced(50, 1, H.gap);
+  sh.setRowHeightsForced(52, 14, H.chart);
+  sh.setRowHeightsForced(66, 1, H.gap);
+  sh.setRowHeightsForced(67, 14, H.chart);
+  sh.setRowHeightsForced(81, 1, H.gap);
   // Header
   const title = sh.getRange("C2:G2");
   title

@@ -134,7 +134,7 @@ function nvBuildTable(sheetKey) {
 
   // Header row: the title, or the MAP formula of a calculated column
   const heads = def.cols.map((c) => (c.calc ? nvApiFormula(nvCalcFormula(sheetKey, c)) : c.title));
-  sh.getRange(L.headerRow, L.firstCol, 1, def.cols.length).setValues([heads]);
+  nvWriteMatrix(sh.getRange(L.headerRow, L.firstCol, 1, def.cols.length), [heads]);
 
   // Caption: the counters of the sheet and a short remark
   const cap = nvResolveCaption(sheetKey, def.caption);
