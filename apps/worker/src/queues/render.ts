@@ -103,7 +103,8 @@ const TEMPLATES: Record<string, Template> = {
   "ops.digest": (p) => {
     const items = Array.isArray(p.items) ? (p.items as Params[]) : [];
     const lines = items.map((i) => `${text(i.queue)} ×${whole(i.count)}: ${text(i.message)}`);
-    return ["Ошибки за сутки:", ...lines].join("\n");
+    const more = whole(p.more);
+    return ["Ошибки за сутки:", ...lines, ...(more > 0 ? [`… и ещё ${more}`] : [])].join("\n");
   },
 };
 

@@ -86,6 +86,11 @@ export class FakeJobs implements JobSink {
   async hasQueue(queue: string) {
     return this.queues.has(queue);
   }
+  /** What `stalled` answers. */
+  stalledQueues: { queue: string; seconds: number }[] = [];
+  async stalled(seconds: number) {
+    return this.stalledQueues.filter((q) => q.seconds > seconds);
+  }
 }
 
 export function recordingFailures(): FailureSink & { recorded: FailureInfo[] } {

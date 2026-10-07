@@ -84,6 +84,13 @@ describe("registerQueue", () => {
     expect(calls.createQueue[0]?.[1]).toMatchObject({ retryLimit: 6, retryDelay: 30, retryDelayMax: 600 });
   });
 
+  it("does not cap a pause that does not grow: pg-boss refuses a cap without the backoff", async () => {
+    const { ctx, calls } = fakeContext();
+    await registerQueue(ctx, { name: "flat", retry: { backoff: false, delaySec: 1 }, handler: async () => {} });
+    expect(calls.createQueue[0]?.[1]).toMatchObject({ retryBackoff: false, retryDelay: 1 });
+    expect(calls.createQueue[0]?.[1]).not.toHaveProperty("retryDelayMax");
+  });
+
   it("gives the handler the data of the job and which attempt it is", async () => {
     const { ctx, run } = fakeContext();
     const seen: unknown[] = [];

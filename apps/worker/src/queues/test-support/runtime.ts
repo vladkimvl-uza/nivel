@@ -24,7 +24,9 @@ export function testRuntime(
     files?: FileStore;
     probes?: Probes;
     renderer?: MessageRenderer;
-    boss?: Pick<PgBoss, "send" | "getQueue">;
+    boss?: Pick<PgBoss, "send" | "getQueue" | "getQueues">;
+    /** The worker runs on the real clock, as it does in production (the loops and the throttle need time to pass). */
+    realClock?: boolean;
   } = {},
 ): TestRuntime {
   const telegram = new FakeTelegram(w.clock);
@@ -42,7 +44,8 @@ export function testRuntime(
       ({
         send: (queue: string, data: object, opts: object) => jobs.send(queue, data, opts),
         getQueue: async (q: string) => ((await jobs.hasQueue(q)) ? {} : null),
-      } as unknown as Pick<PgBoss, "send" | "getQueue">),
+        getQueues: async () => jobs.stalledQueues.map((s) => ({ name: s.queue, readyOldestSeconds: s.seconds })),
+      } as unknown as Pick<PgBoss, "send" | "getQueue" | "getQueues">),
     log,
     settings: {
       appMode: "production",
@@ -52,7 +55,7 @@ export function testRuntime(
       filesDir: undefined,
       ...over.settings,
     },
-    now: w.clock.now,
+    now: over.realClock ? () => new Date() : w.clock.now,
     fetch: over.fetch ?? fakeFetch,
     telegram,
     ...(over.files ? { files: over.files } : {}),

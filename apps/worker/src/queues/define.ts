@@ -43,6 +43,8 @@ export interface QueueSpec<D extends object = Record<string, unknown>> {
   retry?: Partial<RetryOptions>;
   /** Seconds a run may last before pg-boss gives it up. */
   expireInSeconds?: number;
+  /** How often the worker looks for a job, in seconds (pg-boss: 2 by default, 0.5 at least); the tests make it short. */
+  pollSeconds?: number;
   handler: (data: D, meta: JobMeta) => Promise<void>;
 }
 
@@ -57,14 +59,19 @@ export async function registerQueue<D extends object = Record<string, unknown>>(
     retryLimit: retry.limit,
     retryDelay: retry.delaySec,
     retryBackoff: retry.backoff,
-    retryDelayMax: retry.maxDelaySec,
+    // pg-boss refuses a cap on the pause when the pause does not grow.
+    ...(retry.backoff ? { retryDelayMax: retry.maxDelaySec } : {}),
     ...(spec.expireInSeconds === undefined ? {} : { expireInSeconds: spec.expireInSeconds }),
   };
   await ctx.boss.createQueue(spec.name, options);
   if (spec.cron !== undefined) await ctx.boss.schedule(spec.name, spec.cron, null, { tz: TASHKENT_TZ });
-  await ctx.boss.work<D>(spec.name, { includeMetadata: true }, async (jobs: RunningJob<D>[]) => {
-    for (const job of jobs) await runJob(ctx, spec, job, retry);
-  });
+  await ctx.boss.work<D>(
+    spec.name,
+    { includeMetadata: true, ...(spec.pollSeconds === undefined ? {} : { pollingIntervalSeconds: spec.pollSeconds }) },
+    async (jobs: RunningJob<D>[]) => {
+      for (const job of jobs) await runJob(ctx, spec, job, retry);
+    },
+  );
 }
 
 async function runJob<D extends object>(

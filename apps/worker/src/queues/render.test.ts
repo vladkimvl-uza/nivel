@@ -149,6 +149,11 @@ describe("the texts of the owner (Russian: the owner reads the admin panel in Ru
     expect(text).toContain("×3");
     expect(text).toContain("web.revalidate");
   });
+
+  it("says how many failures the digest does not list", () => {
+    const text = r.render("ops.digest", "ru", { items: [{ queue: "q", message: "m", count: 1 }], more: 4 }) as string;
+    expect(text).toContain("и ещё 4");
+  });
 });
 
 describe("the renderer", () => {

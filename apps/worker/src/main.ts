@@ -1,11 +1,15 @@
-// Background jobs on pg-boss (ARCHITECTURE 9). WP-00: start the queue, register domains, serve /healthz.
+// Background jobs on pg-boss (ARCHITECTURE 9). WP-00 made the frame; WP-14 gives the domains their runtime (the database as the
+// role nivel_worker, the services, the clock, the doors to Telegram, the site and the disk), starts the queue and serves /healthz.
 import { appPort, LOG_REDACT_PATHS, loadEnv } from "@nivel/config";
+import { createDb } from "@nivel/db";
 import { pingDatabase } from "@nivel/db/health";
 import { PgBoss } from "pg-boss";
 import pino from "pino";
 import { startHealthServer } from "./health.ts";
 import { registerAll } from "./jobs/index.ts";
 import { queueOptions } from "./queue.ts";
+import { Lifecycle, type WorkerContext } from "./queues/runtime.ts";
+import { createWorkerRuntime } from "./queues/wire.ts";
 
 const env = loadEnv("worker");
 const log = pino({ name: "worker", redact: [...LOG_REDACT_PATHS] });
@@ -18,20 +22,45 @@ boss.on("error", (err) => log.error({ err }, "pg-boss error"));
 let queue: "starting" | "started" | "stopped" = "starting";
 await boss.start();
 queue = "started";
-const domains = await registerAll({ boss, log });
+
+// One pool of the role nivel_worker for the jobs; the services run on the same handle with the role `worker`.
+const db = createDb(env.DATABASE_URL_WORKER, { max: 8, applicationName: "nivel-worker-jobs" });
+const runtime = createWorkerRuntime({
+  db,
+  boss,
+  log,
+  settings: {
+    appMode: env.APP_MODE,
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    revalidateKey: env.REVALIDATE_HMAC_KEY,
+    botToken: env.BOT_TOKEN,
+    filesDir: env.FILES_DIR,
+    // Read from the environment as it is: the schema of the worker does not list them (request to the integrator).
+    botMode: process.env.BOT_MODE === "webhook" ? "webhook" : "polling",
+  },
+  backupMarkFile: process.env.BACKUP_MARK_FILE || undefined,
+});
+if (!runtime.telegram.enabled) log.warn("disabled: no BOT_TOKEN, the messages of the outbox are skipped with a record");
+
+const lifecycle = new Lifecycle();
+const ctx: WorkerContext = { boss, log, runtime, onStart: lifecycle.onStart, onStop: lifecycle.onStop };
+const domains = await registerAll(ctx);
 log.info({ domains }, "job domains registered");
+// The loops start after every domain has made its queues, so that a row of the outbox never meets a queue that is not there yet.
+await lifecycle.start();
 
 const server = await startHealthServer(port, async () => {
-  const db = await pingDatabase(env.DATABASE_URL_WORKER);
-  const ok = db.ok && queue === "started";
+  const health = await pingDatabase(env.DATABASE_URL_WORKER);
+  const ok = health.ok && queue === "started";
   return {
     ok,
     body: {
       app: "worker",
       status: ok ? "ok" : "degraded",
-      db: db.ok ? { ok: true, ms: db.ms } : { ok: false, error: db.error },
+      db: health.ok ? { ok: true, ms: health.ms } : { ok: false, error: health.error },
       queue,
       domains: domains.length,
+      telegram: runtime.telegram.enabled ? "enabled" : "disabled: no BOT_TOKEN",
       time: new Date().toISOString(),
     },
   };
@@ -42,7 +71,13 @@ const shutdown = async (signal: string) => {
   log.info({ signal }, "stopping");
   queue = "stopped";
   server.close();
+  try {
+    await lifecycle.stop();
+  } catch (err) {
+    log.error({ err }, "a loop did not stop cleanly");
+  }
   await boss.stop({ graceful: true, timeout: 10_000 });
+  await db.$client.end();
   process.exit(0);
 };
 process.on("SIGINT", () => void shutdown("SIGINT"));

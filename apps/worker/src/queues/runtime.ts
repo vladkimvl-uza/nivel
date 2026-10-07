@@ -21,6 +21,8 @@ export interface WorkerSettings {
   botToken: string | undefined;
   /** FILES_DIR: where the bytes of the files lie; without it the retention of files does not run. */
   filesDir: string | undefined;
+  /** BOT_MODE of the installation: in `webhook` mode ops.selfcheck looks at the last error of the webhook. */
+  botMode?: "polling" | "webhook" | undefined;
 }
 
 /** Sends a job to a queue of pg-boss; the real one is a thin cover over the `PgBoss` of the process. */
@@ -28,6 +30,8 @@ export interface JobSink {
   send(queue: string, data: object, opts?: { singletonKey?: string; startAfter?: Date }): Promise<string | null>;
   /** Whether another domain has made the queue already (pdf.render is made by WP-12). */
   hasQueue(queue: string): Promise<boolean>;
+  /** Queues whose oldest ready job has waited more than `seconds` (nobody takes it: ops.selfcheck). */
+  stalled(seconds: number): Promise<{ queue: string; seconds: number }[]>;
 }
 
 export interface SendMessageInput {

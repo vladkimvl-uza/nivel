@@ -22,7 +22,7 @@ import { createTelegramGateway, disabledTelegram } from "./telegram.ts";
 import { Throttle } from "./throttle.ts";
 
 /** pg-boss as the relay uses it: send under a key, ask whether another domain has made a queue. */
-export function createJobSink(boss: Pick<PgBoss, "send" | "getQueue">): JobSink {
+export function createJobSink(boss: Pick<PgBoss, "send" | "getQueue" | "getQueues">): JobSink {
   return {
     async send(queue, data, opts) {
       return boss.send(queue, data, {
@@ -33,12 +33,18 @@ export function createJobSink(boss: Pick<PgBoss, "send" | "getQueue">): JobSink 
     async hasQueue(queue) {
       return (await boss.getQueue(queue)) !== null;
     },
+    async stalled(seconds) {
+      const queues = await boss.getQueues();
+      return queues
+        .filter((q) => (q.readyOldestSeconds ?? 0) > seconds)
+        .map((q) => ({ queue: q.name, seconds: q.readyOldestSeconds ?? 0 }));
+    },
   };
 }
 
 export interface RuntimeSources {
   db: Db;
-  boss: Pick<PgBoss, "send" | "getQueue">;
+  boss: Pick<PgBoss, "send" | "getQueue" | "getQueues">;
   log: Logger;
   settings: WorkerSettings;
   now?: () => Date;
