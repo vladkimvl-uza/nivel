@@ -3,6 +3,7 @@
 // the form, and writes the row together with its entry of the journal in one transaction (`withAudit`). The status of the
 // warranty case follows `warrantyTransition` of the domain; deadlines come from `warrantyDeadlines`.
 
+import { LEAD_CHANNELS } from "@nivel/contracts/leads";
 import { UuidSchema } from "@nivel/contracts/orders";
 import type { Db } from "@nivel/db";
 import { buildPassports, warrantyCases } from "@nivel/db";
@@ -15,7 +16,7 @@ import {
   warrantyDeadlines,
   warrantyTransition,
 } from "@nivel/domain/warranty";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { type AuditSink, withAudit } from "../auth/audit.ts";
 import type { Role } from "../auth/roles.ts";
 import { canDo } from "./access.ts";
@@ -184,6 +185,8 @@ async function loadCalendar(db: Db): Promise<WorkCalendar> {
 }
 
 const HANDED = new Set(["handed_over", "closed"]);
+/** Where the customer came from: the channels of the system. The form has none, so what is sent is checked. */
+const CASE_CHANNELS: readonly string[] = LEAD_CHANNELS;
 
 export async function openWarrantyCase(w: Writer, orderId: string, form: FormInput): Promise<Outcome> {
   if (!canDo(w.user.role, "warranty.write")) return DENIED;
@@ -191,6 +194,8 @@ export async function openWarrantyCase(w: Writer, orderId: string, form: FormInp
   if (!description) return fail("Опишите, что случилось.");
   if (description.length > 2000) return fail("Описание длиннее 2000 знаков.");
   const channel = text(form, "channel") ?? "admin";
+  if (!CASE_CHANNELS.includes(channel)) return fail("Канал обращения не распознан.");
+  if (!UuidSchema.safeParse(orderId).success) return fail("Заказ не найден.");
   const order = await sales.getOrder(w.db, orderId);
   if (!order) return fail("Заказ не найден.");
   if (!HANDED.has(order.status)) return fail("Гарантийный случай открывается по заказу, который передан клиенту.");
@@ -223,10 +228,13 @@ export async function openWarrantyCase(w: Writer, orderId: string, form: FormInp
 const CAUSES: readonly ClientFault[] = ["impact", "liquid", "overclocking", "third_party_replacement"];
 const WARRANTY_EVENTS = ["START_DIAGNOSIS", "SEND_TO_SUPPLIER", "RESOLVE", "REJECT", "CLOSE"] as const;
 
+class CaseMoved extends Error {}
+
 export async function advanceWarranty(w: Writer, caseId: string, form: FormInput): Promise<Outcome> {
   if (!canDo(w.user.role, "warranty.write")) return DENIED;
   const type = WARRANTY_EVENTS.find((t) => t === form.get("event"));
   if (!type) return fail("Выберите действие по гарантийному случаю.");
+  if (!UuidSchema.safeParse(caseId).success) return fail("Гарантийный случай не найден.");
   const found = await w.db.query.warrantyCases.findFirst({ where: (t, { eq }) => eq(t.id, caseId) });
   if (!found) return fail("Гарантийный случай не найден.");
   let event: WarrantyEvent;
@@ -247,20 +255,29 @@ export async function advanceWarranty(w: Writer, caseId: string, form: FormInput
     );
   }
   const closed = result.next === "closed";
-  await withAudit(w.audit, meta(w, "warranty.advance", "sales.warranty_cases", caseId), async (tx) => {
-    const ex = executorOf(w, tx);
-    await ex
-      .update(warrantyCases)
-      .set({
-        status: result.next,
-        ...(event.type === "REJECT"
-          ? { clientFault: event.clientFault, vendorClaim: { rejection: { evidence: event.evidence } } }
-          : {}),
-        ...(closed ? { closedAt: w.now() } : {}),
-      })
-      .where(eq(warrantyCases.id, caseId));
-    return { value: undefined, entityId: caseId, before: { status: found.status }, after: { status: result.next } };
-  });
+  try {
+    await withAudit(w.audit, meta(w, "warranty.advance", "sales.warranty_cases", caseId), async (tx) => {
+      const ex = executorOf(w, tx);
+      // The change is made from the status that was read: when somebody has moved the case meanwhile, nothing is written
+      // (and the entry of the journal goes back with the transaction), so two presses at once do not both win.
+      const moved = await ex
+        .update(warrantyCases)
+        .set({
+          status: result.next,
+          ...(event.type === "REJECT"
+            ? { clientFault: event.clientFault, vendorClaim: { rejection: { evidence: event.evidence } } }
+            : {}),
+          ...(closed ? { closedAt: w.now() } : {}),
+        })
+        .where(and(eq(warrantyCases.id, caseId), eq(warrantyCases.status, found.status)))
+        .returning({ id: warrantyCases.id });
+      if (moved.length === 0) throw new CaseMoved();
+      return { value: undefined, entityId: caseId, before: { status: found.status }, after: { status: result.next } };
+    });
+  } catch (error) {
+    if (error instanceof CaseMoved) return fail("Случай уже изменили: обновите страницу и повторите.");
+    throw error;
+  }
   return {
     ok: true,
     message: `Случай ${found.number}: ${WARRANTY_STATUS_LABEL[result.next] ?? result.next}.`,

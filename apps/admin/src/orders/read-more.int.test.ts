@@ -575,6 +575,40 @@ describe("the warranty case", () => {
     expect(row.vendor_claim.rejection.evidence).toContain("коррозии");
   });
 
+  it("refuses ids that are not ids and a channel that is not one of ours, without an error of the database", async () => {
+    const o = await handedOverOrder(w, "Гарантия ввод");
+    expect(await openWarrantyCase(writer(), "not-an-id", form({ description: "Шум" }))).toMatchObject({
+      ok: false,
+      message: "Заказ не найден.",
+    });
+    const channel = await openWarrantyCase(
+      writer(),
+      o.orderId,
+      form({ description: "Шум", channel: "carrier-pigeon" }),
+    );
+    expect(channel).toMatchObject({ ok: false });
+    expect(channel.message).toContain("Канал");
+    expect(await advanceWarranty(writer(), "not-an-id", form({ event: "CLOSE" }))).toMatchObject({
+      ok: false,
+      message: "Гарантийный случай не найден.",
+    });
+    const none = await w.db.$client.query("select 1 from sales.warranty_cases where order_id = $1", [o.orderId]);
+    expect(none.rows).toHaveLength(0);
+  });
+
+  it("applies one transition once: two presses at the same moment do not both win", async () => {
+    const o = await handedOverOrder(w, "Гарантия гонка");
+    const opened = await openWarrantyCase(writer(), o.orderId, form({ description: "Гудит блок питания" }));
+    const caseId = opened.ok ? (opened.id as string) : "";
+    const answers = await Promise.all(
+      Array.from({ length: 4 }, () => advanceWarranty(writer(), caseId, form({ event: "START_DIAGNOSIS" }))),
+    );
+    expect(answers.filter((a) => a.ok)).toHaveLength(1);
+    const entries = (await audit("warranty.advance")).filter((e) => e.entity_id === caseId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.after).toEqual({ status: "diagnosing" });
+  });
+
   it("refuses an unknown action, an unknown case, and a role that may not", async () => {
     const o = await handedOverOrder(w, "Гарантия права");
     const opened = await openWarrantyCase(writer(), o.orderId, form({ description: "Шум вентилятора" }));
