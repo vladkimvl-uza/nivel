@@ -3,7 +3,7 @@
 // requests that arrive together cannot check more than the rule allows).
 //
 // Used for what must not share the counter of the account in the database: a sign-in from one source (an address, for
-// one e-mail) and the sensitive changes inside a live session. The counts are lost when the process restarts; that is
+// one e-mail), all the sign-ins of one address over all e-mails, and the sensitive changes inside a live session. The counts are lost when the process restarts; that is
 // accepted: a restart is not in the hands of whoever guesses, and a count that is gone only gives a fresh series.
 //
 // A series ends by time: after `windowMs` from its first failure it starts again from zero, so a typo of last week does
@@ -41,7 +41,7 @@ export class AttemptLimiter {
   private nextSeries = 1;
 
   private readonly rule: LimiterRule;
-  /** Bounds the memory: when it is full the oldest series is forgotten. */
+  /** Bounds the memory: when it is full one series is forgotten (see `evict`). */
   private readonly maxKeys: number;
 
   constructor(rule: LimiterRule, maxKeys = 10_000) {
@@ -60,12 +60,13 @@ export class AttemptLimiter {
     }
     if (!entry || entry.lockedUntil > 0 || t - entry.startedAt >= this.rule.windowMs) {
       this.entries.delete(key);
-      if (this.entries.size >= this.maxKeys) {
-        const oldest = this.entries.keys().next();
-        if (!oldest.done) this.entries.delete(oldest.value);
-      }
+      if (this.entries.size >= this.maxKeys) this.evict(t);
       entry = { series: this.nextSeries, count: 0, startedAt: t, lockedUntil: 0, lastRefusalJournaled: 0 };
       this.nextSeries += 1;
+      this.entries.set(key, entry);
+    } else {
+      // The map is kept in the order of use: the key just used goes to the end.
+      this.entries.delete(key);
       this.entries.set(key, entry);
     }
     entry.count += 1;
@@ -96,8 +97,63 @@ export class AttemptLimiter {
     if (entry.count === 0) this.entries.delete(claim.key);
   }
 
+  /**
+   * Makes room for one key. A series that has ended goes first (it would start again from zero anyway). Then the
+   * series that is not locked and has the fewest failures, the one used longest ago among equals: whoever fills the map
+   * with keys of one failure each cannot push out a series that has four. A lock goes last (the one that ends first):
+   * forgetting it would let the source in before its time.
+   */
+  private evict(t: number): void {
+    let fewest: { key: string; count: number } | undefined;
+    let soonest: { key: string; until: number } | undefined;
+    for (const [key, entry] of this.entries) {
+      if (entry.lockedUntil > t) {
+        if (!soonest || entry.lockedUntil < soonest.until) soonest = { key, until: entry.lockedUntil };
+      } else if (entry.lockedUntil > 0 || t - entry.startedAt >= this.rule.windowMs) {
+        this.entries.delete(key);
+        return;
+      } else if (!fewest || entry.count < fewest.count) {
+        fewest = { key, count: entry.count };
+      }
+    }
+    const victim = fewest?.key ?? soonest?.key;
+    if (victim !== undefined) this.entries.delete(victim);
+  }
+
   isLocked(key: string, now: Date): boolean {
     const entry = this.entries.get(key);
     return entry !== undefined && entry.lockedUntil > now.getTime();
+  }
+}
+
+/**
+ * Lets a journal entry through at most once per `gapMs` per key. For the failures that nobody owns (an e-mail without
+ * an account, a refusal of a locked account): the journal only grows, so a flood must not write a row per request.
+ */
+export class JournalGate {
+  private readonly last = new Map<string, number>();
+  private readonly gapMs: number;
+  private readonly maxKeys: number;
+
+  constructor(gapMs = REFUSAL_JOURNAL_GAP_MS, maxKeys = 10_000) {
+    this.gapMs = gapMs;
+    this.maxKeys = maxKeys;
+  }
+
+  get size(): number {
+    return this.last.size;
+  }
+
+  allow(key: string, now: Date): boolean {
+    const t = now.getTime();
+    const before = this.last.get(key);
+    if (before !== undefined && t - before < this.gapMs) return false;
+    this.last.delete(key);
+    if (this.last.size >= this.maxKeys) {
+      const oldest = this.last.keys().next();
+      if (!oldest.done) this.last.delete(oldest.value);
+    }
+    this.last.set(key, t);
+    return true;
   }
 }

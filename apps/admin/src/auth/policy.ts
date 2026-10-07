@@ -8,10 +8,19 @@ export const AUTH_POLICY = {
   lockAfterFailures: 5,
   lockMinutes: 15,
   /**
-   * Over all sources together: the account is locked (its sessions end) after this many failed sign-ins. Higher than
-   * the limit of one source, so that a stranger from one address cannot keep the owner out (a distributed guess still stops).
+   * Over all sources together: the account is locked (its sessions end) after this many failed sign-ins inside one
+   * window of `lockMinutes` from the first of them (the count does not carry over from week to week). One source gives
+   * at most `lockAfterFailures` of them in a window, and one address (all e-mails together) at most
+   * `addressCeilingFailures` checks, so one address cannot reach this number alone: a distributed guess still stops it,
+   * and it takes at least four addresses within 15 minutes to end the sessions of the owner.
    */
   accountCeilingFailures: 20,
+  /**
+   * One address over all e-mails: checks of a password (that were not refused by the limit of the source) that
+   * failed, inside one window. A flood of unknown e-mails from one address stops here, before the check of a password
+   * and before the journal: a sign-in that goes through gives its attempt back.
+   */
+  addressCeilingFailures: 20,
   /** A session ends after 8 hours without a request (sliding) ... */
   idleHours: 8,
   /** ... and in any case after 7 days since the sign-in. */

@@ -323,3 +323,117 @@ describe("a stranger cannot keep the owner out, and learns nothing about the e-m
     expect(await h.service.unlock("nobody@nivel.uz", "cli")).toEqual({ ok: false, reason: "not_found" });
   });
 });
+
+// Second adversarial round: what one address can do with requests that name e-mails it does not own.
+describe("one address cannot flood the journal, evict its own counters or wear down the account", () => {
+  let h: Harness;
+  beforeEach(async () => {
+    h = await setup();
+  });
+
+  const rows = (action: string) => h.store.audit.filter((a) => a.action === action).length;
+  const unknownRows = () =>
+    h.store.audit.filter((a) => (a.after as { reason?: string } | undefined)?.reason === "unknown_email").length;
+
+  it("limits the requests of one address over all e-mails: few checks of a password, few rows in the journal", async () => {
+    const before = h.verifyCount();
+    const auditBefore = h.store.audit.length;
+    const answers = new Set<string>();
+    for (let i = 0; i < 3000; i += 1) {
+      answers.add(JSON.stringify(await signIn(h, { email: `nobody-${i}@nivel.uz`, password: WRONG, ipHash: "flood" })));
+    }
+    expect(answers).toEqual(new Set([JSON.stringify(INVALID), JSON.stringify(THROTTLED)]));
+    expect(h.verifyCount() - before).toBeLessThanOrEqual(AUTH_POLICY.addressCeilingFailures);
+    expect(h.store.audit.length - auditBefore).toBeLessThanOrEqual(10);
+  });
+
+  it("writes at most one row a minute per address for unknown e-mails, and again when the minute has passed", async () => {
+    for (let i = 0; i < 10; i += 1) {
+      await signIn(h, { email: `nobody-${i}@nivel.uz`, password: WRONG, ipHash: "flood" });
+    }
+    expect(unknownRows()).toBe(1);
+    h.clock.advance(MS_PER_MINUTE + 1);
+    await signIn(h, { email: "nobody-x@nivel.uz", password: WRONG, ipHash: "flood" });
+    expect(unknownRows()).toBe(2);
+  });
+
+  it("opens the address again after the window, and another address was never closed", async () => {
+    for (let i = 0; i < AUTH_POLICY.addressCeilingFailures + 5; i += 1) {
+      await signIn(h, { email: `nobody-${i}@nivel.uz`, password: WRONG, ipHash: "flood" });
+    }
+    expect(await signIn(h, { email: "other@nivel.uz", password: WRONG, ipHash: "flood" })).toEqual(THROTTLED);
+    expect((await signIn(h, { ipHash: "owner-home" })).ok).toBe(true);
+    h.clock.advance(AUTH_POLICY.lockMinutes * MS_PER_MINUTE + 1);
+    expect(await signIn(h, { email: "other@nivel.uz", password: WRONG, ipHash: "flood" })).toEqual(INVALID);
+  });
+
+  it("does not count the requests that the source limit refuses", async () => {
+    for (let i = 0; i < 5; i += 1) await signIn(h, { password: WRONG, ipHash: "stranger" });
+    for (let i = 0; i < 100; i += 1) await signIn(h, { password: WRONG, ipHash: "stranger" });
+    // Only the five checked attempts stand against the address: fifteen more e-mails are still answered, not refused.
+    for (let i = 0; i < AUTH_POLICY.addressCeilingFailures - 6; i += 1) {
+      expect(await signIn(h, { email: `x-${i}@nivel.uz`, password: WRONG, ipHash: "stranger" })).toEqual(INVALID);
+    }
+  });
+
+  it("gives back the attempt of a good sign-in: many sessions of one office are not a flood", async () => {
+    for (let i = 0; i < AUTH_POLICY.addressCeilingFailures * 2; i += 1) {
+      expect((await signIn(h, { ipHash: "office" })).ok).toBe(true);
+      h.clock.advance(31_000); // a code of the app is not used twice
+    }
+  });
+
+  it("the flood of unknown e-mails cannot push the counters of the owner's e-mail out of memory", async () => {
+    for (let i = 0; i < 4; i += 1) expect(await signIn(h, { password: WRONG, ipHash: "stranger" })).toEqual(INVALID);
+    for (let i = 0; i < 12_000; i += 1) {
+      await signIn(h, { email: `nobody-${i}@nivel.uz`, password: WRONG, ipHash: "stranger" });
+    }
+    for (let i = 0; i < 6; i += 1) {
+      expect(await signIn(h, { password: WRONG, ipHash: "stranger" })).toEqual(THROTTLED);
+    }
+    expect(h.store.accounts.get(h.user.id)?.failedLogins).toBe(4);
+  });
+
+  it("journals the refusals of a locked account at most once a minute per account, whatever the sources", async () => {
+    for (let i = 0; i < AUTH_POLICY.accountCeilingFailures; i += 1) {
+      await signIn(h, { password: WRONG, ipHash: `s-${i}` });
+    }
+    const before = rows("auth.login_blocked");
+    for (let i = 0; i < 300; i += 1) await signIn(h, { ipHash: `late-${i}` });
+    expect(rows("auth.login_blocked") - before).toBe(1);
+    h.clock.advance(MS_PER_MINUTE + 1);
+    await signIn(h, { ipHash: "late-again" });
+    expect(rows("auth.login_blocked") - before).toBe(2);
+  });
+
+  it("one address cannot reach the ceiling of the account over the hours, lock the owner out or end his sessions", async () => {
+    const session = await signIn(h, { ipHash: "owner-home" });
+    if (!session.ok) throw new Error("expected success");
+    for (let cycle = 0; cycle < 8; cycle += 1) {
+      for (let i = 0; i < 5; i += 1) await signIn(h, { password: WRONG, ipHash: "stranger" });
+      expect(h.store.accounts.get(h.user.id)?.lockedUntil).toBeNull();
+      expect(await h.service.authenticate(session.token)).not.toBeNull();
+      h.clock.advance(AUTH_POLICY.lockMinutes * MS_PER_MINUTE + 1);
+    }
+    expect(h.store.audit.map((a) => a.action)).not.toContain("auth.locked");
+  });
+
+  it("the typos of the owner over days do not add up to a lock", async () => {
+    for (let day = 0; day < 10; day += 1) {
+      for (let i = 0; i < 3; i += 1)
+        expect(await signIn(h, { password: WRONG, ipHash: "owner-home" })).toEqual(INVALID);
+      h.clock.advance(24 * 60 * MS_PER_MINUTE);
+    }
+    expect(h.store.audit.map((a) => a.action)).not.toContain("auth.locked");
+    expect(h.store.accounts.get(h.user.id)?.lockedUntil).toBeNull();
+    expect((await signIn(h, { ipHash: "owner-home" })).ok).toBe(true);
+  });
+
+  it("still locks the account when several addresses together reach the ceiling inside one window", async () => {
+    for (let i = 0; i < AUTH_POLICY.accountCeilingFailures; i += 1) {
+      await signIn(h, { password: WRONG, ipHash: `s-${i}` });
+      h.clock.advance(10_000);
+    }
+    expect(h.store.accounts.get(h.user.id)?.lockedUntil).not.toBeNull();
+  });
+});

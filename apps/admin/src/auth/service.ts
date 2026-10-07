@@ -1,7 +1,7 @@
 // Sign-in, sessions and the own account (ARCHITECTURE 6.1, 10.1 A07). Pure logic over ports: storage, password hasher,
 // clock. Messages for people are Russian; the reasons returned to the screens are codes.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { AttemptLimiter } from "./attempts.ts";
+import { AttemptLimiter, JournalGate } from "./attempts.ts";
 import { checkPasswordPolicy, type PasswordHasher, randomPassword } from "./password.ts";
 import { AUTH_POLICY, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from "./policy.ts";
 import type { Role } from "./roles.ts";
@@ -128,6 +128,15 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   // `claimAttempt`), and an e-mail without an active account has a ceiling of its own so that it answers the same way.
   const sources = new AttemptLimiter({ lockAfter: AUTH_POLICY.lockAfterFailures, windowMs });
   const absentAccounts = new AttemptLimiter({ lockAfter: AUTH_POLICY.accountCeilingFailures, windowMs });
+  // One address over all e-mails: the checks of a password it causes are limited whatever e-mails it names, so a flood
+  // of unknown e-mails (each with a source of its own) stops before the check and before the journal.
+  const addresses = new AttemptLimiter({ lockAfter: AUTH_POLICY.addressCeilingFailures, windowMs });
+  // The failures that nobody owns (an e-mail without an account, an account that is locked) are journaled at most once
+  // a minute per address or account: the journal only grows.
+  const journalGate = new JournalGate();
+  // When the series of failures of an account began (the database keeps the count, not its age): a series ends after
+  // the window, so the failures of one address over days do not add up to the ceiling and the typos of the owner do not either.
+  const accountSeries = new Map<string, number>();
   // The sensitive changes inside a session count apart from the sign-ins: a stranger's failures do not stand next to
   // the owner's typos, and the typos do not close the sign-in.
   const sessionChecks = new AttemptLimiter({ lockAfter: AUTH_POLICY.lockAfterFailures, windowMs }, 1_000);
@@ -188,6 +197,19 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     if (!state.lockedUntil || state.lockedUntil <= at) return null;
     await journalLock(account, state.lockedUntil, ipHash, scope);
     return state.lockedUntil;
+  }
+
+  /**
+   * A series of failures of the account ends after the window from its first one: the count in the database starts
+   * again (only when nobody counted since it was read). A lock that has run out is restarted by `claimAttempt`.
+   */
+  async function expireAccountSeries(account: AdminAccount, at: Date): Promise<void> {
+    if (account.failedLogins === 0 || account.lockedUntil) return;
+    const started = accountSeries.get(account.id) ?? at.getTime();
+    accountSeries.set(account.id, started);
+    if (at.getTime() - started < windowMs) return;
+    await store.resetFailures(account.id, { failedLogins: account.failedLogins, locked: false });
+    accountSeries.delete(account.id);
   }
 
   /**
@@ -328,8 +350,35 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       // is the same for an e-mail that exists and one that does not), then the account over all sources.
       const at = now();
       const emailKey = sha256(email).slice(0, 32);
-      const source = sources.claim(`${emailKey}|${input.ipHash ?? "-"}`, at);
+      const addressKey = input.ipHash ?? "-";
+      const address = addresses.claim(addressKey, at);
+      if (!address.claimed) {
+        if (address.journal) {
+          await audit({
+            actor: "anonymous",
+            action: "auth.login_blocked",
+            entity: "ops.admin_users",
+            entityId: null,
+            after: { reason: "address", until: address.lockedUntil.toISOString() },
+            ipHash: input.ipHash,
+          });
+        }
+        return THROTTLED;
+      }
+      if (address.lockedUntil) {
+        await audit({
+          actor: "anonymous",
+          action: "auth.login_throttled",
+          entity: "ops.admin_users",
+          entityId: null,
+          after: { until: address.lockedUntil.toISOString(), scope: "address" },
+          ipHash: input.ipHash,
+        });
+      }
+      const source = sources.claim(`${emailKey}|${addressKey}`, at);
       if (!source.claimed) {
+        // Refused here without a check of a password: it does not stand against the address.
+        addresses.release(address);
         if (source.journal) {
           await audit({
             actor: "anonymous",
@@ -361,31 +410,37 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         // No account to sign in to: the same count, the same wait and the same words as for one that exists.
         const ghost = absentAccounts.claim(emailKey, at);
         await hasher.verify(await dummyHash(), input.password);
-        await audit({
-          actor: account ? actorOf(account) : "anonymous",
-          action: "auth.login_failed",
-          entity: "ops.admin_users",
-          entityId: account?.id ?? null,
-          after: account ? { reason: "inactive" } : { reason: "unknown_email", emailHash: emailKey.slice(0, 16) },
-          ipHash: input.ipHash,
-        });
+        if (journalGate.allow(account ? `inactive|${account.id}` : `unknown|${addressKey}`, at)) {
+          await audit({
+            actor: account ? actorOf(account) : "anonymous",
+            action: "auth.login_failed",
+            entity: "ops.admin_users",
+            entityId: account?.id ?? null,
+            after: account ? { reason: "inactive" } : { reason: "unknown_email", emailHash: emailKey.slice(0, 16) },
+            ipHash: input.ipHash,
+          });
+        }
         await journalSource(account, account?.id ?? null);
         return answerFor(!ghost.claimed || ghost.lockedUntil !== null);
       }
 
+      await expireAccountSeries(account, at);
       const claim = await store.claimAttempt(account.id, ceilingRule, at);
       if (!claim.claimed) {
         await hasher.verify(await dummyHash(), input.password);
-        await audit({
-          actor: actorOf(account),
-          action: "auth.login_blocked",
-          entity: "ops.admin_users",
-          entityId: account.id,
-          after: { reason: "account", until: claim.lockedUntil?.toISOString() ?? null },
-          ipHash: input.ipHash,
-        });
+        if (journalGate.allow(`blocked|${account.id}`, at)) {
+          await audit({
+            actor: actorOf(account),
+            action: "auth.login_blocked",
+            entity: "ops.admin_users",
+            entityId: account.id,
+            after: { reason: "account", until: claim.lockedUntil?.toISOString() ?? null },
+            ipHash: input.ipHash,
+          });
+        }
         return THROTTLED;
       }
+      if (claim.failedLogins === 1) accountSeries.set(account.id, at.getTime());
       const fail = async (reason: string): Promise<LoginResult> => {
         const lockedUntil = await journalFailure(account, "auth.login_failed", reason, input.ipHash, claim, "account");
         // The account is locked over all sources: sessions that are left end with it (a lock does not depend on the way it came).
@@ -399,6 +454,8 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
 
       await store.resetFailures(account.id, { failedLogins: claim.failedLogins, locked: claim.lockedUntil !== null });
       sources.reset(source);
+      addresses.release(address);
+      accountSeries.delete(account.id);
       const token = randomBytes(32).toString("base64url");
       const expiresAt = new Date(at.getTime() + limits.idleMs);
       await store.createSession({
@@ -569,6 +626,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       const account = await store.findByEmail(normalizeEmail(email));
       if (!account) return { ok: false, reason: "not_found" };
       await store.resetFailures(account.id);
+      accountSeries.delete(account.id);
       await audit({ actor, action: "auth.unlocked", entity: "ops.admin_users", entityId: account.id });
       return { ok: true };
     },
