@@ -191,6 +191,9 @@ export function startBg(config: SiteConfig, win: Win = window): () => void {
   const lv = find<HTMLElement>(doc, "[data-ord-lv]");
   const rcsSumRoot = find<HTMLElement>(doc, "[data-rcs-sum]");
   if (!ob || !scene || !shadeWin || !ord || !ordS || !ordSt || !lv || !rcsSumRoot) return () => {};
+  const rcsS = rcsSumRoot.querySelector<HTMLElement>(".s");
+  const rcsRet = rcsSumRoot.querySelector<HTMLElement>(".ret");
+  if (!rcsS || !rcsRet) return () => {};
 
   const reduced = doc.documentElement.classList.contains("is-reduced");
   const nav = win.navigator as Navigator & NavigatorExtras;
@@ -222,8 +225,8 @@ export function startBg(config: SiteConfig, win: Win = window): () => void {
     receipts: findAll<HTMLElement>(doc, "[data-rcs] .rc"),
     rcsSum: {
       root: rcsSumRoot,
-      s: rcsSumRoot.querySelector<HTMLElement>(".s") as HTMLElement,
-      ret: rcsSumRoot.querySelector<HTMLElement>(".ret") as HTMLElement,
+      s: rcsS,
+      ret: rcsRet,
     },
     asm: findAll<HTMLElement>(doc, "[data-asm] li"),
     labels: {

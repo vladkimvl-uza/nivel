@@ -1,6 +1,7 @@
 "use client";
 
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
+import { FailSafe } from "../../../../src/i18n/site/client/fail-safe.ts";
 
 // The intro of the logo, «Fit to tolerance» (R-17), is loaded only when the finale comes near the window. `LogoIntro` itself
 // loads the 3D core with import() after the browser is idle and does nothing under reduced motion; here not even its own
@@ -31,9 +32,11 @@ export function FinaleSeat({ fallback, label }: { fallback: ReactNode; label: st
   return (
     <div ref={box} className="fin-seat">
       {armed ? (
-        <Suspense fallback={fallback}>
-          <Intro mode="hero" label={label} />
-        </Suspense>
+        <FailSafe fallback={fallback}>
+          <Suspense fallback={fallback}>
+            <Intro mode="hero" label={label} />
+          </Suspense>
+        </FailSafe>
       ) : (
         fallback
       )}

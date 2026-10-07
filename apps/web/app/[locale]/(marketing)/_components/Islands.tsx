@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { SiteConfig } from "../../../../src/i18n/site/client/config.ts";
+import { fallBackToStatic } from "../../../../src/i18n/site/client/fallback.ts";
 
 /**
  * Starts the scripts of the page after it has loaded and the browser is idle (BUILD_PLAN WP-16: the scripts of the scroll and of
@@ -13,9 +14,13 @@ export function Islands({ config }: { config: SiteConfig }) {
     let cancelled = false;
     let stop: (() => void) | undefined;
     const start = () => {
-      void import("../../../../src/i18n/site/client/boot.ts").then((m) => {
-        if (!cancelled) stop = m.boot(config);
-      });
+      // A chunk that does not come (network, a release that replaced it) must not leave the page half switched on: the
+      // blocks hidden for the reveal would stay hidden. The page goes back to its static view.
+      void import("../../../../src/i18n/site/client/boot.ts")
+        .then((m) => {
+          if (!cancelled) stop = m.boot(config);
+        })
+        .catch((error: unknown) => fallBackToStatic(window, "boot", error));
     };
     const idle = () => {
       const ric = window.requestIdleCallback;

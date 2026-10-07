@@ -375,6 +375,7 @@ export class FakeWindow {
     src = "";
     decoding = "";
   };
+  AbortController = globalThis.AbortController;
   ResizeObserver = FakeObserver;
   IntersectionObserver = FakeObserver;
   URL = {
@@ -382,7 +383,7 @@ export class FakeWindow {
     revokeObjectURL: (u: string) => void this.revoked.push(u),
   };
   performance = { now: () => this.now };
-  fetch = async (url: string) => {
+  fetch = async (url: string, _init?: unknown) => {
     this.fetches.push(url);
     return { ok: true, blob: async () => ({ size: 1 }) };
   };
@@ -457,6 +458,9 @@ export class FakeWindow {
   }
   pendingTimers() {
     return this.timers.length;
+  }
+  pendingFrames() {
+    return this.frames.length;
   }
 }
 

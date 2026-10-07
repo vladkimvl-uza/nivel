@@ -5,6 +5,7 @@
 import { startChrome } from "./chrome.ts";
 import type { SiteConfig } from "./config.ts";
 import type { Win } from "./dom.ts";
+import { fallBackToStatic } from "./fallback.ts";
 
 /** How many screens of scroll before the end of the first screen the background is loaded. */
 const NEAR_SCREENS = 2;
@@ -13,7 +14,12 @@ const LATE_MS = 5000;
 
 export function boot(config: SiteConfig, win: Win = window): () => void {
   const doc = win.document;
-  const stops: (() => void)[] = [startChrome(win)];
+  const stops: (() => void)[] = [];
+  try {
+    stops.push(startChrome(win));
+  } catch (error) {
+    fallBackToStatic(win, "chrome", error);
+  }
   let stopped = false;
   const keep = (stop: () => void) => {
     if (stopped) stop();
@@ -21,7 +27,9 @@ export function boot(config: SiteConfig, win: Win = window): () => void {
   };
 
   if (!doc.documentElement.classList.contains("is-reduced")) {
-    void import("./hero.ts").then((m) => keep(m.startHero(config, win)));
+    void import("./hero.ts")
+      .then((m) => keep(m.startHero(config, win)))
+      .catch((error: unknown) => fallBackToStatic(win, "hero", error));
   }
 
   let bgStarted = false;
@@ -33,7 +41,9 @@ export function boot(config: SiteConfig, win: Win = window): () => void {
     if (bgStarted) return;
     bgStarted = true;
     win.removeEventListener("scroll", near);
-    void import("./bg.ts").then((m) => keep(m.startBg(config, win)));
+    void import("./bg.ts")
+      .then((m) => keep(m.startBg(config, win)))
+      .catch((error: unknown) => fallBackToStatic(win, "bg", error));
   };
   win.addEventListener("scroll", near, { passive: true });
   const late = win.setTimeout(startBackground, LATE_MS);

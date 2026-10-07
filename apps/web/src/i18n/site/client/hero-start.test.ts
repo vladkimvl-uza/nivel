@@ -41,6 +41,17 @@ describe("startHero: pages that stay static", () => {
     expect(() => stop()).not.toThrow();
   });
 
+  it("does nothing when a step of the ruler has lost its fill", () => {
+    FakeObserver.all = [];
+    const win = new FakeWindow();
+    const page = heroPage(win);
+    win.document.querySelector("[data-step-i] b")?.remove();
+    const stop = startHero(testConfig(), win as unknown as Win);
+    expect(win.listenerCount("scroll")).toBe(0);
+    expect(page.caps[0]?.classList.contains("is-on")).toBe(false);
+    expect(() => stop()).not.toThrow();
+  });
+
   it("does nothing on a page served static (is-reduced)", () => {
     const { win, page } = setup({ reducedClass: true });
     expect(win.listenerCount("scroll")).toBe(0);
@@ -266,6 +277,70 @@ describe("startHero: the clip", () => {
     win.tick();
     await flush();
     expect(v.getAttribute("src")).toBeTruthy();
+  });
+
+  it("asks for the clip once while the first file is still coming (a phone scrolling during the download)", async () => {
+    const { win, page } = setup({ coarse: true, width: 400 });
+    const answers: (() => void)[] = [];
+    win.fetch = (url: string) => {
+      win.fetches.push(url);
+      return new Promise((resolve) => {
+        answers.push(() => resolve({ ok: true, blob: async () => ({ size: 1 }) } as unknown as Response));
+      });
+    };
+    win.dispatch("scroll");
+    for (const share of [0.05, 0.1, 0.2, 0.3, 0.4]) scrollHeroTo(win, page, share);
+    await flush();
+    expect(win.fetches).toHaveLength(1);
+    for (const answer of answers) answer();
+    await flush();
+    const v = video(page) as FakeVideo;
+    expect(v.getAttribute("src")).toMatch(/^blob:/);
+    expect(v.loads).toBe(1);
+    expect(win.revoked).toHaveLength(0);
+  });
+
+  it("ignores the answer of a download that the phone gave up (the clip was dropped meanwhile)", async () => {
+    const { win, page } = setup({ coarse: true, width: 400 });
+    const answers: (() => void)[] = [];
+    const signals: AbortSignal[] = [];
+    win.fetch = (url: string, init?: unknown) => {
+      win.fetches.push(url);
+      signals.push((init as { signal: AbortSignal }).signal);
+      return new Promise((resolve) => {
+        answers.push(() => resolve({ ok: true, blob: async () => ({ size: 1 }) } as unknown as Response));
+      });
+    };
+    win.dispatch("scroll");
+    await flush();
+    page.track.rect = { ...page.track.rect, top: -9000, bottom: -3800 };
+    win.dispatch("scroll");
+    win.tick();
+    for (const answer of answers) answer();
+    await flush();
+    const v = video(page) as FakeVideo;
+    expect(v.getAttribute("src")).toBeNull();
+    expect(signals[0]?.aborted).toBe(true);
+    expect(v.loads).toBe(1);
+  });
+
+  it("stops the frame loop when the phone drops the clip in the middle of a seek", async () => {
+    const { win, page } = setup({ coarse: true, width: 400 });
+    win.dispatch("scroll");
+    await flush();
+    const v = video(page) as FakeVideo;
+    v.duration = 8;
+    v.dispatch("loadedmetadata");
+    scrollHeroTo(win, page, 0.5);
+    win.tick(3);
+    expect(v.seeks.length).toBeGreaterThan(0);
+    // the seek is on its way (no `seeked` yet) when the visitor jumps to the form at the end of the page
+    page.track.rect = { ...page.track.rect, top: -9000, bottom: -3800 };
+    win.dispatch("scroll");
+    win.tick();
+    expect(v.getAttribute("src")).toBeNull();
+    win.tick(3);
+    expect(win.pendingFrames()).toBe(0);
   });
 
   it("changes the clip for the new size after a resize", async () => {

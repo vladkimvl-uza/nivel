@@ -4,23 +4,32 @@ import type { Win } from "./dom.ts";
 import { el, FakeWindow, type FakeWindowOptions } from "./test-support/fake-dom.ts";
 import { testConfig } from "./test-support/pages.ts";
 
-const calls = vi.hoisted(() => ({ chrome: 0, hero: 0, bg: 0, stops: [] as string[] }));
+const calls = vi.hoisted(() => ({
+  chrome: 0,
+  hero: 0,
+  bg: 0,
+  stops: [] as string[],
+  fail: { chrome: false, hero: false, bg: false },
+}));
 
 vi.mock("./chrome.ts", () => ({
   startChrome: () => {
     calls.chrome += 1;
+    if (calls.fail.chrome) throw new Error("chrome failed");
     return () => calls.stops.push("chrome");
   },
 }));
 vi.mock("./hero.ts", () => ({
   startHero: () => {
     calls.hero += 1;
+    if (calls.fail.hero) throw new Error("hero failed");
     return () => calls.stops.push("hero");
   },
 }));
 vi.mock("./bg.ts", () => ({
   startBg: () => {
     calls.bg += 1;
+    if (calls.fail.bg) throw new Error("bg failed");
     return () => calls.stops.push("bg");
   },
 }));
@@ -42,6 +51,7 @@ function setup(o: FakeWindowOptions & { reducedClass?: boolean; trackBottom?: nu
 beforeEach(() => {
   calls.chrome = calls.hero = calls.bg = 0;
   calls.stops = [];
+  calls.fail = { chrome: false, hero: false, bg: false };
 });
 afterEach(() => vi.clearAllMocks());
 
@@ -123,5 +133,45 @@ describe("boot", () => {
     stop();
     await flush();
     expect(calls.stops.sort()).toEqual(["bg", "chrome", "hero"]);
+  });
+});
+
+describe("boot: a script that fails leaves the page whole", () => {
+  const is = (win: FakeWindow) => win.document.documentElement.classList.contains("is-reduced");
+
+  it("serves the page static when the first screen fails to start", async () => {
+    calls.fail.hero = true;
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { win } = setup();
+    await flush();
+    expect(is(win)).toBe(true);
+    expect(log).toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain("hero failed");
+    log.mockRestore();
+  });
+
+  it("serves the page static when the background fails to start", async () => {
+    calls.fail.bg = true;
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { win } = setup({ trackBottom: 100 });
+    await flush();
+    expect(is(win)).toBe(true);
+    log.mockRestore();
+  });
+
+  it("serves the page static and still returns a stop when the small things fail", async () => {
+    calls.fail.chrome = true;
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { win, stop } = setup();
+    expect(is(win)).toBe(true);
+    expect(() => stop()).not.toThrow();
+    await flush();
+    log.mockRestore();
+  });
+
+  it("does not touch the page when everything starts", async () => {
+    const { win } = setup();
+    await flush();
+    expect(is(win)).toBe(false);
   });
 });

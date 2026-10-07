@@ -12,12 +12,13 @@ interface Setup {
   stop: () => void;
 }
 
-function setup(o: FakeWindowOptions & { reducedClass?: boolean; skipPage?: boolean } = {}): Setup {
+function setup(o: FakeWindowOptions & { reducedClass?: boolean; skipPage?: boolean; dropSum?: string } = {}): Setup {
   FakeObserver.all = [];
   const win = new FakeWindow({ deviceMemory: 8, ...o });
   const page = bgPage(win);
   if (o.reducedClass) win.document.documentElement.classList.add("is-reduced");
   if (o.skipPage) page.ob.remove();
+  if (o.dropSum) win.document.querySelector(`[data-rcs-sum] ${o.dropSum}`)?.remove();
   const stop = startBg(testConfig({ reduced: o.reducedClass === true }), win as unknown as Win);
   win.tick(2);
   return { win, page, stop };
@@ -44,6 +45,15 @@ describe("startBg: missing page", () => {
     expect(win.listenerCount("scroll")).toBe(0);
     expect(() => stop()).not.toThrow();
   });
+
+  it.each([".s", ".ret"])(
+    "stays off when the sum of the receipts has no %s node (no crash in the frame loop)",
+    (node) => {
+      const { win, stop } = setup({ dropSum: node });
+      expect(win.listenerCount("scroll")).toBe(0);
+      expect(() => stop()).not.toThrow();
+    },
+  );
 });
 
 describe("startBg: the scroll", () => {

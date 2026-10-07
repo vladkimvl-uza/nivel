@@ -127,10 +127,13 @@ export function startHero(config: SiteConfig, win: Win = window): () => void {
   let mode: "video" | "posters" = heroMode(verdict) === "video" ? "video" : "posters";
   if (heroMode(verdict) === "reduced") return () => {};
 
+  const stepItems = all<HTMLElement>(root, "[data-steps] [data-step-i]");
+  const fills = stepItems.map((li) => li.querySelector<HTMLElement>("b"));
+  if (fills.some((b) => !b)) return () => {};
   const els: HeroApplyEls = {
     caps: all<HTMLElement>(root, "[data-cap]"),
-    steps: all<HTMLElement>(root, "[data-steps] [data-step-i]"),
-    fills: all<HTMLElement>(root, "[data-steps] [data-step-i]").map((li) => li.querySelector("b") as HTMLElement),
+    steps: stepItems,
+    fills: fills.filter((b): b is HTMLElement => b !== null),
     stepsNow,
     hdoc: root.querySelector<HTMLElement>("[data-hdoc]"),
     off,
@@ -167,25 +170,39 @@ export function startHero(config: SiteConfig, win: Win = window): () => void {
   let progress = 0;
   let magnetTimer = 0;
 
-  const loadClip = () => {
+  // The state of the file: a download that is on its way is not "no clip". Without it every frame of a phone's scroll asked for
+  // the file again; a download that was given up (dropped, resized) must not set its file on the video when it ends.
+  let clip: "idle" | "loading" | "ready" = "idle";
+  let clipToken = 0;
+  let clipAbort: AbortController | null = null;
+
+  const loadClip = (restart = false) => {
     if (!video || !scrubber) return;
+    if (clip === "loading" && !restart) return;
+    clipAbort?.abort();
+    clipAbort = null;
+    const token = ++clipToken;
     const url = config.hero.video[currentSize];
     video.classList.remove("is-ready");
     scrubber.reset();
+    clip = "loading";
     const set = (src: string) => {
-      if (video) {
-        video.src = src;
-        video.load();
-      }
+      if (token !== clipToken || !video) return;
+      clip = "ready";
+      video.src = src;
+      video.load();
     };
     if (!win.fetch || !win.URL) return set(url);
+    const abort = typeof win.AbortController === "function" ? new win.AbortController() : null;
+    clipAbort = abort;
     win
-      .fetch(url)
+      .fetch(url, abort ? { signal: abort.signal } : undefined)
       .then((r) => {
         if (!r.ok) throw new Error("no clip");
         return r.blob();
       })
       .then((blob) => {
+        if (token !== clipToken) return;
         if (blobUrl) win.URL.revokeObjectURL(blobUrl);
         const next = win.URL.createObjectURL(blob);
         blobUrl = next;
@@ -195,7 +212,14 @@ export function startHero(config: SiteConfig, win: Win = window): () => void {
   };
 
   const dropClip = () => {
+    clipToken += 1;
+    clipAbort?.abort();
+    clipAbort = null;
+    clip = "idle";
+    // a seek that was on its way will never say `seeked`: the scrubber must not wait for it
+    scrubber?.reset();
     if (!video) return;
+    video.classList.remove("is-ready");
     video.removeAttribute("src");
     video.load();
     if (blobUrl) win.URL.revokeObjectURL(blobUrl);
@@ -267,8 +291,8 @@ export function startHero(config: SiteConfig, win: Win = window): () => void {
     // a phone lets the clip go when the first screen is far above, and takes it back on the way up
     if (coarse() && video) {
       const far = track.getBoundingClientRect().bottom < -win.innerHeight;
-      if (far && video.getAttribute("src")) dropClip();
-      else if (!far && !video.getAttribute("src")) loadClip();
+      if (far && clip !== "idle") dropClip();
+      else if (!far && clip === "idle") loadClip();
     }
   };
   let queued = 0;
@@ -286,7 +310,7 @@ export function startHero(config: SiteConfig, win: Win = window): () => void {
     currentSize = next;
     for (const [i, img] of posters.entries()) if (i > 0) img.removeAttribute("src");
     showPoster(lastStep);
-    if (video) loadClip();
+    if (video && clip !== "idle") loadClip(true);
   };
   win.addEventListener("resize", onResize);
   update();
