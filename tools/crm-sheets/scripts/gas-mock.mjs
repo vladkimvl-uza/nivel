@@ -1042,6 +1042,8 @@ class Spreadsheet {
     this.locale = "en_US";
     this.themeColors = {};
     this.themeFont = null;
+    this.filterViews = [];
+    this.nextFilterViewId = 1000;
     this.activeSheet = null;
     this.toasts = [];
     this.id = "mock-spreadsheet-id";
@@ -1127,6 +1129,8 @@ class Spreadsheet {
     this.toasts.push({ msg, title, sec });
   }
   getSpreadsheetTheme() {
+    // The reference: "SpreadsheetTheme|null: the current theme, or null if no theme is applied"
+    if (this.env.noTheme) return null;
     const self = this;
     const types = new Set([
       "TEXT",
@@ -1220,6 +1224,10 @@ class Env {
     this.sidebars = [];
     this.menus = [];
     this.dialogs = [];
+    // Switches of the tests: the Sheets service answers with an error; getSpreadsheetTheme() returns null
+    this.sheetsFail = false;
+    this.noTheme = false;
+    this.deprecatedFields = [];
     this.webAppUrl = "https://script.google.com/macros/s/MOCK/exec";
   }
 }
@@ -1248,6 +1256,165 @@ function formatDate(date, tz, pattern) {
   };
   // Literal text in single quotes is kept as it is.
   return pattern.replace(/'([^']*)'|yyyy|MM|dd|HH|mm|ss|SSS|XXX|u/g, (m, lit) => (lit !== undefined ? lit : map[m]));
+}
+
+/**
+ * The advanced service "Sheets" (v4), as far as the CRM uses it: Spreadsheets.get and batchUpdate with filter views.
+ * It refuses what the reference of the Sheets API refuses: a condition type that filters do not support (ONE_OF_LIST is
+ * "supported by data validation" only), a wrong number of values, an unknown request, a missing sheet. A batch is all or
+ * nothing. The deprecated field FilterView.criteria is accepted (it still works) but recorded in env.deprecatedFields.
+ */
+const FILTER_CONDITIONS = {
+  NUMBER_GREATER: 1,
+  NUMBER_GREATER_THAN_EQ: 1,
+  NUMBER_LESS: 1,
+  NUMBER_LESS_THAN_EQ: 1,
+  NUMBER_EQ: 1,
+  NUMBER_NOT_EQ: 1,
+  NUMBER_BETWEEN: 2,
+  NUMBER_NOT_BETWEEN: 2,
+  TEXT_CONTAINS: 1,
+  TEXT_NOT_CONTAINS: 1,
+  TEXT_STARTS_WITH: 1,
+  TEXT_ENDS_WITH: 1,
+  TEXT_EQ: 1,
+  TEXT_NOT_EQ: 1,
+  DATE_EQ: 1,
+  DATE_BEFORE: 1,
+  DATE_AFTER: 1,
+  DATE_ON_OR_BEFORE: 1,
+  DATE_ON_OR_AFTER: 1,
+  DATE_BETWEEN: 2,
+  DATE_NOT_BETWEEN: 2,
+  DATE_NOT_EQ: 1,
+  DATE_IS_VALID: 0,
+  BLANK: 0,
+  NOT_BLANK: 0,
+  CUSTOM_FORMULA: 1,
+};
+const RELATIVE_DATES = ["PAST_YEAR", "PAST_MONTH", "PAST_WEEK", "YESTERDAY", "TODAY", "TOMORROW"];
+
+function sheetsError(path, text) {
+  return new Error(
+    `GoogleJsonResponseException: API call to sheets.spreadsheets.batchUpdate failed with error: Invalid requests${path}: ${text}`,
+  );
+}
+
+function checkFilterCondition(path, cond) {
+  if (!cond || typeof cond !== "object") throw sheetsError(path, "condition is missing");
+  if (!(cond.type in FILTER_CONDITIONS))
+    throw sheetsError(
+      path + ".type",
+      `condition type ${JSON.stringify(cond.type)} is not supported by filters (data validation only, or unknown)`,
+    );
+  const values = cond.values || [];
+  if (!Array.isArray(values) || values.length !== FILTER_CONDITIONS[cond.type])
+    throw sheetsError(
+      path + ".values",
+      `${cond.type} needs ${FILTER_CONDITIONS[cond.type]} value(s), got ${values.length}`,
+    );
+  values.forEach((v, i) => {
+    const kinds = ["userEnteredValue", "relativeDate"].filter((k) => v && v[k] !== undefined);
+    if (kinds.length !== 1) throw sheetsError(`${path}.values[${i}]`, "exactly one of userEnteredValue or relativeDate");
+    if (kinds[0] === "userEnteredValue" && typeof v.userEnteredValue !== "string")
+      throw sheetsError(`${path}.values[${i}].userEnteredValue`, "must be a string");
+    if (kinds[0] === "relativeDate") {
+      if (!RELATIVE_DATES.includes(v.relativeDate))
+        throw sheetsError(`${path}.values[${i}].relativeDate`, `unknown ${v.relativeDate}`);
+      if (!cond.type.startsWith("DATE_"))
+        throw sheetsError(`${path}.values[${i}]`, "relativeDate only for date conditions");
+    }
+  });
+}
+
+function checkFilterCriteria(path, crit) {
+  if (!crit || typeof crit !== "object") throw sheetsError(path, "filterCriteria is missing");
+  if (crit.hiddenValues !== undefined) {
+    if (!Array.isArray(crit.hiddenValues) || crit.hiddenValues.some((x) => typeof x !== "string"))
+      throw sheetsError(`${path}.hiddenValues`, "must be a list of strings");
+  }
+  if (crit.condition !== undefined) checkFilterCondition(`${path}.condition`, crit.condition);
+  if (crit.hiddenValues === undefined && crit.condition === undefined) throw sheetsError(path, "empty criteria");
+}
+
+function createSheetsService(env) {
+  const noMatch = (name) =>
+    new Error(`Exception: The parameters do not match the method signature for Sheets.Spreadsheets.${name}`);
+  return {
+    Spreadsheets: {
+      get(id, optionalArgs) {
+        if (env.sheetsFail) throw new Error("GoogleJsonResponseException: sheets.spreadsheets.get failed: Service unavailable");
+        if (typeof id !== "string") throw noMatch("get");
+        if (optionalArgs !== undefined && (optionalArgs === null || typeof optionalArgs !== "object")) throw noMatch("get");
+        if (id !== env.ss.id) throw new Error(`GoogleJsonResponseException: Requested entity was not found: ${id}`);
+        return {
+          spreadsheetId: id,
+          sheets: env.ss.sheets.map((sh) => ({
+            properties: { sheetId: sh.id, title: sh.name },
+            filterViews: env.ss.filterViews
+              .filter((v) => v.range.sheetId === sh.id)
+              .map((v) => ({ filterViewId: v.filterViewId, title: v.title })),
+          })),
+        };
+      },
+      batchUpdate(resource, id) {
+        if (env.sheetsFail)
+          throw new Error("GoogleJsonResponseException: sheets.spreadsheets.batchUpdate failed: Service unavailable");
+        if (!resource || !Array.isArray(resource.requests) || typeof id !== "string") throw noMatch("batchUpdate");
+        const work = env.ss.filterViews.map((v) => ({ ...v }));
+        let nextId = env.ss.nextFilterViewId;
+        const replies = [];
+        const deprecated = [];
+        resource.requests.forEach((req, i) => {
+          const keys = Object.keys(req);
+          const path = `[${i}]`;
+          if (keys.length !== 1) throw sheetsError(path, "a request has exactly one field");
+          const kind = keys[0];
+          if (kind === "deleteFilterView") {
+            const fid = req.deleteFilterView.filterId;
+            const at = work.findIndex((v) => v.filterViewId === fid);
+            if (at < 0) throw sheetsError(`${path}.deleteFilterView.filterId`, `no filter view ${fid}`);
+            work.splice(at, 1);
+            replies.push({});
+          } else if (kind === "addFilterView") {
+            const f = req.addFilterView.filter;
+            const p = `${path}.addFilterView.filter`;
+            if (!f || typeof f.title !== "string" || !f.title) throw sheetsError(`${p}.title`, "missing");
+            const r = f.range;
+            if (!r || !env.ss.sheets.some((sh) => sh.id === r.sheetId)) throw sheetsError(`${p}.range.sheetId`, "no such sheet");
+            for (const k of ["startRowIndex", "startColumnIndex", "endColumnIndex", "endRowIndex"]) {
+              if (r[k] !== undefined && (!Number.isInteger(r[k]) || r[k] < 0))
+                throw sheetsError(`${p}.range.${k}`, "must be a non-negative integer");
+            }
+            if (f.criteria !== undefined) {
+              deprecated.push("FilterView.criteria");
+              for (const [col, c] of Object.entries(f.criteria)) checkFilterCriteria(`${p}.criteria[${col}]`, c);
+            }
+            (f.filterSpecs || []).forEach((spec, j) => {
+              if (!Number.isInteger(spec.columnIndex) || spec.columnIndex < 0)
+                throw sheetsError(`${p}.filterSpecs[${j}].columnIndex`, "must be a non-negative integer");
+              checkFilterCriteria(`${p}.filterSpecs[${j}].filterCriteria`, spec.filterCriteria);
+            });
+            (f.sortSpecs || []).forEach((spec, j) => {
+              if (!Number.isInteger(spec.dimensionIndex) || spec.dimensionIndex < 0)
+                throw sheetsError(`${p}.sortSpecs[${j}].dimensionIndex`, "must be a non-negative integer");
+              if (!["ASCENDING", "DESCENDING"].includes(spec.sortOrder))
+                throw sheetsError(`${p}.sortSpecs[${j}].sortOrder`, `unknown ${spec.sortOrder}`);
+            });
+            const filterViewId = nextId++;
+            work.push({ ...f, filterViewId });
+            replies.push({ addFilterView: { filter: { ...f, filterViewId } } });
+          } else {
+            throw sheetsError(path, `request ${kind} is not imitated by the mock`);
+          }
+        });
+        env.ss.filterViews = work;
+        env.ss.nextFilterViewId = nextId;
+        env.deprecatedFields.push(...deprecated);
+        return { spreadsheetId: id, replies };
+      },
+    },
+  };
 }
 
 /** Builds the global objects of Apps Script around one environment. */
@@ -1686,6 +1853,7 @@ export function createGas(opts = {}) {
   return {
     env,
     globals: {
+      ...(opts.sheetsService === false ? {} : { Sheets: createSheetsService(env) }),
       SpreadsheetApp,
       Charts,
       PropertiesService,

@@ -11860,7 +11860,12 @@ function nvApplyBookTheme() {
   ss.setSpreadsheetLocale(NV_LOCALE);
   // Every 60 minutes: TODAY() and NOW() of the formulas ("Сегодня", the panel) are then never older than an hour
   ss.setRecalculationInterval(SpreadsheetApp.RecalculationInterval.HOUR);
+  // The reference: SpreadsheetTheme or null ("null if no theme is applied")
   const theme = ss.getSpreadsheetTheme();
+  if (!theme) {
+    Logger.log("Тема книги не применена: цвета темы пропущены");
+    return;
+  }
   try {
     theme.setFontFamily(NV_FONT_TEXT);
   } catch (e) {
@@ -11884,51 +11889,150 @@ function nvApplyFilter(sheetKey) {
   sh.getRange(NV_LAYOUT.headerRow, NV_LAYOUT.firstCol, rows, def.cols.length).createFilter();
 }
 
-/** Filter views through the advanced Sheets service, when it is enabled; the basic filter stays without it. */
+/**
+ * Notes of the setup: things that could not be done (the Sheets service is off or refused a request) and must not stop
+ * the setup or loop it. They are kept in the document properties and shown by the self-check.
+ */
+const NV_SETUP_NOTES_PROP = "NV_SETUP_NOTES";
+
+function nvSetupNotes() {
+  try {
+    return JSON.parse(nvDocProps().getProperty(NV_SETUP_NOTES_PROP) || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+/** Remembers (or, with an empty text, forgets) a note of the setup under a name. */
+function nvSetupNote(name, text) {
+  const notes = nvSetupNotes();
+  if (text) notes[name] = String(text).slice(0, 400);
+  else delete notes[name];
+  nvDocProps().setProperty(NV_SETUP_NOTES_PROP, JSON.stringify(notes));
+}
+
+/**
+ * The views of the filter, as data. keep: the values the view shows. One value is the condition TEXT_EQ; several values
+ * are the dictionary without them in hiddenValues (ONE_OF_LIST is a condition of data validation, filters refuse it);
+ * since: only the last week (DATE_AFTER with a relative date).
+ */
+const NV_FILTER_VIEWS = [
+  { sheet: "orders", title: "В работе", col: "group", keep: ["В работе", "Ждёт клиента"], dict: "NVD_STATUS_GROUP" },
+  { sheet: "orders", title: "Сроки", col: "nextDate", sort: "ASCENDING" },
+  {
+    sheet: "orders",
+    title: "Архив",
+    col: "code",
+    keep: ["closed", "cancelled", "podbor_delivered"],
+    dict: "NVD_STATUS_CODE",
+  },
+  { sheet: "history", title: "Принудительные", col: "how", keep: ["Принудительно"] },
+  { sheet: "history", title: "За неделю", col: "time", week: true, sort: "DESCENDING" },
+];
+
+/** The criteria of one view (FilterSpec.filterCriteria), or null when the view only sorts. */
+function nvFilterCriteria(v) {
+  if (v.week) return { condition: { type: "DATE_AFTER", values: [{ relativeDate: "PAST_WEEK" }] } };
+  if (!v.keep) return null;
+  if (v.keep.length === 1) return { condition: { type: "TEXT_EQ", values: [{ userEnteredValue: v.keep[0] }] } };
+  const hidden = [];
+  nvDictValues(v.dict).forEach((x) => {
+    const t = String(x);
+    if (v.keep.indexOf(t) < 0 && hidden.indexOf(t) < 0) hidden.push(t);
+  });
+  // The empty string is how the API names the blank rows of the column
+  hidden.push("");
+  return { hiddenValues: hidden };
+}
+
+function nvFilterViewRequest(v) {
+  const sh = nvSheet(v.sheet);
+  const def = NV_SCHEMA[v.sheet];
+  const colIdx = nvColIndex(v.sheet, v.col) - 1;
+  const view = {
+    title: v.title,
+    range: {
+      sheetId: sh.getSheetId(),
+      startRowIndex: NV_LAYOUT.headerRow - 1,
+      startColumnIndex: NV_LAYOUT.firstCol - 1,
+      endColumnIndex: NV_LAYOUT.firstCol - 1 + def.cols.length,
+    },
+  };
+  const criteria = nvFilterCriteria(v);
+  if (criteria) view.filterSpecs = [{ columnIndex: colIdx, filterCriteria: criteria }];
+  if (v.sort) view.sortSpecs = [{ dimensionIndex: colIdx, sortOrder: v.sort }];
+  return { addFilterView: { filter: view } };
+}
+
+/**
+ * Filter views through the advanced Sheets service. It never throws: a refusal of the service (a batch is all or nothing)
+ * is retried view by view, and what still fails is written to the notes of the setup (the self-check shows it). A step
+ * that threw would be repeated by the timer of the setup every eight minutes and the book would never be finished.
+ */
 function nvFilterViews() {
-  if (typeof Sheets === "undefined") return { created: 0, reason: "служба Sheets не включена" };
-  const ss = nvSpreadsheet();
-  const id = ss.getId();
-  const views = [
-    { sheet: "orders", title: "В работе", col: "group", values: ["В работе", "Ждёт клиента"] },
-    { sheet: "orders", title: "Сроки", col: "nextDate", sort: true },
-    { sheet: "orders", title: "Архив", col: "code", values: ["closed", "cancelled", "podbor_delivered"] },
-    { sheet: "history", title: "Принудительные", col: "how", values: ["Принудительно"] },
-    { sheet: "history", title: "За неделю", col: "time", sort: true },
-  ];
-  const requests = [];
-  const existing = Sheets.Spreadsheets.get(id, {
-    fields: "sheets(properties(sheetId),filterViews(filterViewId,title))",
-  });
-  (existing.sheets || []).forEach((s) => {
-    (s.filterViews || []).forEach((fv) => {
-      if (views.some((v) => v.title === fv.title)) requests.push({ deleteFilterView: { filterId: fv.filterViewId } });
+  const name = "Представления фильтров";
+  if (typeof Sheets === "undefined") {
+    nvSetupNote(name, "служба Sheets не включена: виды фильтра не созданы (работает обычный фильтр)");
+    return { created: 0, reason: "служба Sheets не включена" };
+  }
+  const failed = [];
+  let created = 0;
+  try {
+    const id = nvSpreadsheet().getId();
+    const existing = Sheets.Spreadsheets.get(id, {
+      fields: "sheets(properties(sheetId),filterViews(filterViewId,title))",
     });
-  });
-  views.forEach((v) => {
-    const sh = nvSheet(v.sheet);
-    const def = NV_SCHEMA[v.sheet];
-    const colIdx = nvColIndex(v.sheet, v.col) - 1;
-    const view = {
-      title: v.title,
-      range: {
-        sheetId: sh.getSheetId(),
-        startRowIndex: NV_LAYOUT.headerRow - 1,
-        startColumnIndex: NV_LAYOUT.firstCol - 1,
-        endColumnIndex: NV_LAYOUT.firstCol - 1 + def.cols.length,
-      },
+    const oldIds = (title) => {
+      const ids = [];
+      (existing.sheets || []).forEach((s) => {
+        (s.filterViews || []).forEach((fv) => {
+          if (fv.title === title) ids.push(fv.filterViewId);
+        });
+      });
+      return ids;
     };
-    if (v.values)
-      view.criteria = {
-        [String(colIdx)]: {
-          condition: { type: "ONE_OF_LIST", values: v.values.map((x) => ({ userEnteredValue: x })) },
-        },
-      };
-    if (v.sort) view.sortSpecs = [{ dimensionIndex: colIdx, sortOrder: v.col === "time" ? "DESCENDING" : "ASCENDING" }];
-    requests.push({ addFilterView: { filter: view } });
-  });
-  Sheets.Spreadsheets.batchUpdate({ requests: requests }, id);
-  return { created: views.length };
+    const items = [];
+    NV_FILTER_VIEWS.forEach((v) => {
+      try {
+        const requests = oldIds(v.title).map((fid) => ({ deleteFilterView: { filterId: fid } }));
+        requests.push(nvFilterViewRequest(v));
+        items.push({ title: v.title, requests: requests });
+      } catch (e) {
+        failed.push(v.title + ": " + (e?.message ? e.message : e));
+      }
+    });
+    const all = [];
+    items.forEach((it) => {
+      it.requests.forEach((r) => all.push(r));
+    });
+    let batchOk = false;
+    if (!failed.length) {
+      try {
+        Sheets.Spreadsheets.batchUpdate({ requests: all }, id);
+        batchOk = true;
+        created = items.length;
+      } catch (e) {
+        Logger.log("Виды фильтра одним запросом не созданы: " + (e?.message ? e.message : e));
+      }
+    }
+    if (!batchOk) {
+      items.forEach((it) => {
+        try {
+          Sheets.Spreadsheets.batchUpdate({ requests: it.requests }, id);
+          created += 1;
+        } catch (e) {
+          failed.push(it.title + ": " + (e?.message ? e.message : e));
+        }
+      });
+    }
+  } catch (e) {
+    failed.push(e?.message ? e.message : String(e));
+  }
+  nvSetupNote(
+    name,
+    failed.length ? "не созданы (" + (NV_FILTER_VIEWS.length - created) + "): " + failed.join(" | ") : "",
+  );
+  return { created: created, failed: failed };
 }
 
 /** Protections of the special sheets: a warning, nothing is locked. */
@@ -14165,6 +14269,13 @@ function nvSelfCheckRows() {
     (head.getFontFamily() === NV_FONT_TEXT && mono.getFontFamily() === NV_FONT_MONO);
   if (fontOk) ok("Шрифты", NV_FONT_TEXT + " и " + NV_FONT_MONO);
   else warn("Шрифты", "не применены; если Fira Sans нет в списке шрифтов: Шрифт → Другие шрифты");
+
+  // Things the setup could not do (they never stop it): the views of the filter
+  const setupNotes = nvSetupNotes();
+  Object.keys(setupNotes).forEach((k) => {
+    warn(k, setupNotes[k]);
+  });
+  if (!setupNotes["Представления фильтров"]) ok("Представления фильтров", NV_FILTER_VIEWS.length + " видов");
 
   // Webhook
   const last = Number(nvScriptProps().getProperty(NV_PROP.lastWebhookAt) || 0);

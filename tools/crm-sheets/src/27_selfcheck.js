@@ -197,6 +197,13 @@ function nvSelfCheckRows() {
   if (fontOk) ok("Шрифты", NV_FONT_TEXT + " и " + NV_FONT_MONO);
   else warn("Шрифты", "не применены; если Fira Sans нет в списке шрифтов: Шрифт → Другие шрифты");
 
+  // Things the setup could not do (they never stop it): the views of the filter
+  const setupNotes = nvSetupNotes();
+  Object.keys(setupNotes).forEach((k) => {
+    warn(k, setupNotes[k]);
+  });
+  if (!setupNotes["Представления фильтров"]) ok("Представления фильтров", NV_FILTER_VIEWS.length + " видов");
+
   // Webhook
   const last = Number(nvScriptProps().getProperty(NV_PROP.lastWebhookAt) || 0);
   if (s.webhookOn === true) {
