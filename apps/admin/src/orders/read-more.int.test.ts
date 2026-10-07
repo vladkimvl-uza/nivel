@@ -9,6 +9,7 @@ import { listLeads, searchCustomers } from "./read-leads.ts";
 import { loadDraftLines, searchCatalog } from "./read-quote.ts";
 import { listOtherIncome, listRegistry, listRegistryYears, registryCsv } from "./read-registry.ts";
 import {
+  assemblingOrder,
   draftOrder,
   handedOverOrder,
   leadOrder,
@@ -18,7 +19,7 @@ import {
   reportSentOrder,
   sentOrder,
 } from "./test-support/flow.ts";
-import { createWorld, newCustomer, PC_CATALOG, type World } from "./test-support/world.ts";
+import { createWorld, newCustomer, newFile, PC_CATALOG, type World } from "./test-support/world.ts";
 import { addOtherIncome, advanceWarranty, openWarrantyCase, savePassport, type Writer } from "./writes.ts";
 
 let w: World;
@@ -305,8 +306,12 @@ describe("the registry", () => {
 });
 
 describe("the passport of a build", () => {
-  it("is saved with the serial numbers and the tests, and the next save replaces it", async () => {
-    const o = await leadOrder(w, "Паспорт");
+  const photoOf = (kind: string) => newFile(w.db, { kind, retention: "order_warranty_plus_3y" });
+  const stored = async (orderId: string) =>
+    (await w.db.$client.query("select * from sales.build_passports where order_id = $1", [orderId])).rows[0];
+
+  it("is saved with the serial numbers and the tests, and the next save replaces them", async () => {
+    const o = await assemblingOrder(w, "Паспорт");
     const first = await savePassport(
       writer("assistant"),
       o.orderId,
@@ -322,8 +327,7 @@ describe("the passport of a build", () => {
       }),
     );
     expect(first).toMatchObject({ ok: true });
-    const row = (await w.db.$client.query("select * from sales.build_passports where order_id = $1", [o.orderId]))
-      .rows[0];
+    const row = await stored(o.orderId);
     expect(row.serials).toEqual({ Процессор: "CPU-123", Видеокарта: "GPU-456" });
     expect(row.bios_version).toBe("F14");
     expect(row.tests).toEqual({
@@ -338,17 +342,93 @@ describe("the passport of a build", () => {
       o.orderId,
       form({ serials: "Процессор: CPU-999", minutes: "100", errors: "Перегрев\nСбой драйвера" }),
     );
-    const next = (
-      await w.db.$client.query("select serials, tests from sales.build_passports where order_id = $1", [o.orderId])
-    ).rows[0];
+    const next = await stored(o.orderId);
     expect(next.serials).toEqual({ Процессор: "CPU-999" });
     expect(next.tests.errors).toEqual(["Перегрев", "Сбой драйвера"]);
     const entries = await audit("order.passport_save");
     expect(entries.filter((e) => e.entity_id === o.orderId)).toHaveLength(2);
   });
 
+  it("keeps the photos and the notes of the first save when the next one brings none (the form does not hold them)", async () => {
+    const o = await assemblingOrder(w, "Паспорт: фото сохраняются");
+    const build = await photoOf("part_photo");
+    const seal = await photoOf("serial_photo");
+    const second = await photoOf("part_photo");
+    await savePassport(
+      writer("assistant"),
+      o.orderId,
+      form({ serials: "Процессор: CPU-1", notes: "Пломбы на крышке", photoIds: [build], sealPhotoIds: [seal] }),
+    );
+    // The second save, from a page opened anew: no photo fields, the notes field is there with what it held.
+    await savePassport(
+      writer("assistant"),
+      o.orderId,
+      form({ serials: "Процессор: CPU-1", minutes: "420", notes: "Пломбы на крышке" }),
+    );
+    let row = await stored(o.orderId);
+    expect(row.photos).toEqual([build]);
+    expect(row.seal_photos).toEqual([seal]);
+    expect(row.notes).toBe("Пломбы на крышке");
+    // A new photo is added to the old ones, the same one twice is kept once; a form without the notes field leaves them.
+    await savePassport(writer(), o.orderId, form({ serials: "Процессор: CPU-1", photoIds: [second, build] }));
+    row = await stored(o.orderId);
+    expect(row.photos).toEqual([build, second]);
+    expect(row.seal_photos).toEqual([seal]);
+    expect(row.notes).toBe("Пломбы на крышке");
+    // The field of the notes that is sent empty clears them: it is the person's decision.
+    await savePassport(writer(), o.orderId, form({ serials: "Процессор: CPU-1", notes: "" }));
+    expect((await stored(o.orderId)).notes).toBeNull();
+  });
+
+  it("takes as photos only files of the registry of the right kind", async () => {
+    const o = await assemblingOrder(w, "Паспорт: чужие файлы");
+    const receipt = await photoOf("receipt");
+    const unknown = "0199aaaa-bbbb-7ccc-8ddd-0000000000ee";
+    const wrongKind = await savePassport(writer(), o.orderId, form({ photoIds: [receipt] }));
+    expect(wrongKind).toMatchObject({ ok: false });
+    expect(wrongKind.message).toContain("Фото");
+    expect(await savePassport(writer(), o.orderId, form({ sealPhotoIds: [unknown] }))).toMatchObject({ ok: false });
+    expect(await stored(o.orderId)).toBeUndefined();
+  });
+
+  it("keeps two parts of one name apart: two memory modules have two serial numbers", async () => {
+    const o = await assemblingOrder(w, "Паспорт: две планки");
+    await savePassport(
+      writer(),
+      o.orderId,
+      form({ serials: "Оперативная память: KF-111\nОперативная память: KF-222\nПроцессор: CPU-1" }),
+    );
+    const saved = (await stored(o.orderId)).serials;
+    expect(saved).toEqual({
+      "Оперативная память": "KF-111",
+      "Оперативная память (2)": "KF-222",
+      Процессор: "CPU-1",
+    });
+    // The form shows what was saved: saving it again changes nothing.
+    const again = Object.entries(saved)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join("\n");
+    await savePassport(writer(), o.orderId, form({ serials: again }));
+    expect((await stored(o.orderId)).serials).toEqual(saved);
+  });
+
+  it("is written only while the order is in assembly, tests or ready: not before, not after", async () => {
+    const early = await leadOrder(w, "Паспорт рано");
+    const tooEarly = await savePassport(writer(), early.orderId, form({ minutes: "420" }));
+    expect(tooEarly).toMatchObject({ ok: false });
+    expect(tooEarly.message).toContain("сборк");
+    const late = await handedOverOrder(w, "Паспорт поздно");
+    expect(await savePassport(writer(), late.orderId, form({ minutes: "1", errors: "ошибка" }))).toMatchObject({
+      ok: false,
+    });
+    const kept = await stored(late.orderId);
+    expect(kept.tests.minutes).toBe(420);
+    expect(kept.tests.errors).toEqual([]);
+    expect(await stored(early.orderId)).toBeUndefined();
+  });
+
   it("refuses what is not a serial list, a test that is not minutes, a role that may not, an order that does not exist", async () => {
-    const o = await leadOrder(w, "Паспорт плохой");
+    const o = await assemblingOrder(w, "Паспорт плохой");
     expect((await savePassport(writer(), o.orderId, form({ serials: `${"x".repeat(100)}: 1` }))).ok).toBe(false);
     expect((await savePassport(writer(), o.orderId, form({ minutes: "много" }))).ok).toBe(false);
     expect((await savePassport(writer(), o.orderId, form({ minutes: "9999" }))).ok).toBe(false);
@@ -358,14 +438,14 @@ describe("the passport of a build", () => {
     expect(
       await savePassport({ ...writer(), user: { id: "t", role: "translator" } }, o.orderId, form({})),
     ).toMatchObject({ denied: true });
+    expect(await stored(o.orderId)).toBeUndefined();
   });
 
   it("opens the tests of the order to the automaton: a passport with 6 hours and no errors passes the guard", async () => {
     // The guard of TESTS_PASSED reads exactly what the form writes (services/orders/guards.ts).
-    const o = await leadOrder(w, "Паспорт и тесты");
+    const o = await assemblingOrder(w, "Паспорт и тесты");
     await savePassport(writer(), o.orderId, form({ minutes: "360", errors: "" }));
-    const row = (await w.db.$client.query("select tests from sales.build_passports where order_id = $1", [o.orderId]))
-      .rows[0];
+    const row = await stored(o.orderId);
     expect(row.tests.minutes).toBe(360);
     expect(row.tests.errors).toEqual([]);
   });

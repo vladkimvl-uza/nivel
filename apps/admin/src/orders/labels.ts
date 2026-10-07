@@ -172,3 +172,6 @@ export const WAITING_FOR: Partial<Record<OrderStatus, string>> = {
   podbor_delivered: "«Подбор» передан. Плата зачтётся, если клиент закажет сборку в срок.",
   cancelled: "Заказ отменён, расчёты завершены.",
 };
+
+/** The statuses in which the passport of the build is filled: the tests run and the check of the tests needs it. */
+export const PASSPORT_STATUSES: ReadonlySet<string> = new Set(["assembling", "testing", "ready"]);

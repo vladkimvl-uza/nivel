@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionUser } from "../auth/service.ts";
+import type { Ctx } from "./commands.ts";
 
 const state = vi.hoisted(() => ({
   user: null as SessionUser | null,
@@ -101,15 +102,12 @@ describe("the frame of a server action", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       const failure = new Error("connection terminated unexpectedly");
-      const svc = { payments: { confirm: async () => Promise.reject(failure) } } as unknown as commands.Ctx["svc"];
+      const svc = { payments: { confirm: async () => Promise.reject(failure) } } as unknown as Ctx["svc"];
       const data = new FormData();
       data.append("paymentId", "p1");
       data.append("fiscalReceiptNo", "1");
       const r = await runAction(spec, (user) =>
-        commands.confirmPayment(
-          { user, svc, rt: {} as commands.Ctx["rt"], now: () => new Date() },
-          fromFormData(data),
-        ),
+        commands.confirmPayment({ user, svc, rt: {} as Ctx["rt"], now: () => new Date() }, fromFormData(data)),
       );
       expect(r).toMatchObject({ ok: false, message: SERVICE_FALLBACK });
       expect(spy).toHaveBeenCalledTimes(1);

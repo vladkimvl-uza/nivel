@@ -1,7 +1,8 @@
 // What the forms must bring before the services are asked, and the commands that the first test file leaves out.
+
+import { orders } from "@nivel/services";
 import { describe, expect, it, vi } from "vitest";
 import type { Role } from "../auth/roles.ts";
-import { orders } from "@nivel/services";
 import { fromFormData } from "./build-event.ts";
 import type { Ctx, Svc } from "./commands.ts";
 import * as commands from "./commands.ts";

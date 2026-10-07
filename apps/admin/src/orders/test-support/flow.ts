@@ -205,19 +205,21 @@ export async function signedAct(w: FlowWorld, orderId: string, kind: "material_a
   return act.actId;
 }
 
+/** The materials are accepted (the act is signed): the order is in assembly. */
+export async function assemblingOrder(w: FlowWorld & { worker?: orders.Runtime }, name?: string) {
+  const o = await settledOrder(w, name);
+  const materials = await signedAct(w, o.orderId, "material_acceptance");
+  const r = await orders.dispatch(o.orderId, { type: "MATERIALS_ACCEPTED", actId: materials }, ownerOf(w), w.admin);
+  if (!r.ok) throw new Error(`MATERIALS_ACCEPTED was refused: ${r.error}`);
+  return o;
+}
+
 /** Assembled, tested (a passport of 7 hours without errors), dispatched; the final part of the fee is expected. */
 export async function deliveringOrder(w: FlowWorld & { worker?: orders.Runtime }, name?: string) {
-  const o = await settledOrder(w, name);
+  const o = await assemblingOrder(w, name);
   const owner = ownerOf(w);
-  const materials = await signedAct(w, o.orderId, "material_acceptance");
-  const steps: Parameters<typeof orders.dispatch>[1][] = [
-    { type: "MATERIALS_ACCEPTED", actId: materials },
-    { type: "ASSEMBLED" },
-  ];
-  for (const e of steps) {
-    const r = await orders.dispatch(o.orderId, e, owner, w.admin);
-    if (!r.ok) throw new Error(`${e.type} was refused: ${r.error}`);
-  }
+  const r0 = await orders.dispatch(o.orderId, { type: "ASSEMBLED" }, owner, w.admin);
+  if (!r0.ok) throw new Error(`ASSEMBLED was refused: ${r0.error}`);
   await w.db.$client.query(
     `insert into sales.build_passports (order_id, serials, tests) values ($1, '{"Процессор":"SN-1"}', '{"minutes":420,"errors":[]}')`,
     [o.orderId],

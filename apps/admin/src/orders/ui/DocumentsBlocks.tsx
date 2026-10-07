@@ -13,7 +13,7 @@ import {
   signActAction,
 } from "../actions.ts";
 import { formatDateTime, formatSum } from "../format.ts";
-import { ACT_KIND_LABEL, FAULT_LABEL, SIGNED_VIA_LABEL, WARRANTY_STATUS_LABEL } from "../labels.ts";
+import { ACT_KIND_LABEL, FAULT_LABEL, PASSPORT_STATUSES, SIGNED_VIA_LABEL, WARRANTY_STATUS_LABEL } from "../labels.ts";
 import type { OrderCard } from "../read-orders.ts";
 import { ActionForm } from "./ActionForm.tsx";
 import { PhotoPicker } from "./PhotoPicker.tsx";
@@ -213,12 +213,10 @@ export function ActsBlock({ card, canGenerate, canSign }: { card: OrderCard; can
 }
 
 // ---- passport ---------------------------------------------------------------------------------------------------------
-const PASSPORT_OPEN = new Set(["assembling", "testing", "ready"]);
-
 export function PassportBlock({ card, canWrite }: { card: OrderCard; canWrite: boolean }) {
   const id = card.order.id;
   const p = card.passport;
-  const editable = canWrite && PASSPORT_OPEN.has(card.order.status);
+  const editable = canWrite && PASSPORT_STATUSES.has(card.order.status);
   if (!p && !editable) return null;
   const serials = p
     ? Object.entries(p.serials)
@@ -323,6 +321,20 @@ export function PassportBlock({ card, canWrite }: { card: OrderCard; canWrite: b
                 placeholder="Пусто, если ошибок не было"
               />
             </div>
+            <div className="nv-field">
+              <label className="nv-field__label" htmlFor="passport-notes">
+                Заметки
+              </label>
+              <textarea
+                id="passport-notes"
+                name="notes"
+                className="nv-field__control adm-textarea"
+                rows={2}
+                defaultValue={p?.notes ?? ""}
+                placeholder="Пломбы, особенности сборки"
+              />
+            </div>
+            <p className="adm-note">Загруженные ранее фото остаются в паспорте; новые добавляются к ним.</p>
             <PhotoPicker name="photoIds" kind="part_photo" label="Фото сборки" multiple />
             <PhotoPicker name="sealPhotoIds" kind="serial_photo" label="Фото серийных номеров и пломб" multiple />
           </ActionForm>
