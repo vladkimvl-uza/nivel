@@ -57,10 +57,10 @@ describe("handleErrorDigest: the summary of ops.app_errors at 20:00", () => {
           lang: "ru",
           params: {
             items: [
-              { queue: "ledger.append", message: "db down", count: 3 },
-              { queue: "web.revalidate", message: "HTTP 502", count: 1 },
-              { queue: "-", message: "no prefix at all", count: 2 },
-              { queue: "web", message: "TypeError: x is undefined", count: 5 },
+              { queue: "ledger.append", message: "db down", count: 3, last: "12.10 19:00" },
+              { queue: "web.revalidate", message: "HTTP 502", count: 1, last: "12.10 18:00" },
+              { queue: "-", message: "no prefix at all", count: 2, last: "12.10 17:00" },
+              { queue: "web", message: "TypeError: x is undefined", count: 5, last: "12.10 16:00" },
             ],
             more: 0,
           },

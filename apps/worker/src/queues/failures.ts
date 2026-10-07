@@ -23,6 +23,13 @@ const MASKS: readonly [RegExp, string][] = [
   [/\b\d{9,}\b/g, "<num>"],
 ];
 
+/** A text with the marks of personal data hidden (phone, card, mail, token, long numbers); the length is not cut except against abuse. */
+export function maskPersonalData(text: string, lookahead = 10_000): string {
+  let out = text.length > lookahead ? text.slice(0, lookahead) : text;
+  for (const [re, mask] of MASKS) out = out.replace(re, mask);
+  return out;
+}
+
 /** The text of an error as the table may keep it: no phone, card, mail or token, a few hundred characters at most. */
 export function sanitizeMessage(error: unknown, limit = MAX_MESSAGE): string {
   let text: string;

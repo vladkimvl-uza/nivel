@@ -4,7 +4,7 @@
 /**
  * The names of the jobs the services queue (packages/services/src/outbox/contract.ts). The package does not export the
  * contract object, so the worker keeps its own copy; `contract.test.ts` compares it with the source of the contract.
- * TODO(integrator): export OUTBOX_JOB and OUTBOX_TEMPLATE from `@nivel/services` (outbox/index.ts) and drop this copy.
+ * Request 3 to the integrator (report of WP-14): export OUTBOX_JOB and OUTBOX_TEMPLATE from `@nivel/services` (outbox/index.ts) and drop this copy.
  */
 export const OUTBOX_JOB = {
   PDF_RENDER: "pdf.render",

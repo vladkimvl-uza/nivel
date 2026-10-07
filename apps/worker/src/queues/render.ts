@@ -5,7 +5,7 @@
 //
 // The owner reads the admin panel in Russian only, so the texts to the owner are Russian. The text to the customer has
 // both languages; the Uzbek one is a draft until the translator has seen it (oʻ and gʻ are U+02BB, other apostrophes U+02BC).
-// TODO(integrator): when the namespace `worker` is registered in packages/i18n, move these strings into
+// Request 6 to the integrator (report of WP-14): when the namespace `worker` is registered in packages/i18n, move these strings into
 // messages/{uz,ru,meta}/worker.json; the key names stay the same.
 import type { Lang, MessageRenderer } from "./runtime.ts";
 
@@ -135,9 +135,12 @@ const TEMPLATES: Record<string, Template> = {
 
   "ops.digest": (p) => {
     const items = Array.isArray(p.items) ? (p.items as Params[]) : [];
-    const lines = items.map((i) => `${text(i.queue)} ×${whole(i.count)}: ${text(i.message)}`);
+    // The count is that of the row of ops.app_errors: all the times since the failure was first seen, not only the last day.
+    const lines = items.map(
+      (i) => `${text(i.queue)} (всего ×${whole(i.count)}, последний раз ${text(i.last)}): ${text(i.message)}`,
+    );
     const more = whole(p.more);
-    return ["Ошибки за сутки:", ...lines, ...(more > 0 ? [`… и ещё ${more}`] : [])].join("\n");
+    return ["Сбои за последние сутки:", ...lines, ...(more > 0 ? [`… и ещё ${more}`] : [])].join("\n");
   },
 };
 

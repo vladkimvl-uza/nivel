@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertDayKey, fingerprintOf, sanitizeMessage } from "./failures.ts";
+import { alertDayKey, fingerprintOf, maskPersonalData, sanitizeMessage } from "./failures.ts";
 
 describe("sanitizeMessage: the error table has no personal data (DATA-MAP: no PD in stacks)", () => {
   it("masks phone numbers, card numbers, e-mail addresses and bot tokens", () => {
@@ -35,6 +35,11 @@ describe("sanitizeMessage: the error table has no personal data (DATA-MAP: no PD
     const out = sanitizeMessage(`${"x ".repeat(100)}write to ivan.petrov@example.uz now`, 1000);
     expect(out).toContain("<email>");
     expect(out).not.toContain("example.uz");
+  });
+
+  it("hides the personal data of a free text without cutting it short", () => {
+    const out = maskPersonalData("Позвоните +998 90 123-45-67 или на ivan@example.uz, карта 8600 1234 5678 9012");
+    expect(out).toBe("Позвоните <phone> или на <email>, карта <card>");
   });
 
   it("answers a text for anything: an Error, a string, an object, nothing", () => {

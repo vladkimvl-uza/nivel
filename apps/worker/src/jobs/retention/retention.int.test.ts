@@ -223,6 +223,24 @@ describe("retention.purge on the real database, as the role worker", () => {
     ]);
   });
 
+  it("does not let a clock of the worker that runs ahead erase what the database still holds young (sessions, updates)", async () => {
+    await q(migrator, "insert into bot.processed_updates (update_id, at) values (9101, now() - interval '2 days')");
+    await q(
+      migrator,
+      "insert into bot.sessions (key, value, updated_at) values ('young-chat', '{}', now() - interval '2 days')",
+    );
+    const [dbNow] = await q<{ t: Date }>(w.db, "select now() as t");
+    const before = w.clock.now();
+    w.clock.set(new Date((dbNow?.t ?? new Date()).getTime() + 90 * 86_400_000));
+    try {
+      await handleRetention(runtime());
+    } finally {
+      w.clock.set(before);
+    }
+    expect(await q(w.db, "select 1 from bot.processed_updates where update_id = 9101")).toHaveLength(1);
+    expect(await q(migrator, "select 1 from bot.sessions where key = 'young-chat'")).toHaveLength(1);
+  });
+
   it("writes the audit rows of the erasure without personal data", async () => {
     const rows = await q<{ action: string; after: Record<string, unknown> | null }>(
       migrator,

@@ -21,7 +21,13 @@ export interface ThresholdDeps {
   enqueue(input: ops.OutboxInput): Promise<unknown>;
 }
 
-export async function handleThresholdCheck(deps: ThresholdDeps): Promise<{ alerts: (number | "plan")[] }> {
+const isDuplicate = (answer: unknown): boolean =>
+  typeof answer === "object" && answer !== null && (answer as { duplicate?: unknown }).duplicate === true;
+
+/** `alerts` are the levels the share has crossed; `queued` are those this run put into the outbox (the others had their key already). */
+export async function handleThresholdCheck(
+  deps: ThresholdDeps,
+): Promise<{ alerts: (number | "plan")[]; queued: (number | "plan")[] }> {
   const now = deps.now();
   const asOf = isoDateInTashkent(now);
   const year = Number(asOf.slice(0, 4));
@@ -39,8 +45,9 @@ export async function handleThresholdCheck(deps: ThresholdDeps): Promise<{ alert
   });
 
   const alerts: (number | "plan")[] = [];
+  const queued: (number | "plan")[] = [];
   for (const level of status.crossedAlerts) {
-    await deps.enqueue({
+    const answer = await deps.enqueue({
       kind: "telegram_message",
       dedupeKey: `threshold:${year}:${level}`,
       priority: PRIORITY,
@@ -52,9 +59,10 @@ export async function handleThresholdCheck(deps: ThresholdDeps): Promise<{ alert
       },
     });
     alerts.push(level);
+    if (!isDuplicate(answer)) queued.push(level);
   }
   if (status.overPlanCap && planCap !== null) {
-    await deps.enqueue({
+    const answer = await deps.enqueue({
       kind: "telegram_message",
       dedupeKey: `threshold:${year}:plan`,
       priority: PRIORITY,
@@ -66,9 +74,11 @@ export async function handleThresholdCheck(deps: ThresholdDeps): Promise<{ alert
       },
     });
     alerts.push("plan");
+    if (!isDuplicate(answer)) queued.push("plan");
   }
-  deps.log.info({ year, shareBp: status.shareBp, alerts }, "threshold.check");
-  return { alerts };
+  const already = alerts.filter((a) => !queued.includes(a));
+  deps.log.info({ year, shareBp: status.shareBp, queued, already }, "threshold.check");
+  return { alerts, queued };
 }
 
 /** The plan of the owner from the setting `money.threshold` (a whole sum), or `null`. */

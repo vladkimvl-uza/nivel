@@ -5,6 +5,8 @@
 // far as the owner allowed: the name and the Telegram nick of the customer, never the phone or the address.
 import { createHmac } from "node:crypto";
 
+import { maskPersonalData } from "../../../queues/failures.ts";
+
 export const CRM_VERSION = 1;
 export const CRM_SOURCE = "nivel-platform";
 export const CRM_EVENT_TYPES = [
@@ -25,6 +27,15 @@ export function iso(at: Date): string {
 
 const cut = (v: string | null | undefined, max: number): string | null =>
   v === null || v === undefined || v === "" ? null : v.slice(0, max);
+
+/**
+ * A text a person wrote (a comment, a reason, a title, a name): a phone number, a card number or an e-mail address in it does not
+ * leave the platform, the CRM gets the mark instead (the header of this file: never the phone or the address).
+ */
+const free = (v: string | null | undefined, max: number): string | null => {
+  const masked = v === null || v === undefined ? v : maskPersonalData(v);
+  return cut(masked, max);
+};
 
 // ---- the codes of the platform that the CRM names differently -----------------------------------------------------------
 
@@ -74,7 +85,7 @@ export function leadCreatedData(f: LeadFacts): Record<string, unknown> {
         ? null
         : {
             ref: f.customer.ref,
-            display_name: cut(f.customer.displayName, 100),
+            display_name: free(f.customer.displayName, 100),
             telegram_username: cut(f.customer.telegramUsername, 64),
           },
     tg_topic_url: null,
@@ -197,7 +208,7 @@ export function orderStatusChangedData(f: OrderChangeFacts): Record<string, unkn
         ? null
         : {
             point: f.cancel.point,
-            reason: cut(f.cancel.reason, 500) ?? "",
+            reason: free(f.cancel.reason, 500) ?? "",
             settlement: {
               fee_earned: f.cancel.settlement.feeEarned,
               fee_to_refund: f.cancel.settlement.feeToRefund,
@@ -278,9 +289,9 @@ export function purchaseRecordedData(f: PurchaseFacts): Record<string, unknown> 
   return {
     purchase_id: f.purchaseId,
     order_number: f.orderNumber,
-    title: cut(f.title, 200) ?? "",
+    title: free(f.title, 200) ?? "",
     category_code: f.categoryCode,
-    vendor_name: cut(f.vendorName, 100) ?? "",
+    vendor_name: free(f.vendorName, 100) ?? "",
     qty: f.qty,
     amount_sum: f.amountSum,
     paid_via: f.paidVia,
@@ -289,7 +300,7 @@ export function purchaseRecordedData(f: PurchaseFacts): Record<string, unknown> 
     esf_no: cut(f.esfNo, 64),
     esf_due: f.esfDue,
     discount_sum: f.discountSum,
-    bonus_note: cut(f.bonusNote, 200),
+    bonus_note: free(f.bonusNote, 200),
     serials: f.serials,
     vendor_warranty_months: f.vendorWarrantyMonths,
     vendor_warranty_until: f.vendorWarrantyUntil,
@@ -325,7 +336,7 @@ export function warrantyCaseOpenedData(f: WarrantyFacts): Record<string, unknown
     purchase_id: f.purchaseId,
     opened_at: iso(f.openedAt),
     channel: f.channel,
-    summary: cut(f.summary, 500) ?? "",
+    summary: free(f.summary, 500) ?? "",
     status: f.status,
     deadlines: {
       reply: dateOrNull(f.dueReply),

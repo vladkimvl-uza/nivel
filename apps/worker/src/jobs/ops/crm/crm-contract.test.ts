@@ -434,6 +434,38 @@ describe("the events the worker builds are accepted by the CRM", () => {
   });
 });
 
+describe("what a person wrote in a free text does not carry a phone number to the CRM", () => {
+  it("masks the phone and the e-mail in the summary of a warranty case and the name of a customer", () => {
+    const warranty = warrantyCaseOpenedData({
+      number: "G-2026-0033",
+      orderNumber: "NV-2026-0301",
+      purchaseId: null,
+      openedAt: new Date("2026-11-03T12:10:00+05:00"),
+      channel: "bot",
+      summary: "Не включается, звоните +998 90 123-45-67 или ivan@example.uz",
+      status: "opened",
+      dueReply: null,
+      dueDiagnosis: null,
+      dueLoaner: null,
+      dueFix: null,
+    });
+    expect(warranty.summary).toBe("Не включается, звоните <phone> или <email>");
+    const lead = leadCreatedData({
+      number: "L-2026-0001",
+      createdAt: new Date("2026-10-12T09:00:00+05:00"),
+      channel: "bot",
+      utm: null,
+      lang: "ru",
+      district: null,
+      scope: "pc",
+      wantedBy: null,
+      configurationCode: null,
+      customer: { ref: "c-1", displayName: "Дилшод +998901234567", telegramUsername: "dilshod" },
+    }) as { customer: { display_name: string } };
+    expect(lead.customer.display_name).toBe("Дилшод <phone>");
+  });
+});
+
 describe("what the CRM refuses", () => {
   it("answers wrong_env for the other environment, and does not apply the event", () => {
     const r = send("lead.created", leadCreatedData(lead({ number: "L-2026-0290", customer: null })), {

@@ -126,4 +126,30 @@ describe("isFeeScaleShape: the shape of FeeSettings of the domain", () => {
     expect(isFeeScaleShape(null)).toBe(false);
     expect(isFeeScaleShape([])).toBe(false);
   });
+
+  it("refuses a scale that the admin panel and the calculation of the fee would refuse: the same ranges and the same sum of the shares", () => {
+    const stages = (over: Record<string, number>) => ({ ...DEFAULT_FEE_SETTINGS.stageSharesBp, ...over });
+    const bad: Record<string, unknown>[] = [
+      scale({ pcLowRateBp: 10_001 }),
+      scale({ pcLowRateBp: -1 }),
+      scale({ advanceBp: 20_000 }),
+      scale({ pcThreshold: -1 }),
+      scale({ minFullCyclePc: -5 }),
+      scale({ stageSharesBp: stages({ selection: 1000 }) }), // does not add up to 10 000
+      scale({ stageSharesBp: stages({ selection: -2000, purchase: 7000 }) }),
+      scale({ commissionLineStages: ["selection", "teleport"] }),
+      scale({ reserveRoundStep: 0 }),
+      scale({ podborCreditDays: 0 }),
+      scale({ podborCreditDays: 366 }),
+      scale({ shelfLifeHours: { components: 0, furniture: 72 } }),
+      scale({ shelfLifeHours: { components: 24, furniture: 721 } }),
+    ];
+    for (const value of bad) expect(isFeeScaleShape(value)).toBe(false);
+  });
+
+  it("does not put a damaged scale into force and tells the owner (the check is the same as the admin panel's)", async () => {
+    const t = setup({ next: scale({ stageSharesBp: { ...DEFAULT_FEE_SETTINGS.stageSharesBp, selection: 1000 } }) });
+    expect(await promoteDueFeeScale(t.deps)).toEqual({ outcome: "invalid" });
+    expect(t.promoted).toEqual([]);
+  });
 });

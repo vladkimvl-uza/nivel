@@ -20,11 +20,11 @@ function status(over: Partial<ThresholdStatus> = {}): ThresholdStatus {
   };
 }
 
-function setup(over: { status?: ThresholdStatus; planCap?: number | null; now?: Date } = {}) {
+function setup(over: { status?: ThresholdStatus; planCap?: number | null; now?: Date; alreadyQueued?: string[] } = {}) {
   const snapshots: ops.ThresholdSnapshotInput[] = [];
   const enqueued: ops.OutboxInput[] = [];
   const asked: (number | undefined)[] = [];
-  const { log } = recordingLogger();
+  const { log, lines } = recordingLogger();
   const deps: ThresholdDeps = {
     now: () => over.now ?? new Date("2026-10-12T10:00:00+05:00"),
     log,
@@ -38,10 +38,10 @@ function setup(over: { status?: ThresholdStatus; planCap?: number | null; now?: 
     },
     enqueue: async (input) => {
       enqueued.push(input);
-      return { id: "x", duplicate: false };
+      return { id: "x", duplicate: over.alreadyQueued?.includes(input.dedupeKey ?? "") ?? false };
     },
   };
-  return { deps, snapshots, enqueued, asked };
+  return { deps, snapshots, enqueued, asked, lines };
 }
 
 describe("handleThresholdCheck: the status of the threshold, the snapshot of the day and the alerts", () => {
@@ -84,8 +84,19 @@ describe("handleThresholdCheck: the status of the threshold, the snapshot of the
 
   it("is quiet below the first level", async () => {
     const t = setup({ status: status({ volume: sum(500_000_000), shareBp: bp(5000) }) });
-    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: [] });
+    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: [], queued: [] });
     expect(t.enqueued).toEqual([]);
+  });
+
+  it("says which alerts it queued now and which the outbox had already: a level is not reported as told when the key was taken", async () => {
+    const t = setup({
+      status: status({ crossedAlerts: [bp(6000), bp(7000)] }),
+      alreadyQueued: ["threshold:2026:7000"],
+    });
+    const result = await handleThresholdCheck(t.deps);
+    expect(result).toEqual({ alerts: [6000, 7000], queued: [6000] });
+    const line = t.lines.find((l) => l.message === "threshold.check");
+    expect(line?.data).toMatchObject({ queued: [6000], already: [7000] });
   });
 
   it("tells the owner of every level the share has crossed, once for each level and year", async () => {
@@ -97,7 +108,7 @@ describe("handleThresholdCheck: the status of the threshold, the snapshot of the
         crossedAlerts: [bp(6000), bp(7000)],
       }),
     });
-    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: [6000, 7000] });
+    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: [6000, 7000], queued: [6000, 7000] });
     expect(t.enqueued).toEqual([
       {
         kind: "telegram_message",
@@ -152,7 +163,7 @@ describe("handleThresholdCheck: the status of the threshold, the snapshot of the
         overPlanCap: true,
       }),
     });
-    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: ["plan"] });
+    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: ["plan"], queued: ["plan"] });
     expect(t.enqueued).toEqual([
       {
         kind: "telegram_message",
@@ -170,7 +181,7 @@ describe("handleThresholdCheck: the status of the threshold, the snapshot of the
 
   it("does not tell about the plan without a plan", async () => {
     const t = setup({ planCap: null, status: status({ overPlanCap: true }) });
-    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: [] });
+    expect(await handleThresholdCheck(t.deps)).toEqual({ alerts: [], queued: [] });
   });
 
   it("recounts on the same snapshot when it is run again after a payment: the snapshot is the same day's", async () => {

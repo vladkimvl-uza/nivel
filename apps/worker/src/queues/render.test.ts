@@ -165,12 +165,14 @@ describe("the texts of the owner (Russian: the owner reads the admin panel in Ru
   it("builds the digest of the errors of the day", () => {
     const text = r.render("ops.digest", "ru", {
       items: [
-        { queue: "ledger.append", message: "db down", count: 3 },
-        { queue: "web.revalidate", message: "HTTP 502", count: 1 },
+        { queue: "ledger.append", message: "db down", count: 3, last: "12.10 19:00" },
+        { queue: "web.revalidate", message: "HTTP 502", count: 1, last: "12.10 18:00" },
       ],
     }) as string;
     expect(text).toContain("ledger.append");
-    expect(text).toContain("×3");
+    // the count of the row is for all time: the text says so and gives the moment of the last failure
+    expect(text).toContain("всего ×3, последний раз 12.10 19:00");
+    expect(text).not.toContain("за сутки:");
     expect(text).toContain("web.revalidate");
   });
 

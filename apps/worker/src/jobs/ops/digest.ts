@@ -2,7 +2,7 @@
 // ones that were written after the last attempt of a job). A quiet day sends nothing.
 import type { Db } from "@nivel/db";
 import type { ops } from "@nivel/db/repos";
-import { isoDateInTashkent } from "@nivel/domain/calendar";
+import { isoDateInTashkent, tashkentTime } from "@nivel/domain/calendar";
 import type { Logger } from "pino";
 
 const SHOWN = 10;
@@ -23,6 +23,13 @@ export interface DigestDeps {
   enqueue(input: ops.OutboxInput): Promise<unknown>;
 }
 
+/** "12.10 19:00" in the time of Tashkent. */
+function lastSeen(at: Date): string {
+  const [, month = "", day = ""] = isoDateInTashkent(at).split("-");
+  const { hour, minute } = tashkentTime(at);
+  return `${day}.${month} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 export async function handleErrorDigest(deps: DigestDeps): Promise<{ sent: boolean; items: number }> {
   const now = deps.now();
   const rows = await deps.recentErrors(new Date(now.getTime() - DAY_MS));
@@ -30,7 +37,13 @@ export async function handleErrorDigest(deps: DigestDeps): Promise<{ sent: boole
   const items = rows.slice(0, SHOWN).map((r) => {
     // The worker writes "[queue] text" (queues/failures.ts); the other applications write their own text.
     const m = r.app === "worker" ? /^\[([^\]]+)\]\s*([\s\S]*)$/.exec(r.message) : null;
-    return { queue: m?.[1] ?? (r.app === "worker" ? "-" : r.app), message: m?.[2] ?? r.message, count: r.count };
+    // `count` of ops.app_errors grows for the whole life of a row, so the digest shows when the failure was last seen as well.
+    return {
+      queue: m?.[1] ?? (r.app === "worker" ? "-" : r.app),
+      message: m?.[2] ?? r.message,
+      count: r.count,
+      last: lastSeen(r.lastAt),
+    };
   });
   await deps.enqueue({
     kind: "telegram_message",

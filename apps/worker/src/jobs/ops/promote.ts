@@ -5,7 +5,7 @@
 //
 // The role nivel_worker has SELECT on ops.settings and nothing else (DATA-MAP 2), so this job writes only when the database
 // gives the role the right; without it the job says so in the log and the scale waits for the page of the admin panel as before.
-// TODO(integrator): either GRANT UPDATE, INSERT on ops.settings to nivel_worker (wide: the worker could then change the prices),
+// Request 2 to the integrator (see the report of WP-14): either GRANT UPDATE, INSERT on ops.settings to nivel_worker (wide: the worker could then change the prices),
 // or, better, a SECURITY DEFINER function ops.promote_fee_scale(now) for this one pair of keys; see the report of WP-14.
 import type { Db } from "@nivel/db";
 import { ops } from "@nivel/db/repos";
@@ -40,10 +40,49 @@ function isRealDate(text: string): boolean {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text;
 }
 
-/** True for an object with exactly the keys of `FeeSettings` of the domain and values of the same kinds (whole numbers where they are). */
+const STAGES = Object.keys(DEFAULT_FEE_SETTINGS.stageSharesBp);
+const between = (v: unknown, lo: number, hi: number): boolean =>
+  typeof v === "number" && Number.isSafeInteger(v) && v >= lo && v <= hi;
+
+/**
+ * The ranges and the rule of the shares that the admin panel's `FeeSettingsSchema` and `parseFeeSettings` of the services hold:
+ * a scale they would refuse must not be put into force by the worker (the calculation of the fee would then fail on every quote).
+ * Request 3 to the integrator (report of WP-14): export `parseFeeSettings` from `@nivel/services`; this copy then goes.
+ */
+function inRanges(v: Record<string, unknown>): boolean {
+  const shares = v.stageSharesBp as Record<string, unknown>;
+  const bpKeys = [
+    "pcLowRateBp",
+    "pcHighRateBp",
+    "mountRateBp",
+    "complexRateBp",
+    "advanceBp",
+    "reserveBp",
+    "reserveHighBp",
+    "reserveHighShareBp",
+    "podborShareBp",
+    "afterTestsRetainBp",
+  ];
+  if (!bpKeys.every((k) => between(v[k], 0, 10_000))) return false;
+  const sumKeys = ["pcThreshold", "pcHighMinFee", "minFullCyclePc", "minFreeWindowPc", "minFullCycleSetup"];
+  if (!sumKeys.every((k) => between(v[k], 0, Number.MAX_SAFE_INTEGER))) return false;
+  if (!STAGES.every((k) => between(shares[k], 0, 10_000))) return false;
+  if (STAGES.reduce((total, k) => total + (shares[k] as number), 0) !== 10_000) return false;
+  if (!(v.commissionLineStages as string[]).every((s) => STAGES.includes(s))) return false;
+  const shelf = v.shelfLifeHours as Record<string, unknown>;
+  return (
+    between(v.reserveRoundStep, 1, Number.MAX_SAFE_INTEGER) &&
+    between(v.podborCreditDays, 1, 365) &&
+    between(shelf.components, 1, 720) &&
+    between(shelf.furniture, 1, 720)
+  );
+}
+
+/** True for an object with exactly the keys of `FeeSettings` of the domain, values of the same kinds and in the ranges of the settings. */
 export function isFeeScaleShape(value: unknown): value is Record<string, unknown> & { effectiveFrom: string } {
   if (!sameShape(value, DEFAULT_FEE_SETTINGS)) return false;
-  return isRealDate((value as { effectiveFrom: string }).effectiveFrom);
+  if (!isRealDate((value as { effectiveFrom: string }).effectiveFrom)) return false;
+  return inRanges(value as Record<string, unknown>);
 }
 
 export type PromoteOutcome =

@@ -92,13 +92,28 @@ export async function handleRetention(deps: RetentionDeps): Promise<RetentionSum
 }
 
 export function createPgRetentionPorts(db: Db): RetentionPorts {
+  // The functions of the database (leads, files, the AI) cut the moment they are given at its own clock; the two deletes of this
+  // file do the same, so a clock of the worker that runs ahead (a restored VM, a lost NTP) cannot erase what is still young.
+  const notAfterDatabaseClock = async (at: Date): Promise<Date> => {
+    const { rows } = await db.$client.query<{ t: Date }>("select now() as t");
+    const dbNow = rows[0]?.t;
+    return dbNow !== undefined && dbNow.getTime() < at.getTime() ? dbNow : at;
+  };
   return {
     purgeLeads: (now) => sales.purgeExpiredLeads(db, now),
     purgeFiles: (now, removeBytes) => ops.purgeExpiredFilesAndRemoveBytes(db, removeBytes, now),
     purgeAi: (now) => ai.purgeExpiredConversations(db, now),
-    purgeUpdates: (now) => bot.purgeProcessedUpdates(db, PROCESSED_UPDATES_DAYS, now),
+    purgeUpdates: async (now) =>
+      bot.purgeProcessedUpdates(db, PROCESSED_UPDATES_DAYS, await notAfterDatabaseClock(now)),
     async purgeSessions(cutoff) {
-      const { rowCount } = await db.$client.query("delete from bot.sessions where updated_at < $1", [cutoff]);
+      // `cutoff` is "now minus the idle days" by the clock of the worker; it is never later than the same cut by the database's.
+      const safe = new Date(
+        Math.min(
+          cutoff.getTime(),
+          (await notAfterDatabaseClock(new Date())).getTime() - BOT_SESSION_IDLE_DAYS * DAY_MS,
+        ),
+      );
+      const { rowCount } = await db.$client.query("delete from bot.sessions where updated_at < $1", [safe]);
       return rowCount ?? 0;
     },
   };
