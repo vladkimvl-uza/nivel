@@ -471,7 +471,8 @@ describe("the panel", () => {
       expect(o.backgroundColor).toBe("#FBF9F4");
       const colours = [...Object.values(o.series || {}).map((s) => s.color), ...(o.colors || [])];
       for (const c of colours) expect(allowed.has(c), c).toBe(true);
-      expect(o["vAxis.gridlines.color"]).toBe("#E4DDD2");
+      // Gridlines sit on the continuous axis only: hAxis of a horizontal bar chart, vAxis of the others
+      expect(o[`${ch.spec.type === "BAR" ? "hAxis" : "vAxis"}.gridlines.color`]).toBe("#E4DDD2");
       expect(JSON.stringify(o)).not.toMatch(/is3D|vAxes|targetAxisIndex/);
     }
     expect(charts[0].spec.type).toBe("COMBO");

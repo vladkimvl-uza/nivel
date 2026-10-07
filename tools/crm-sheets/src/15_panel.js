@@ -102,6 +102,13 @@ function nvTileTrendFormula(tile, T, flagRef) {
   const first = tile.trend.range === "reserve" ? NV_ND.res : NV_ND.weeks;
   const range = nvDataRange(tile.trend.col, first, tile.trend.col, first + 11);
   const color = T === NV_THEMES.night ? "#A9A59C" : T.muted;
+  if (tile.trend.type === "line") {
+    // A line has no "lastcolor" (only column and winloss charts have): the whole line takes the colour of the state
+    const lineColor = "IF(" + flagRef + '=TRUE; "' + T.accent + '"; "' + color + '")';
+    return (
+      "=SPARKLINE(" + range + '; {"charttype"\\"line"; "color"\\' + lineColor + '; "linewidth"\\2; "empty"\\"zero"})'
+    );
+  }
   return (
     "=SPARKLINE(" +
     range +

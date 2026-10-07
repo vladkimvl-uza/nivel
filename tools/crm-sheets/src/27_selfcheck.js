@@ -230,6 +230,19 @@ function nvSelfCheckRows() {
   });
   if (!setupNotes["Представления фильтров"]) ok("Представления фильтров", NV_FILTER_VIEWS.length + " видов");
 
+  // Charts: the options that Sheets read back
+  try {
+    const chartBad = nvChartOptionProblems();
+    if (chartBad.length)
+      warn(
+        "Графики",
+        "Таблицы не вернули параметры: " + chartBad.join("; ") + ". Сверьте вид графиков на листе «Панель» (раздел README «Что проверить»)",
+      );
+    else ok("Графики", NV_PANEL.charts.length + " графиков, параметры читаются обратно");
+  } catch (e) {
+    warn("Графики", "не проверены: " + (e?.message ? e.message : e));
+  }
+
   // Webhook
   const last = Number(nvScriptProps().getProperty(NV_PROP.lastWebhookAt) || 0);
   if (s.webhookOn === true) {

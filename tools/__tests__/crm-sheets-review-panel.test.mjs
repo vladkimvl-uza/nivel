@@ -88,9 +88,15 @@ describe("orange is only for what is worse than the norm", () => {
       if (!t.trend) continue;
       const f = sh._cell(t.pos.row + 3, t.pos.col).f;
       expect(f, t.key).not.toContain("highcolor");
-      if (t.trend.type === "column" || t.trend.type === "line") {
+      if (t.trend.type === "column") {
         expect(f, t.key).toContain('"lastcolor"');
         expect(f, t.key).toMatch(/IF\(\$[A-Z]+\d+/);
+        seen += 1;
+      }
+      // A line has no "lastcolor" (only column and winloss have): the whole line takes the colour of the state
+      if (t.trend.type === "line") {
+        expect(f, t.key).not.toContain("lastcolor");
+        expect(f, t.key).toMatch(/"color",IF\(\$[A-Z]+\d+=TRUE/);
         seen += 1;
       }
     }

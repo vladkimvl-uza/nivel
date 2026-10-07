@@ -873,3 +873,137 @@ describe("formulas of the book: the documentation of Google, rule by rule", () =
     expect(rules("=C1<=INDIRECT(\"'Настройки'!C5\")", ctx)).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// group 4: charts and sparklines
+
+describe("group 4: SPARKLINE options belong to the type of the sparkline", () => {
+  it("every sparkline of the book uses only the options of its own type", () => {
+    expect(lintBook(built, ["sparkline-option", "sparkline-type"])).toEqual([]);
+  });
+
+  it("the linter finds lastcolor on a line, and accepts it on a column", () => {
+    const line = '=SPARKLINE(A1:A5,{"charttype","line";"lastcolor","red"})';
+    const col = '=SPARKLINE(A1:A5,{"charttype","column";"lastcolor","red"})';
+    expect(lintFormula(line).map((q) => q.rule)).toContain("sparkline-option");
+    expect(lintFormula(col)).toEqual([]);
+  });
+
+  it("the tile «Резерв гарантии» (a line) marks the state by the colour of the line, the columns by the last bar", () => {
+    const sh = built.env.ss.getSheetByName("Панель");
+    const tiles = json(built, "NV_TILES.map((t, i) => ({ key: t.key, trend: t.trend, pos: nvTilePos(i) }))");
+    const wres = tiles.find((t) => t.key === "wres");
+    const f = sh._cell(wres.pos.row + 3, wres.pos.col).f;
+    expect(f).toContain('"charttype","line"');
+    expect(f).toMatch(/"color",IF\(\$[A-Z]+\d+=TRUE,/);
+    expect(f).not.toContain("lastcolor");
+    for (const t of tiles.filter((x) => x.trend?.type === "column"))
+      expect(sh._cell(t.pos.row + 3, t.pos.col).f, t.key).toContain('"lastcolor"');
+  });
+});
+
+describe("group 4: gridlines only on the continuous axis", () => {
+  const charts = () => built.env.ss.getSheetByName("Панель").charts;
+  const T = () => json(built, "nvThemeFor('panel')");
+
+  it("a horizontal bar chart has gridlines on hAxis (values) and none on vAxis (categories)", () => {
+    const bars = charts().filter((c) => c.spec.type === "BAR");
+    expect(bars).toHaveLength(4);
+    for (const c of bars) {
+      const keys = Object.keys(c.spec.options);
+      expect(keys.filter((k) => k.startsWith("vAxis.gridlines") || k.startsWith("vAxis.minorGridlines"))).toEqual([]);
+      expect(c.spec.options["hAxis.gridlines.color"]).toBe(T().grid);
+    }
+  });
+
+  it("the other charts have gridlines on vAxis and none on the discrete hAxis", () => {
+    const others = charts().filter((c) => c.spec.type !== "BAR");
+    expect(others).toHaveLength(4);
+    for (const c of others) {
+      const keys = Object.keys(c.spec.options);
+      expect(keys.filter((k) => k.startsWith("hAxis.gridlines") || k.startsWith("hAxis.minorGridlines"))).toEqual([]);
+      expect(c.spec.options["vAxis.gridlines.color"]).toBe(T().grid);
+    }
+  });
+
+  it("the mock refuses gridlines on a discrete axis, an unknown option and a type that does not exist", () => {
+    const sh = built.env.ss.getSheetByName("Панель");
+    const data = built.env.ss.getSheetByName("_Данные");
+    const base = () => sh.newChart().setChartType("BAR").addRange(data.getRange("A1:C5")).setPosition(2, 2, 0, 0);
+    expect(() => base().setOption("vAxis.gridlines.color", "#eee").build()).toThrow(/continuous axis/);
+    expect(() => base().setOption("hAxis.gridlines.color", "#eee").build()).not.toThrow();
+    expect(() => base().setOption("titel", "x").build()).toThrow(/Unknown chart option/);
+    expect(() => sh.newChart().setChartType("BARS")).toThrow(/setChartType/);
+    expect(() => sh.newChart().setChartType("LINE").addRange(data.getRange("A1:C5")).setOption("hAxis.gridlines.color", "#eee").build()).toThrow(
+      /discrete/,
+    );
+  });
+});
+
+describe("group 4: the script removes only its own charts", () => {
+  const own = (p) => p.env.ss.getSheetByName("Панель").charts;
+
+  function fresh() {
+    const p = newProject();
+    p.call("nvSetup");
+    return p;
+  }
+
+  function ownersChart(p, row, col) {
+    const sh = p.env.ss.getSheetByName("Панель");
+    const data = p.env.ss.getSheetByName("_Данные");
+    const chart = sh
+      .newChart()
+      .setChartType("COLUMN")
+      .addRange(data.getRange("A1:B5"))
+      .setPosition(row, col, 0, 0)
+      .setOption("title", "Мой график")
+      .build();
+    sh.insertChart(chart);
+    return chart;
+  }
+
+  it("a chart added by the owner survives the rebuild, and the eight of the script are not doubled", () => {
+    const p = fresh();
+    expect(own(p)).toHaveLength(8);
+    const mine = ownersChart(p, 90, 2);
+    p.call("nvBuildCharts");
+    p.call("nvBuildCharts");
+    expect(own(p)).toHaveLength(9);
+    expect(own(p)).toContain(mine);
+  });
+
+  it("a chart of the script that the owner moved is still replaced, not left as a second copy", () => {
+    const p = fresh();
+    const moved = own(p)[0];
+    moved.spec.position = { row: 100, col: 5, offX: 0, offY: 0 };
+    p.call("nvBuildCharts");
+    expect(own(p)).toHaveLength(8);
+    expect(own(p)).not.toContain(moved);
+  });
+
+  it("the ids are kept in a document property", () => {
+    const p = fresh();
+    const ids = JSON.parse(p.env.docProps.get("NV_CHART_IDS"));
+    expect(ids).toHaveLength(8);
+    expect(ids.sort()).toEqual(own(p).map((c) => c.getChartId()).sort());
+  });
+});
+
+describe("group 4: setOption does not say whether a key was taken, the self-check reads it back", () => {
+  const row = (p) => p.call("nvSelfCheckRows").find((r) => r.check === "Графики");
+
+  it("all watched options come back: OK", () => {
+    expect(row(built).result).toBe("ОК");
+  });
+
+  it("when Sheets keeps no stacking and no series settings the self-check names the charts and keys", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.env.chartDropOptions = ["isStacked", "series"];
+    const r = row(p);
+    expect(r.result).toBe("Предупреждение");
+    expect(r.details).toContain("funnel: isStacked");
+    expect(r.details).toContain("deals_vs_threshold: series");
+  });
+});

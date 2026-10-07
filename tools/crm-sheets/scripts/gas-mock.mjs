@@ -1086,28 +1086,74 @@ class Sheet {
   }
 }
 
+const CHART_TYPE_NAMES = ["COLUMN", "BAR", "LINE", "AREA", "COMBO", "STEPPED_AREA", "SCATTER", "PIE", "TABLE"];
+// The first part of the keys of Google Charts that ComboChart, LineChart, BarChart and ColumnChart know (the reference of
+// EmbeddedChartBuilder.setOption does not check the key: the mock does, so that a typo does not pass silently)
+const CHART_OPTION_ROOTS = new Set([
+  "title",
+  "titleTextStyle",
+  "fontName",
+  "fontSize",
+  "backgroundColor",
+  "chartArea",
+  "legend",
+  "hAxis",
+  "vAxis",
+  "series",
+  "seriesType",
+  "isStacked",
+  "bar",
+  "lineWidth",
+  "pointSize",
+  "width",
+  "height",
+  "colors",
+  "curveType",
+  "areaOpacity",
+  "animation",
+  "annotations",
+  "focusTarget",
+  "orientation",
+  "reverseCategories",
+  "tooltip",
+  "interpolateNulls",
+  "dataOpacity",
+  "pointShape",
+  "theme",
+]);
+
 class ChartBuilder {
   constructor(sheet) {
     this.sheet = sheet;
     this.spec = { ranges: [], options: {}, type: null, position: null };
   }
   setChartType(t) {
+    if (!CHART_TYPE_NAMES.includes(t))
+      throw new Error("Exception: The parameters (" + String(t) + ") don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setChartType.");
     this.spec.type = t;
     return this;
   }
   addRange(r) {
+    if (!r || typeof r.getA1Notation !== "function")
+      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.addRange.");
     this.spec.ranges.push(r.getA1Notation());
     return this;
   }
   setPosition(row, col, offX, offY) {
+    if (![row, col, offX, offY].every(Number.isInteger) || row < 1 || col < 1)
+      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setPosition.");
     this.spec.position = { row, col, offX, offY };
     return this;
   }
   setOption(k, v) {
+    if (typeof k !== "string")
+      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setOption.");
     this.spec.options[k] = v;
     return this;
   }
   setNumHeaders(n) {
+    if (!Number.isInteger(n))
+      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setNumHeaders.");
     this.spec.numHeaders = n;
     return this;
   }
@@ -1125,10 +1171,31 @@ class ChartBuilder {
   }
   build() {
     const spec = this.spec;
+    if (!spec.type) throw new Error("Exception: The chart has no type");
+    if (!spec.ranges.length) throw new Error("Exception: The chart has no data range");
+    for (const k of Object.keys(spec.options)) {
+      const root = k.split(".")[0];
+      if (!CHART_OPTION_ROOTS.has(root)) throw new Error("Exception: Unknown chart option " + JSON.stringify(k));
+      // Gridlines exist only on a continuous axis: in a horizontal bar chart the axis of values is hAxis, vAxis lists the categories
+      const discrete = spec.type === "BAR" ? "vAxis" : spec.type === "LINE" || spec.type === "COMBO" || spec.type === "COLUMN" ? "hAxis" : "";
+      if (discrete && (k.startsWith(discrete + ".gridlines") || k.startsWith(discrete + ".minorGridlines")))
+        throw new Error("Exception: " + k + " is only supported for a continuous axis; " + discrete + " of a " + spec.type + " chart is discrete");
+    }
+    const env = this.sheet.owner.env;
+    env.chartSeq = (env.chartSeq || 100) + 1;
+    const id = env.chartSeq;
     return {
       spec,
       sheet: this.sheet,
-      getOptions: () => ({ get: (k) => spec.options[k] }),
+      id,
+      getChartId: () => id,
+      getContainerInfo: () => ({
+        getAnchorRow: () => spec.position?.row ?? 1,
+        getAnchorColumn: () => spec.position?.col ?? 1,
+        getOffsetX: () => spec.position?.offX ?? 0,
+        getOffsetY: () => spec.position?.offY ?? 0,
+      }),
+      getOptions: () => ({ get: (k) => (env.chartDropOptions?.includes(k) ? null : spec.options[k]) }),
       getRanges: () => spec.ranges,
     };
   }

@@ -7607,6 +7607,13 @@ function nvTileTrendFormula(tile, T, flagRef) {
   const first = tile.trend.range === "reserve" ? NV_ND.res : NV_ND.weeks;
   const range = nvDataRange(tile.trend.col, first, tile.trend.col, first + 11);
   const color = T === NV_THEMES.night ? "#A9A59C" : T.muted;
+  if (tile.trend.type === "line") {
+    // A line has no "lastcolor" (only column and winloss charts have): the whole line takes the colour of the state
+    const lineColor = "IF(" + flagRef + '=TRUE; "' + T.accent + '"; "' + color + '")';
+    return (
+      "=SPARKLINE(" + range + '; {"charttype"\\"line"; "color"\\' + lineColor + '; "linewidth"\\2; "empty"\\"zero"})'
+    );
+  }
   return (
     "=SPARKLINE(" +
     range +
@@ -7890,15 +7897,23 @@ function nvChartCommon(T, title, legend) {
     "vAxis.textStyle": { color: T.text2, fontSize: 8 },
     "hAxis.baselineColor": T.text2,
     "vAxis.baselineColor": T.text2,
-    "hAxis.gridlines.color": T.surface,
-    "vAxis.gridlines.color": T.grid,
-    "vAxis.minorGridlines.color": T.surface,
     "bar.groupWidth": "56%",
     lineWidth: 2,
     pointSize: 0,
     width: 576,
     height: 300,
   };
+}
+
+/**
+ * Gridlines only on the axis of values: that is the continuous axis (gridlines are not supported for a discrete one). In
+ * a horizontal bar chart the axis of values is hAxis and vAxis lists the categories; in the others it is the other way.
+ */
+function nvChartGridlines(type, options, T) {
+  const axis = type === "BAR" ? "hAxis" : "vAxis";
+  options[axis + ".gridlines.color"] = T.grid;
+  options[axis + ".minorGridlines.color"] = T.surface;
+  return options;
 }
 
 /** Composition palette: four shades of asphalt and paper. A kind of an order is a category, not a deviation: no orange. */
@@ -7912,7 +7927,7 @@ function nvCompositionColors(T) {
 function nvChartSpecs(T) {
   const D = NV_ND;
   const c = (title, legend, extra) => Object.assign(nvChartCommon(T, title, legend), extra || {});
-  return [
+  const specs = [
     {
       id: "fee_by_month",
       type: "COMBO",
@@ -7995,18 +8010,71 @@ function nvChartSpecs(T) {
       }),
     },
   ];
+  specs.forEach((spec) => {
+    nvChartGridlines(spec.type, spec.options, T);
+  });
+  return specs;
 }
 
 function nvChartType(name) {
   return Charts.ChartType[name];
 }
 
-/** Builds the eight charts again (the old ones of the panel are removed first). */
+const NV_CHART_IDS_PROP = "NV_CHART_IDS";
+
+function nvChartAtOurAnchor(ch) {
+  const at = ch.getContainerInfo();
+  return NV_PANEL.charts.some((a) => a.row === at.getAnchorRow() && a.col === at.getAnchorColumn());
+}
+
+/**
+ * The charts of the panel that this script built: the ids it remembered, or a chart sitting at one of its anchors (the
+ * ones of an older run). A chart the owner added to the panel is not touched.
+ */
+function nvOwnCharts(sh) {
+  let ids = [];
+  try {
+    ids = JSON.parse(nvDocProps().getProperty(NV_CHART_IDS_PROP) || "[]");
+  } catch (e) {
+    ids = [];
+  }
+  return sh.getCharts().filter((ch) => ids.indexOf(ch.getChartId()) >= 0 || nvChartAtOurAnchor(ch));
+}
+
+/** The keys of the options that the self-check reads back from a chart (setOption never says whether Sheets took a key). */
+const NV_CHART_WATCH = ["isStacked", "bar.groupWidth", "fontName", "chartArea.backgroundColor", "series", "colors"];
+
+/** What the charts of the panel did not keep: [] when every watched option is read back from every chart. */
+function nvChartOptionProblems() {
+  const sh = nvSheet("panel");
+  const own = nvOwnCharts(sh);
+  const problems = [];
+  nvChartSpecs(nvThemeFor("panel")).forEach((spec, i) => {
+    const a = NV_PANEL.charts[i];
+    const ch = own.find((c) => {
+      const at = c.getContainerInfo();
+      return at.getAnchorRow() === a.row && at.getAnchorColumn() === a.col;
+    });
+    if (!ch) {
+      problems.push(spec.id + ": графика нет");
+      return;
+    }
+    const lost = NV_CHART_WATCH.filter((k) => {
+      if (spec.options[k] === undefined) return false;
+      const got = ch.getOptions().get(k);
+      return got === null || got === undefined;
+    });
+    if (lost.length) problems.push(spec.id + ": " + lost.join(", "));
+  });
+  return problems;
+}
+
+/** Builds the eight charts again (the charts of this script are removed first; the owner's own are left). */
 function nvBuildCharts() {
   const sh = nvSheet("panel");
   const data = nvSheet("data");
   const T = nvThemeFor("panel");
-  sh.getCharts().forEach((ch) => {
+  nvOwnCharts(sh).forEach((ch) => {
     sh.removeChart(ch);
   });
   const specs = nvChartSpecs(T);
@@ -8022,6 +8090,12 @@ function nvBuildCharts() {
     });
     sh.insertChart(b.build());
   });
+  // Remember the ids of what was inserted: a chart that the owner moves is still ours next time
+  const ids = sh
+    .getCharts()
+    .filter((ch) => nvChartAtOurAnchor(ch))
+    .map((ch) => ch.getChartId());
+  nvDocProps().setProperty(NV_CHART_IDS_PROP, JSON.stringify(ids));
   return specs.length;
 }
 
@@ -14526,6 +14600,19 @@ function nvSelfCheckRows() {
     warn(k, setupNotes[k]);
   });
   if (!setupNotes["Представления фильтров"]) ok("Представления фильтров", NV_FILTER_VIEWS.length + " видов");
+
+  // Charts: the options that Sheets read back
+  try {
+    const chartBad = nvChartOptionProblems();
+    if (chartBad.length)
+      warn(
+        "Графики",
+        "Таблицы не вернули параметры: " + chartBad.join("; ") + ". Сверьте вид графиков на листе «Панель» (раздел README «Что проверить»)",
+      );
+    else ok("Графики", NV_PANEL.charts.length + " графиков, параметры читаются обратно");
+  } catch (e) {
+    warn("Графики", "не проверены: " + (e?.message ? e.message : e));
+  }
 
   // Webhook
   const last = Number(nvScriptProps().getProperty(NV_PROP.lastWebhookAt) || 0);
