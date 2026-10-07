@@ -178,7 +178,7 @@ function nvSelfCheckRows() {
         "; меню Настройка → Установить триггеры (считаются только триггеры текущего пользователя: проверяйте под учётной записью владельца)",
     );
   else ok("Триггеры", "установлены ровно по одному (считаются только триггеры текущего пользователя)");
-  // A trigger that an earlier version left: its function is gone, so every run of it ends in a failure mail from Google
+  // A trigger that an earlier version left: its function is gone, so every run of it ends in a failure that Google reports
   const dead = nvDeadTriggers();
   if (dead.length)
     warn(

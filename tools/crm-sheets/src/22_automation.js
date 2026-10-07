@@ -34,7 +34,7 @@ function nvAssertTriggerOwner() {
 /**
  * A trigger of ours (a handler named nv…) whose function the script no longer has: an earlier version had one more
  * handler and left its trigger in the book (the weekly copy, removed on 07.10.2026). Such a trigger can only fail, and
- * Google mails the owner about every failure. A handler of another name is not ours and is never touched.
+ * Google sends the owner a notice about it. A handler of another name is not ours and is never touched.
  */
 function nvIsDeadTrigger(trigger) {
   const handler = trigger.getHandlerFunction();
