@@ -7,12 +7,24 @@ import { PgBoss } from "pg-boss";
 import pino from "pino";
 import { startHealthServer } from "./health.ts";
 import { registerAll } from "./jobs/index.ts";
+import { isCrmUrl } from "./jobs/ops/crm/sync.ts";
 import { queueOptions } from "./queue.ts";
 import { Lifecycle, type WorkerContext } from "./queues/runtime.ts";
 import { createWorkerRuntime } from "./queues/wire.ts";
 
 const env = loadEnv("worker");
 const log = pino({ name: "worker", redact: [...LOG_REDACT_PATHS] });
+
+// The CRM of the owner: both values, and the address of a web app of Google, or nothing is sent (the schema of the worker does not
+// list the two keys yet: request to the integrator).
+const sheetsUrl = process.env.NIVEL_SHEETS_URL?.trim();
+const sheetsSecret = process.env.NIVEL_SHEETS_SECRET?.trim();
+if ((sheetsUrl || sheetsSecret) && !(sheetsUrl && sheetsSecret && isCrmUrl(sheetsUrl))) {
+  log.warn(
+    "CRM: NIVEL_SHEETS_URL must be the address /exec of an Apps Script of Google and NIVEL_SHEETS_SECRET must be set; nothing is sent to the CRM",
+  );
+}
+const crm = sheetsUrl && sheetsSecret && isCrmUrl(sheetsUrl) ? { url: sheetsUrl, secret: sheetsSecret } : undefined;
 const port = Number(process.env.PORT) || appPort("worker", env.NIVEL_SLOT);
 
 // The schema pgboss is made by the migration; the worker has no CREATE on the database (see queue.ts).
@@ -37,6 +49,7 @@ const runtime = createWorkerRuntime({
     filesDir: env.FILES_DIR,
     // Read from the environment as it is: the schema of the worker does not list them (request to the integrator).
     botMode: process.env.BOT_MODE === "webhook" ? "webhook" : "polling",
+    crm,
   },
   backupMarkFile: process.env.BACKUP_MARK_FILE || undefined,
 });

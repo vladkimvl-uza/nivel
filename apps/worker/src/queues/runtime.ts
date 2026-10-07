@@ -4,6 +4,7 @@
 import type { Db } from "@nivel/db";
 import type { orders } from "@nivel/services";
 import type { Logger } from "pino";
+import type { CrmConfig } from "../jobs/ops/crm/sync.ts";
 import type { JobContext } from "../jobs/types.ts";
 import type { FailureSink } from "./failures.ts";
 import type { Throttle } from "./throttle.ts";
@@ -21,6 +22,8 @@ export interface WorkerSettings {
   botToken: string | undefined;
   /** FILES_DIR: where the bytes of the files lie; without it the retention of files does not run. */
   filesDir: string | undefined;
+  /** NIVEL_SHEETS_URL and NIVEL_SHEETS_SECRET: the web app of the CRM of the owner in Google Sheets; absent, nothing goes to the CRM. */
+  crm?: CrmConfig | undefined;
   /** BOT_MODE of the installation: in `webhook` mode ops.selfcheck looks at the last error of the webhook. */
   botMode?: "polling" | "webhook" | undefined;
 }

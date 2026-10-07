@@ -69,9 +69,16 @@ describe("registerQueue", () => {
 
   it("applies the options again to a queue that exists already, so that a change in a new release reaches it", async () => {
     const { ctx, calls } = fakeContext();
-    await registerQueue(ctx, { name: "payment.expect", retry: { limit: 6, maxDelaySec: 600 }, handler: async () => {} });
+    await registerQueue(ctx, {
+      name: "payment.expect",
+      retry: { limit: 6, maxDelaySec: 600 },
+      handler: async () => {},
+    });
     expect(calls.updateQueue).toEqual([
-      ["payment.expect", expect.objectContaining({ retryLimit: 6, retryDelay: 30, retryBackoff: true, retryDelayMax: 600 })],
+      [
+        "payment.expect",
+        expect.objectContaining({ retryLimit: 6, retryDelay: 30, retryBackoff: true, retryDelayMax: 600 }),
+      ],
     ]);
     await registerQueue(ctx, { name: "flat", retry: { backoff: false }, handler: async () => {} });
     expect(calls.updateQueue[1]?.[1]).toMatchObject({ retryBackoff: false, retryDelayMax: null });
