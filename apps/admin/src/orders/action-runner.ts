@@ -30,7 +30,7 @@ export async function runAction(
   try {
     outcome = await work(user, ipHash);
   } catch (error) {
-    // Anything the command did not turn into text: the person sees the general text, the journal of the server has the rest.
+    // Anything the command did not turn into text: the person sees the general text, the log of the server has the rest. The commands log theirs themselves (`explain`).
     console.error(`[orders] ${spec.name} failed:`, error);
     return { ok: false, message: SERVICE_FALLBACK, at: Date.now() };
   }

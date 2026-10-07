@@ -1,9 +1,11 @@
 // What the forms must bring before the services are asked, and the commands that the first test file leaves out.
 import { describe, expect, it, vi } from "vitest";
 import type { Role } from "../auth/roles.ts";
+import { orders } from "@nivel/services";
 import { fromFormData } from "./build-event.ts";
 import type { Ctx, Svc } from "./commands.ts";
 import * as commands from "./commands.ts";
+import { SERVICE_FALLBACK } from "./messages.ts";
 
 const ORDER = "0199aaaa-bbbb-7ccc-8ddd-000000000001";
 const PAY = "0199aaaa-bbbb-7ccc-8ddd-000000000002";
@@ -244,5 +246,29 @@ describe("the report, the acts, the requests, the documents", () => {
     const r = await commands.generateReport(ctx, ORDER);
     expect(r.ok).toBe(false);
     expect(r.message).not.toContain("1234");
+  });
+
+  it("an unexpected exception is written to the log of the server with its command, the expected ones are not", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const failure = new Error("connection terminated");
+      const ctx = ctxOf("owner", {
+        payments: { confirm: vi.fn(async () => Promise.reject(failure)) },
+        reports: {
+          generate: vi.fn(async () => {
+            throw orders.ValidationError.of("orderId", "order_required", "order required");
+          }),
+        },
+      } as unknown as Partial<Svc>);
+      const r = await commands.confirmPayment(ctx, form({ paymentId: PAY, fiscalReceiptNo: "1" }));
+      expect(r).toMatchObject({ ok: false, message: SERVICE_FALLBACK });
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(String(log.mock.calls[0]?.[0])).toContain("payments.write");
+      expect(log.mock.calls[0]?.[1]).toBe(failure);
+      await commands.generateReport(ctx, ORDER);
+      expect(log).toHaveBeenCalledTimes(1);
+    } finally {
+      log.mockRestore();
+    }
   });
 });

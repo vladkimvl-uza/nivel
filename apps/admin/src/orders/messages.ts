@@ -168,7 +168,27 @@ const NOT_FOUND_TEXT: Record<string, string> = {
   configuration: "Сохранённая сборка не найдена.",
 };
 
-/** The Russian text for what the services threw. Anything unexpected is the general text: details go to the journal. */
+/** What the services throw on purpose: a refusal with a reason the person can act on. Everything else is a failure. */
+export function isExpected(error: unknown): boolean {
+  return (
+    error instanceof orders.ValidationError ||
+    error instanceof orders.ForbiddenError ||
+    error instanceof orders.NotFoundError ||
+    error instanceof orders.ConfigError
+  );
+}
+
+/**
+ * The text for what a command caught. A refusal of the services becomes its Russian text; anything else is a failure
+ * nobody planned: the person sees the general text, and the server log gets the command and the error itself (the
+ * stack is the only trace of why a money operation did not go through).
+ */
+export function explain(error: unknown, where: string): string {
+  if (!isExpected(error)) console.error(`[orders] ${where} failed:`, error);
+  return errorText(error);
+}
+
+/** The Russian text for what the services threw. Anything unexpected is the general text: details go to the log of the server (`explain`). */
 export function errorText(error: unknown): string {
   if (error instanceof orders.ValidationError) {
     const texts = error.issues.map((i) => issueText(i.path, i.code));

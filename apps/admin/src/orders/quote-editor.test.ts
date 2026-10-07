@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Role } from "../auth/roles.ts";
 import { fromFormData } from "./build-event.ts";
 import type { Ctx, Svc } from "./commands.ts";
+import { SERVICE_FALLBACK } from "./messages.ts";
 import { applyChange, type DraftLines, parseChange, parseTasks, type QuoteCtx, rebuildQuote } from "./quote-editor.ts";
 
 const GPU = "0199aaaa-bbbb-7ccc-8ddd-0000000000a1";
@@ -248,6 +249,24 @@ describe("rebuilding the estimate", () => {
       expect.anything(),
       ctx.rt,
     );
+  });
+
+  it("writes an unexpected exception to the log and shows only the general text", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const failure = new Error("deadlock detected");
+      const build = vi.fn(async () => Promise.reject(failure));
+      const r = await rebuildQuote(
+        ctxOf("owner", empty, { quotes: { build } } as unknown as Partial<Svc>),
+        ORDER,
+        form({ change: "add", productId: GPU }),
+      );
+      expect(r).toMatchObject({ ok: false, message: SERVICE_FALLBACK });
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log.mock.calls[0]?.[1]).toBe(failure);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("is the owner's: the assistant does not change the estimate", async () => {

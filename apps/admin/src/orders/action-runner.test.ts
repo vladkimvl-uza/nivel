@@ -22,6 +22,8 @@ vi.mock("../auth/runtime.ts", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: (p: string) => state.revalidated.push(p) }));
 
 const { runAction, SESSION_ENDED } = await import("./action-runner.ts");
+const { fromFormData } = await import("./build-event.ts");
+const commands = await import("./commands.ts");
 const { SERVICE_FALLBACK } = await import("./messages.ts");
 
 const owner: SessionUser = {
@@ -93,5 +95,28 @@ describe("the frame of a server action", () => {
     expect(JSON.stringify(r)).not.toContain("ECONNREFUSED");
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it("a command of the services that fails unexpectedly leaves a trace in the log and shows the general text", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const failure = new Error("connection terminated unexpectedly");
+      const svc = { payments: { confirm: async () => Promise.reject(failure) } } as unknown as commands.Ctx["svc"];
+      const data = new FormData();
+      data.append("paymentId", "p1");
+      data.append("fiscalReceiptNo", "1");
+      const r = await runAction(spec, (user) =>
+        commands.confirmPayment(
+          { user, svc, rt: {} as commands.Ctx["rt"], now: () => new Date() },
+          fromFormData(data),
+        ),
+      );
+      expect(r).toMatchObject({ ok: false, message: SERVICE_FALLBACK });
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0]?.[1]).toBe(failure);
+      expect(state.audit).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

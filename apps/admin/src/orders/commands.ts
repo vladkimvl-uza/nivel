@@ -10,7 +10,7 @@ import type { Role } from "../auth/roles.ts";
 import { canDo, type OrdersPermission } from "./access.ts";
 import { buildEvent, type FormInput, parseSum, permissionOf } from "./build-event.ts";
 import { STATUS_LABEL } from "./labels.ts";
-import { errorText, guardText } from "./messages.ts";
+import { explain, guardText } from "./messages.ts";
 
 export type Svc = typeof Services;
 
@@ -41,7 +41,7 @@ async function guarded(ctx: Ctx, permission: OrdersPermission | null, work: () =
   try {
     return await work();
   } catch (error) {
-    return fail(errorText(error));
+    return fail(explain(error, permission));
   }
 }
 

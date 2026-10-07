@@ -125,6 +125,23 @@ describe("the file of an order", () => {
     state.rows = [{ storage_key: "uploads/zz/missing.jpg", mime: "image/jpeg" }];
     expect((await serveFile(FILE_ID)).status).toBe(404);
   });
+
+  it("answers a failure of reading that is not a missing file with 500 and writes it to the log", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      // A folder where a file should be: reading it fails with EISDIR, not ENOENT.
+      await mkdir(join(state.filesDir, "uploads", "dir.jpg"), { recursive: true });
+      state.rows = [{ storage_key: "uploads/dir.jpg", mime: "image/jpeg" }];
+      const r = await serveFile(FILE_ID);
+      expect(r.status).toBe(500);
+      expect(log).toHaveBeenCalledTimes(1);
+      state.rows = [{ storage_key: "uploads/zz/missing.jpg", mime: "image/jpeg" }];
+      expect((await serveFile(FILE_ID)).status).toBe(404);
+      expect(log).toHaveBeenCalledTimes(1);
+    } finally {
+      log.mockRestore();
+    }
+  });
 });
 
 describe("the CSV of the registry", () => {

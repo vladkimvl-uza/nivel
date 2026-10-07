@@ -43,7 +43,10 @@ export async function serveFile(id: string): Promise<Response> {
         ...(row.mime.startsWith("image/") ? { "content-security-policy": "default-src 'none'; sandbox" } : {}),
       },
     });
-  } catch {
-    return plain(404, "Файл не найден.");
+  } catch (error) {
+    // A file that is gone is a 404; a folder that cannot be read (rights, a failing disk) is ours to know about.
+    if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT") return plain(404, "Файл не найден.");
+    console.error(`[orders] the file ${id} could not be read:`, error);
+    return plain(500, "Файл сейчас не читается. Повторите позже.");
   }
 }

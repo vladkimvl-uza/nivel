@@ -9,7 +9,7 @@ import type * as Services from "@nivel/services";
 import { canDo } from "./access.ts";
 import { type FormInput, parseSum } from "./build-event.ts";
 import type { Ctx, Outcome } from "./commands.ts";
-import { errorText } from "./messages.ts";
+import { explain } from "./messages.ts";
 
 export type ManualLine = Services.quotes.ManualLine;
 
@@ -177,6 +177,6 @@ export async function rebuildQuote(ctx: QuoteCtx, orderId: string, form: FormInp
     );
     return { ok: true, message: `Смета пересчитана сервером (версия ${built.version}).`, id: built.quoteId };
   } catch (error) {
-    return { ok: false, message: errorText(error) };
+    return { ok: false, message: explain(error, "quotes.build") };
   }
 }
