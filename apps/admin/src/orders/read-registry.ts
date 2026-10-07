@@ -23,6 +23,8 @@ export interface RegistryRow {
 }
 
 const num = (v: unknown): number => Number(v ?? 0);
+/** The mark of the order of bytes: Excel reads the CSV as UTF-8 only with it. */
+export const BOM = "\ufeff";
 
 export async function listRegistry(db: Db, year: number): Promise<RegistryRow[]> {
   const { rows } = await db.$client.query<{
@@ -187,5 +189,5 @@ export function registryCsv(
       i.note ?? "",
     ]);
   }
-  return `﻿${lines.map((l) => l.map(csvCell).join(";")).join("\r\n")}\r\n`;
+  return `${BOM}${lines.map((l) => l.map(csvCell).join(";")).join("\r\n")}\r\n`;
 }

@@ -112,8 +112,8 @@ describe("the money block", () => {
       },
     });
     const out = html(h(MoneyBlock, { card }));
-    expect(out).toContain("12 210 000 сум");
-    expect(out).toContain("2 800 000 сум");
+    expect(out).toContain("12\u00a0210\u00a0000\u00a0сум");
+    expect(out).toContain("2\u00a0800\u00a0000\u00a0сум");
     expect(out).toContain('data-testid="spend-meter"');
     expect(out).toContain('max="12210000"');
     expect(out).toContain('value="2800000"');
@@ -131,9 +131,9 @@ describe("the money block", () => {
 describe("the estimate", () => {
   it("shows the totals saved by the server, the verdict, the lines and who buys them", () => {
     const out = html(h(QuoteBlock, { card: cardOf("estimate_draft"), canEdit: true }));
-    expect(out).toContain("12 210 000 сум");
-    expect(out).toContain("1 777 500 сум");
-    expect(out).toContain("13 987 500 сум");
+    expect(out).toContain("12\u00a0210\u00a0000\u00a0сум");
+    expect(out).toContain("1\u00a0777\u00a0500\u00a0сум");
+    expect(out).toContain("13\u00a0987\u00a0500\u00a0сум");
     expect(out).toContain("Совместимо");
     expect(out).toContain("полный цикл");
     expect(out).toContain("ИП из денег клиента");
@@ -247,7 +247,7 @@ describe("next steps", () => {
       ],
     });
     expect(out).toContain("PP-7");
-    expect(out).not.toContain("1 000 сум");
+    expect(out).not.toContain("1\u00a0000\u00a0сум");
     expect(out).toContain('value="2026-10-12T10:00"');
   });
 
@@ -364,7 +364,7 @@ describe("purchases", () => {
     expect(out).toContain("Фискальный чек № CH-1");
     expect(out).toContain("ЭСФ № ESF-7");
     expect(out).toContain("ждёт подписи до 22.10.2026");
-    expect(out).toContain("скидка 10 000 сум");
+    expect(out).toContain("скидка 10\u00a0000\u00a0сум");
     expect(out).toContain(`href="/orders/files/${ID(700)}"`);
     expect(out).toContain("SN1");
   });
@@ -427,11 +427,11 @@ describe("the report, the acts, the passport, the warranty, the documents", () =
     const owner = html(h(ReportBlock, { card, canWrite: true }));
     expect(owner).toContain("Сформировать отчёт");
     expect(owner).toContain("Отправить отчёт клиенту");
-    expect(owner).toContain("360 000 сум");
+    expect(owner).toContain("360\u00a0000\u00a0сум");
     const helper = html(h(ReportBlock, { card, canWrite: false }));
     expect(helper).not.toContain("Сформировать отчёт");
     expect(helper).not.toContain("Отправить отчёт клиенту");
-    expect(helper).toContain("360 000 сум");
+    expect(helper).toContain("360\u00a0000\u00a0сум");
   });
 
   it("is absent when there is no report and nothing to make", () => {
@@ -646,7 +646,7 @@ describe("the chronology and the threshold", () => {
       remaining: 64_383_561,
     };
     const out = html(h(ThresholdBlock, { status: status as never }));
-    expect(out).toContain("164 383 561 сум");
+    expect(out).toContain("164\u00a0383\u00a0561\u00a0сум");
     expect(out).toContain("60,83 %");
     expect(out).toContain("73 %");
     expect(out).toContain("60 %");

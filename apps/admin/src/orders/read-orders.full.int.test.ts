@@ -7,7 +7,7 @@ import { getOrderCard } from "./read-orders.ts";
 import { listCategories, listVendors, searchCatalog } from "./read-quote.ts";
 import { customerOf, handedOverOrder, ownerOf, reportSentOrder } from "./test-support/flow.ts";
 import { createWorld, newFile, type World } from "./test-support/world.ts";
-import { openWarrantyCase, savePassport } from "./writes.ts";
+import { openWarrantyCase } from "./writes.ts";
 
 let w: World;
 beforeAll(async () => {
@@ -34,17 +34,10 @@ describe("the card of a handed over order", () => {
     };
     const photo = await newFile(w.db, { kind: "part_photo", retention: "order_warranty_plus_3y" });
     const seal = await newFile(w.db, { kind: "serial_photo", retention: "order_warranty_plus_3y" });
-    await savePassport(
-      writer,
-      o.orderId,
-      form({
-        serials: "Процессор: SN-1",
-        minutes: "420",
-        photoIds: photo,
-        sealPhotoIds: seal,
-        notes: "Пломбы на месте",
-        labelCode: "L-1",
-      }),
+    // The passport was written while the order was in assembly (the writes refuse a handed over order): here its photos.
+    await w.db.$client.query(
+      "update sales.build_passports set photos = $2::jsonb, seal_photos = $3::jsonb, notes = $4, label_code = $5 where order_id = $1",
+      [o.orderId, JSON.stringify([photo]), JSON.stringify([seal]), "Пломбы на месте", "L-1"],
     );
     const kase = await openWarrantyCase(writer, o.orderId, form({ description: "Не включается" }));
     expect(kase.ok).toBe(true);

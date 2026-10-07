@@ -1,6 +1,7 @@
 // Display formatting of the admin (Russian only, Asia/Tashkent). Nothing here calculates money: a sum is shown as it
 // was stored, basis points are written as percent by integer arithmetic.
-const NBSP = " ";
+/** U+00A0: a sum is not broken across lines on a narrow screen. */
+const NBSP = "\u00a0";
 
 /** "12 500 000 сум": whole sums only. A missing sum is a dash. */
 export function formatSum(value: number | null | undefined): string {

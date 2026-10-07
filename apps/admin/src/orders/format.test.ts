@@ -3,13 +3,13 @@ import { formatBp, formatDate, formatDateTime, formatSum, tashkentDay } from "./
 
 describe("formatSum", () => {
   it("groups by three with non-breaking spaces and names the unit", () => {
-    expect(formatSum(12_500_000)).toBe("12 500 000 сум");
-    expect(formatSum(0)).toBe("0 сум");
-    expect(formatSum(999)).toBe("999 сум");
-    expect(formatSum(1_000)).toBe("1 000 сум");
+    expect(formatSum(12_500_000)).toBe("12\u00a0500\u00a0000\u00a0сум");
+    expect(formatSum(0)).toBe("0\u00a0сум");
+    expect(formatSum(999)).toBe("999\u00a0сум");
+    expect(formatSum(1_000)).toBe("1\u00a0000\u00a0сум");
   });
   it("writes a negative sum with a proper minus", () => {
-    expect(formatSum(-150_000)).toBe("−150 000 сум");
+    expect(formatSum(-150_000)).toBe("−150\u00a0000\u00a0сум");
   });
   it("shows a dash for a missing sum and refuses a fraction", () => {
     expect(formatSum(null)).toBe("—");

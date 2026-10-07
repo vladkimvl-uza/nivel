@@ -52,5 +52,5 @@ export function heicPhoto(): Buffer {
 
 /** The text of a sum as the screen writes it, with ordinary spaces (the browser test compares normalised text). */
 export function plainSum(text: string): string {
-  return text.replace(/ /g, " ");
+  return text.replace(/\u00a0/g, " ");
 }

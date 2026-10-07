@@ -8,7 +8,7 @@ import { fromFormData } from "./build-event.ts";
 import { loadDashboard } from "./read-dashboard.ts";
 import { listLeads, searchCustomers } from "./read-leads.ts";
 import { loadDraftLines, searchCatalog } from "./read-quote.ts";
-import { listOtherIncome, listRegistry, listRegistryYears, registryCsv } from "./read-registry.ts";
+import { BOM, listOtherIncome, listRegistry, listRegistryYears, registryCsv } from "./read-registry.ts";
 import { factsOf } from "./runtime.ts";
 import {
   assemblingOrder,
@@ -347,7 +347,7 @@ describe("the registry", () => {
     const rows = await listRegistry(w.db, 2026);
     const income = await listOtherIncome(w.db, 2026);
     const csv = registryCsv(rows, income, (s) => s);
-    expect(csv.startsWith("﻿Вид;Номер;Статус;")).toBe(true);
+    expect(csv.startsWith(`${BOM}Вид;Номер;Статус;`)).toBe(true);
     expect(csv.split("\r\n")[1]?.startsWith("Заказ;NV-2026-")).toBe(true);
     expect(csv).toContain("Доход другой деятельности ИП;;;;;;;;;;12000000;2026-09;Другая деятельность ИП");
   });
