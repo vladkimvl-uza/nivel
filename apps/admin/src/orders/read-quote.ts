@@ -1,5 +1,6 @@
 // What the editor of the estimate and the form of a purchase need to choose from: the positions of the catalog with their
 // market price, the shops, and the lines of the current draft.
+import { CategoryCodeSchema, FeeGroupSchema } from "@nivel/contracts/catalog";
 import type { Db } from "@nivel/db";
 import type { DraftLines } from "./quote-editor.ts";
 
@@ -33,8 +34,8 @@ export async function loadDraftLines(db: Db, orderId: string): Promise<DraftLine
     } else {
       out.manual.push({
         title: r.title_snapshot,
-        categoryCode: r.category_code as never,
-        feeGroup: r.fee_group as never,
+        categoryCode: CategoryCodeSchema.parse(r.category_code),
+        feeGroup: FeeGroupSchema.parse(r.fee_group),
         qty: r.qty,
         unitSum: num(r.unit_market_sum),
         ...(r.purchased_by_ip ? {} : { purchasedByIp: false }),

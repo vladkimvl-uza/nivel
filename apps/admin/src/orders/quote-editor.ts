@@ -2,7 +2,7 @@
 // The lines of the draft are the state: a change is applied to them and the whole list goes to `quotes.build`, which
 // calculates it on the server with the domain (prices from the market, the scale from the settings). The screen shows
 // the saved draft; it adds nothing up (red lines).
-import { CategoryCodeSchema } from "@nivel/contracts/catalog";
+import { CategoryCodeSchema, ProductIdSchema } from "@nivel/contracts/catalog";
 import { UuidSchema } from "@nivel/contracts/orders";
 import type { CategoryCode, FeeGroup } from "@nivel/domain/catalog";
 import type * as Services from "@nivel/services";
@@ -165,7 +165,7 @@ export async function rebuildQuote(ctx: QuoteCtx, orderId: string, form: FormInp
       {
         orderId,
         lines: applied.lines.catalog.map((l) => ({
-          productId: l.productId as never,
+          productId: ProductIdSchema.parse(l.productId),
           qty: l.qty,
           ...(l.customerOwned ? { customerOwned: true } : {}),
         })),

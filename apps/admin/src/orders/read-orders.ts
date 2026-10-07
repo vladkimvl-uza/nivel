@@ -264,24 +264,24 @@ export interface OrderCard {
   files: Record<string, { kind: string; mime: string; bytes: number }>;
 }
 
-function parseTotals(
-  raw: unknown,
-  row: { purchaseLimit: number; feeTotal: number } & Record<string, number>,
-): QuoteTotalsView {
+type QuoteRow = NonNullable<Awaited<ReturnType<typeof sales.getQuote>>>;
+
+/** The sums are the columns of the quote, as the database holds them (all of them are NOT NULL); the rest is the stored calculation. */
+function parseTotals(raw: unknown, row: QuoteRow): QuoteTotalsView {
   const stored = (raw as { totals?: Record<string, unknown> } | null)?.totals ?? {};
   const fee = (stored.fee ?? {}) as Record<string, unknown>;
   const elig = (stored.eligibility ?? {}) as { mode?: string; minEstimate?: number };
   return {
-    componentsSum: row.componentsSum ?? 0,
-    outsideScaleSum: row.outsideScaleSum ?? 0,
-    reserveBp: row.reserveBp ?? 0,
-    reserveSum: row.reserveSum ?? 0,
+    componentsSum: row.componentsSum,
+    outsideScaleSum: row.outsideScaleSum,
+    reserveBp: row.reserveBp,
+    reserveSum: row.reserveSum,
     purchaseLimit: row.purchaseLimit,
     feeTotal: row.feeTotal,
-    feeCommissionLine: row.feeCommissionLine ?? 0,
-    feeWorksLine: row.feeWorksLine ?? 0,
-    advance: row.feeAdvance ?? 0,
-    final: row.feeFinal ?? 0,
+    feeCommissionLine: row.feeCommissionLine,
+    feeWorksLine: row.feeWorksLine,
+    advance: row.feeAdvance,
+    final: row.feeFinal,
     grandTotal: num(stored.grandTotal),
     effectiveRateBp: typeof fee.effectiveRateBp === "number" ? fee.effectiveRateBp : null,
     eligibility: elig.mode ?? "unknown",
@@ -303,7 +303,7 @@ async function loadQuote(db: Db, quoteId: string): Promise<QuoteView | null> {
     manuallyCheckedAt: q.manuallyCheckedAt,
     watermarkDraft: q.watermarkDraft,
     settingsVersion: q.settingsVersion,
-    totals: parseTotals(q.totals, q as never),
+    totals: parseTotals(q.totals, q),
     compatVerdict: meta.compatVerdict ?? "incomplete",
     shelfLifeHours: typeof meta.shelfLifeHours === "number" ? meta.shelfLifeHours : null,
     pdf: { uz: q.pdfUzFileId, ru: q.pdfRuFileId },
