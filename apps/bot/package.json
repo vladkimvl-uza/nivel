@@ -12,8 +12,17 @@
     "@grammyjs/auto-retry": "catalog:",
     "@grammyjs/runner": "catalog:",
     "@nivel/config": "workspace:*",
+    "@nivel/contracts": "workspace:*",
     "@nivel/db": "workspace:*",
+    "@nivel/domain": "workspace:*",
+    "@nivel/i18n": "workspace:*",
+    "@nivel/services": "workspace:*",
+    "@nivel/telegram": "workspace:*",
     "grammy": "catalog:",
     "pino": "catalog:"
+  },
+  "devDependencies": {
+    "@nivel/testing": "workspace:*",
+    "msw": "catalog:"
   }
 }
