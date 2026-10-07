@@ -4,15 +4,30 @@
 // Money and statuses are not calculated here (red lines): the sums are the ones the person typed or the services made.
 // Framework-free (no `next/*`): server actions in `actions.ts` wrap these; tests give them fake services.
 
+import { UuidSchema } from "@nivel/contracts/orders";
 import type { OrderStatus } from "@nivel/domain/order";
 import type * as Services from "@nivel/services";
 import type { Role } from "../auth/roles.ts";
+import type { AuditEntry } from "../auth/store.ts";
 import { canDo, type OrdersPermission } from "./access.ts";
 import { buildEvent, type FormInput, parseSum, permissionOf } from "./build-event.ts";
+import { PDF_FLAG } from "./flags.ts";
 import { STATUS_LABEL } from "./labels.ts";
 import { explain, guardText } from "./messages.ts";
 
 export type Svc = typeof Services;
+
+/** What a command reads from the database itself, where the services have no scenario to ask. */
+export interface Facts {
+  /** The customer of the order: the form never names him. */
+  customerOf(orderId: string): Promise<string | null>;
+  /** The number of the order, as the database holds it. */
+  orderNumber(orderId: string): Promise<string | null>;
+  /** The order an act belongs to. */
+  actOrderId(actId: string): Promise<string | null>;
+  /** A switch of unfinished work (`feature.*`): on only when it is exactly `true`. */
+  featureOn(key: string): Promise<boolean>;
+}
 
 export interface Ctx {
   user: { id: string; role: Role };
@@ -20,6 +35,11 @@ export interface Ctx {
   /** The runtime of the services (the admin role of the database), always passed explicitly. */
   rt: Services.orders.Runtime;
   now(): Date;
+  facts: Facts;
+  /** The journal of the admin: for what the services do not write themselves. */
+  audit: { append(entry: AuditEntry): Promise<void> };
+  /** Hash of the address of the request, for the journal. */
+  ipHash: string | null;
 }
 
 export type Outcome =
@@ -44,6 +64,10 @@ async function guarded(ctx: Ctx, permission: OrdersPermission | null, work: () =
     return fail(explain(error, permission));
   }
 }
+
+/** A line of the journal for a success the services do not journal themselves. */
+const journal = (ctx: Ctx, action: string, entity: string, entityId: string | null, after: unknown): Promise<void> =>
+  ctx.audit.append({ actor: `admin:${ctx.user.id}`, action, entity, entityId, after, ipHash: ctx.ipHash });
 
 const text = (form: FormInput, name: string): string | undefined => {
   const v = form.get(name)?.trim();
@@ -243,12 +267,34 @@ export async function recordPurchase(ctx: Ctx, orderId: string, form: FormInput)
 
 const MONEY_CONSENTS = ["limit_overrun", "no_receipt_purchase", "replacement", "third_party_payer"] as const;
 
-/** The consent of the customer to what moves money, noted by the owner (the customer said it in the bot or by phone). */
-export async function recordConsent(ctx: Ctx, orderId: string, customerId: string, form: FormInput): Promise<Outcome> {
+const MAX_CONSENT_NOTE = 500;
+
+/**
+ * The consent of the customer to what moves money, noted by the owner (the customer said it in the bot or by phone).
+ * One press lifts a ban (a purchase over the limit, one without a receipt), so the person says how the customer agreed:
+ * that goes into the evidence of the consent with who recorded it, and a line goes into the journal.
+ */
+export async function recordConsent(ctx: Ctx, orderId: string, form: FormInput): Promise<Outcome> {
   return guarded(ctx, "consents.money", async () => {
     const kind = pick(MONEY_CONSENTS, text(form, "kind"));
     if (!kind) return fail("Выберите вид согласия.");
-    await ctx.svc.consents.record({ kind, customerId, orderId, granted: true, channel: "admin" }, ctx.rt);
+    const note = text(form, "note");
+    if (!note) return fail("Напишите, как и когда клиент согласился: звонок, сообщение в боте, встреча.");
+    if (note.length > MAX_CONSENT_NOTE) return fail(`Пояснение длиннее ${MAX_CONSENT_NOTE} знаков.`);
+    const customerId = await ctx.facts.customerOf(orderId);
+    if (!customerId) return fail("Заказ не найден.");
+    const r = await ctx.svc.consents.record(
+      {
+        kind,
+        customerId,
+        orderId,
+        granted: true,
+        channel: "admin",
+        evidence: { note, recordedBy: `admin:${ctx.user.id}`, via: "owner_statement" },
+      },
+      ctx.rt,
+    );
+    await journal(ctx, "orders.consent_record", "ops.consents", r.id, { kind, orderId, channel: "admin" });
     return ok("Согласие клиента записано.");
   });
 }
@@ -257,6 +303,10 @@ export async function recordConsent(ctx: Ctx, orderId: string, customerId: strin
 export async function generateReport(ctx: Ctx, orderId: string): Promise<Outcome> {
   return guarded(ctx, "reports.write", async () => {
     const r = await ctx.svc.reports.generate({ orderId }, actorOf(ctx), ctx.rt);
+    await journal(ctx, "orders.report_generate", "sales.commission_reports", r.reportId, {
+      orderId,
+      version: r.version,
+    });
     return ok(`Отчёт сформирован (версия ${r.version}).`, r.reportId);
   });
 }
@@ -363,21 +413,42 @@ export const PDF_DOCS = [
   "warranty",
 ] as const;
 
-/** Queues the rendering of a document; the worker (WP-12) makes the file in uz and ru. Only when the switch is on (the page checks). */
-export async function requestPdf(ctx: Ctx, orderId: string, orderNumber: string, form: FormInput): Promise<Outcome> {
+/**
+ * Queues the rendering of a document; the worker (WP-12) makes the file in uz and ru. Only when the switch is on: the
+ * page hides the button, and here it is checked again, because the action can be called without the page. The number of
+ * the order and the act come from the database, never from the form or the arguments the page bound (the browser sees
+ * them): a job for the worker names a real order and an act of that order.
+ */
+export async function requestPdf(ctx: Ctx, orderId: string, form: FormInput): Promise<Outcome> {
   return guarded(ctx, "pdf.render", async () => {
+    if (!(await ctx.facts.featureOn(PDF_FLAG))) return fail("Документы PDF пока не включены.");
     const doc = pick(PDF_DOCS, text(form, "doc"));
     if (!doc) return fail("Выберите документ.");
     const actId = text(form, "actId");
-    await ctx.svc.outbox.enqueue(
+    if (!UuidSchema.safeParse(orderId).success) return fail("Заказ не найден.");
+    if (actId !== undefined && !UuidSchema.safeParse(actId).success) return fail("Акт не найден.");
+    const orderNumber = await ctx.facts.orderNumber(orderId);
+    if (!orderNumber) return fail("Заказ не найден.");
+    if (actId !== undefined && (await ctx.facts.actOrderId(actId)) !== orderId) return fail("Акт не найден.");
+    // A second press within the minute is the same job: the queue answers with the one it already has.
+    const minute = Math.floor(ctx.now().getTime() / 60_000);
+    const queued = await ctx.svc.outbox.enqueue(
       {
         kind: "job",
         payload: { job: "pdf.render", orderId, orderNumber, doc, ...(actId === undefined ? {} : { actId }) },
-        dedupeKey: `pdf:${orderId}:${doc}:${actId ?? "-"}:${ctx.now().getTime()}`,
+        dedupeKey: `pdf:${orderId}:${doc}:${actId ?? "-"}:${minute}`,
       },
       {},
       ctx.rt,
     );
-    return ok("Документ поставлен в очередь: файл появится в карточке, когда задача отработает.");
+    await journal(ctx, "orders.pdf_request", "sales.orders", orderId, {
+      doc,
+      ...(actId === undefined ? {} : { actId }),
+    });
+    return ok(
+      queued.duplicate
+        ? "Документ уже в очереди: файл появится в карточке, когда задача отработает."
+        : "Документ поставлен в очередь: файл появится в карточке, когда задача отработает.",
+    );
   });
 }

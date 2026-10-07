@@ -4,9 +4,10 @@ import { orders } from "@nivel/services";
 import { describe, expect, it, vi } from "vitest";
 import type { Role } from "../auth/roles.ts";
 import { fromFormData } from "./build-event.ts";
-import type { Ctx, Svc } from "./commands.ts";
+import type { Svc } from "./commands.ts";
 import * as commands from "./commands.ts";
 import { SERVICE_FALLBACK } from "./messages.ts";
+import { fakeCtx } from "./test-support/ctx.ts";
 
 const ORDER = "0199aaaa-bbbb-7ccc-8ddd-000000000001";
 const PAY = "0199aaaa-bbbb-7ccc-8ddd-000000000002";
@@ -14,16 +15,8 @@ const VENDOR = "0199aaaa-bbbb-7ccc-8ddd-000000000004";
 const FILE = "0199aaaa-bbbb-7ccc-8ddd-000000000005";
 const ACT = "0199aaaa-bbbb-7ccc-8ddd-000000000006";
 const LEAD = "0199aaaa-bbbb-7ccc-8ddd-000000000007";
-const CUSTOMER = "0199aaaa-bbbb-7ccc-8ddd-000000000008";
 
-function ctxOf(role: Role, svc: Partial<Svc> = {}): Ctx {
-  return {
-    user: { id: `${role}-1`, role },
-    svc: svc as Svc,
-    rt: {} as Ctx["rt"],
-    now: () => new Date("2026-10-12T05:00:00Z"),
-  };
-}
+const ctxOf = (role: Role, svc: Partial<Svc> = {}) => fakeCtx(role, svc);
 const form = (entries: Record<string, string> = {}) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(entries)) f.append(k, v);
@@ -199,8 +192,8 @@ describe("the report, the acts, the requests, the documents", () => {
     await refused(() => commands.generateAct(owner, ORDER, form({ kind: "napkin" })), "вид акта");
     await refused(() => commands.signPaperAct(owner, form({ fileId: FILE })), "Акт не выбран");
     await refused(() => commands.bindLead(owner, LEAD, form({})), "клиента");
-    await refused(() => commands.recordConsent(owner, ORDER, CUSTOMER, form({})), "вид согласия");
-    await refused(() => commands.requestPdf(owner, ORDER, "NV-1", form({ doc: "napkin" })), "документ");
+    await refused(() => commands.recordConsent(owner, ORDER, form({})), "вид согласия");
+    await refused(() => commands.requestPdf(owner, ORDER, form({ doc: "napkin" })), "документ");
   });
 
   it("an act of a kind that needs no lines is drawn without them, and the lines are cut from their quantities", async () => {
@@ -247,9 +240,7 @@ describe("the report, the acts, the requests, the documents", () => {
   it("the request for a PDF queues the job of the worker, with the act when there is one; the assistant may ask", async () => {
     const enqueue = vi.fn(async () => ({ id: "j1", duplicate: false }));
     const ctx = ctxOf("assistant", { outbox: { enqueue } } as unknown as Partial<Svc>);
-    expect((await commands.requestPdf(ctx, ORDER, "NV-2026-0001", form({ doc: "act_handover", actId: ACT }))).ok).toBe(
-      true,
-    );
+    expect((await commands.requestPdf(ctx, ORDER, form({ doc: "act_handover", actId: ACT }))).ok).toBe(true);
     expect(enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "job",
@@ -258,13 +249,60 @@ describe("the report, the acts, the requests, the documents", () => {
       {},
       ctx.rt,
     );
-    await commands.requestPdf(ctx, ORDER, "NV-2026-0001", form({ doc: "quote" }));
+    expect(ctx.journal).toEqual([
+      expect.objectContaining({ actor: "admin:assistant-1", action: "orders.pdf_request", entityId: ORDER }),
+    ]);
+    await commands.requestPdf(ctx, ORDER, form({ doc: "quote" }));
     const payload = (enqueue.mock.calls[1] as unknown as [{ payload: Record<string, unknown> }])[0].payload;
     expect(payload).not.toHaveProperty("actId");
     const translator = ctxOf("translator", { outbox: { enqueue } } as unknown as Partial<Svc>);
-    expect(await commands.requestPdf(translator, ORDER, "NV-1", form({ doc: "quote" }))).toMatchObject({
+    expect(await commands.requestPdf(translator, ORDER, form({ doc: "quote" }))).toMatchObject({
       denied: true,
     });
+  });
+
+  it("the number of the order in the job is the one of the database: the page cannot name another", async () => {
+    const enqueue = vi.fn(async () => ({ id: "j1", duplicate: false }));
+    const ctx = ctxOf("owner", { outbox: { enqueue } } as unknown as Partial<Svc>);
+    ctx.world.numbers[ORDER] = "NV-2026-0777";
+    await commands.requestPdf(ctx, ORDER, form({ doc: "quote", orderNumber: "NV-2026-9999" }));
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ orderNumber: "NV-2026-0777" }) }),
+      {},
+      ctx.rt,
+    );
+  });
+
+  it("refuses an order that is not there, an id that is not an id, an act of another order, and a switch that is off", async () => {
+    const enqueue = vi.fn(async () => ({ id: "j1", duplicate: false }));
+    const ctx = ctxOf("owner", { outbox: { enqueue } } as unknown as Partial<Svc>);
+    const other = "0199aaaa-bbbb-7ccc-8ddd-0000000000bb";
+    ctx.world.actOrders[other] = "0199aaaa-bbbb-7ccc-8ddd-0000000000cc";
+    await refused(
+      () => commands.requestPdf(ctx, "0199aaaa-bbbb-7ccc-8ddd-0000000000aa", form({ doc: "quote" })),
+      "Заказ",
+    );
+    await refused(() => commands.requestPdf(ctx, "not-an-id", form({ doc: "quote" })), "Заказ");
+    await refused(() => commands.requestPdf(ctx, ORDER, form({ doc: "act_handover", actId: "x" })), "Акт");
+    await refused(() => commands.requestPdf(ctx, ORDER, form({ doc: "act_handover", actId: other })), "Акт");
+    ctx.world.flags["feature.pdf"] = false;
+    await refused(() => commands.requestPdf(ctx, ORDER, form({ doc: "quote" })), "не включены");
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(ctx.journal).toEqual([]);
+  });
+
+  it("asks for a document once a minute: a second press gives the same job, the next minute a new one", async () => {
+    const enqueue = vi.fn(async () => ({ id: "j1", duplicate: true }));
+    const ctx = ctxOf("owner", { outbox: { enqueue } } as unknown as Partial<Svc>);
+    const first = await commands.requestPdf(ctx, ORDER, form({ doc: "quote" }));
+    expect(first).toMatchObject({ ok: true });
+    expect(first.message).toContain("уже");
+    const later = { ...ctx, now: () => new Date("2026-10-12T05:01:30Z") };
+    await commands.requestPdf(ctx, ORDER, form({ doc: "quote" }));
+    await commands.requestPdf(later, ORDER, form({ doc: "quote" }));
+    const keys = enqueue.mock.calls.map((c) => (c as unknown as [{ dedupeKey: string }])[0].dedupeKey);
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[2]).not.toBe(keys[0]);
   });
 
   it("an exception of the services becomes text, and the person is not told what it was", async () => {

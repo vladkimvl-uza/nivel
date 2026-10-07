@@ -470,7 +470,7 @@ export function PdfBlock({ card, canRender }: { card: OrderCard; canRender: bool
           {r.files.ru ? <a href={`/orders/files/${r.files.ru}`}>ru</a> : <span className="adm-note">ru ещё нет</span>}
           {canRender ? (
             <ActionForm
-              action={requestPdfAction.bind(null, card.order.id, card.order.number)}
+              action={requestPdfAction.bind(null, card.order.id)}
               submit="Сформировать заново"
               testId={`render-${r.doc}`}
               className="adm-inline"

@@ -2,9 +2,10 @@ import { orders } from "@nivel/services";
 import { describe, expect, it, vi } from "vitest";
 import type { Role } from "../auth/roles.ts";
 import { fromFormData } from "./build-event.ts";
-import type { Ctx, Svc } from "./commands.ts";
+import type { Svc } from "./commands.ts";
 import { SERVICE_FALLBACK } from "./messages.ts";
 import { applyChange, type DraftLines, parseChange, parseTasks, type QuoteCtx, rebuildQuote } from "./quote-editor.ts";
+import { fakeCtx } from "./test-support/ctx.ts";
 
 const GPU = "0199aaaa-bbbb-7ccc-8ddd-0000000000a1";
 const CPU = "0199aaaa-bbbb-7ccc-8ddd-0000000000a2";
@@ -199,12 +200,7 @@ describe("tasks of the build", () => {
 });
 
 function ctxOf(role: Role, draft: DraftLines, svc: Partial<Svc>): QuoteCtx {
-  const base: Ctx = {
-    user: { id: `${role}-1`, role },
-    svc: svc as Svc,
-    rt: {} as Ctx["rt"],
-    now: () => new Date(),
-  };
+  const base = fakeCtx(role, svc);
   return { ...base, drafts: { load: vi.fn(async () => draft) } };
 }
 

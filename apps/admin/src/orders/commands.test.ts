@@ -2,9 +2,10 @@ import { orders } from "@nivel/services";
 import { describe, expect, it, vi } from "vitest";
 import type { Role } from "../auth/roles.ts";
 import { fromFormData } from "./build-event.ts";
-import type { Ctx, Svc } from "./commands.ts";
+import type { Svc } from "./commands.ts";
 import * as commands from "./commands.ts";
 import { GUARD_TEXT } from "./messages.ts";
+import { fakeCtx } from "./test-support/ctx.ts";
 
 const ORDER = "0199aaaa-bbbb-7ccc-8ddd-000000000001";
 const PAY = "0199aaaa-bbbb-7ccc-8ddd-000000000002";
@@ -15,14 +16,7 @@ const ACT = "0199aaaa-bbbb-7ccc-8ddd-000000000006";
 const LEAD = "0199aaaa-bbbb-7ccc-8ddd-000000000007";
 const CUSTOMER = "0199aaaa-bbbb-7ccc-8ddd-000000000008";
 
-function ctxOf(role: Role, svc: Partial<Svc> = {}): Ctx {
-  return {
-    user: { id: `${role}-1`, role },
-    svc: svc as Svc,
-    rt: {} as Ctx["rt"],
-    now: () => new Date("2026-10-12T05:00:00Z"),
-  };
-}
+const ctxOf = (role: Role, svc: Partial<Svc> = {}) => fakeCtx(role, svc);
 const form = (entries: Record<string, string | string[]>) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(entries)) for (const x of Array.isArray(v) ? v : [v]) f.append(k, x);
@@ -370,12 +364,67 @@ describe("consents that move money", () => {
   it("are recorded by the owner for the customer of the order, by the admin channel", async () => {
     const record = vi.fn(async () => ({ id: "c1" }));
     const ctx = ctxOf("owner", { consents: { record } } as unknown as Partial<Svc>);
-    const r = await commands.recordConsent(ctx, ORDER, CUSTOMER, form({ kind: "limit_overrun" }));
+    const r = await commands.recordConsent(ctx, ORDER, form({ kind: "limit_overrun", note: "Сказал по телефону" }));
     expect(r.ok).toBe(true);
     expect(record).toHaveBeenCalledWith(
-      { kind: "limit_overrun", customerId: CUSTOMER, orderId: ORDER, granted: true, channel: "admin" },
+      {
+        kind: "limit_overrun",
+        customerId: CUSTOMER,
+        orderId: ORDER,
+        granted: true,
+        channel: "admin",
+        evidence: { note: "Сказал по телефону", recordedBy: "admin:owner-1", via: "owner_statement" },
+      },
       ctx.rt,
     );
+  });
+
+  it("leave a trace of who recorded them and on what ground: the evidence and a line of the journal", async () => {
+    const record = vi.fn(async () => ({ id: "c-77" }));
+    const ctx = ctxOf("owner", { consents: { record } } as unknown as Partial<Svc>);
+    await commands.recordConsent(ctx, ORDER, form({ kind: "no_receipt_purchase", note: "Написал в боте 12.10" }));
+    expect(ctx.journal).toEqual([
+      {
+        actor: "admin:owner-1",
+        action: "orders.consent_record",
+        entity: "ops.consents",
+        entityId: "c-77",
+        after: { kind: "no_receipt_purchase", orderId: ORDER, channel: "admin" },
+        ipHash: "ip-1",
+      },
+    ]);
+  });
+
+  it("are not recorded without the ground: the person says how the customer agreed", async () => {
+    const record = vi.fn();
+    const ctx = ctxOf("owner", { consents: { record } } as unknown as Partial<Svc>);
+    const r = await commands.recordConsent(ctx, ORDER, form({ kind: "limit_overrun" }));
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain("как");
+    expect((await commands.recordConsent(ctx, ORDER, form({ kind: "limit_overrun", note: "x".repeat(501) }))).ok).toBe(
+      false,
+    );
+    expect(record).not.toHaveBeenCalled();
+    expect(ctx.journal).toEqual([]);
+  });
+
+  it("take the customer from the order, and a role that may not learns nothing about the order", async () => {
+    const record = vi.fn();
+    const ctx = ctxOf("owner", { consents: { record } } as unknown as Partial<Svc>);
+    const gone = await commands.recordConsent(
+      ctx,
+      "0199aaaa-bbbb-7ccc-8ddd-0000000000aa",
+      form({ kind: "limit_overrun", note: "Сказал" }),
+    );
+    expect(gone).toMatchObject({ ok: false, message: "Заказ не найден." });
+    const lookups = vi.fn(async () => CUSTOMER);
+    const helper = ctxOf("assistant", { consents: { record } } as unknown as Partial<Svc>);
+    helper.facts.customerOf = lookups;
+    expect(await commands.recordConsent(helper, ORDER, form({ kind: "limit_overrun", note: "Сказал" }))).toMatchObject({
+      denied: true,
+    });
+    expect(lookups).not.toHaveBeenCalled();
+    expect(record).not.toHaveBeenCalled();
   });
 
   it("are not recorded by the assistant", async () => {
@@ -383,8 +432,7 @@ describe("consents that move money", () => {
     const r = await commands.recordConsent(
       ctxOf("assistant", { consents: { record } } as unknown as Partial<Svc>),
       ORDER,
-      CUSTOMER,
-      form({ kind: "limit_overrun" }),
+      form({ kind: "limit_overrun", note: "Сказал" }),
     );
     expect(r).toMatchObject({ ok: false, denied: true });
     expect(record).not.toHaveBeenCalled();
@@ -395,8 +443,7 @@ describe("consents that move money", () => {
     const r = await commands.recordConsent(
       ctxOf("owner", { consents: { record } } as unknown as Partial<Svc>),
       ORDER,
-      CUSTOMER,
-      form({ kind: "pd_processing" }),
+      form({ kind: "pd_processing", note: "Сказал" }),
     );
     expect(r.ok).toBe(false);
     expect(record).not.toHaveBeenCalled();
@@ -416,6 +463,14 @@ describe("the report, the acts, the requests", () => {
     const send = vi.fn(async () => ({ ok: true as const, status: "report_sent" as const }));
     const ctx = ctxOf("owner", { reports: { generate, send } } as unknown as Partial<Svc>);
     expect((await commands.generateReport(ctx, ORDER)).ok).toBe(true);
+    expect(ctx.journal).toEqual([
+      expect.objectContaining({
+        actor: "admin:owner-1",
+        action: "orders.report_generate",
+        entity: "sales.commission_reports",
+        entityId: QUOTE,
+      }),
+    ]);
     expect((await commands.sendReport(ctx, ORDER, form({ reportId: QUOTE }))).ok).toBe(true);
     expect(send).toHaveBeenCalledWith({ orderId: ORDER, reportId: QUOTE }, { kind: "owner", id: "owner-1" }, ctx.rt);
     const helper = ctxOf("assistant", { reports: { generate, send } } as unknown as Partial<Svc>);

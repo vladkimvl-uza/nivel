@@ -9,6 +9,7 @@ import { loadDashboard } from "./read-dashboard.ts";
 import { listLeads, searchCustomers } from "./read-leads.ts";
 import { loadDraftLines, searchCatalog } from "./read-quote.ts";
 import { listOtherIncome, listRegistry, listRegistryYears, registryCsv } from "./read-registry.ts";
+import { factsOf } from "./runtime.ts";
 import {
   assemblingOrder,
   draftOrder,
@@ -475,6 +476,38 @@ describe("the passport of a build", () => {
     const row = await stored(o.orderId);
     expect(row.tests.minutes).toBe(360);
     expect(row.tests.errors).toEqual([]);
+  });
+});
+
+describe("what the commands look up in the database", () => {
+  it("gives the customer and the number of an order, the order of an act, and the state of a switch", async () => {
+    const o = await handedOverOrder(w, "Справки");
+    const facts = factsOf(w.db);
+    const row = (await w.db.$client.query("select customer_id, number from sales.orders where id = $1", [o.orderId]))
+      .rows[0];
+    expect(await facts.customerOf(o.orderId)).toBe(row.customer_id);
+    expect(await facts.orderNumber(o.orderId)).toBe(row.number);
+    expect(await facts.actOrderId(o.handoverActId)).toBe(o.orderId);
+  });
+
+  it("answers nothing for an id that is not an id and for a record that is not there, without asking the database", async () => {
+    const facts = factsOf(w.db);
+    const gone = "0199aaaa-bbbb-7ccc-8ddd-0000000000dd";
+    expect(await facts.customerOf("not-an-id")).toBeNull();
+    expect(await facts.orderNumber(gone)).toBeNull();
+    expect(await facts.actOrderId("not-an-id")).toBeNull();
+    expect(await facts.actOrderId(gone)).toBeNull();
+  });
+
+  it("reads a switch as on only when it is exactly true", async () => {
+    const facts = factsOf(w.db);
+    expect(await facts.featureOn("feature.nothing")).toBe(false);
+    await w.db.$client.query(
+      "insert into ops.settings (key, value, updated_by) values ('feature.test_switch', '1'::jsonb, 'test') on conflict (key) do update set value = excluded.value",
+    );
+    expect(await facts.featureOn("feature.test_switch")).toBe(false);
+    await w.db.$client.query("update ops.settings set value = 'true'::jsonb where key = 'feature.test_switch'");
+    expect(await facts.featureOn("feature.test_switch")).toBe(true);
   });
 });
 

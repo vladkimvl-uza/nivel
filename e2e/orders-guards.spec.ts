@@ -84,6 +84,10 @@ test.describe("отказы автомата в карточке заказа", 
     const consent = page.getByTestId("consent-details");
     await consent.locator("summary").click();
     await consent.getByLabel("На что согласен клиент").selectOption("limit_overrun");
+    // Without a word on how the customer agreed the consent is not recorded: it lifts a ban.
+    await consent.getByRole("button", { name: "Записать согласие клиента" }).click();
+    await expect(consent.locator(".adm-flash--error")).toContainText("как и когда клиент согласился");
+    await consent.getByLabel("Как и когда клиент согласился").fill("Позвонил, согласен на превышение");
     await consent.getByRole("button", { name: "Записать согласие клиента" }).click();
     await expect(consent.locator(".adm-flash--ok")).toContainText("Согласие клиента записано");
     await form.getByRole("button", { name: "Записать покупку" }).click();
@@ -95,6 +99,16 @@ test.describe("отказы автомата в карточке заказа", 
       o.orderId,
     ]);
     expect(given).toHaveLength(1);
+    const evidence = await admin.query(
+      "select evidence from ops.consents where order_id = $1 and kind = 'limit_overrun'",
+      [o.orderId],
+    );
+    expect((evidence[0] as { evidence: { note: string; recordedBy: string } }).evidence).toMatchObject({
+      note: "Позвонил, согласен на превышение",
+      recordedBy: `admin:${owner.id}`,
+    });
+    const journal = await admin.query("select 1 from ops.audit_log where action = 'orders.consent_record'");
+    expect(journal.length).toBeGreaterThanOrEqual(1);
   });
 
   test("деньги на закупку через QR не принимаются, плата без номера чека — тоже", async ({ page, admin, world }) => {

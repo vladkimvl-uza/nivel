@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const calls = vi.hoisted(() => ({
   specs: [] as { name: string; entity: string; entityId?: string | null; revalidate: string[] }[],
   commands: [] as { fn: string; args: unknown[] }[],
-  order: { customerId: "cust-1" } as { customerId: string } | undefined,
   outcome: { ok: true, message: "Готово." } as { ok: boolean; message: string; id?: string },
 }));
 
@@ -32,14 +31,9 @@ vi.mock("./action-runner.ts", () => ({
   },
 }));
 vi.mock("./runtime.ts", () => ({
-  ordersCtx: (user: unknown) => ({ ctx: "orders", user }),
-  quoteCtx: (user: unknown) => ({ ctx: "quote", user }),
+  ordersCtx: (user: unknown, ip: unknown) => ({ ctx: "orders", user, ip }),
+  quoteCtx: (user: unknown, ip: unknown) => ({ ctx: "quote", user, ip }),
   writerFor: (user: unknown, ip: unknown) => ({ writer: true, user, ip }),
-}));
-vi.mock("../auth/runtime.ts", () => ({
-  getRuntime: () => ({
-    db: { query: { orders: { findFirst: async () => calls.order } } },
-  }),
 }));
 
 const record =
@@ -90,7 +84,6 @@ const O = "order-1";
 beforeEach(() => {
   calls.specs.length = 0;
   calls.commands.length = 0;
-  calls.order = { customerId: "cust-1" };
   calls.outcome = { ok: true, message: "Готово." };
 });
 
@@ -225,7 +218,7 @@ const CASES: Case[] = [
   ],
   [
     "requestPdfAction",
-    () => actions.requestPdfAction(O, "NV-2026-0001", IDLE, form({ doc: "quote" })),
+    () => actions.requestPdfAction(O, IDLE, form({ doc: "quote" })),
     "requestPdf",
     "orders.pdf_request",
     "sales.orders",
@@ -253,7 +246,7 @@ describe("what the actions pass on", () => {
   it("gives the event type and the order to the command, as the person signed in", async () => {
     await actions.runEventAction(O, "FEE_PREPAID", IDLE, form({ paymentId: "p1" }));
     const call = calls.commands[0];
-    expect(call?.args[0]).toEqual({ ctx: "orders", user: { id: "u1", role: "owner" } });
+    expect(call?.args[0]).toEqual({ ctx: "orders", user: { id: "u1", role: "owner" }, ip: "iphash" });
     expect(call?.args.slice(1, 3)).toEqual([O, "FEE_PREPAID"]);
     const given = call?.args[3] as { get(n: string): string | null };
     expect(given.get("paymentId")).toBe("p1");
@@ -265,16 +258,10 @@ describe("what the actions pass on", () => {
     for (const spec of calls.specs) expect(spec.revalidate).toContain(`/orders/${O}/quote`);
   });
 
-  it("takes the customer of the consent from the order, not from the form", async () => {
+  it("names the order only: the customer of the consent is read by the command, after the role is checked", async () => {
     await actions.recordConsentAction(O, IDLE, form({ kind: "limit_overrun", customerId: "somebody-else" }));
-    expect(calls.commands[0]?.args.slice(1, 3)).toEqual([O, "cust-1"]);
-  });
-
-  it("says the order is not found when it is gone, and records nothing", async () => {
-    calls.order = undefined;
-    const answer = await actions.recordConsentAction(O, IDLE, form({ kind: "limit_overrun" }));
-    expect(answer).toEqual({ ok: false, message: "Заказ не найден." });
-    expect(calls.commands).toHaveLength(0);
+    expect(calls.commands[0]?.args.slice(1, 2)).toEqual([O]);
+    expect(calls.commands[0]?.args).toHaveLength(3);
   });
 
   it("gives the writes the person and the hash of the address", async () => {

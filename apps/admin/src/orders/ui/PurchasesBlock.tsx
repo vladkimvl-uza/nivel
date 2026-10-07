@@ -122,6 +122,13 @@ export function PurchasesBlock({
               defaultValue="limit_overrun"
               options={Object.entries(CONSENT_LABEL).map(([value, label]) => ({ value, label }))}
             />
+            <TextField
+              id="consent-note"
+              name="note"
+              label="Как и когда клиент согласился"
+              hint="Например: «позвонил 12.10 в 15:20» или «написал в боте». Остаётся в записи согласия."
+              maxLength={500}
+            />
           </ActionForm>
         </details>
       ) : null}
