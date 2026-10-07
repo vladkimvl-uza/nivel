@@ -166,9 +166,7 @@ describe("the whole road of a customer through the bot", () => {
       lang: "uz",
       orderNumber: order.number,
     });
-    const sentReport = await h.bot.api.sendMessage(ali.id, reportMessage.text, {
-      reply_markup: keyboardMarkup(reportMessage.buttons),
-    });
+    const sentReport = await h.bot.api.sendMessage(ali.id, reportMessage.text, markupOf(reportMessage.buttons));
     await h.send(h.tg.press(ali, ali.id, sentReport.message_id, `o:${order.number}:rok`));
     expect(h.tg.textsTo(ali.id).at(-1)).toBe("Hisobot tasdiqlandi. Rahmat.");
     const refund = (
@@ -193,9 +191,7 @@ describe("the whole road of a customer through the bot", () => {
       orderNumber: order.number,
       params: { actId: act.actId, actKind: "material_acceptance" },
     });
-    const sentAct = await h.bot.api.sendMessage(ali.id, actMessage.text, {
-      reply_markup: keyboardMarkup(actMessage.buttons),
-    });
+    const sentAct = await h.bot.api.sendMessage(ali.id, actMessage.text, markupOf(actMessage.buttons));
     await h.send(h.tg.press(ali, ali.id, sentAct.message_id, actMessage.buttons[0]?.[0]?.callbackData as string));
     const signed = (await q("select signed_via, evidence from sales.acts where id = $1", [act.actId]))[0];
     expect(signed).toMatchObject({
