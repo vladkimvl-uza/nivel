@@ -274,6 +274,7 @@ function nvCreatePurchase(fields, opts) {
 function nvPurchaseHistory(orderNum, purchaseId, fields, opts) {
   const ctx = nvLoadOrderContext(orderNum);
   if (!ctx) return [];
+  nvNotifyFundsExceeded(ctx);
   const label = ctx.order.status;
   nvHistoryAppend({
     object: "Заказ",
@@ -316,12 +317,34 @@ function nvPurchaseAfterEdit(rowNo) {
   if (p.order) {
     const ctx = nvLoadOrderContext(p.order);
     if (!ctx) msgs.push("Заказ " + p.order + " не найден");
-    else
+    else {
       nvPurchaseWarnings(ctx).forEach((m) => {
         msgs.push(m);
       });
+      nvNotifyFundsExceeded(ctx);
+    }
   }
   return msgs;
+}
+
+/** Receipts above the money received: a toast is not enough, the owner gets a message (once per order and amount). */
+function nvNotifyFundsExceeded(ctx) {
+  const st = ctx.state;
+  if (st.receipts <= st.fundsGot) return false;
+  const key = "NV_FUNDS_ALERT_" + ctx.order.num;
+  const props = nvScriptProps();
+  if (props.getProperty(key) === String(st.receipts)) return false;
+  props.setProperty(key, String(st.receipts));
+  nvNotifyOwner(
+    "Заказ " +
+      ctx.order.num +
+      ": чеки " +
+      st.receipts +
+      " сум больше полученных денег " +
+      st.fundsGot +
+      " сум. Своими деньгами за клиента не платим.",
+  );
+  return true;
 }
 
 /* ---------------------------------------------------------------- warranty */

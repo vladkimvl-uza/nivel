@@ -211,3 +211,52 @@ function nvWarrantyFundState(demo, now) {
   });
   return { balance: balance, closedOrders: closed, lossesBp: nvLossesBp(expenses, receipts12) };
 }
+
+/** The start contribution of the warranty fund is the first line of the ledger (written once, never again). */
+function nvEnsureStartContribution() {
+  return nvWithLock(() => {
+    const rows = nvReadTable("reserves");
+    if (rows.some((r) => r.basis === "Стартовый взнос" && r.demo !== true)) return false;
+    const amount = nvSettings().warrantyStart;
+    if (!(amount > 0)) return false;
+    nvLedgerAppend({
+      date: nvToday(),
+      fund: "Гарантийный",
+      ref: "",
+      amount: amount,
+      basis: "Стартовый взнос",
+      who: "Владелец",
+      comment: "Стартовый взнос по решению владельца",
+    });
+    return true;
+  });
+}
+
+/** A correction of a fund by the owner: a signed whole sum and a comment that must not be empty. */
+function nvLedgerAdjust(fund, amount, comment) {
+  if (NV_RESERVE_FUNDS.indexOf(fund) < 0) throw new RangeError("Неизвестный фонд: " + fund);
+  if (!Number.isSafeInteger(amount) || amount === 0) throw new RangeError("Сумма поправки — целое число, не ноль");
+  if (nvStr(comment) === "") throw new RangeError("Поправка требует комментарий");
+  nvWithLock(() =>
+    nvLedgerAppend({ fund: fund, amount: amount, basis: "Поправка", who: "Владелец", comment: nvStr(comment) }),
+  );
+  return true;
+}
+
+/** Menu: a correction of a reserve through three dialogs. */
+function nvLedgerAdjustUi() {
+  const fund = nvPrompt("Поправка в резерве", "Фонд: «Гарантийный» или «Налоговый риск»");
+  if (fund === null) return false;
+  const sum = nvPrompt("Поправка в резерве", "Сумма со знаком, целое число (расход — минус)");
+  if (sum === null) return false;
+  const comment = nvPrompt("Поправка в резерве", "Комментарий (обязателен)");
+  if (comment === null) return false;
+  try {
+    nvLedgerAdjust(nvStr(fund), Number(nvStr(sum).replace(/\s/g, "")), comment);
+    nvToast("Поправка записана в «Резервы»");
+    return true;
+  } catch (e) {
+    nvToast(String(e?.message ? e.message : e), "Поправка не записана", 10);
+    return false;
+  }
+}

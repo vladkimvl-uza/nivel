@@ -133,9 +133,9 @@ function nvBuildPanel() {
       .build(),
   );
   demo.setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
-  ss.setNamedRange("P_PERIOD", period);
-  ss.setNamedRange("P_YEAR", year);
-  ss.setNamedRange("P_DEMO", demo);
+  nvSetName(ss, "P_PERIOD", period);
+  nvSetName(ss, "P_YEAR", year);
+  nvSetName(ss, "P_DEMO", demo);
   sh.getRange("B2").setValue("");
   sh.getRange("C2").setValue("Nivel · CRM");
   sh.getRange("K2").setFormula("=" + nvDataRef("B", NV_ND.params + 9));

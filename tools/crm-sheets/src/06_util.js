@@ -101,6 +101,52 @@ function nvHasProp(name) {
   return v !== null && v !== undefined && v !== "";
 }
 
+/* ---------------------------------------------------------------- named ranges */
+
+let nvNamedCache = null;
+
+/** The named ranges of the book by name (read once; cleared when the setup starts). */
+function nvNamedMap(ss) {
+  if (!nvNamedCache) {
+    nvNamedCache = {};
+    ss.getNamedRanges().forEach((nr) => {
+      nvNamedCache[nr.getName()] = nr;
+    });
+  }
+  return nvNamedCache;
+}
+
+function nvResetNamedCache() {
+  nvNamedCache = null;
+}
+
+/** The same place of a range as text: Sheet!A1:B2. */
+function nvPlaceOf(range) {
+  return range.getSheet().getName() + "!" + range.getA1Notation();
+}
+
+/**
+ * Names a range; if the name exists and points elsewhere, the existing name is moved (setNamedRange would fail or
+ * duplicate); if it already points there, nothing is written (a second setup makes no calls for it).
+ */
+function nvSetName(ss, name, range) {
+  const map = nvNamedMap(ss);
+  const existing = map[name];
+  if (existing) {
+    if (nvPlaceOf(existing.getRange()) !== nvPlaceOf(range)) existing.setRange(range);
+    return;
+  }
+  ss.setNamedRange(name, range);
+  // A stub for the next lookups of this run; moving it later re-reads the real object
+  map[name] = {
+    getRange: () => range,
+    setRange: (r) => {
+      nvNamedCache = null;
+      nvNamedMap(ss)[name].setRange(r);
+    },
+  };
+}
+
 /* ---------------------------------------------------------------- settings */
 
 let nvSettingsCache = null;
@@ -115,17 +161,24 @@ function nvSettings(fresh) {
   } catch (e) {
     ss = null;
   }
-  if (ss) {
+  const sheet = ss ? ss.getSheetByName(NV_SN.settings) : null;
+  if (sheet) {
+    // One read of the columns value..name; the rows are found by the name NV_* in the column E
+    const n = Math.max(0, sheet.getMaxRows() - NV_LAYOUT.firstRow + 1);
+    const block = n ? sheet.getRange(NV_LAYOUT.firstRow, NV_SET_COLS.value, n, 3).getValues() : [];
+    const byName = {};
+    block.forEach((r) => {
+      if (r[2]) byName[r[2]] = r[0];
+    });
     nvSettingRows().forEach((row) => {
-      const range = ss.getRangeByName(row.name);
-      if (!range) return;
-      let v = range.getValue();
+      if (!(row.name in byName)) return;
+      let v = byName[row.name];
       if (v === "" || v === null) {
         if (row.type !== "date") return;
       }
-      if (row.type === "date") v = v instanceof Date ? nvIsoDate(v) : String(v || "");
+      if (row.type === "date") v = nvIsDateValue(v) ? nvIsoDate(v) : String(v || "");
       else if (row.type === "bool") v = v === true || v === "TRUE" || v === "Да";
-      else if (row.type === "time" && v instanceof Date) v = nvFormat(v, "HH:mm");
+      else if (row.type === "time" && nvIsDateValue(v)) v = nvFormat(v, "HH:mm");
       else if (["bp", "sum", "int"].indexOf(row.type) >= 0) v = Number(v);
       s[row.key] = v;
     });
@@ -133,6 +186,11 @@ function nvSettings(fresh) {
   s.alerts = [s.alert1, s.alert2, s.alert3, s.alert4, s.alert5].map(Number).filter((x) => x > 0);
   nvSettingsCache = s;
   return s;
+}
+
+/** A Date of any realm (the test environment makes dates in another context). */
+function nvIsDateValue(v) {
+  return Object.prototype.toString.call(v) === "[object Date]";
 }
 
 function nvResetSettingsCache() {
@@ -155,6 +213,14 @@ function nvHolidays() {
     if (d) out.push(nvIsoDate(d));
   });
   return out;
+}
+
+/**
+ * Text that came from outside (a name, a note, the summary of an event) must never become a formula: a value that
+ * starts with = + - or @ is stored as text (the leading apostrophe is not part of the value in Sheets).
+ */
+function nvSafeText(v) {
+  return typeof v === "string" && /^[=+\-@]/.test(v) ? "'" + v : v;
 }
 
 /* ---------------------------------------------------------------- table access */
@@ -217,7 +283,7 @@ function nvWriteCells(sheetKey, row, values) {
     const rowVals = [];
     for (let c = from; c <= idx[j]; c++) {
       const k = def.cols[c - NV_LAYOUT.firstCol].key;
-      rowVals.push(values[k] === undefined || values[k] === null ? "" : values[k]);
+      rowVals.push(values[k] === undefined || values[k] === null ? "" : nvSafeText(values[k]));
     }
     sh.getRange(row, from, 1, idx[j] - from + 1).setValues([rowVals]);
     i = j + 1;
@@ -233,7 +299,7 @@ function nvAppendRow(sheetKey, values) {
   const arr = def.cols.map((c) => {
     if (c.calc) return null;
     const v = values[c.key];
-    return v === undefined ? "" : v;
+    return v === undefined ? "" : nvSafeText(v);
   });
   // Calculated columns hold the header formula only: never write into them. Write the runs between them.
   let i = 0;
@@ -265,7 +331,7 @@ function nvWriteRowsMatrix(sheetKey, row, objects) {
     let j = i;
     while (j + 1 < cols.length && !cols[j + 1].calc) j++;
     const matrix = objects.map((o) =>
-      cols.slice(i, j + 1).map((c) => (o[c.key] === undefined || o[c.key] === null ? "" : o[c.key])),
+      cols.slice(i, j + 1).map((c) => (o[c.key] === undefined || o[c.key] === null ? "" : nvSafeText(o[c.key]))),
     );
     sh.getRange(row, NV_LAYOUT.firstCol + i, objects.length, j - i + 1).setValues(matrix);
     i = j + 1;

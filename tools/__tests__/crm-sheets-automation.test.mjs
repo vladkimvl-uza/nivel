@@ -725,6 +725,47 @@ describe("cancellation by the price list of the stages", () => {
   });
 });
 
+describe("the ledger of the reserves", () => {
+  it("the start contribution of 3 000 000 is the first line, written once", () => {
+    const rows = read("reserves");
+    expect(rows[0]).toMatchObject({
+      fund: "Гарантийный",
+      amount: 3_000_000,
+      basis: "Стартовый взнос",
+      who: "Владелец",
+      demo: false,
+    });
+    expect(p.call("nvEnsureStartContribution")).toBe(false);
+    expect(read("reserves").filter((r) => r.basis === "Стартовый взнос")).toHaveLength(1);
+  });
+
+  it("a correction needs a fund, a whole sum that is not zero and a comment", () => {
+    expect(() => p.call("nvLedgerAdjust", "Неизвестный", 100, "x")).toThrow();
+    expect(() => p.call("nvLedgerAdjust", "Гарантийный", 0, "x")).toThrow();
+    expect(() => p.call("nvLedgerAdjust", "Гарантийный", 10.5, "x")).toThrow();
+    expect(() => p.call("nvLedgerAdjust", "Гарантийный", 100, "  ")).toThrow();
+    p.call("nvLedgerAdjust", "Налоговый риск", -50_000, "Возврат после ответа налоговой, часть");
+    const row = read("reserves").at(-1);
+    expect(row).toMatchObject({
+      fund: "Налоговый риск",
+      amount: -50_000,
+      basis: "Поправка",
+      who: "Владелец",
+      comment: "Возврат после ответа налоговой, часть",
+    });
+  });
+
+  it("the menu asks for the three values and refuses an empty comment", () => {
+    const before = read("reserves").length;
+    p.env.promptAnswers.push("Гарантийный", "120000", "");
+    expect(p.call("nvLedgerAdjustUi")).toBe(false);
+    expect(read("reserves")).toHaveLength(before);
+    p.env.promptAnswers.push("Гарантийный", "120 000", "Взнос владельца");
+    expect(p.call("nvLedgerAdjustUi")).toBe(true);
+    expect(read("reserves").at(-1).amount).toBe(120_000);
+  });
+});
+
 describe("settings and the history of changes", () => {
   it("a changed setting is written to the history with the old and the new value, and used at once", () => {
     const layout = JSON.parse(p.run("JSON.stringify(nvSettingsLayout())"));

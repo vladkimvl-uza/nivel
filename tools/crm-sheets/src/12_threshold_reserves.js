@@ -96,20 +96,44 @@ function nvBuildThreshold() {
   sh.getRange(L.headerRow, 2, 1, 2).setValues([["Показатель", "Значение"]]);
   sh.getRange(L.headerRow, NV_TH.months.col, 1, 12).setValues([NV_TH_MONTH_HEAD]);
   sh.getRange(L.headerRow, NV_TH.other.col, 1, 4).setValues([NV_TH_OTHER_HEAD]);
-  nvThresholdYearRows().forEach((r, i) => {
-    const row = NV_TH.year.first + i;
-    sh.getRange(row, 2).setValue(r[0]);
-    sh.getRange(row, 3).setFormula(nvApiFormula(r[1]));
-    ss.setNamedRange(r[2], sh.getRange(row, 3));
+  const yearRows = nvThresholdYearRows();
+  sh.getRange(NV_TH.year.first, 2, yearRows.length, 2).setValues(yearRows.map((r) => [r[0], nvApiFormula(r[1])]));
+  yearRows.forEach((r, i) => {
+    nvSetName(ss, r[2], sh.getRange(NV_TH.year.first + i, 3));
   });
   const ot = (k) =>
     "$" + nvLetter(NV_TH.other.col + k) + "$" + NV_TH.other.first + ":$" + nvLetter(NV_TH.other.col + k);
+  // The twelve months: columns E..L in one call and the due dates (N) in another; the inputs M, O, P are never written
+  const feeOf = (group, m) =>
+    "=SUMIFS(" +
+    P("amount") +
+    "; " +
+    P("group") +
+    '; "' +
+    group +
+    '"; ' +
+    P("status") +
+    '; "Подтверждён"; ' +
+    P("date") +
+    '; ">="&' +
+    m +
+    "; " +
+    P("date") +
+    '; "<"&EDATE(' +
+    m +
+    "; 1); " +
+    P("demo") +
+    "; " +
+    C +
+    ")";
+  const monthRows = [];
+  const dueRows = [];
   for (let i = 0; i < 12; i++) {
     const r = NV_TH.months.first + i;
     const m = "E" + r;
-    sh.getRange(r, 5).setFormula(nvApiFormula("=DATE($C$6; " + (i + 1) + "; 1)"));
-    sh.getRange(r, 6).setFormula(
-      nvApiFormula(
+    monthRows.push(
+      [
+        "=DATE($C$6; " + (i + 1) + "; 1)",
         "=SUMIFS(" +
           Pu("amount") +
           "; " +
@@ -125,55 +149,28 @@ function nvBuildThreshold() {
           "; " +
           C +
           ")",
-      ),
+        feeOf("Плата", m),
+        feeOf("Возврат платы", m),
+        "=SUMIFS(" + ot(1) + "; " + ot(0) + '; ">="&' + m + "; " + ot(0) + '; "<"&EDATE(' + m + "; 1))",
+        "=F" + r + "+G" + r + "-H" + r + "+I" + r,
+        "=SUM($J$6:J" + r + ")",
+        "=QUOTIENT(MAX(0; G" + r + "-H" + r + ")*NV_TURNOVER_TAX_BP+9999; 10000)",
+      ].map(nvApiFormula),
     );
-    ["Плата", "Возврат платы"].forEach((group, j) => {
-      sh.getRange(r, 7 + j).setFormula(
-        nvApiFormula(
-          "=SUMIFS(" +
-            P("amount") +
-            "; " +
-            P("group") +
-            '; "' +
-            group +
-            '"; ' +
-            P("status") +
-            '; "Подтверждён"; ' +
-            P("date") +
-            '; ">="&' +
-            m +
-            "; " +
-            P("date") +
-            '; "<"&EDATE(' +
-            m +
-            "; 1); " +
-            P("demo") +
-            "; " +
-            C +
-            ")",
-        ),
-      );
-    });
-    sh.getRange(r, 9).setFormula(
-      nvApiFormula("=SUMIFS(" + ot(1) + "; " + ot(0) + '; ">="&' + m + "; " + ot(0) + '; "<"&EDATE(' + m + "; 1))"),
-    );
-    sh.getRange(r, 10).setFormula(nvApiFormula("=F" + r + "+G" + r + "-H" + r + "+I" + r));
-    sh.getRange(r, 11).setFormula(nvApiFormula("=SUM($J$6:J" + r + ")"));
-    sh.getRange(r, 12).setFormula(
-      nvApiFormula("=QUOTIENT(MAX(0; G" + r + "-H" + r + ")*NV_TURNOVER_TAX_BP+9999; 10000)"),
-    );
-    sh.getRange(r, 14).setFormula(nvApiFormula("=DATE(YEAR(E" + r + "); MONTH(E" + r + ")+1; 15)"));
+    dueRows.push([nvApiFormula("=DATE(YEAR(E" + r + "); MONTH(E" + r + ")+1; 15)")]);
   }
+  sh.getRange(NV_TH.months.first, 5, 12, 8).setValues(monthRows);
+  sh.getRange(NV_TH.months.first, 14, 12, 1).setValues(dueRows);
   const tr = NV_TH.months.total;
   sh.getRange(tr, 5).setValue("Итого");
   ["F", "G", "H", "I", "J", "L", "M"].forEach((l) => {
     sh.getRange(l + tr).setFormula(nvApiFormula("=SUM(" + l + "6:" + l + "17)"));
   });
-  ss.setNamedRange("TH_MONTHS", sh.getRange("E6:E17"));
-  ss.setNamedRange("TH_DEALS", sh.getRange("J6:J17"));
-  ss.setNamedRange("TH_CUM", sh.getRange("K6:K17"));
-  ss.setNamedRange("TH_TAX_EST", sh.getRange("L6:L17"));
-  ss.setNamedRange("TH_PAID", sh.getRange("O6:O17"));
+  nvSetName(ss, "TH_MONTHS", sh.getRange("E6:E17"));
+  nvSetName(ss, "TH_DEALS", sh.getRange("J6:J17"));
+  nvSetName(ss, "TH_CUM", sh.getRange("K6:K17"));
+  nvSetName(ss, "TH_TAX_EST", sh.getRange("L6:L17"));
+  nvSetName(ss, "TH_PAID", sh.getRange("O6:O17"));
 
   // Validations
   const intRule = (cell) =>
@@ -389,7 +386,7 @@ function nvBuildReservesSummary() {
     const row = NV_RES_SUMMARY.first + i;
     sh.getRange(row, c).setValue(r[0]);
     sh.getRange(row, c + 1).setFormula(nvApiFormula(r[1]));
-    ss.setNamedRange(r[2], sh.getRange(row, c + 1));
+    nvSetName(ss, r[2], sh.getRange(row, c + 1));
   });
   sh.getRange(NV_RES_SUMMARY.first + 3, c).setNote(
     "Определение подтверждает владелец: расходы из гарантийного резерва за 12 месяцев к чекам сданных заказов, в бп.",

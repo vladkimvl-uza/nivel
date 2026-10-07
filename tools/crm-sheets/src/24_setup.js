@@ -129,26 +129,26 @@ function nvProtectSpecial() {
 function nvDefineNames() {
   const ss = nvSpreadsheet();
   const panel = nvSheet("panel");
-  ss.setNamedRange("P_PERIOD", panel.getRange("C3"));
-  ss.setNamedRange("P_YEAR", panel.getRange("F3"));
-  ss.setNamedRange("P_DEMO", panel.getRange("I3"));
+  nvSetName(ss, "P_PERIOD", panel.getRange("C3"));
+  nvSetName(ss, "P_YEAR", panel.getRange("F3"));
+  nvSetName(ss, "P_DEMO", panel.getRange("I3"));
   const data = nvSheet("data");
   nvDataNames().forEach((n) => {
-    ss.setNamedRange(n[0], data.getRange(n[1] + n[2]));
+    nvSetName(ss, n[0], data.getRange(n[1] + n[2]));
   });
   const th = nvSheet("threshold");
   nvThresholdYearRows().forEach((r, i) => {
-    ss.setNamedRange(r[2], th.getRange(NV_TH.year.first + i, 3));
+    nvSetName(ss, r[2], th.getRange(NV_TH.year.first + i, 3));
   });
-  ss.setNamedRange("TH_MONTHS", th.getRange("E6:E17"));
-  ss.setNamedRange("TH_DEALS", th.getRange("J6:J17"));
-  ss.setNamedRange("TH_CUM", th.getRange("K6:K17"));
-  ss.setNamedRange("TH_TAX_EST", th.getRange("L6:L17"));
-  ss.setNamedRange("TH_PAID", th.getRange("O6:O17"));
+  nvSetName(ss, "TH_MONTHS", th.getRange("E6:E17"));
+  nvSetName(ss, "TH_DEALS", th.getRange("J6:J17"));
+  nvSetName(ss, "TH_CUM", th.getRange("K6:K17"));
+  nvSetName(ss, "TH_TAX_EST", th.getRange("L6:L17"));
+  nvSetName(ss, "TH_PAID", th.getRange("O6:O17"));
   const rs = nvSheet("reserves");
   ["NV_RES_BAL_W", "NV_RES_BAL_T", "NV_RES_CLOSED", "NV_RES_LOSS_BP", "NV_RES_RATE", "NV_RES_MATURE"].forEach(
     (name, i) => {
-      ss.setNamedRange(name, rs.getRange(NV_RES_SUMMARY.first + i, NV_RES_SUMMARY.col + 1));
+      nvSetName(ss, name, rs.getRange(NV_RES_SUMMARY.first + i, NV_RES_SUMMARY.col + 1));
     },
   );
 }
@@ -233,6 +233,7 @@ function nvSetupSteps() {
   steps.push([
     "Завершение",
     () => {
+      nvEnsureStartContribution();
       nvDocProps().setProperty("NV_SCHEMA_VERSION", String(NV_SCHEMA_VERSION));
       nvDocProps().setProperty("NV_SETUP_AT", String(nvNow().getTime()));
       nvScriptProps().setProperty(NV_PROP.spreadsheetId, nvSpreadsheet().getId());
@@ -246,6 +247,7 @@ function nvSetupSteps() {
 /** Builds the book. opts.budgetMs: the time after which the run saves its step and a timer continues it. */
 function nvSetup(opts) {
   const o = opts || {};
+  nvResetNamedCache();
   const budget = o.budgetMs === undefined ? NV_SETUP_BUDGET_MS : o.budgetMs;
   const started = Date.now();
   const props = nvDocProps();

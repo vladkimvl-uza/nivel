@@ -561,6 +561,30 @@ describe("a second run changes nothing and keeps the data", () => {
     expect(counts()).toEqual(c1);
   });
 
+  it("a second run does not create or move a named range, and its writes stay in a fixed budget", () => {
+    let named = 0;
+    let writes = 0;
+    const orig = ss.setNamedRange.bind(ss);
+    ss.setNamedRange = (...a) => {
+      named += 1;
+      return orig(...a);
+    };
+    const Range = Object.getPrototypeOf(sheet("Панель").getRange(1, 1));
+    const counted = ["setValue", "setValues", "setFormula", "setNote", "setNotes"].map((k) => {
+      const f = Range[k];
+      Range[k] = function (...a) {
+        writes += 1;
+        return f.apply(this, a);
+      };
+      return [k, f];
+    });
+    p.call("nvSetup");
+    ss.setNamedRange = orig;
+    for (const [k, f] of counted) Range[k] = f;
+    expect(named).toBe(0);
+    expect(writes).toBeLessThan(900);
+  });
+
   it("keeps the rows of data, the values the owner changed in the settings and the labels of the dictionaries", () => {
     p.call("nvDemoFill");
     ss.getRangeByName("NV_PC_LOW_BP").setValue(1600);

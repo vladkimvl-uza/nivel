@@ -24,6 +24,7 @@ function nvBuildMenu() {
     .addItem("Секреты: почта владельца", "nvMenuSecretEmail")
     .addItem("Секреты: ключ вебхука", "nvMenuSecretWebhook")
     .addItem("Установить триггеры", "nvMenuInstallTriggers")
+    .addItem("Поправка в резерве", "nvMenuLedgerAdjust")
     .addItem("Обезличить старые заявки", "nvMenuAnonymize")
     .addItem("Журнал вебхука", "nvMenuWebhookLog");
   ui.createMenu("Nivel CRM")
@@ -171,7 +172,21 @@ function nvMenuOrderFromCalc() {
 function nvMenuNewLead() {
   nvShowForm("lead");
 }
+function nvMenuLedgerAdjust() {
+  nvLedgerAdjustUi();
+}
+/** On a row of "Заявки" the lead of this row is converted at once; elsewhere a form asks for the lead. */
 function nvMenuConvertLead() {
+  const sh = nvSpreadsheet().getActiveSheet();
+  if (sh && sh.getName() === NV_SN.leads && sh.getActiveCell) {
+    const row = sh.getActiveCell().getRow();
+    const num = row >= NV_LAYOUT.firstRow ? nvStr(sh.getRange(row, nvColIndex("leads", "num")).getValue()) : "";
+    if (num) {
+      const r = nvConvertLead(num);
+      nvToast(r.ok ? "Заказ " + r.order + (r.existing ? " уже был создан" : " создан") : "Заявка не найдена", num);
+      return;
+    }
+  }
   nvShowForm("convert");
 }
 function nvMenuOrderAction() {

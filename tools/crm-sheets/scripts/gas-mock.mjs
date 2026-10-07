@@ -315,7 +315,8 @@ class Range {
         cell.f = v;
         cell.v = "";
       } else {
-        cell.v = v === null ? "" : v;
+        // A leading apostrophe makes the value text and is not part of it
+        cell.v = v === null ? "" : typeof v === "string" && v.startsWith("'") ? v.slice(1) : v;
         delete cell.f;
       }
       delete cell.rich;
@@ -330,7 +331,7 @@ class Range {
         cell.f = v;
         cell.v = "";
       } else {
-        cell.v = v === null ? "" : v;
+        cell.v = v === null ? "" : typeof v === "string" && v.startsWith("'") ? v.slice(1) : v;
         delete cell.f;
       }
       delete cell.rich;
@@ -441,6 +442,18 @@ class Range {
   }
   setNote(n) {
     return this._set("note", n);
+  }
+  setNotes(m) {
+    return this._setMatrix("note", m);
+  }
+  setFontFamilies(m) {
+    return this._setMatrix("ff", m);
+  }
+  setFontSizes(m) {
+    return this._setMatrix("fs", m);
+  }
+  setHorizontalAlignments(m) {
+    return this._setMatrix("ha", m);
   }
   setDataValidation(rule) {
     return this._set("dv", rule);
@@ -1075,9 +1088,12 @@ class Spreadsheet {
     return this.locale;
   }
   getNamedRanges() {
-    return [...this.named.entries()].map(([name, range]) => ({
+    return [...this.named.entries()].map(([name, _range]) => ({
       getName: () => name,
-      getRange: () => range,
+      getRange: () => this.named.get(name),
+      setRange: (r) => {
+        this.named.set(name, r);
+      },
       remove: () => this.named.delete(name),
     }));
   }

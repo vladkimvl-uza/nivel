@@ -133,7 +133,7 @@ function nvBuildCalc() {
           .build(),
       );
     }
-    ss.setNamedRange("CALC_" + k.toUpperCase(), cell);
+    nvSetName(ss, "CALC_" + k.toUpperCase(), cell);
   });
   const formulas = nvCalcFormulas();
   NV_CALC.results.forEach((r, i) => {
@@ -206,8 +206,8 @@ function nvBuildCalc() {
   sh.getRange(rv.total, 3).setFormula(
     nvApiFormula("=IF(" + parts + '=""; ""; ' + parts + "+C" + rv.fee + "+C" + rv.reserve + ")"),
   );
-  ss.setNamedRange("CALC_BUDGET", sh.getRange(rv.budget, 3));
-  ss.setNamedRange("CALC_PARTS", sh.getRange(rv.parts, 3));
+  nvSetName(ss, "CALC_BUDGET", sh.getRange(rv.budget, 3));
+  nvSetName(ss, "CALC_PARTS", sh.getRange(rv.parts, 3));
   // Self-check of the scale
   const ch = NV_CALC.check;
   sh.getRange(ch.head - 1, 2).setValue("Самопроверка шкалы");

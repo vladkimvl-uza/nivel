@@ -27,29 +27,41 @@ function nvBuildSettings() {
   const titles = ["Параметр", "Значение", "Ед.", "Имя в формулах", "Источник", "Дата изменения"];
   sh.getRange(L.headerRow, NV_SET_COLS.label, 1, 6).setValues([titles]);
   const today = nvToday();
-  layout.forEach((item) => {
-    const r = item.def;
-    if (item.isGroup) {
-      sh.getRange(item.row, NV_SET_COLS.label).setValue(r.group);
-      return;
-    }
-    const valueCell = sh.getRange(item.row, NV_SET_COLS.value);
-    sh.getRange(item.row, NV_SET_COLS.label, 1, 1).setValue(r.label);
-    sh.getRange(item.row, NV_SET_COLS.unit, 1, 3).setValues([[r.unit, r.name, r.source]]);
-    const exists = ss.getRangeByName(r.name);
-    if (!exists) {
+  const known = nvNamedMap(ss);
+  const params = layout.filter((x) => !x.isGroup);
+  const missing = params.filter((x) => !known[x.def.name]);
+  if (missing.length === params.length) {
+    // A new book: the whole block in two calls (the text cells get the text format first, so "10:00" stays text)
+    sh.getRange(L.firstRow, NV_SET_COLS.value, layout.length, 1).setNumberFormats(
+      layout.map((x) => [!x.isGroup && (x.def.type === "time" || x.def.type === "text") ? "@" : "General"]),
+    );
+    const matrix = layout.map((x) => {
+      const r = x.def;
+      if (x.isGroup) return [r.group, "", "", "", "", ""];
+      const value = r.type === "formula" ? r.formula : r.value;
+      return [r.label, value, r.unit, r.name, r.source, today];
+    });
+    sh.getRange(L.firstRow, NV_SET_COLS.label, layout.length, 6).setValues(matrix);
+  } else {
+    // A later run: only the settings that are not there yet (the owner's values stay)
+    missing.forEach((item) => {
+      const r = item.def;
+      const valueCell = sh.getRange(item.row, NV_SET_COLS.value);
+      sh.getRange(item.row, NV_SET_COLS.label).setValue(r.label);
+      sh.getRange(item.row, NV_SET_COLS.unit, 1, 3).setValues([[r.unit, r.name, r.source]]);
       if (r.type === "formula") valueCell.setFormula(r.formula);
-      else if (r.type === "time" || (r.type === "text" && !r.list)) {
-        valueCell.setNumberFormat("@").setValue(r.value);
-      } else valueCell.setValue(r.value === "" ? "" : r.value);
+      else if (r.type === "time" || r.type === "text") valueCell.setNumberFormat("@").setValue(r.value);
+      else valueCell.setValue(r.value);
       sh.getRange(item.row, NV_SET_COLS.changed).setValue(today);
-      ss.setNamedRange(r.name, valueCell);
-    }
+    });
+  }
+  params.forEach((item) => {
+    nvSetName(ss, item.def.name, sh.getRange(item.row, NV_SET_COLS.value));
   });
   // NV_ALERTS_BP: the five alert cells as one range.
   const alertRows = layout.filter((x) => x.def.alert).map((x) => x.row);
   if (alertRows.length)
-    ss.setNamedRange("NV_ALERTS_BP", sh.getRange(alertRows[0], NV_SET_COLS.value, alertRows.length, 1));
+    nvSetName(ss, "NV_ALERTS_BP", sh.getRange(alertRows[0], NV_SET_COLS.value, alertRows.length, 1));
   nvResetSettingsCache();
 }
 
@@ -81,6 +93,8 @@ function nvStyleSettings() {
   const T = nvThemeFor("settings");
   const L = NV_LAYOUT;
   const layout = nvSettingsLayout();
+  const n = layout.length;
+  const first = L.firstRow;
   const maxRows = sh.getMaxRows();
   const maxCols = sh.getMaxColumns();
   sh.getRange(1, 1, maxRows, maxCols)
@@ -114,44 +128,63 @@ function nvStyleSettings() {
     .setFontColor(T.headText)
     .setVerticalAlignment("middle");
   nvBorder(head, "bottom", T.headRule, "SOLID_MEDIUM");
+
+  // The body in whole columns: the rows differ only in the matrices below
+  const block = sh.getRange(first, NV_SET_COLS.label, n, 6);
+  block.setBackgrounds(
+    layout.map((x) => {
+      const bg = x.isGroup ? T.bg : x.row % 2 === 0 ? T.surface : T.band;
+      const row = new Array(6).fill(bg);
+      if (!x.isGroup && x.def.type === "formula") row[1] = T.headCalc;
+      return row;
+    }),
+  );
+  nvRowLines(block, T.rowLine);
+  sh.setRowHeights(first, n, 28);
+  layout.forEach((x) => {
+    if (!x.isGroup) return;
+    sh.getRange(x.row, NV_SET_COLS.label, 1, 6).setBorder(false, false, false, false, false, false);
+    sh.setRowHeight(x.row, 30);
+    sh.getRange(x.row, NV_SET_COLS.label).setVerticalAlignment("bottom");
+  });
+  const labels = sh.getRange(first, NV_SET_COLS.label, n, 1);
+  labels.setFontWeights(layout.map((x) => [x.isGroup ? "bold" : "normal"]));
+  labels.setFontColors(layout.map((x) => [x.isGroup ? T.accentText : T.text]));
+  const values = sh.getRange(first, NV_SET_COLS.value, n, 1);
+  values.setFontFamily(NV_FONT_MONO).setFontWeight("bold");
+  values.setHorizontalAlignments(layout.map((x) => [!x.isGroup && x.def.type === "bool" ? "center" : "right"]));
+  values.setFontColors(layout.map((x) => [!x.isGroup && x.def.readonly ? T.text2 : T.text]));
+  values.setNumberFormats(
+    layout.map((x) => {
+      if (x.isGroup) return ["General"];
+      const t = x.def.type;
+      if (t === "bp" || t === "int" || t === "formula") return ["#,##0"];
+      if (t === "sum") return [NV_FMT.sum];
+      if (t === "date") return [NV_FMT.date];
+      if (t === "time" || t === "text") return ["@"];
+      return ["General"];
+    }),
+  );
+  values.setDataValidations(
+    layout.map((x) => [x.isGroup || x.def.readonly || x.def.type === "formula" ? null : nvSettingValidation(x.def)]),
+  );
+  sh.getRange(first, NV_SET_COLS.unit, n, 1).setFontColor(T.text2).setHorizontalAlignment("left");
+  sh.getRange(first, NV_SET_COLS.name, n, 1).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2);
+  sh.getRange(first, NV_SET_COLS.source, n, 1).setFontColor(T.text2).setFontSize(9);
+  sh.getRange(first, NV_SET_COLS.changed, n, 1)
+    .setNumberFormat(NV_FMT.date)
+    .setFontFamily(NV_FONT_MONO)
+    .setFontSize(9)
+    .setFontColor(T.text2)
+    .setHorizontalAlignment("left");
+  layout.forEach((x) => {
+    if (x.isGroup) sh.getRange(x.row, NV_SET_COLS.label).setFontSize(10).setFontFamily(NV_FONT_TEXT);
+  });
+
   const rules = [];
   const stageRows = layout.filter((x) => x.def.stage).map((x) => x.row);
-  layout.forEach((item) => {
-    const range = sh.getRange(item.row, NV_SET_COLS.label, 1, 6);
-    if (item.isGroup) {
-      range.setBackground(T.bg);
-      sh.getRange(item.row, NV_SET_COLS.label).setFontWeight("bold").setFontColor(T.accentText).setFontSize(10);
-      sh.setRowHeight(item.row, 30);
-      sh.getRange(item.row, NV_SET_COLS.label).setVerticalAlignment("bottom");
-      return;
-    }
-    const r = item.def;
-    range.setBackground(item.row % 2 === 0 ? T.surface : T.band);
-    nvRowLines(range, T.rowLine);
-    sh.setRowHeight(item.row, 28);
-    const value = sh.getRange(item.row, NV_SET_COLS.value);
-    value.setFontFamily(NV_FONT_MONO).setHorizontalAlignment("right").setFontWeight("bold");
-    if (r.type === "bp" || r.type === "int" || r.type === "formula") value.setNumberFormat("#,##0");
-    else if (r.type === "sum") value.setNumberFormat(NV_FMT.sum);
-    else if (r.type === "date") value.setNumberFormat(NV_FMT.date);
-    else if (r.type === "bool") value.setHorizontalAlignment("center");
-    if (r.type === "formula") value.setBackground(T.headCalc);
-    if (r.readonly) value.setFontColor(T.text2);
-    sh.getRange(item.row, NV_SET_COLS.name).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2);
-    sh.getRange(item.row, NV_SET_COLS.unit).setFontColor(T.text2).setHorizontalAlignment("left");
-    sh.getRange(item.row, NV_SET_COLS.source).setFontColor(T.text2).setFontSize(9);
-    sh.getRange(item.row, NV_SET_COLS.changed)
-      .setNumberFormat(NV_FMT.date)
-      .setFontFamily(NV_FONT_MONO)
-      .setFontSize(9)
-      .setFontColor(T.text2)
-      .setHorizontalAlignment("left");
-    const dv = r.readonly || r.type === "formula" ? null : nvSettingValidation(r);
-    if (dv) value.setDataValidation(dv);
-  });
   if (stageRows.length) {
-    const first = stageRows[0];
-    const range = sh.getRange(first, NV_SET_COLS.value, stageRows.length, 1);
+    const range = sh.getRange(stageRows[0], NV_SET_COLS.value, stageRows.length, 1);
     const f = "=SUM($C$" + stageRows[0] + ":$C$" + stageRows[stageRows.length - 1] + ")<>10000";
     rules.push(nvRule(range, f, { bg: T.overdueFill, color: T.overdueText, bold: true }));
   }

@@ -483,20 +483,37 @@ function nvBuildDict() {
   const sh = nvSheet("dict");
   const L = NV_LAYOUT;
   const placed = nvDictPlacement();
-  const needCols = placed[placed.length - 1].col + 2;
+  const lastCol = placed[placed.length - 1].col;
+  const needCols = lastCol + 2;
   if (sh.getMaxColumns() < needCols) sh.insertColumnsAfter(sh.getMaxColumns(), needCols - sh.getMaxColumns());
   const needRows = L.firstRow + 140;
   if (sh.getMaxRows() < needRows) sh.insertRowsAfter(sh.getMaxRows(), needRows - sh.getMaxRows());
+  // The titles and the names of the blocks: two calls for the whole width
+  const width = lastCol - L.firstCol + 1;
+  const titles = new Array(width).fill("");
+  const blocks = new Array(width).fill("");
+  placed.forEach((p) => {
+    titles[p.col - L.firstCol] = p.def.title;
+    blocks[p.col - L.firstCol] = p.blockStart ? p.def.block : "";
+  });
+  sh.getRange(L.headerRow, L.firstCol, 1, width).setValues([titles]);
+  sh.getRange(4, L.firstCol, 1, width).setValues([blocks]);
+  // Which columns are filled already (the owner's labels stay): one read of the body
+  const body = sh.getRange(L.firstRow, L.firstCol, 140, width).getValues();
   placed.forEach((p) => {
     const c = p.def;
-    const body = sh.getRange(L.firstRow, p.col, p.count, 1);
-    const existing = body.getValues().filter((r) => r[0] !== "" && r[0] !== null).length;
-    if (existing === 0 && c.values.length) {
+    const idx = p.col - L.firstCol;
+    let filled = false;
+    for (let i = 0; i < body.length; i++) {
+      if (body[i][idx] !== "" && body[i][idx] !== null) {
+        filled = true;
+        break;
+      }
+    }
+    if (!filled && c.values.length) {
       sh.getRange(L.firstRow, p.col, c.values.length, 1).setValues(c.values.map((v) => [v]));
     }
-    ss.setNamedRange(c.name, body);
-    sh.getRange(L.headerRow, p.col).setValue(c.title);
-    sh.getRange(4, p.col).setValue(p.blockStart ? c.block : "");
+    nvSetName(ss, c.name, sh.getRange(L.firstRow, p.col, p.count, 1));
   });
   return placed;
 }

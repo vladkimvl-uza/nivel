@@ -152,20 +152,22 @@ function nvBuildTable(sheetKey) {
   const filled = nvNextRow(sheetKey) - L.firstRow;
   if (filled > 0) nvFlagValidations(sheetKey, L.firstRow, filled);
 
-  // Validations and header notes
+  // Validations; the notes of the header go in one call
+  const notes = [];
   def.cols.forEach((c, i) => {
     const colIdx = L.firstCol + i;
     const dv = nvColumnValidation(sheetKey, c);
     if (dv) sh.getRange(L.firstRow, colIdx, rows, 1).setDataValidation(dv);
-    const head = sh.getRange(L.headerRow, colIdx);
-    if (c.calc || c.prot === "formula") head.setNote("Считает формула. Не править: ячейки ниже заполняются сами.");
-    else if (c.prot === "script") head.setNote("Заполняет скрипт. Ручная правка допустима только в крайнем случае.");
+    let note = "";
+    if (c.calc || c.prot === "formula") note = "Считает формула. Не править: ячейки ниже заполняются сами.";
+    else if (c.prot === "script") note = "Заполняет скрипт. Ручная правка допустима только в крайнем случае.";
     else if (c.plat)
-      head.setNote(
-        "Поле платформы: у строк с источником «Платформа» его присылает событие, правка вручную спросит подтверждение.",
-      );
-    else if (c.dynamicList) head.setNote("Список допустимых событий для текущего статуса.");
+      note =
+        "Поле платформы: у строк с источником «Платформа» его присылает событие, правка вручную спросит подтверждение.";
+    else if (c.dynamicList) note = "Список допустимых событий для текущего статуса.";
+    notes.push(note);
   });
+  sh.getRange(L.headerRow, L.firstCol, 1, def.cols.length).setNotes([notes]);
   return def;
 }
 

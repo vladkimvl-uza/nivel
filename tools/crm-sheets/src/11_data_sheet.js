@@ -826,14 +826,32 @@ function nvBuildData() {
   if (sh.getMaxRows() < need) sh.insertRowsAfter(sh.getMaxRows(), need - sh.getMaxRows());
   if (sh.getMaxColumns() < 8) sh.insertColumnsAfter(sh.getMaxColumns(), 8 - sh.getMaxColumns());
   nvDataNames().forEach((n) => {
-    ss.setNamedRange(n[0], sh.getRange(n[1] + n[2]));
+    nvSetName(ss, n[0], sh.getRange(n[1] + n[2]));
   });
+  // The whole sheet is written in a few blocks. The two arrays that spill (the top channels and the cycle) are left alone:
+  // only their first cell holds a formula, the cells under it are the result.
+  const cols = 8;
+  const rows = NV_ND.comp + 1;
+  const matrix = [];
+  for (let r = 0; r < rows; r++) matrix.push(new Array(cols).fill(""));
   nvDataCells().forEach((c) => {
     const f = c.f;
-    const range = sh.getRange(c.col + c.row);
-    if (typeof f === "string" && f.charAt(0) === "=") range.setFormula(nvApiFormula(f));
-    else range.setValue(f);
+    matrix[c.row - 1][c.col.charCodeAt(0) - 65] = typeof f === "string" && f.charAt(0) === "=" ? nvApiFormula(f) : f;
   });
+  const block = (r1, r2, c1, c2) => {
+    if (r2 < r1) return;
+    sh.getRange(r1, c1, r2 - r1 + 1, c2 - c1 + 1).setValues(
+      matrix.slice(r1 - 1, r2).map((row) => row.slice(c1 - 1, c2)),
+    );
+  };
+  const topEnd = NV_ND.top + 7;
+  const cycleEnd = NV_ND.cycle + 11;
+  block(1, NV_ND.top - 1, 1, cols);
+  block(NV_ND.top, NV_ND.top, 1, 1);
+  block(topEnd + 1, NV_ND.cycle - 1, 1, cols);
+  block(NV_ND.cycle, NV_ND.cycle, 1, 1);
+  block(NV_ND.cycle, cycleEnd, 4, 5);
+  block(cycleEnd + 1, rows, 1, cols);
   sh.getRange(NV_ND.kpi, 1, NV_KPI_KEYS.length, 1).setFontColor("#6B6862");
   sh.setTabColor("#A9A59C");
   sh.hideSheet();

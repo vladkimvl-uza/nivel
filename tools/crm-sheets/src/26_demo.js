@@ -344,17 +344,20 @@ function nvDemoFill() {
             ["Корпус", "Корпус"],
           ];
     const fundState = { balance: 0, closed: 0 };
-    // The start contribution of the warranty fund
-    reserves.push({
-      date: at(70, 10),
-      fund: "Гарантийный",
-      ref: "",
-      amount: s.warrantyStart,
-      basis: "Стартовый взнос",
-      who: "Владелец",
-      comment: "Стартовый взнос по решению владельца",
-      demo: true,
-    });
+    // The start contribution of the warranty fund: the real one is the first line of the ledger since the setup;
+    // a book without it gets a demo line, so that the demo fund has its balance
+    if (!nvReadTable("reserves").some((r) => r.basis === "Стартовый взнос" && r.demo !== true)) {
+      reserves.push({
+        date: at(70, 10),
+        fund: "Гарантийный",
+        ref: "",
+        amount: s.warrantyStart,
+        basis: "Стартовый взнос",
+        who: "Владелец",
+        comment: "Стартовый взнос по решению владельца",
+        demo: true,
+      });
+    }
     fundState.balance = s.warrantyStart;
 
     NV_DEMO_ORDERS.forEach((spec, idx) => {
