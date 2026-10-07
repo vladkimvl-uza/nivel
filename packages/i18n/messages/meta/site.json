@@ -1,0 +1,2212 @@
+{
+  "meta.title": {
+    "context": "<title> of the one-page site",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "meta.description": {
+    "context": "meta description of the one-page site",
+    "maxLen": 230,
+    "status": "draft"
+  },
+  "skip": {
+    "context": "link at the top of the first screen: skips the pinned scroll to How we work",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "header.home": {
+    "context": "aria-label of the logo link in the header",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "header.nav": {
+    "context": "aria-label of the main navigation",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "header.menu": {
+    "context": "aria-label of the menu button on a phone",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "header.lang": {
+    "context": "aria-label of the language switch",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "header.langUz": {
+    "context": "name of the Uzbek link of the language switch, always in Uzbek",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "header.langRu": {
+    "context": "name of the Russian link of the language switch, always in Russian",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "nav.how": {
+    "context": "navigation and kicker: How we work",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "nav.prices": {
+    "context": "navigation: prices and warranty",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "nav.request": {
+    "context": "navigation: the request form",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "cta.request": {
+    "context": "main call to action: goes to the request form",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "cta.telegram": {
+    "context": "button: opens the Telegram bot",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "cta.telegramShort": {
+    "context": "short label of the Telegram button on a phone",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "illustration": {
+    "context": "caption while stock footage is on the screen; must stay visible, not our work",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "hero.label": {
+    "context": "aria-label of the first screen",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "hero.c0.eyebrow": {
+    "context": "eyebrow above the headline",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "hero.c0.title": {
+    "context": "H1 of the page",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "hero.c0.text": {
+    "context": "lead under the headline",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "hero.c1.eyebrow": {
+    "context": "step 01 name",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "hero.c1.title": {
+    "context": "step 01 headline",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "hero.c1.text": {
+    "context": "step 01 text; hours = validity of an estimate from the fee settings",
+    "maxLen": 250,
+    "status": "draft"
+  },
+  "hero.c2.eyebrow": {
+    "context": "step 02 name",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "hero.c2.title": {
+    "context": "step 02 headline",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "hero.c2.text": {
+    "context": "step 02 text; rates and amounts come from the fee settings",
+    "maxLen": 210,
+    "status": "draft"
+  },
+  "hero.c2.note": {
+    "context": "note under step 02 text; the sample order",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "hero.c3.eyebrow": {
+    "context": "step 03 name",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "hero.c3.title": {
+    "context": "step 03 headline",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "hero.c3.text": {
+    "context": "step 03 text",
+    "maxLen": 150,
+    "status": "draft"
+  },
+  "hero.c4.eyebrow": {
+    "context": "step 04 name; neutral, not Done",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "hero.c4.title": {
+    "context": "step 04 headline",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "hero.c4.text": {
+    "context": "step 04 text; mountRate from the fee settings",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "hero.steps.s0": {
+    "context": "progress bar label of step 1",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "hero.steps.s1": {
+    "context": "progress bar label of step 2",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "hero.steps.s2": {
+    "context": "progress bar label of step 3",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "hero.steps.s3": {
+    "context": "progress bar label of step 4",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "hero.stepNow": {
+    "context": "current step on a phone; n = 01..04",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "hero.listAlt": {
+    "context": "alt text of a still in the static list",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "hero.listNote": {
+    "context": "note under the static list of four stills",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "hero.hdoc.title": {
+    "context": "heading of the small estimate sample next to step 02",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "hero.hdoc.meta": {
+    "context": "line under the small estimate heading",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "hero.hdoc.caseFans": {
+    "context": "merged row of the small estimate",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "hero.hdoc.parts": {
+    "context": "total row of the small estimate",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "hero.hdoc.fee": {
+    "context": "fee row of the small estimate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.cpu.group": {
+    "context": "group of the position cpu in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.cpu.name": {
+    "context": "name of the position cpu in the sample documents",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "items.cpu.desc": {
+    "context": "short description of the position cpu",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.cool.group": {
+    "context": "group of the position cool in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.cool.name": {
+    "context": "name of the position cool in the sample documents",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "items.cool.desc": {
+    "context": "short description of the position cool",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "items.mb.group": {
+    "context": "group of the position mb in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.mb.name": {
+    "context": "name of the position mb in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.mb.desc": {
+    "context": "short description of the position mb",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.ram.group": {
+    "context": "group of the position ram in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.ram.name": {
+    "context": "name of the position ram in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.ram.desc": {
+    "context": "short description of the position ram",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.gpu.group": {
+    "context": "group of the position gpu in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.gpu.name": {
+    "context": "name of the position gpu in the sample documents",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "items.gpu.desc": {
+    "context": "short description of the position gpu",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.ssd.group": {
+    "context": "group of the position ssd in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.ssd.name": {
+    "context": "name of the position ssd in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.ssd.desc": {
+    "context": "short description of the position ssd",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.psu.group": {
+    "context": "group of the position psu in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.psu.name": {
+    "context": "name of the position psu in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.psu.desc": {
+    "context": "short description of the position psu",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.case.group": {
+    "context": "group of the position case in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.case.name": {
+    "context": "name of the position case in the sample documents",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "items.case.desc": {
+    "context": "short description of the position case",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "items.fans.group": {
+    "context": "group of the position fans in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.fans.name": {
+    "context": "name of the position fans in the sample documents",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "items.fans.desc": {
+    "context": "short description of the position fans",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "promise.p1.title": {
+    "context": "promise 1 title",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "promise.p1.text": {
+    "context": "promise 1 text; <n> marks a figure set in mono",
+    "maxLen": 220,
+    "status": "draft"
+  },
+  "promise.p2.title": {
+    "context": "promise 2 title",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "promise.p2.text": {
+    "context": "promise 2 text",
+    "maxLen": 150,
+    "status": "draft"
+  },
+  "promise.p3.title": {
+    "context": "promise 3 title",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "promise.p3.text": {
+    "context": "promise 3 text",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "how.title": {
+    "context": "H2 of How we work",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "how.lead": {
+    "context": "lead of How we work",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "how.map": {
+    "context": "line above the map of four steps onto six",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "how.win1": {
+    "context": "pause caption on a phone",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "how.win2": {
+    "context": "pause caption on a phone",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "route.term": {
+    "context": "label in the panel of a step",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.money": {
+    "context": "label in the panel of a step",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.doc": {
+    "context": "label in the panel of a step",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.toggle": {
+    "context": "button that opens the panel of a step on a phone",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "route.st1.title": {
+    "context": "step 1 of the route: title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st1.text": {
+    "context": "step 1 of the route: text",
+    "maxLen": 150,
+    "status": "draft"
+  },
+  "route.st1.term": {
+    "context": "step 1 of the route: term",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "route.st1.money": {
+    "context": "step 1 of the route: money",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st1.doc": {
+    "context": "step 1 of the route: doc",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st1.stamp": {
+    "context": "step 1 of the route: stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st1.date": {
+    "context": "step 1 of the route: date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st2.title": {
+    "context": "step 2 of the route: title",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "route.st2.text": {
+    "context": "step 2 of the route: text",
+    "maxLen": 150,
+    "status": "draft"
+  },
+  "route.st2.term": {
+    "context": "step 2 of the route: term",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "route.st2.money": {
+    "context": "step 2 of the route: money",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "route.st2.doc": {
+    "context": "step 2 of the route: doc",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "route.st2.stamp": {
+    "context": "step 2 of the route: stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st2.date": {
+    "context": "step 2 of the route: date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st3.title": {
+    "context": "step 3 of the route: title",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "route.st3.text": {
+    "context": "step 3 of the route: text",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "route.st3.term": {
+    "context": "step 3 of the route: term",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "route.st3.money": {
+    "context": "step 3 of the route: money",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "route.st3.doc": {
+    "context": "step 3 of the route: doc",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "route.st3.stamp": {
+    "context": "step 3 of the route: stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st3.date": {
+    "context": "step 3 of the route: date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st4.title": {
+    "context": "step 4 of the route: title",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "route.st4.text": {
+    "context": "step 4 of the route: text",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "route.st4.term": {
+    "context": "step 4 of the route: term",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st4.money": {
+    "context": "step 4 of the route: money",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "route.st4.doc": {
+    "context": "step 4 of the route: doc",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "route.st4.stamp": {
+    "context": "step 4 of the route: stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st4.date": {
+    "context": "step 4 of the route: date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st5.title": {
+    "context": "step 5 of the route: title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st5.text": {
+    "context": "step 5 of the route: text",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "route.st5.term": {
+    "context": "step 5 of the route: term",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st5.money": {
+    "context": "step 5 of the route: money",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "route.st5.doc": {
+    "context": "step 5 of the route: doc",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "route.st5.stamp": {
+    "context": "step 5 of the route: stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st5.date": {
+    "context": "step 5 of the route: date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st6.title": {
+    "context": "step 6 of the route: title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st6.text": {
+    "context": "step 6 of the route: text",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "route.st6.term": {
+    "context": "step 6 of the route: term",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st6.money": {
+    "context": "step 6 of the route: money",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "route.st6.doc": {
+    "context": "step 6 of the route: doc",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "route.st6.stamp": {
+    "context": "step 6 of the route: stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.st6.date": {
+    "context": "step 6 of the route: date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "route.foot1": {
+    "context": "term of a PC from stock",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "route.foot2": {
+    "context": "term of a setup with furniture",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "route.foot3": {
+    "context": "note under the terms",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "docs.sample": {
+    "context": "plaque on a sample document",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.heading": {
+    "context": "heading of the sample estimate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.label": {
+    "context": "aria-label of the sample estimate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.meta1": {
+    "context": "first line under the heading of the estimate",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "docs.est.meta2": {
+    "context": "second line under the heading of the estimate",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "docs.est.caption": {
+    "context": "hidden caption of the estimate table",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "docs.est.colIndex": {
+    "context": "column header: number",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.colName": {
+    "context": "column header: position",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.colAmount": {
+    "context": "column header: price",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.parts": {
+    "context": "row: parts total",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "docs.est.feeHigh": {
+    "context": "row: fee on the high rate, with the minimum",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "docs.est.feeLow": {
+    "context": "row: fee on the low rate",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "docs.est.total": {
+    "context": "row: total",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.limit": {
+    "context": "footnote: purchase limit with the reserve",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "docs.est.pay": {
+    "context": "footnote: payment in parts",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "docs.est.stamp": {
+    "context": "stamp of the estimate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.est.stampMeta": {
+    "context": "date of the stamp of the estimate (sample)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "docs.rcpt.heading": {
+    "context": "heading of the sample receipt report",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "docs.rcpt.label": {
+    "context": "aria-label of the sample receipt report",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "docs.rcpt.meta": {
+    "context": "line under the heading of the report",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "docs.rcpt.caption": {
+    "context": "hidden caption of the table",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "docs.rcpt.colItem": {
+    "context": "column header",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.rcpt.colEstimate": {
+    "context": "column header",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.rcpt.colReceipt": {
+    "context": "column header",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.rcpt.colDiff": {
+    "context": "column header",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.rcpt.byEstimate": {
+    "context": "row: by the estimate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.rcpt.byReceipts": {
+    "context": "row: by the receipts",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "docs.rcpt.refund": {
+    "context": "row: refund to the customer",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "docs.rcpt.foot1": {
+    "context": "footnote line 1",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "docs.rcpt.foot2": {
+    "context": "footnote line 2",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "docs.rcpt.stamp": {
+    "context": "stamp of the report",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "docs.rcpt.stampMeta": {
+    "context": "date of the stamp of the report (sample)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "ruler.label": {
+    "context": "aria-label of the ruler under the header",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "ruler.idLong": {
+    "context": "ruler: what it shows (computer)",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "ruler.idShort": {
+    "context": "ruler: what it shows (narrow window)",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.stage.0": {
+    "context": "name of stage 00 of the order on the ruler",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.stage.1": {
+    "context": "name of stage 01 of the order on the ruler",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.stage.2": {
+    "context": "name of stage 02 of the order on the ruler",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.stage.3": {
+    "context": "name of stage 03 of the order on the ruler",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.stage.4": {
+    "context": "name of stage 04 of the order on the ruler",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.stage.5": {
+    "context": "name of stage 05 of the order on the ruler",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.stage.6": {
+    "context": "name of stage 06 of the order on the ruler",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.idle.s": {
+    "context": "ruler text before the route",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "bg.idle.ss": {
+    "context": "short ruler text before the route",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.route.s": {
+    "context": "ruler text while the route of six steps goes by",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.route.ss": {
+    "context": "short ruler text while the route goes by",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.x.s": {
+    "context": "ruler text during the purchase",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.x.ss": {
+    "context": "short ruler text during the purchase",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.y.s": {
+    "context": "ruler text during the assembly",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "bg.y.ss": {
+    "context": "short ruler text during the assembly",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.asm.0": {
+    "context": "item 1 of 8 of the assembly list",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.asm.1": {
+    "context": "item 2 of 8 of the assembly list",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "bg.asm.2": {
+    "context": "item 3 of 8 of the assembly list",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.asm.3": {
+    "context": "item 4 of 8 of the assembly list",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.asm.4": {
+    "context": "item 5 of 8 of the assembly list",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.asm.5": {
+    "context": "item 6 of 8 of the assembly list",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "bg.asm.6": {
+    "context": "item 7 of 8 of the assembly list",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "bg.asm.7": {
+    "context": "item 8 of 8 of the assembly list",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.t.s": {
+    "context": "ruler text during the test",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "bg.t.ss": {
+    "context": "short ruler text during the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.t.done.s": {
+    "context": "ruler text: test done",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "bg.t.done.ss": {
+    "context": "short ruler text: test done",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.pas.s": {
+    "context": "ruler text at the passport",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.pas.ss": {
+    "context": "short ruler text at the passport",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.act.s": {
+    "context": "ruler text at the act; final = share of the fee at handover",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "bg.act.ss": {
+    "context": "short ruler text at the act",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "bg.done.s": {
+    "context": "ruler text: handed over, warranty starts",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "bg.done.ss": {
+    "context": "short ruler text: warranty starts",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.fin.closed.s": {
+    "context": "ruler text: order closed",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "bg.fin.closed.ss": {
+    "context": "short ruler text: order closed",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.fin.closed.st": {
+    "context": "stamp on the ruler: closed",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "bg.fin.year.s": {
+    "context": "ruler text: the warranty year has gone",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "bg.fin.year.ss": {
+    "context": "short ruler text: the warranty year has gone",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.fin.run.s": {
+    "context": "ruler text: warranty runs",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "bg.fin.run.sCare": {
+    "context": "ruler text: warranty runs, the care visit is due",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "bg.fin.run.ss": {
+    "context": "short ruler text: warranty runs",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.fin.run.ssCare": {
+    "context": "short ruler text: the care visit is due",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "bg.fin.care": {
+    "context": "stamp on the ruler: care visit",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "band.x.aria": {
+    "context": "aria-label of the purchase scene",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "band.x.label": {
+    "context": "caption of the purchase scene",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "band.y.aria": {
+    "context": "aria-label of the assembly scene",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "band.y.label": {
+    "context": "caption of the assembly scene",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "band.t.aria": {
+    "context": "aria-label of the test scene",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "band.t.label": {
+    "context": "caption of the test scene",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "band.t.of": {
+    "context": "after the clock of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "band.t.clock": {
+    "context": "line under the clock of the test",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "band.t.ok": {
+    "context": "result line under the clock of the test",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "rc.shop": {
+    "context": "shop line of a sample receipt",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "rc.qty": {
+    "context": "quantity line of a sample receipt",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "rc.total": {
+    "context": "total line of a sample receipt",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "rc.sample": {
+    "context": "stamp on a sample receipt",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "rc.sum": {
+    "context": "sum of the receipts that have come",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "rc.refund": {
+    "context": "refund line shown with all nine receipts",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.kicker": {
+    "context": "kicker of the passport section",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.title": {
+    "context": "H2 of the passport section",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "passport.lead": {
+    "context": "lead of the passport section",
+    "maxLen": 210,
+    "status": "draft"
+  },
+  "passport.p1": {
+    "context": "passport point 1",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "passport.p2": {
+    "context": "passport point 2",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "passport.p3": {
+    "context": "passport point 3",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "passport.log": {
+    "context": "caption of the test log under the points",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "passport.docLabel": {
+    "context": "aria-label of the sample passport",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "passport.docTitle": {
+    "context": "heading of the sample passport",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.docSub": {
+    "context": "line under the heading of the passport",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "passport.meta.estimate": {
+    "context": "passport field label",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.meta.tests": {
+    "context": "passport field label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.meta.handover": {
+    "context": "passport field label",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.meta.warranty": {
+    "context": "passport field label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.sec1": {
+    "context": "section of the passport",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.sec1note": {
+    "context": "note of section 1",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.spec.cpu": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.gpu": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.ram": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.ssd": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.bios": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.profile": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.psu": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.room": {
+    "context": "passport spec label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.gpuValue": {
+    "context": "passport spec value",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.ramValue": {
+    "context": "passport spec value",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.ssdValue": {
+    "context": "passport spec value",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.psuValue": {
+    "context": "passport spec value",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.sec2": {
+    "context": "section of the passport",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.sec2note": {
+    "context": "note of section 2",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.chart.cpu": {
+    "context": "chart title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.chart.gpu": {
+    "context": "chart title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.chart.max": {
+    "context": "peak value next to the chart title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.chart.hour": {
+    "context": "hour mark on the axis of the chart",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.chart.label": {
+    "context": "aria-label of a temperature chart",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "passport.th.test": {
+    "context": "column header of the table of tests",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.th.duration": {
+    "context": "column header of the table of tests",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.th.result": {
+    "context": "column header of the table of tests",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.th.verdict": {
+    "context": "column header of the table of tests",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.ok": {
+    "context": "verdict: normal",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t1.name": {
+    "context": "test row 1",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.t1.dur": {
+    "context": "test row 1 duration",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t1.res": {
+    "context": "test row 1 result",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.t2.name": {
+    "context": "test row 2",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.t2.dur": {
+    "context": "test row 2 duration",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t2.res": {
+    "context": "test row 2 result",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.t3.name": {
+    "context": "test row 3",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.t3.dur": {
+    "context": "test row 3 duration",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t3.res": {
+    "context": "test row 3 result",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.t4.name": {
+    "context": "test row 4",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.t4.dur": {
+    "context": "test row 4 duration",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t4.res": {
+    "context": "test row 4 result",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t5.name": {
+    "context": "test row 5",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.t5.dur": {
+    "context": "test row 5 duration",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t5.res": {
+    "context": "test row 5 result",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.t6.name": {
+    "context": "test row 6",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.t6.dur": {
+    "context": "test row 6 duration",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.t6.res": {
+    "context": "test row 6 result",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.sign": {
+    "context": "signature line",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "passport.attach.title": {
+    "context": "attachments heading",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.attach.l1": {
+    "context": "attachment 1",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.attach.l2": {
+    "context": "attachment 2",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.attach.l3": {
+    "context": "attachment 3",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.stamp.ring": {
+    "context": "text along the round stamp",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "passport.stamp.label": {
+    "context": "accessible name of the round stamp",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "prices.kicker": {
+    "context": "kicker of the prices section",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "prices.title": {
+    "context": "H2 of the prices section",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "prices.lead": {
+    "context": "lead of the prices section",
+    "maxLen": 240,
+    "status": "draft"
+  },
+  "prices.tag": {
+    "context": "tag: the date of the price list comes from the fee settings",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "prices.th.size": {
+    "context": "column header of the scale",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.th.rate": {
+    "context": "column header of the scale",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.th.example": {
+    "context": "column header of the scale",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.r1.label": {
+    "context": "scale row 1",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "prices.r1.note": {
+    "context": "scale row 1 note",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "prices.r2.label": {
+    "context": "scale row 2",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "prices.r2.note": {
+    "context": "scale row 2 note",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "prices.r2.min": {
+    "context": "under the rate of row 2",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "prices.r3.label": {
+    "context": "scale row 3",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.r3.note": {
+    "context": "scale row 3 note",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "prices.example": {
+    "context": "example column: estimate and fee",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.chart.title": {
+    "context": "title of the fee chart",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "prices.chart.text": {
+    "context": "text under the title of the fee chart",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "prices.chart.aria": {
+    "context": "aria-label of the fee chart",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "prices.chart.axisX": {
+    "context": "x axis of the fee chart",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.chart.axisY": {
+    "context": "y axis of the fee chart",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.chart.min": {
+    "context": "label of the flat part of the fee chart",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "prices.f1.title": {
+    "context": "fact 1",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "prices.f1.text": {
+    "context": "fact 1 text",
+    "maxLen": 190,
+    "status": "draft"
+  },
+  "prices.f1.link": {
+    "context": "link of fact 1 to the sample report",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "prices.f2.title": {
+    "context": "fact 2",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "prices.f2.text": {
+    "context": "fact 2 text",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "prices.f3.title": {
+    "context": "fact 3",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "prices.f3.text": {
+    "context": "fact 3 text",
+    "maxLen": 220,
+    "status": "draft"
+  },
+  "guarantee.label": {
+    "context": "aria-label of the sample guarantee",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "guarantee.title": {
+    "context": "heading of the sample guarantee",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "guarantee.meta": {
+    "context": "line under the heading of the guarantee",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "guarantee.g1.title": {
+    "context": "guarantee item 1",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "guarantee.g1.text": {
+    "context": "guarantee item 1 text",
+    "maxLen": 150,
+    "status": "draft"
+  },
+  "guarantee.g2.title": {
+    "context": "guarantee item 2",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "guarantee.g2.text": {
+    "context": "guarantee item 2 text",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "guarantee.g3.title": {
+    "context": "guarantee item 3",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "guarantee.g3.text": {
+    "context": "guarantee item 3 text",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "guarantee.g4.title": {
+    "context": "guarantee item 4",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "guarantee.g4.text": {
+    "context": "guarantee item 4 text",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "guarantee.foot1": {
+    "context": "footnote of the guarantee",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "guarantee.foot2": {
+    "context": "footnote of the guarantee",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "guarantee.stamp": {
+    "context": "stamp of the guarantee",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "guarantee.stampMeta": {
+    "context": "date of the stamp of the guarantee (sample)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "returns.kicker": {
+    "context": "kicker of the returns block",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "returns.title": {
+    "context": "H3 of the returns block",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "returns.lead": {
+    "context": "lead of the returns block",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "returns.r1.title": {
+    "context": "returns item 1",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "returns.r1.text": {
+    "context": "returns item 1 text",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "returns.r2.title": {
+    "context": "returns item 2",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "returns.r2.text": {
+    "context": "returns item 2 text; shares of the stages from the fee settings",
+    "maxLen": 230,
+    "status": "draft"
+  },
+  "returns.r3.title": {
+    "context": "returns item 3",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "returns.r3.text": {
+    "context": "returns item 3 text",
+    "maxLen": 190,
+    "status": "draft"
+  },
+  "returns.link": {
+    "context": "link to the returns document",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.kicker": {
+    "context": "kicker of the request section",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.title": {
+    "context": "H2 of the request section",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "form.lead": {
+    "context": "lead of the request section",
+    "maxLen": 170,
+    "status": "draft"
+  },
+  "form.name": {
+    "context": "form field label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.phone": {
+    "context": "form field label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.phoneHint": {
+    "context": "hint under the phone field",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "form.telegram": {
+    "context": "form field label",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "form.telegramHint": {
+    "context": "hint under the Telegram field",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "form.scopeLabel": {
+    "context": "form field label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.scopePlaceholder": {
+    "context": "placeholder of the select",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.scope.pc": {
+    "context": "option of the select",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.scope.pc_periph": {
+    "context": "option of the select",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.scope.setup": {
+    "context": "option of the select",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "form.district": {
+    "context": "form field label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.budget": {
+    "context": "form field label",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.budgetHint": {
+    "context": "hint under the budget field",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "form.comment": {
+    "context": "form field label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.commentHint": {
+    "context": "hint under the comment field",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "form.website": {
+    "context": "label of the hidden field for bots",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.consent": {
+    "context": "label of the consent checkbox",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "form.consentLinks": {
+    "context": "text under the consent checkbox with two links",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "form.submit": {
+    "context": "submit button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.sending": {
+    "context": "submit button while sending",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "form.okTitle": {
+    "context": "title after a successful submit",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "form.okTitleNoNumber": {
+    "context": "title after a submit without a number",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.okText": {
+    "context": "text after a successful submit",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "form.error.invalid": {
+    "context": "form error",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "form.error.rate_limited": {
+    "context": "form error",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "form.error.unavailable": {
+    "context": "form error",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "form.error.failed": {
+    "context": "form error",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "form.fieldError.required": {
+    "context": "field error",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.fieldError.phone_invalid": {
+    "context": "field error",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "form.fieldError.contact_required": {
+    "context": "field error",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "form.fieldError.telegram_invalid": {
+    "context": "field error",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "form.fieldError.too_long": {
+    "context": "field error",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.fieldError.budget_invalid": {
+    "context": "field error",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "form.fieldError.scope_invalid": {
+    "context": "field error",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "form.fieldError.consent_required": {
+    "context": "field error",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "form.fieldError.rejected": {
+    "context": "field error",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "form.or": {
+    "context": "text before the Telegram button next to the form",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "final.title": {
+    "context": "H2 of the finale",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "final.text": {
+    "context": "text of the finale",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "final.logo": {
+    "context": "accessible name of the logo in the finale",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.promise": {
+    "context": "promise in the footer",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "footer.contact": {
+    "context": "footer column title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.bot": {
+    "context": "footer link",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "footer.city": {
+    "context": "footer line",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "footer.docs": {
+    "context": "footer column title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.doc.offer": {
+    "context": "footer link to the offer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.doc.privacy": {
+    "context": "footer link to the privacy policy",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "footer.doc.warranty": {
+    "context": "footer link to the warranty",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.doc.returns": {
+    "context": "footer link to the returns",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.doc.consentPd": {
+    "context": "footer link to the consent",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "footer.doc.stageTariff": {
+    "context": "footer link to the stage tariff",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "footer.reqTitle": {
+    "context": "footer column title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.req.link": {
+    "context": "footer link to the requisites page",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "footer.req.ip": {
+    "context": "requisites label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.req.inn": {
+    "context": "requisites label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.req.account": {
+    "context": "requisites label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.req.address": {
+    "context": "requisites label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.req.pending": {
+    "context": "requisites value until the sole proprietor is registered",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "footer.src.title": {
+    "context": "footer column title",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.src.text": {
+    "context": "sources of the stock videos with links; five links a1..a5",
+    "maxLen": 510,
+    "status": "draft"
+  },
+  "footer.note": {
+    "context": "bottom line of the footer",
+    "maxLen": 190,
+    "status": "draft"
+  },
+  "footer.motionOff": {
+    "context": "button: switch the animation off",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "footer.motionOn": {
+    "context": "button: switch the animation on",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "legal.back": {
+    "context": "link back to the home page from a legal page",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "legal.draft": {
+    "context": "plaque on a legal document that is a stub",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "legal.draftNote": {
+    "context": "note under the draft plaque",
+    "maxLen": 170,
+    "status": "draft"
+  },
+  "legal.version": {
+    "context": "version of the document",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "legal.effective": {
+    "context": "date from which a published document applies",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "legal.builtin": {
+    "context": "source of the text when there is no document in the database",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "legal.hash": {
+    "context": "hash of a published document",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "legal.metaDescription": {
+    "context": "meta description of a legal page",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "legal.offer.title": {
+    "context": "title of the legal page offer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "legal.privacy.title": {
+    "context": "title of the legal page privacy",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "legal.warranty.title": {
+    "context": "title of the legal page warranty",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "legal.returns.title": {
+    "context": "title of the legal page returns",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "legal.consentPd.title": {
+    "context": "title of the legal page consentPd",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "legal.stageTariff.title": {
+    "context": "title of the legal page stageTariff",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "legal.offer.body": {
+    "context": "Markdown text of the offer; a draft built into the site until a document is published",
+    "maxLen": 2370,
+    "status": "draft"
+  },
+  "legal.privacy.body": {
+    "context": "Markdown text of the privacy policy; names Google LLC (USA, Data Privacy Framework) as the recipient of the CRM table; a draft until the lawyer checks it",
+    "maxLen": 2820,
+    "status": "draft"
+  },
+  "legal.warranty.body": {
+    "context": "Markdown text of the warranty; a draft built into the site",
+    "maxLen": 990,
+    "status": "draft"
+  },
+  "legal.returns.body": {
+    "context": "Markdown text of the returns document; shares of the stages come from the fee settings",
+    "maxLen": 910,
+    "status": "draft"
+  },
+  "legal.consentPd.body": {
+    "context": "Markdown text of the consent to the processing of personal data that is ticked in the request form; its version is BUILTIN_PD_CONSENT_VERSION in apps/web/src/lead-form/form.ts",
+    "maxLen": 760,
+    "status": "draft"
+  },
+  "legal.stageTariff.body": {
+    "context": "Markdown text of the stage tariff; the shares and the date come from the fee settings",
+    "maxLen": 490,
+    "status": "draft"
+  },
+  "requisites.title": {
+    "context": "title of the requisites page",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.lead": {
+    "context": "lead of the requisites page",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "requisites.row.ip": {
+    "context": "requisites row label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.row.inn": {
+    "context": "requisites row label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.row.account": {
+    "context": "requisites row label",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "requisites.row.funds": {
+    "context": "requisites row label",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "requisites.row.bank": {
+    "context": "requisites row label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.row.address": {
+    "context": "requisites row label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.row.contact": {
+    "context": "requisites row label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.row.contactValue": {
+    "context": "requisites value",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "requisites.row.site": {
+    "context": "requisites row label",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.row.siteValue": {
+    "context": "requisites value",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.note": {
+    "context": "note under the requisites table",
+    "maxLen": 160,
+    "status": "draft"
+  }
+}

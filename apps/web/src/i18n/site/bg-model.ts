@@ -170,6 +170,8 @@ export interface BgState {
   receipts: number;
   /** Item of the assembly list that is being set, -1..7. */
   assembly: number;
+  /** The item came by itself (the process went on without the scroll): its clip starts from the chapter of the item. */
+  advanced: boolean;
   /** Clock of the test, hours, 0..8. */
   hours: number;
   /** Current step of the order on the ruler, 0..6, or -1. */
@@ -206,6 +208,7 @@ const OFF: BgState = {
   clip: 0,
   receipts: 0,
   assembly: -1,
+  advanced: false,
   hours: 0,
   cur: -1,
   pv: 0,
@@ -241,6 +244,7 @@ export function computeBgState(i: BgInput): BgState {
   let clip = 0;
   let receipts = 0;
   let assembly = -1;
+  let advanced = false;
   let hours = 0;
   let progress = 0;
   let need = false;
@@ -301,7 +305,8 @@ export function computeBgState(i: BgInput): BgState {
       // the frame follows the item: the scroll drives it inside a chapter, an item that came by itself starts its chapter
       const u = cl(pa / 0.92) * 8;
       const driven = Math.min(7, Math.floor(u));
-      clip = assembly > driven ? (YC[assembly] as number) : ymap(pa / 0.92);
+      advanced = assembly > driven;
+      clip = advanced ? (YC[assembly] as number) : ymap(pa / 0.92);
       s = L("bg.y.s", { k: assembly + 1, name: L(`bg.asm.${assembly}`) });
       ss = L("bg.y.ss", { k: assembly + 1 });
       cur = 4;
@@ -391,6 +396,7 @@ export function computeBgState(i: BgInput): BgState {
     clip,
     receipts,
     assembly,
+    advanced,
     hours,
     cur,
     pv,

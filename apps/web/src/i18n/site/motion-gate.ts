@@ -35,10 +35,13 @@ export function decideGate(i: GateInput): GateVerdict {
 
 export type HeroMode = "video" | "posters" | "reduced";
 
-/** `reduced`: a static page (no pinned scroll, four stills in a grid); `posters`: the same scroll with stills; `video`. */
-export function heroMode(gate: GateVerdict, reduced: boolean): HeroMode {
-  if (reduced) return "reduced";
-  return gate.ok ? "video" : "posters";
+/**
+ * `reduced`: a static page (no pinned scroll, four stills in a grid, not a single video) for a visitor who wants less motion
+ * and for a browser that saves traffic; `posters`: the same pinned scroll with stills (slow channel, weak device); `video`.
+ */
+export function heroMode(gate: GateVerdict): HeroMode {
+  if (gate.ok) return "video";
+  return gate.why === "reduced-motion" || gate.why === "save-data" ? "reduced" : "posters";
 }
 
 /** The videos of the background below the first screen: also not on a phone with less than 4 GB (unknown counts as 4). */

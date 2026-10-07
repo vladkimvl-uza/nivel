@@ -306,6 +306,8 @@ describe("computeBgState: where the page is on the way of the order NV-0001", ()
       const driven = at(yAt(0.005));
       const lived = at(yAt(0.005), { life: { x: 0, y: 3.2, h: 0, d: 0 } });
       expect(lived.assembly).toBe(driven.assembly + 3);
+      expect(lived.advanced).toBe(true);
+      expect(driven.advanced).toBe(false);
       expect(lived.clip).toBeCloseTo(YC[lived.assembly] as number, 9);
     });
 

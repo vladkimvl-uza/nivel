@@ -5,6 +5,8 @@ export function buildCsp(nonce: string, dev: boolean): string {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
+    // The first screen keeps its clip in memory (a blob) and scrubs it by the scroll.
+    "media-src 'self' blob:",
     "font-src 'self'",
     `connect-src 'self'${dev ? " ws: wss:" : ""}`,
     "object-src 'none'",

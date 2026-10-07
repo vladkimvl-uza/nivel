@@ -9,27 +9,16 @@ import { realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, sep } from "node:path";
 import { Readable } from "node:stream";
 
-export const DEFAULT_MEDIA_BASE = "/media";
 export const DEFAULT_MEDIA_DIR = "docs/design/hero-video/media";
 /** The names of the files carry no hash today (the prototype names), so a year is a promise the deploy keeps by renaming. */
 export const CACHE_CONTROL = "public, max-age=31536000, immutable";
-
-/** Where the page asks for the media: `MEDIA_BASE_URL` (a path or an https address) or `/media`. */
-export function mediaBaseOf(env: { MEDIA_BASE_URL?: string | undefined }): string {
-  const raw = env.MEDIA_BASE_URL?.trim().replace(/\/+$/, "") ?? "";
-  return /^(?:\/(?!\/)[A-Za-z0-9._~/-]*|https?:\/\/[^\s]+)$/.test(raw) && raw !== "" ? raw : DEFAULT_MEDIA_BASE;
-}
-
-export function mediaUrl(base: string, relative: string): string {
-  return `${base.replace(/\/+$/, "")}/${relative.replace(/^\/+/, "")}`;
-}
 
 /**
  * The folder of the media on this machine, or null. A relative MEDIA_DIR is looked for from the working folder up to the
  * root of the disk: the standalone server starts deep inside `.next`, the repository is a few levels above it.
  */
 export function resolveMediaRoot(
-  env: { MEDIA_DIR?: string | undefined },
+  env: Readonly<Record<string, string | undefined>>,
   cwd: string,
   exists: (path: string) => boolean,
 ): string | null {
@@ -37,11 +26,11 @@ export function resolveMediaRoot(
   for (const candidate of [wanted, DEFAULT_MEDIA_DIR]) {
     if (candidate === "") continue;
     if (isAbsolute(candidate)) {
-      if (exists(join(candidate))) return join(candidate);
+      if (exists(join(/* turbopackIgnore: true */ candidate))) return join(/* turbopackIgnore: true */ candidate);
       continue;
     }
     for (let dir = cwd; ; dir = dirname(dir)) {
-      const path = join(dir, candidate);
+      const path = join(/* turbopackIgnore: true */ dir, candidate);
       if (exists(path)) return path;
       if (dirname(dir) === dir) break;
     }
@@ -60,7 +49,7 @@ export function resolveMediaFile(root: string, segments: readonly string[]): str
   }
   const last = segments[segments.length - 1] as string;
   if (!MEDIA_FILE.test(last)) return null;
-  return join(root, ...segments);
+  return join(/* turbopackIgnore: true */ root, ...segments);
 }
 
 const TYPES: Record<string, string> = {
@@ -111,9 +100,12 @@ export async function serveMedia(
   let real: string;
   let size: number;
   try {
-    const [rootReal, fileReal] = await Promise.all([realpath(root), realpath(file)]);
+    const [rootReal, fileReal] = await Promise.all([
+      realpath(/* turbopackIgnore: true */ root),
+      realpath(/* turbopackIgnore: true */ file),
+    ]);
     if (!fileReal.startsWith(rootReal + sep)) return notFound(); // a link that leads out of the folder
-    const info = await stat(fileReal);
+    const info = await stat(/* turbopackIgnore: true */ fileReal);
     if (!info.isFile()) return notFound();
     real = fileReal;
     size = info.size;
@@ -134,6 +126,8 @@ export async function serveMedia(
   const headers: Record<string, string> = { ...common, "content-length": String(size === 0 ? 0 : end - start + 1) };
   if (status === 206) headers["content-range"] = `bytes ${start}-${end}/${size}`;
   if (request.method === "HEAD" || size === 0) return new Response(null, { status, headers });
-  const body = Readable.toWeb(createReadStream(real, { start, end })) as unknown as ReadableStream;
+  const body = Readable.toWeb(
+    createReadStream(/* turbopackIgnore: true */ real, { start, end }),
+  ) as unknown as ReadableStream;
   return new Response(body, { status, headers });
 }

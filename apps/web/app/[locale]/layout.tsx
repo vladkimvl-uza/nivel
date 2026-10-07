@@ -1,31 +1,67 @@
 import { htmlLang, isLocale, locales } from "@nivel/i18n";
-import { defaultTheme } from "@nivel/ui";
-import type { Metadata } from "next";
+import { defaultTheme, themeTokens } from "@nivel/ui";
+import { StampInkDefs } from "@nivel/ui/react";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { ReactNode } from "react";
+import { alternatesFor } from "../../src/i18n/paths.ts";
+import { MOTION_COOKIE, readMotionPrefs } from "../../src/i18n/site/prefs.ts";
 import "./globals.css";
 
-// Spike (BUILD_PLAN 4.2, fonts): fonts of theme B through next/font/local; only the main text face is preloaded.
-// next/font does not expose the file URL, so a hand-written <link rel="preload"> is impossible without a second
-// copy of the file: the fallback from the spike table is used (see docs/arch/ADR-006). WP-09 owns the font set.
-const textFont = localFont({
-  src: "../../../../packages/ui/fonts/fira-sans-latin-400-normal.woff2",
-  weight: "400",
+// Fonts of the night design system (packages/ui/fonts, ADR-006): own woff2 through next/font/local. One face is preloaded, the
+// text face; the others are fetched when the page uses them (`display: swap`). The names of the faces are put into the
+// variables --font-* and picked up by --display, --sans, --cond, --mono in globals.css.
+const text = localFont({
+  src: [
+    { path: "../../../../packages/ui/fonts/fira-sans-400.woff2", weight: "400", style: "normal" },
+    { path: "../../../../packages/ui/fonts/fira-sans-500.woff2", weight: "500", style: "normal" },
+  ],
   display: "swap",
   preload: true,
-  variable: "--nv-font-text",
+  variable: "--font-text",
 });
-const textFontSemibold = localFont({
-  src: "../../../../packages/ui/fonts/fira-sans-latin-600-normal.woff2",
-  weight: "600",
+const display = localFont({
+  src: [{ path: "../../../../packages/ui/fonts/brygada-1918-500.woff2", weight: "500", style: "normal" }],
   display: "swap",
   preload: false,
-  variable: "--nv-font-text-semibold",
+  variable: "--font-display",
 });
+const condensed = localFont({
+  src: [
+    { path: "../../../../packages/ui/fonts/fira-sans-extra-condensed-600.woff2", weight: "600", style: "normal" },
+    { path: "../../../../packages/ui/fonts/fira-sans-extra-condensed-700.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  preload: false,
+  variable: "--font-cond",
+});
+const mono = localFont({
+  src: [
+    { path: "../../../../packages/ui/fonts/ibm-plex-mono-400.woff2", weight: "400", style: "normal" },
+    { path: "../../../../packages/ui/fonts/ibm-plex-mono-500.woff2", weight: "500", style: "normal" },
+  ],
+  display: "swap",
+  preload: false,
+  variable: "--font-mono",
+});
+// In IBM Plex Mono the sign U+02BB looks like an acute accent: Uzbek text uses Noto Sans Mono (themes.css).
+const monoUz = localFont({
+  src: [
+    { path: "../../../../packages/ui/fonts/noto-sans-mono-400.woff2", weight: "400", style: "normal" },
+    { path: "../../../../packages/ui/fonts/noto-sans-mono-500.woff2", weight: "500", style: "normal" },
+  ],
+  display: "swap",
+  preload: false,
+  variable: "--font-mono-uz",
+});
+
+const FONT_CLASSES = [text, display, condensed, mono, monoUz].map((f) => f.variable).join(" ");
+
+/** Before the first paint: the page is `js` (it may run the pinned scroll) unless the visitor wants less motion or saves traffic. */
+const BOOT = `(function(d){d.classList.add("js");try{var c=navigator.connection;if(matchMedia("(prefers-reduced-motion: reduce)").matches||(c&&c.saveData))d.classList.add("is-reduced")}catch(e){}})(document.documentElement)`;
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -34,13 +70,28 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-  const t = await getTranslations({ locale, namespace: "common.meta" });
+  const t = await getTranslations({ locale, namespace: "site.meta" });
+  const base = process.env.PUBLIC_BASE_URL;
   return {
-    title: t("title"),
+    ...(base ? { metadataBase: new URL(base) } : {}),
+    title: { default: t("title"), template: "%s — Nivel" },
     description: t("description"),
-    alternates: { languages: { uz: "/uz", ru: "/ru", "x-default": "/uz" } },
+    alternates: alternatesFor(""),
+    openGraph: {
+      title: t("title"),
+      description: t("description"),
+      type: "website",
+      locale: htmlLang[locale].replace("-", "_"),
+    },
   };
 }
+
+export const viewport: Viewport = {
+  themeColor: themeTokens[defaultTheme].themeColor,
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export default async function LocaleLayout({
   children,
@@ -53,17 +104,23 @@ export default async function LocaleLayout({
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
   // Reading the request makes the page dynamic, so Next stamps the CSP nonce on its scripts.
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const h = await headers();
+  const nonce = h.get("x-nonce") ?? undefined;
+  const prefs = readMotionPrefs((await cookies()).get(MOTION_COOKIE)?.value, h.get("save-data"));
 
   return (
     <html
       lang={htmlLang[locale]}
       data-theme={defaultTheme}
-      className={`${textFont.variable} ${textFontSemibold.variable}`}
+      className={`${FONT_CLASSES}${prefs.reduced ? " is-reduced" : ""}`}
       data-nonce-present={nonce ? "1" : "0"}
     >
+      <head>
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: BOOT }} />
+      </head>
       <body>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <StampInkDefs />
+        {children}
       </body>
     </html>
   );

@@ -1,0 +1,660 @@
+{
+  "meta": {
+    "title": "Nivel — Toshkentda kompyuter va ish joyini yigʻish. Xariddan oldin smeta",
+    "description": "Nivel — Toshkentda kompyuter va ish joylarini tanlash, xarid qilish, yigʻish, sinash va oʻrnatish. Xariddan oldin smeta. Topshirishdan oldin sinov. Natija uchun yagona darcha."
+  },
+  "skip": "Animatsiyani oʻtkazib yuborish",
+  "header": {
+    "home": "Nivel — bosh sahifa",
+    "nav": "Asosiy menyu",
+    "menu": "Menyu",
+    "lang": "Til",
+    "langUz": "Oʻzbekcha",
+    "langRu": "Русский"
+  },
+  "nav": {
+    "how": "Qanday ishlaymiz",
+    "prices": "Narxlar",
+    "request": "Ariza"
+  },
+  "cta": {
+    "request": "Ariza qoldirish",
+    "telegram": "Telegramga yozish",
+    "telegramShort": "Telegram"
+  },
+  "illustration": "Illyustratsiya. Studiya ishi emas",
+  "hero": {
+    "label": "Ish joyini yigʻish",
+    "c0": {
+      "eyebrow": "Kompyuter va ish joyini yigʻish · Toshkent",
+      "title": "Vazifangizga mos ish joyi. Xariddan oldin smeta.",
+      "text": "Tanlaymiz, sotib olamiz, yigʻamiz, sinaymiz va oʻrnatamiz. Natija uchun oʻzimiz javob beramiz."
+    },
+    "c1": {
+      "eyebrow": "Tanlov",
+      "title": "Avval vazifa va byudjet.",
+      "text": "Oʻyin, montaj, dasturlash yoki oʻqish uchun qismlarni tanlaymiz. Narxlar — Toshkentdagi uchta sotuvchining sanadagi medianasi. Smeta {hours} soat amal qiladi."
+    },
+    "c2": {
+      "eyebrow": "Xarid",
+      "title": "Oʻzimiz sotib olamiz. Cheklar — sizga.",
+      "text": "Qismlar — chekdagi narxda, ustamasiz. Ish haqi — alohida qatorda: smeta {threshold} gacha boʻlsa {lowRate}, {threshold} dan — {highRate}, lekin kamida {minFee}.",
+      "note": "Misol: qismlar {parts}, ish haqi {fee} — {from} dan {to} gacha boʻlgan smeta uchun eng kam haq."
+    },
+    "c3": {
+      "eyebrow": "Yigʻish va sinov",
+      "title": "Yigʻamiz va 8 soat sinaymiz.",
+      "text": "Yigʻish, kabellarni yotqizish, BIOS yangilash. Topshirishdan oldin — 8 soat yuklama sinovi, bayonnoma — sizga."
+    },
+    "c4": {
+      "eyebrow": "Setap",
+      "title": "Faqat kompyuter emas, butun joyni oʻrnatamiz.",
+      "text": "Kronshteyn, chiroq, akustika, stol ostidagi kabellar. Joy montaji — alohida qatorda, {mountRate}. Butun setapga 12 oy kafolat."
+    },
+    "steps": {
+      "s0": "01 Tanlov",
+      "s1": "02 Xarid",
+      "s2": "03 Yigʻish va sinov",
+      "s3": "04 Setap"
+    },
+    "stepNow": "{n} / 04 · {name}",
+    "listAlt": "Illyustratsiya, qadam {n} / 4",
+    "listNote": "illyustratsiya: stok video, studiya ishi emas",
+    "hdoc": {
+      "title": "Smeta · qismlar",
+      "meta": "NV-0001 · narxlar {date} holatiga · misol",
+      "caseFans": "Korpus va 3 ta ventilyator",
+      "parts": "Qismlar, chek narxida",
+      "fee": "Ish haqi"
+    }
+  },
+  "items": {
+    "cpu": {
+      "group": "Protsessor",
+      "name": "AMD Ryzen 7 9700X",
+      "desc": "8 yadro, AM5"
+    },
+    "cool": {
+      "group": "Sovutish",
+      "name": "Minorali kuler 120 mm",
+      "desc": "6 quvur, ikki ventilyator"
+    },
+    "mb": {
+      "group": "Ona plata",
+      "name": "Plata B650",
+      "desc": "AM5, Wi-Fi 6E"
+    },
+    "ram": {
+      "group": "Xotira",
+      "name": "32 GB DDR5-6000",
+      "desc": "2 × 16 GB, CL30"
+    },
+    "gpu": {
+      "group": "Videokarta",
+      "name": "GeForce RTX 5070",
+      "desc": "12 GB"
+    },
+    "ssd": {
+      "group": "Disk",
+      "name": "SSD 2 TB",
+      "desc": "NVMe PCIe 4.0"
+    },
+    "psu": {
+      "group": "Quvvat bloki",
+      "name": "750 W Gold",
+      "desc": "ATX 3.1"
+    },
+    "case": {
+      "group": "Korpus",
+      "name": "Mid-tower, toʻq rang",
+      "desc": "ATX, yongʻoq reykali old panel, 46 l"
+    },
+    "fans": {
+      "group": "Ventilyatorlar",
+      "name": "3 × 120 mm",
+      "desc": "sokin, yoritishsiz"
+    }
+  },
+  "promise": {
+    "p1": {
+      "title": "Xariddan oldin smeta.",
+      "text": "Pozitsiyalar, doʻkonlar va sanadagi narxlar. Ish haqi — alohida qatorda. Smeta <n>{hours}</n> soat amal qiladi."
+    },
+    "p2": {
+      "title": "Topshirishdan oldin sinov.",
+      "text": "<n>8</n> soat yuklama ostida, xotira — tun boʻyi. Bayonnoma, seriya raqamlari va cheklar — yigʻma pasportida."
+    },
+    "p3": {
+      "title": "Natija uchun yagona darcha.",
+      "text": "Butun setapga <n>12</n> oy kafolat. Doʻkon va servislarga biz boramiz, siz emas."
+    }
+  },
+  "how": {
+    "title": "Olti qadam. Har birida — hujjat, sana va muhr.",
+    "lead": "Qismlar uchun pul va ish haqi alohida qatorlarda. Pastda — NV-0001 buyurtma namunasi: sanalar shartli.",
+    "map": "Birinchi ekrandagi toʻrt bosqich — buyurtmaning olti qadami:",
+    "win1": "00 Buyurtma · NV-0001 · 05.10 · namuna",
+    "win2": "6 qadam — 6 hujjat: smeta, chek, hisobot, bayonnoma, dalolatnoma, kafolat"
+  },
+  "route": {
+    "term": "Muddat",
+    "money": "Pul",
+    "doc": "Hujjat",
+    "toggle": "Muddat · pul · hujjat",
+    "st1": {
+      "title": "Smeta",
+      "text": "Pozitsiyalar, doʻkonlar, sana va vaqti bilan narxlar. Byudjetning uch varianti. Ish haqi — soʻmda, alohida qatorda.",
+      "term": "1–2 ish kuni, {hours} soat amal qiladi",
+      "money": "0 soʻm",
+      "doc": "smeta va oferta",
+      "stamp": "Tasdiqlandi",
+      "date": "05.10"
+    },
+    "st2": {
+      "title": "Xarid uchun toʻlov",
+      "text": "Ish haqining {advance} — QR orqali, chek bilan. Qismlar uchun pul — YaTT hisobiga: smeta va {reserve} zaxira.",
+      "term": "kelishilgan kun",
+      "money": "ish haqining {advance} + xarid limiti",
+      "doc": "avans uchun fiskal chek",
+      "stamp": "Toʻlandi",
+      "date": "05.10"
+    },
+    "st3": {
+      "title": "Xarid va cheklar bilan hisobot",
+      "text": "Oʻzimiz sotib olamiz. Cheklar, kafolat talonlari va seriya raqamlari — sizga. Limit qoldigʻini qaytaramiz.",
+      "term": "1–2 ish kuni, hisobot 24–48 soatda",
+      "money": "qoldiq — 5 ish kunida sizga",
+      "doc": "cheklar boʻyicha hisobot",
+      "stamp": "Cheklar 9/9",
+      "date": "07.10"
+    },
+    "st4": {
+      "title": "Yigʻish va sinovlar",
+      "text": "Yigʻish, kabellar, BIOS, xotira profili, Windows. 8 soat yuklama, xotira sinovi — tun boʻyi.",
+      "term": "2–3 ish kuni",
+      "money": "talab qilinmaydi",
+      "doc": "sinov bayonnomasi",
+      "stamp": "0 xato",
+      "date": "10.10"
+    },
+    "st5": {
+      "title": "Topshirish",
+      "text": "Olib kelamiz, butun joyni oʻrnatamiz, yoqamiz. 15–20 daqiqa nima qayerdaligini koʻrsatamiz.",
+      "term": "topshirish kuni",
+      "money": "ish haqining {final}",
+      "doc": "dalolatnoma, yigʻma pasporti, cheklar nusxasi",
+      "stamp": "Topshirildi",
+      "date": "12.10"
+    },
+    "st6": {
+      "title": "Kafolat",
+      "text": "Ish va biz sotib olgan barcha qismlarga 12 oy «yagona darcha». Taʼmir vaqtida almashtiruvchi kompyuter.",
+      "term": "12 oy",
+      "money": "0 soʻm, yiliga bir marta profilaktika",
+      "doc": "kafolat majburiyati",
+      "stamp": "Kafolat",
+      "date": "12.10.27 gacha"
+    },
+    "foot1": "<b>5–8 ish kuni</b> — qismlari mavjud kompyuter",
+    "foot2": "<b>10–15 ish kuni</b> — mebelli setap",
+    "foot3": "muddatlar smeta tasdiqlangandan boshlab; buyurtma mebel — 4 haftagacha"
+  },
+  "docs": {
+    "sample": "namuna",
+    "est": {
+      "heading": "Smeta № NV-0001",
+      "label": "Smeta namunasi",
+      "meta1": "narxlar 05.10.2026, 14:20 holatiga · Toshkentdagi uchta sotuvchi medianasi",
+      "meta2": "06.10.2026, 14:20 gacha amal qiladi · misol, oferta emas",
+      "caption": "Smeta namunasi: pozitsiyalar va narxlar",
+      "colIndex": "№",
+      "colName": "Pozitsiya",
+      "colAmount": "Narx, soʻm",
+      "parts": "Qismlar, chekdagi narxda",
+      "feeHigh": "Ish haqi: {rate} — {byRate}, kamida {min}",
+      "feeLow": "Ish haqi: qismlar summasining {rate}",
+      "total": "Jami",
+      "limit": "Xarid limiti {rate} zaxira bilan — {limit}",
+      "pay": "Ish haqining {advance} — tasdiqlashda, {final} — topshirishda",
+      "stamp": "Tasdiqlandi",
+      "stampMeta": "05.10.2026 · 15:02"
+    },
+    "rcpt": {
+      "heading": "Cheklar hisoboti № NV-0001",
+      "label": "Cheklar hisoboti namunasi",
+      "meta": "xarid 06–07.10.2026 · cheklar, talonlar va seriya raqamlari surati — Telegramda",
+      "caption": "Cheklar hisoboti namunasi: smeta, chek va farq",
+      "colItem": "Pozitsiya",
+      "colEstimate": "Smeta",
+      "colReceipt": "Chek",
+      "colDiff": "Farq",
+      "byEstimate": "Smeta boʻyicha",
+      "byReceipts": "Cheklar boʻyicha",
+      "refund": "Sizga qaytariladi, 5 ish kunigacha",
+      "foot1": "Cheklar: 9 dan 9 · kafolat talonlari: 9",
+      "foot2": "ish haqi oʻzgarmaydi: {fee}",
+      "stamp": "Cheklar 9/9",
+      "stampMeta": "07.10.2026 · 18:40"
+    }
+  },
+  "ruler": {
+    "label": "Buyurtma yoʻli",
+    "idLong": "Vizualizatsiya · NV-0001 namuna · sanalar shartli",
+    "idShort": "Vizual. · NV-0001 namuna · shartli"
+  },
+  "bg": {
+    "stage": {
+      "0": "Buyurtma",
+      "1": "Smeta",
+      "2": "Toʻlov",
+      "3": "Xarid",
+      "4": "Yigʻish va sinov",
+      "5": "Topshirish",
+      "6": "Kafolat"
+    },
+    "idle": {
+      "s": "buyurtma yoʻli · 6 qadam, har birida — hujjat",
+      "ss": "yoʻl, 6 qadam"
+    },
+    "route": {
+      "s": "0{n} · {title} · hujjat: {doc}",
+      "ss": "0{n} · {title}"
+    },
+    "x": {
+      "s": "{date} · cheklar {n}/9",
+      "ss": "{date} · {n}/9"
+    },
+    "y": {
+      "s": "08.10 · yigʻish {k}/8 · {name}",
+      "ss": "{k}/8"
+    },
+    "asm": {
+      "0": "Ona plata B650",
+      "1": "Protsessor Ryzen 7 9700X",
+      "2": "Minorali kuler 120 mm",
+      "3": "Xotira 32 GB DDR5-6000",
+      "4": "SSD 2 TB NVMe",
+      "5": "Videokarta RTX 5070 12 GB",
+      "6": "Quvvat bloki 750 W Gold",
+      "7": "Kabellar, BIOS 3.20, xotira profili"
+    },
+    "t": {
+      "s": "09.10 22:00 · yuklama sinovi {clock} / 08:00",
+      "ss": "{clock} / 08:00",
+      "done": {
+        "s": "10.10 · sinov 08:00 · 0 xato",
+        "ss": "0 xato"
+      }
+    },
+    "pas": {
+      "s": "10.10 · pasport: sinov 08:00 · 0 xato",
+      "ss": "pasport · 0 xato"
+    },
+    "act": {
+      "s": "12.10 · topshirish dalolatnomasi, {final} hisob",
+      "ss": "12.10 · dalolatnoma"
+    },
+    "done": {
+      "s": "12.10.2026 · topshirildi · kafolat 0 / 365 kun",
+      "ss": "0 / 365 kun"
+    },
+    "fin": {
+      "closed": {
+        "s": "NV-0001 yopildi · kafolat 12.10.2027 gacha",
+        "ss": "yopildi · kafolat 12.10.27 gacha",
+        "st": "Yopildi"
+      },
+      "year": {
+        "s": "12.10.2027 · kafolat yili 365 / 365 kun · profilaktika qilindi",
+        "ss": "Kafolat · 365 / 365, yil oʻtdi"
+      },
+      "run": {
+        "s": "{date} · kafolat davom etadi · {d} / 365 kun",
+        "sCare": "{date} · kafolat davom etadi · {d} / 365 kun · profilaktika",
+        "ss": "Kafolat · {d} / 365 · davom etadi",
+        "ssCare": "Kafolat · {d} / 365 · profilaktika"
+      },
+      "care": "Profilaktika"
+    }
+  },
+  "band": {
+    "x": {
+      "aria": "03 Xarid",
+      "label": "03 Xarid · 06–07.10 · cheklar {n}/9 · namunalar"
+    },
+    "y": {
+      "aria": "04 Yigʻish",
+      "label": "04 Yigʻish · 08.10 · {k}/8 · namuna"
+    },
+    "t": {
+      "aria": "04 Sinov",
+      "label": "04 Sinov · 09–10.10 · namuna",
+      "of": "/ 08:00",
+      "clock": "yuklama sinovi · CPU, GPU, quvvat bloki",
+      "ok": "0 xato · 0 qayta yuklanish"
+    }
+  },
+  "rc": {
+    "shop": "Doʻkon {s}",
+    "qty": "soni",
+    "total": "Jami",
+    "sample": "NAMUNA",
+    "sum": "Cheklar {n}/9 · {sum}",
+    "refund": "Sizga qaytariladi: {sum}"
+  },
+  "passport": {
+    "kicker": "Yigʻma pasporti",
+    "title": "Sinov bayonnomasi — kompyuterni yoqishingizdan oldin",
+    "lead": "Har bir yigʻma pasport bilan topshiriladi: tarkib, seriya raqamlari, BIOS versiyasi, xotira profili va 8 soatlik sinov jurnali. Usta imzosi — oxirgi sahifada.",
+    "p1": "Protsessor, videokarta va quvvat bloki — 8 soat yuklama ostida, xato va qayta yuklanishlarsiz.",
+    "p2": "Xotira — tun boʻyi 4 marta sinov. Disk — tezlik va holat, ishlagan soatlari nolga yaqin.",
+    "p3": "Portlar, Wi-Fi, uyqu rejimi va shovqin — qoʻlda tekshiriladi.",
+    "log": "sinov jurnali · CPU, maks. {max} °C · namuna",
+    "docLabel": "Sinov bayonnomasi bilan yigʻma pasporti namunasi",
+    "docTitle": "Yigʻma pasporti № NV-0001",
+    "docSub": "Oʻyin kompyuteri, 2K · smeta va cheklar hisobotidagi yigʻmaning oʻzi",
+    "meta": {
+      "estimate": "Smeta tasdiqlandi",
+      "tests": "Sinovlar",
+      "handover": "Dalolatnoma boʻyicha topshirildi",
+      "warranty": "Kafolat muddati"
+    },
+    "sec1": "1. Tizim",
+    "sec1note": "seriya raqamlari — 2-bet",
+    "spec": {
+      "cpu": "Protsessor",
+      "gpu": "Videokarta",
+      "ram": "Xotira",
+      "ssd": "Disk",
+      "bios": "BIOS versiyasi",
+      "profile": "Xotira profili",
+      "psu": "Quvvat bloki",
+      "room": "Xonada",
+      "gpuValue": "RTX 5070 12 GB",
+      "ramValue": "32 GB DDR5-6000",
+      "ssdValue": "SSD 2 TB NVMe",
+      "psuValue": "750 W Gold"
+    },
+    "sec2": "2. 8 soat yuklama",
+    "sec2note": "datchiklar jurnali, qadam 10 daqiqa",
+    "chart": {
+      "cpu": "Protsessor",
+      "gpu": "Videokarta",
+      "max": "maks. {max}",
+      "hour": "{h} soat",
+      "label": "{name}: 8 soatlik harorat, maksimum {max} °C"
+    },
+    "th": {
+      "test": "Sinov",
+      "duration": "Davomiyligi",
+      "result": "Natija",
+      "verdict": "Xulosa"
+    },
+    "ok": "meʼyorda",
+    "t1": {
+      "name": "Protsessor, OCCT",
+      "dur": "8 soat",
+      "res": "maks. {max} °C, chastota barqaror"
+    },
+    "t2": {
+      "name": "Videokarta, OCCT 3D",
+      "dur": "1 soat",
+      "res": "maks. {max} °C, artefaktlarsiz"
+    },
+    "t3": {
+      "name": "Quvvat bloki, OCCT Power",
+      "dur": "1 soat",
+      "res": "qayta yuklanishsiz, 0 ta WHEA xatosi"
+    },
+    "t4": {
+      "name": "Xotira, MemTest86",
+      "dur": "4 marta",
+      "res": "0 ta xato"
+    },
+    "t5": {
+      "name": "Disk, CrystalDiskMark",
+      "dur": "5 sikl",
+      "res": "oʻqish 7 010 MB/s, holati 100 %"
+    },
+    "t6": {
+      "name": "Portlar, Wi-Fi, uyqu, shovqin",
+      "dur": "qoʻlda",
+      "res": "boʻsh turganda 50 sm masofada 31 dBA"
+    },
+    "sign": "Yigʻdi va tekshirdi — Nivel ustasi · 10.10.2026",
+    "attach": {
+      "title": "Ilova qilingan",
+      "l1": "cheklar nusxasi 9 dan 9",
+      "l2": "kafolat talonlari 9",
+      "l3": "topshirish dalolatnomasi 12.10.2026"
+    },
+    "stamp": {
+      "ring": "NIVEL · TOSHKENT · SINOVDAN OʻTDI · 8 SOAT ·",
+      "label": "Muhr: sinovdan oʻtdi 10.10.2026"
+    }
+  },
+  "prices": {
+    "kicker": "Narxlar va kafolat",
+    "title": "Qismlar — chekdagi narxda. Bizning ishimiz — shkala boʻyicha.",
+    "lead": "Biz qism sotmaymiz: doʻkonlar tanlov uchun bizga pul toʻlamaydi, chegirmalar sizning chekingizda qoladi. Ish haqi smetada soʻmda belgilanadi va cheklar qimmatroq chiqsa ham oshmaydi.",
+    "tag": "narxlar {date} holatiga · misol · oferta emas",
+    "th": {
+      "size": "Smeta",
+      "rate": "Stavka",
+      "example": "Misol"
+    },
+    "r1": {
+      "label": "Kompyuter va periferiya, smeta {threshold} gacha",
+      "note": "monitorlar, klaviatura, sichqoncha, UPS"
+    },
+    "r2": {
+      "label": "Kompyuter va periferiya, smeta {threshold} dan",
+      "note": "chegarada sakrash yoʻq: {threshold} ning {lowRate} — oʻsha {minFee}",
+      "min": "kamida {minFee}"
+    },
+    "r3": {
+      "label": "Setap montaji",
+      "note": "stol, kreslo, kronshteynlar, yorugʻlik, akustika, kabel kanallari"
+    },
+    "example": "{base} → {fee}",
+    "chart": {
+      "title": "Kompyuter smetasi {chartFrom} dan {chartTo} gacha boʻlganda ish haqi",
+      "text": "{threshold} chegarasida sakrash yoʻq: {threshold} dan {noJump} gacha ish haqi {minFee} boʻlib qoladi.",
+      "aria": "Grafik: smetaga qarab ish haqi, {chartFrom} da {feeFrom} dan {chartTo} da {feeTo} gacha",
+      "axisX": "smeta, mln soʻm",
+      "axisY": "ish haqi, mln",
+      "min": "kamida {minFee}"
+    },
+    "f1": {
+      "title": "Qismlar chekdagi narxda, tejalgan pul — sizniki",
+      "text": "Cheklar smetadan arzon chiqsa, farqni 5 ish kuni ichida qaytaramiz. {reserve} zaxira doirasida qimmat chiqsa — ish haqi oʻzgarmaydi.",
+      "link": "Misol: yuqoridagi NV-0001 cheklar hisoboti — {refund} qaytariladi"
+    },
+    "f2": {
+      "title": "Boʻlib toʻlash",
+      "text": "Ish haqining {advance} — smeta tasdiqlanganda, {final} — topshirishda. Qismlar uchun pul — YaTT hisobiga, cheklar boʻyicha hisobot bilan."
+    },
+    "f3": {
+      "title": "Eng kam smeta",
+      "text": "Toʻliq siklli kompyuter — {minPc} dan, montajli setap — {minSetup} dan. {minFree}–{minPc} lik oʻquv yigʻmalari — boʻsh vaqtlarda, tipik konfiguratsiyalar boʻyicha."
+    }
+  },
+  "guarantee": {
+    "label": "Kafolat majburiyati namunasi",
+    "title": "Kafolat majburiyati № NV-0001",
+    "meta": "12.10.2026 dagi topshirish dalolatnomasiga · 12.10.2027 gacha amal qiladi · sanalar shartli",
+    "g1": {
+      "title": "«Yagona darcha» kafolati, 12 oy",
+      "text": "Ish, butun tizim va biz sotib olgan barcha qismlarga. Doʻkonlar va servis markazlari bilan oʻzimiz hal qilamiz."
+    },
+    "g2": {
+      "title": "Almashtiruvchi kompyuter",
+      "text": "Taʼmir vaqtida — almashtiruvchi kompyuter yoki qism, murojaatdan keyin 3 sutkadan kechikmay."
+    },
+    "g3": {
+      "title": "Javob va olib ketish",
+      "text": "1 ish kunida javob beramiz. Kompyuterni oʻz hisobimizdan 1–2 kunda olib ketamiz, diagnostika — 2 kun."
+    },
+    "g4": {
+      "title": "Profilaktika",
+      "text": "Tozalash, termopasta, haroratni tekshirish — 12 oyda bir marta, ish haqiga kiradi."
+    },
+    "foot1": "kafolat mexanik shikastlanish va biz tomonimizdan boʻlmagan ochishni qoplamaydi",
+    "foot2": "murojaat — Telegram @niveluzbot orqali, NV-0001 raqami boʻyicha",
+    "stamp": "Kafolat",
+    "stampMeta": "12.10.2027 gacha"
+  },
+  "returns": {
+    "kicker": "Qaytarish",
+    "title": "Nimani va qachon qaytaramiz",
+    "lead": "Batafsil shartlar — qaytarish hujjatida; u hozircha qoralama va yurist tekshiruvidan oʻtmoqda.",
+    "r1": {
+      "title": "Xarid limitining qoldigʻi",
+      "text": "Qismlarga ajratilgan pulning sarflanmagan qismini — cheklar hisobotidan keyin 5 ish kuni ichida qaytaramiz."
+    },
+    "r2": {
+      "title": "Buyurtmadan voz kechish",
+      "text": "Faqat bajarilgan ish uchun toʻlanadi: tanlov — ish haqining {selection}, xarid — {purchase}, yigʻish — {assembly}, topshirish — {handover}. Sarflanmagan pulni qaytaramiz."
+    },
+    "r3": {
+      "title": "Sifatli tovar",
+      "text": "Qaytarish va almashtirish — qonun va doʻkon qoidalariga koʻra, ular cheklar hisobotida koʻrsatiladi. Qism ishdan chiqsa — kafolat amal qiladi."
+    },
+    "link": "Qaytarish hujjati"
+  },
+  "form": {
+    "kicker": "Ariza",
+    "title": "Vazifani yozing — smetani yuboramiz",
+    "lead": "Ish vaqtida, du–sha 10:00–19:00, Telegramda yoki telefon orqali javob beramiz. Pul — faqat smetani tasdiqlaganingizdan keyin.",
+    "name": "Ism",
+    "phone": "Telefon",
+    "phoneHint": "Masalan, +998 90 123 45 67",
+    "telegram": "Telegram, telefon boʻlmasa",
+    "telegramHint": "@nik yoki profil havolasi",
+    "scopeLabel": "Nima kerak",
+    "scopePlaceholder": "Tanlang",
+    "scope": {
+      "pc": "Kompyuter",
+      "pc_periph": "Kompyuter va periferiya",
+      "setup": "Setap: kompyuter va ish joyi"
+    },
+    "district": "Tuman",
+    "budget": "Byudjet, mln soʻm",
+    "budgetHint": "Yozmasangiz ham boʻladi. Bu sizning istagingiz: smeta sanadagi narxlar boʻyicha hisoblanadi.",
+    "comment": "Izoh",
+    "commentHint": "Kompyuter nima uchun, qaysi oʻyin yoki dasturlar, nima bor",
+    "website": "Sayt (toʻldirmang)",
+    "consent": "Shaxsiy maʼlumotlarni qayta ishlashga roziman",
+    "consentLinks": "Nimani va nima uchun yigʻishimiz — <priv>maxfiylik siyosati</priv> va <cons>rozilik matnida</cons>.",
+    "submit": "Arizani yuborish",
+    "sending": "Yuborilmoqda…",
+    "okTitle": "{number} ariza qabul qilindi",
+    "okTitleNoNumber": "Ariza qabul qilindi",
+    "okText": "Ish vaqtida, du–sha 10:00–19:00, javob beramiz. Qulayroq boʻlsa — Telegramga yozing.",
+    "error": {
+      "invalid": "Quyida belgilangan maydonlarni tekshiring.",
+      "rate_limited": "Bu kontakt yoki manzildan juda koʻp ariza keldi. Telegramga yozing.",
+      "unavailable": "Saytda ariza qabul qilish hozir ishlamayapti. Telegramga yozing: @niveluzbot.",
+      "failed": "Yuborib boʻlmadi. Keyinroq qayta urinib koʻring yoki Telegramga yozing."
+    },
+    "fieldError": {
+      "required": "Bu maydonni toʻldiring.",
+      "phone_invalid": "Telefon raqamiga oʻxshamaydi. Masalan: +998 90 123 45 67.",
+      "contact_required": "Telefon yoki Telegramni kiriting.",
+      "telegram_invalid": "@name koʻrinishidagi nik (5 belgidan) yoki t.me/name havolasi kerak.",
+      "too_long": "Matn juda uzun.",
+      "budget_invalid": "Million soʻmda son kiriting, masalan 27 yoki 27,5.",
+      "scope_invalid": "Nima kerakligini tanlang.",
+      "consent_required": "Maʼlumotlarni qayta ishlashga rozilik boʻlmasa, arizani qabul qilib boʻlmaydi.",
+      "rejected": "Bu maydonni tekshiring."
+    },
+    "or": "Yoki darrov Telegramda"
+  },
+  "final": {
+    "title": "Har bir qism — oʻz uyasida.",
+    "text": "Xariddan oldin smeta, topshirishdan oldin sinov, butun setapga 12 oy kafolat.",
+    "logo": "Nivel"
+  },
+  "footer": {
+    "promise": "Xariddan oldin smeta. Topshirishdan oldin sinov. Natija uchun yagona darcha.",
+    "contact": "Aloqa",
+    "bot": "Telegram-bot @niveluzbot",
+    "city": "Toshkent va viloyat",
+    "docs": "Hujjatlar",
+    "doc": {
+      "offer": "Oferta (UZ/RU)",
+      "privacy": "Maxfiylik siyosati",
+      "warranty": "Kafolat",
+      "returns": "Qaytarish",
+      "consentPd": "Maʼlumotlarni qayta ishlashga rozilik",
+      "stageTariff": "Bosqichlar narxnomasi"
+    },
+    "reqTitle": "Rekvizitlar",
+    "req": {
+      "link": "Barcha rekvizitlar",
+      "ip": "YaTT",
+      "inn": "STIR",
+      "account": "Hisob raqami",
+      "address": "Manzil",
+      "pending": "roʻyxatdan oʻtgach"
+    },
+    "src": {
+      "title": "Manbalar",
+      "text": "Birinchi ekran videosi: Pexels — <a1>33356256</a1> (muallif aniqlanmoqda), <a2>STUDIO LINE INDIA</a2>, <a3>Joshua Malic</a3>. Pastdagi fon: oʻsha videolar va Pexels — <a4>Sasha Poberailo</a4>, <a5>Joshua Malic</a5>. Oʻzgartirilgan: ekranlar almashtirilgan, logotiplar olib tashlangan, tunga oʻtkazilgan, rang va kadr tuzatilgan. Hujjat namunalari va belgi — oʻzimizniki, sanalar shartli."
+    },
+    "note": "© Nivel, 2026. Narxlar — sanadagi misol, oferta emas. Saytdagi videolar — stok illyustratsiya, studiya ishi emas; hujjatlar va chizmalar — namuna.",
+    "motionOff": "Animatsiyasiz",
+    "motionOn": "Animatsiyani yoqish"
+  },
+  "legal": {
+    "back": "Bosh sahifaga",
+    "draft": "Yurist tekshirguncha qoralama",
+    "draftNote": "Bu vaqtinchalik matn: u qoralama va yurist tekshirgach almashtiriladi. Oferta kuchga kirmaguncha oldindan toʻlov olmaymiz.",
+    "version": "Versiya {version}",
+    "effective": "{date} dan amal qiladi",
+    "builtin": "saytdagi qoralama matni",
+    "hash": "Matn nazorat yigʻindisi (SHA-256): {hash}",
+    "metaDescription": "Nivel hujjati: {title}. Matnni yurist tekshiradi.",
+    "offer": {
+      "title": "Ommaviy oferta",
+      "body": "# Ommaviy oferta (qoralama)\n\nBu oferta — vaqtinchalik matn. U hali kuchga kirmagan: yurist matnni tekshirmaguncha va YaTT roʻyxatdan oʻtmaguncha oldindan toʻlov olmaymiz. Oʻzbekcha va ruscha matnlar farq qilsa, oʻzbekcha matn ustun.\n\n## 1. Ijrochi kim\n\nYakka tartibdagi tadbirkor Nivel, Toshkent. Rekvizitlar — roʻyxatdan oʻtgach, «Rekvizitlar» sahifasiga qarang.\n\n## 2. Nima qilamiz\n\nKompyuter va ish joylarini tanlaymiz, sotib olamiz, yigʻamiz, sinaymiz va oʻrnatamiz. Buyurtmachi topshirigʻi bilan ish tutamiz: qismlarni buyurtmachining pulidan va chekdagi narxda olamiz, qismlarga ustama yoʻq.\n\n## 3. Smeta\n\n- Smeta — pozitsiyalar, doʻkonlar va sana hamda vaqt boʻyicha narxlar yozilgan hujjat.\n- Narxlar — Toshkentdagi uchta sotuvchining sanadagi medianasi.\n- Smeta 24 soat amal qiladi (mebel — 72 soat), agar unda boshqacha yozilmagan boʻlsa.\n- Ish haqi — soʻmda, alohida qatorda; «Narxlar» sahifasidagi shkala boʻyicha hisoblanadi.\n\n## 4. Pul\n\n- Ish haqi: 30 % — smeta tasdiqlanganda QR orqali chek bilan, 70 % — topshirishda.\n- Qismlar uchun pul YaTT hisobiga oʻtkaziladi: smeta va narx oshishi uchun zaxira. Limitdan ortiq xaridni faqat sizning yozma roziligingiz bilan qilamiz.\n- Xariddan keyin 24–48 soatda cheklar hisobotini yuboramiz; pul qoldigʻini 5 ish kuni ichida qaytaramiz. Hisobotga eʼtirozlar — 3 ish kuni ichida.\n\n## 5. Sinov va topshirish\n\nTopshirishdan oldin — 8 soatlik yuklama sinovi, bayonnoma va yigʻma pasporti. Topshirish — dalolatnoma boʻyicha.\n\n## 6. Kafolat va qaytarish\n\n12 oylik «yagona darcha» kafolati — «Kafolat» hujjatiga qarang. Qaytarish va voz kechish — «Qaytarish va voz kechish» hujjati va bosqichlar narxnomasiga qarang.\n\n## 7. Keyingi qadam\n\nOferta yakuniy matnini yurist tayyorlaydi. Shu vaqtgacha sayt arizalarni qabul qiladi va smetalarni oferta qabul qilinmasdan yuboradi.\n"
+    },
+    "privacy": {
+      "title": "Maxfiylik siyosati",
+      "body": "# Maxfiylik siyosati (qoralama)\n\nHujjat qanday shaxsiy maʼlumotlarni yigʻishimizni, nima uchun, qayerda saqlashimizni va kimga uzatishimizni tushuntiradi. Matn — qoralama: yakuniy tahrirni yurist tayyorlaydi.\n\n## 1. Operator kim\n\nYakka tartibdagi tadbirkor Nivel, Toshkent (roʻyxatdan oʻtish jarayonida). Aloqa: Telegram @niveluzbot.\n\n## 2. Qanday maʼlumotlarni yigʻamiz\n\n- ism, telefon va Telegramdagi nik — saytdagi ariza va bot bilan suhbatdan;\n- shahar tumani va byudjet — agar ularni kiritgan boʻlsangiz;\n- ariza izohi;\n- buyurtma boʻyicha yozishmalar, smetalar, cheklar, dalolatnomalar va yigʻma pasporti.\n\nBank kartalarini qabul qilmaymiz va ularning maʼlumotlarini saqlamaymiz.\n\n## 3. Nima uchun\n\nArizaga javob berish, smeta tuzish, kompyuterni sotib olish va yigʻish, kafolat berish hamda buxgalteriya va soliq hisobi qonunchiligi talablarini bajarish uchun.\n\n## 4. Qayerda saqlaymiz va kimga uzatamiz\n\n- Arizalar va buyurtmalarning asosiy bazasi — Toshkentdagi serverda.\n- Mijozlar hisobi jadvalini egasi Google Sheets da yuritadi. Qabul qiluvchi — Google LLC (AQSH); jadvalda mijozlarning ismi va telefonlari saqlanadi. AQSHga uzatish joiz: Google LLC Yevropa Ittifoqi — AQSH maʼlumotlarni himoya qilish doirasida (Data Privacy Framework) ishtirok etadi; bu 2026-yil 27-martdan kuchga kirgan ZRU-1125-sonli Qonunga va Vazirlar Mahkamasining 415-sonli qarori bilan tasdiqlangan roʻyxatga mos.\n- Bot xabarlari Telegram orqali oʻtadi.\n- Qismlar sotuvchilariga — ism va telefon, faqat kafolat taloni mijoz nomiga rasmiylashtirilsa va faqat sizning roziligingiz bilan.\n- Bazaning shifrlangan nusxalari Yevropa Ittifoqi mamlakatlarida saqlanadi.\n- Reklama piksellaridan foydalanmaymiz.\n\n## 5. Saqlash muddatlari\n\n- buyurtmasiz arizalar — 12 oy;\n- buyurtmalar, cheklar va kafolat hujjatlari — kafolat tugagunicha va yana 3 yil, lekin 5 yildan kam emas (soliq hujjatlari).\n\n## 6. Sizning huquqlaringiz\n\nMaʼlumotlaringiz nusxasini soʻrashingiz, ularni tuzatishingiz yoki qonun boʻyicha saqlashga majbur boʻlmagan qismini oʻchirishingiz mumkin. Telegram @niveluzbot ga yozing: 30 kun ichida javob beramiz.\n\n## 7. Cookie\n\nFaqat texnik: til va «Animatsiyasiz» tugmasi.\n"
+    },
+    "warranty": {
+      "title": "«Yagona darcha» kafolati",
+      "body": "# «Yagona darcha» kafolati (qoralama)\n\nKafolat — bizning ishimizga, butun tizimga va biz sotib olgan barcha qismlarga 12 oy. Doʻkonlar va servis markazlari bilan oʻzimiz hal qilamiz.\n\n## Muddatlar\n\n- murojaatga javob — 1 ish kuni;\n- kompyuterni oʻz hisobimizdan olib ketamiz — 1–2 kunda; diagnostika — 2 kun;\n- almashtiruvchi kompyuter yoki qism — murojaatdan keyin 3 sutkadan kechikmay;\n- bartaraf etish: ish — 10 ish kunigacha, qismlar — 20 kungacha.\n\n## Profilaktika\n\n12 oyda bir marta — tozalash, termopasta, haroratni tekshirish. Ish haqiga kiradi.\n\n## Nimalar qoplanmaydi\n\nMexanik shikastlanish va biz tomonimizdan boʻlmagan ochish.\n\n## Qanday murojaat qilinadi\n\nTelegram @niveluzbot, buyurtma raqami boʻyicha. Yakuniy muddat va shartlar — ofertada.\n"
+    },
+    "returns": {
+      "title": "Qaytarish va voz kechish",
+      "body": "# Qaytarish va voz kechish (qoralama)\n\n## Xarid puli qoldigʻi\n\nQismlar uchun sarflanmagan pulni cheklar hisobotidan keyin 5 ish kuni ichida qaytaramiz. Cheklar smetadan arzon chiqsa, farqni ham shunday qaytaramiz.\n\n## Buyurtmadan voz kechsangiz\n\nFaqat bajarilgan bosqichlar uchun toʻlaysiz — ish haqining ulushi: tanlov {selection}, xarid {purchase}, yigʻish {assembly}, topshirish {handover}. Tafsilotlar — bosqichlar narxnomasida.\n\n## Sifatli tovar\n\nQaytarish va almashtirish — qonun va doʻkon qoidalariga koʻra; har bir doʻkon qoidalari cheklar hisobotida yoziladi.\n\n## Nosozlik\n\nQism ishdan chiqsa, kafolat amal qiladi.\n\n## Yakuniy matn\n\nUni yurist oferta bilan birga tayyorlaydi.\n"
+    },
+    "consentPd": {
+      "title": "Shaxsiy maʼlumotlarni qayta ishlashga rozilik",
+      "body": "# Shaxsiy maʼlumotlarni qayta ishlashga rozilik (qoralama)\n\nMen Nivel (YaTT, Toshkent) ga ismim, telefonim, Telegramdagi nikim, tumanim va ariza matnimni arizaga javob berish, smeta tuzish va buyurtmani bajarish uchun qayta ishlashga rozilik beraman.\n\nMen bilaman:\n\n- maʼlumotlar Toshkentdagi serverda saqlanadi; mijozlar hisobi jadvalini egasi Google Sheets da yuritadi (Google LLC, AQSH);\n- saqlash muddatlari va huquqlarim maxfiylik siyosatida tavsiflangan;\n- rozilikni Telegram @niveluzbot ga yozib bekor qilish mumkin.\n\nForma yuborilganda rozilik sanasi va tili qayd etiladi.\n"
+    },
+    "stageTariff": {
+      "title": "Bosqichlar narxnomasi",
+      "body": "# Bosqichlar narxnomasi (qoralama)\n\nBuyurtma toʻxtatilsa, ish haqi bajarilgan bosqichlar boʻyicha — ish haqining ulushi sifatida hisoblanadi:\n\n- Tanlov — {selection}\n- Xarid — {purchase}\n- Yigʻish — {assembly}\n- Topshirish — {handover}\n\nUlushlar yigʻindisi — 100 %. Ulushlar narxlar sozlamasida belgilangan; narxnoma {date} dan amal qiladi.\n\nYakuniy shartlar — ofertada.\n"
+    }
+  },
+  "requisites": {
+    "title": "Rekvizitlar",
+    "lead": "Rekvizitlar YaTT roʻyxatdan oʻtgach paydo boʻladi. Shu vaqtgacha arizalar va smetalarni oldindan toʻlovsiz qabul qilamiz.",
+    "row": {
+      "ip": "Ijrochi",
+      "inn": "STIR",
+      "account": "YaTT hisob raqami (ish haqi)",
+      "funds": "Xarid puli uchun YaTT hisobi",
+      "bank": "Bank",
+      "address": "Manzil",
+      "contact": "Aloqa",
+      "contactValue": "Telegram @niveluzbot",
+      "site": "Sayt",
+      "siteValue": "nivel.uz"
+    },
+    "note": "Toʻlov maʼlumotlarini faqat shu yerda va buyurtma hujjatlarida eʼlon qilamiz. Shaxsiy bank kartalaridan foydalanmaymiz."
+  }
+}

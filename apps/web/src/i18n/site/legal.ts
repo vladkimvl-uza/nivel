@@ -5,19 +5,25 @@
 // escapes every text, so there is no way to bring markup in.
 
 export const LEGAL_DOCS = [
-  { slug: "offer", kind: "offer" },
-  { slug: "privacy", kind: "privacy" },
-  { slug: "warranty", kind: "warranty" },
-  { slug: "returns", kind: "returns" },
-  { slug: "consent-pd", kind: "consent_pd" },
-  { slug: "stage-tariff", kind: "stage_tariff" },
+  { slug: "offer", kind: "offer", msg: "offer" },
+  { slug: "privacy", kind: "privacy", msg: "privacy" },
+  { slug: "warranty", kind: "warranty", msg: "warranty" },
+  { slug: "returns", kind: "returns", msg: "returns" },
+  { slug: "consent-pd", kind: "consent_pd", msg: "consentPd" },
+  { slug: "stage-tariff", kind: "stage_tariff", msg: "stageTariff" },
 ] as const;
 
 export type LegalSlug = (typeof LEGAL_DOCS)[number]["slug"];
-export type LegalKind = (typeof LEGAL_DOCS)[number]["kind"];
+/** The kinds of `content.legal_documents` that have a page of their own, and the requisites. */
+export type LegalKind = (typeof LEGAL_DOCS)[number]["kind"] | "requisites";
 
-export function legalKindOf(slug: string): LegalKind | null {
+export function legalKindOf(slug: string): Exclude<LegalKind, "requisites"> | null {
   return LEGAL_DOCS.find((d) => d.slug === slug)?.kind ?? null;
+}
+
+/** The key of the built-in draft in `site.legal.<key>.{title,body}`. */
+export function legalMessageKey(slug: string): string | null {
+  return LEGAL_DOCS.find((d) => d.slug === slug)?.msg ?? null;
 }
 
 export interface LegalRow {
@@ -29,8 +35,11 @@ export interface LegalRow {
   textSha256: string;
   /** `yyyy-mm-dd`; a published version always has it. */
   effectiveFrom: string | null;
-  createdAt: Date;
+  /** A Date, or its ISO text after the row went through the cache of the site. */
+  createdAt: Date | string;
 }
+
+const at = (v: Date | string): number => new Date(v).getTime();
 
 /**
  * The version to show: the newest published one that is already in force, else the newest unpublished one (a draft), else
@@ -47,13 +56,10 @@ export function pickLegalDocument(
     .filter((r) => r.status === "published" && r.effectiveFrom !== null && r.effectiveFrom <= today)
     .sort(
       (a, b) =>
-        (b.effectiveFrom as string).localeCompare(a.effectiveFrom as string) ||
-        b.createdAt.getTime() - a.createdAt.getTime(),
+        (b.effectiveFrom as string).localeCompare(a.effectiveFrom as string) || at(b.createdAt) - at(a.createdAt),
     );
   if (inForce[0]) return inForce[0];
-  const drafts = mine
-    .filter((r) => r.status !== "published")
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const drafts = mine.filter((r) => r.status !== "published").sort((a, b) => at(b.createdAt) - at(a.createdAt));
   return drafts[0] ?? null;
 }
 
@@ -73,8 +79,9 @@ export type Block =
 
 /** Addresses a link may have: web, mail, phone, a path of the site, an anchor. Never `javascript:`, `data:` or `//host`. */
 export function safeHref(href: string): string | null {
-  if (/^(?:https?:\/\/|mailto:|tel:)[^\s\u0000-\u001f]+$/i.test(href)) return href;
-  if (/^\/(?!\/)[^\s\u0000-\u001f]*$/.test(href) || /^#[^\s]*$/.test(href)) return href;
+  if ([...href].some((c) => c.charCodeAt(0) < 32)) return null;
+  if (/^(?:https?:\/\/|mailto:|tel:)\S+$/i.test(href)) return href;
+  if (/^\/(?!\/)\S*$/.test(href) || /^#\S*$/.test(href)) return href;
   return null;
 }
 
@@ -88,6 +95,33 @@ function matchAt(re: RegExp, text: string, at: number): RegExpExecArray | null {
   return re.exec(text);
 }
 
+/** What stands at position `i` of the text: a link, strong, emphasis or code (and how long it is), or nothing. */
+function readAt(text: string, i: number): { len: number; node?: Inline; plain?: string } | null {
+  const ch = text[i];
+  if (ch === "[") {
+    const m = matchAt(LINK, text, i);
+    if (m) {
+      const label = m[1] as string;
+      const href = safeHref(m[2] as string);
+      // an unsafe address loses the link and keeps the words
+      return href
+        ? { len: m[0].length, node: { type: "link", text: label, href } }
+        : { len: m[0].length, plain: label };
+    }
+  }
+  if (ch === "*") {
+    const strong = matchAt(STRONG, text, i);
+    if (strong) return { len: strong[0].length, node: { type: "strong", text: strong[1] as string } };
+    const em = matchAt(EM, text, i);
+    if (em) return { len: em[0].length, node: { type: "em", text: em[1] as string } };
+  }
+  if (ch === "`") {
+    const code = matchAt(CODE, text, i);
+    if (code) return { len: code[0].length, node: { type: "code", text: code[1] as string } };
+  }
+  return null;
+}
+
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
   let plain = "";
@@ -97,31 +131,19 @@ export function parseInline(text: string): Inline[] {
   };
   let i = 0;
   while (i < text.length) {
-    const ch = text[i];
-    let m: RegExpExecArray | null = null;
-    if (ch === "[" && (m = matchAt(LINK, text, i))) {
-      const href = safeHref(m[2] as string);
-      if (href) {
-        flush();
-        out.push({ type: "link", text: m[1] as string, href });
-      } else {
-        plain += m[1] as string;
-      }
-    } else if (ch === "*" && (m = matchAt(STRONG, text, i))) {
-      flush();
-      out.push({ type: "strong", text: m[1] as string });
-    } else if (ch === "*" && (m = matchAt(EM, text, i))) {
-      flush();
-      out.push({ type: "em", text: m[1] as string });
-    } else if (ch === "`" && (m = matchAt(CODE, text, i))) {
-      flush();
-      out.push({ type: "code", text: m[1] as string });
-    } else {
-      plain += ch;
+    const hit = readAt(text, i);
+    if (!hit) {
+      plain += text[i];
       i += 1;
       continue;
     }
-    i += m[0].length;
+    if (hit.node) {
+      flush();
+      out.push(hit.node);
+    } else {
+      plain += hit.plain ?? "";
+    }
+    i += hit.len;
   }
   flush();
   return out;

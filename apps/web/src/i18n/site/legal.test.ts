@@ -3,6 +3,7 @@ import {
   LEGAL_DOCS,
   type LegalRow,
   legalKindOf,
+  legalMessageKey,
   parseInline,
   parseMarkdown,
   pickLegalDocument,
@@ -31,6 +32,18 @@ describe("the legal pages", () => {
       "consent-pd",
       "stage-tariff",
     ]);
+  });
+
+  it("names the built-in draft of each document in the messages", () => {
+    expect(LEGAL_DOCS.map((d) => legalMessageKey(d.slug))).toEqual([
+      "offer",
+      "privacy",
+      "warranty",
+      "returns",
+      "consentPd",
+      "stageTariff",
+    ]);
+    expect(legalMessageKey("nope")).toBeNull();
   });
 
   it("maps a path to the kind of the document in the database", () => {
@@ -90,6 +103,16 @@ describe("pickLegalDocument", () => {
     expect(pickLegalDocument([], "offer", "uz", today)).toBeNull();
     expect(pickLegalDocument([row({ lang: "ru" })], "offer", "uz", today)).toBeNull();
     expect(pickLegalDocument([row({ kind: "privacy" })], "offer", "uz", today)).toBeNull();
+  });
+});
+
+describe("pickLegalDocument after the cache", () => {
+  it("reads the date of creation from its ISO text as well", () => {
+    const rows = [
+      row({ version: "1", status: "stub", effectiveFrom: null, createdAt: "2026-10-01T00:00:00.000Z" }),
+      row({ version: "2", status: "stub", effectiveFrom: null, createdAt: "2026-10-03T00:00:00.000Z" }),
+    ];
+    expect(pickLegalDocument(rows, "offer", "uz", "2026-10-07")?.version).toBe("2");
   });
 });
 

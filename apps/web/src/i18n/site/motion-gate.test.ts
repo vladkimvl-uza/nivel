@@ -46,11 +46,12 @@ describe("decideGate: video or posters", () => {
 });
 
 describe("heroMode", () => {
-  it("is static for a visitor who wants less motion, posters when only the video is not allowed, video otherwise", () => {
-    expect(heroMode({ ok: true, why: "ok" }, false)).toBe("video");
-    expect(heroMode({ ok: false, why: "slow-net" }, false)).toBe("posters");
-    expect(heroMode({ ok: false, why: "save-data" }, false)).toBe("posters");
-    expect(heroMode({ ok: false, why: "reduced-motion" }, true)).toBe("reduced");
+  it("is static for a visitor who wants less motion or saves traffic, posters on a slow channel or device, video otherwise", () => {
+    expect(heroMode({ ok: true, why: "ok" })).toBe("video");
+    expect(heroMode({ ok: false, why: "reduced-motion" })).toBe("reduced");
+    expect(heroMode({ ok: false, why: "save-data" })).toBe("reduced");
+    expect(heroMode({ ok: false, why: "slow-net" })).toBe("posters");
+    expect(heroMode({ ok: false, why: "weak-device" })).toBe("posters");
   });
 });
 
