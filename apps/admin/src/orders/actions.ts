@@ -11,7 +11,7 @@ import { runAction } from "./action-runner.ts";
 import type { ActionState } from "./action-state.ts";
 import { fromFormData } from "./build-event.ts";
 import * as commands from "./commands.ts";
-import { rebuildQuote } from "./quote-editor.ts";
+import { parseTasks, rebuildQuote } from "./quote-editor.ts";
 import { ordersCtx, quoteCtx, writerFor } from "./runtime.ts";
 import * as writes from "./writes.ts";
 
@@ -39,6 +39,29 @@ export async function rebuildQuoteAction(orderId: string, _prev: ActionState, da
     },
     (user, ipHash) => rebuildQuote(quoteCtx(user, ipHash), orderId, fromFormData(data)),
   );
+}
+
+/**
+ * The tasks of the build, kept in the address of the editor: the check of compatibility is recalculated with them at
+ * once, and every form of the page carries them on. The redirect is thrown, so it stays outside the frame.
+ */
+export async function rememberTasksAction(orderId: string, _prev: ActionState, data: FormData) {
+  const form = fromFormData(data);
+  const state = await runAction(
+    {
+      name: "orders.quote_build",
+      entity: "sales.quotes",
+      entityId: orderId,
+      revalidate: [`/orders/${orderId}/quote`, ...orderPaths(orderId)],
+    },
+    (user, ipHash) => rebuildQuote(quoteCtx(user, ipHash), orderId, form),
+  );
+  if (!state.ok) return state;
+  const query = new URLSearchParams();
+  for (const task of parseTasks(form)) query.append("tasks", task);
+  const search = form.get("q");
+  if (search) query.set("q", search);
+  redirect(`/orders/${orderId}/quote?${query.toString()}`);
 }
 
 export async function sendQuoteAction(orderId: string, quoteId: string, _prev: ActionState, data: FormData) {

@@ -247,6 +247,18 @@ describe("rebuilding the estimate", () => {
     );
   });
 
+  it("remembers the tasks of an estimate that has no lines yet without asking the services to build nothing", async () => {
+    const build = vi.fn();
+    const r = await rebuildQuote(
+      ctxOf("owner", empty, { quotes: { build } } as unknown as Partial<Svc>),
+      ORDER,
+      form({ change: "recalc", tasks: ["gaming"] }),
+    );
+    expect(r).toMatchObject({ ok: true });
+    expect(r.message).toContain("Задачи");
+    expect(build).not.toHaveBeenCalled();
+  });
+
   it("writes an unexpected exception to the log and shows only the general text", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     try {

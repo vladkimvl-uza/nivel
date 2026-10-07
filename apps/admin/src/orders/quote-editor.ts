@@ -161,6 +161,10 @@ export async function rebuildQuote(ctx: QuoteCtx, orderId: string, form: FormInp
   try {
     const applied = applyChange(await ctx.drafts.load(orderId), parsed.change);
     if (!applied.ok) return { ok: false, message: applied.message };
+    // The tasks only travel with the lines (the services keep none): with no line yet there is nothing to calculate.
+    if (parsed.change.kind === "recalc" && applied.lines.catalog.length + applied.lines.manual.length === 0) {
+      return { ok: true, message: "Задачи запомнены: они учтены в расчёте, когда в смете появятся строки." };
+    }
     const built = await ctx.svc.quotes.build(
       {
         orderId,

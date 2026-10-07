@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getRuntime } from "../../../../../src/auth/runtime.ts";
 import { canDo } from "../../../../../src/orders/access.ts";
-import { rebuildQuoteAction, sendQuoteAction } from "../../../../../src/orders/actions.ts";
+import { rebuildQuoteAction, rememberTasksAction, sendQuoteAction } from "../../../../../src/orders/actions.ts";
 import { formatSum } from "../../../../../src/orders/format.ts";
 import { STATUS_LABEL } from "../../../../../src/orders/labels.ts";
 import { requireOrdersUser } from "../../../../../src/orders/next.ts";
@@ -83,23 +83,35 @@ export default async function QuoteEditorPage({
         </p>
       ) : null}
 
-      <form className="adm-filters" method="get" action={`/orders/${id}/quote`} data-testid="tasks-form">
-        <fieldset className="adm-group">
-          <legend>Задачи сборки (до двух) — для проверки совместимости</legend>
-          <div className="adm-checks">
-            {TASKS.map(([value, label]) => (
-              <label key={value} className="adm-check">
-                <input type="checkbox" name="tasks" value={value} defaultChecked={tasks.includes(value)} />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        {search ? <input type="hidden" name="q" value={search} /> : null}
-        <Button type="submit" variant="ghost">
-          Запомнить задачи
-        </Button>
-      </form>
+      {editable ? (
+        <ActionForm
+          action={rememberTasksAction.bind(null, id)}
+          submit="Запомнить задачи"
+          className="adm-filters"
+          testId="tasks-form"
+          resetOnSuccess={false}
+        >
+          <input type="hidden" name="change" value="recalc" />
+          <fieldset className="adm-group">
+            <legend>Задачи сборки (до двух) — для проверки совместимости</legend>
+            <div className="adm-checks">
+              {TASKS.map(([value, label]) => (
+                <label key={value} className="adm-check">
+                  <input type="checkbox" name="tasks" value={value} defaultChecked={tasks.includes(value)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {search ? <input type="hidden" name="q" value={search} /> : null}
+          {tasks.length === 0 && quote ? (
+            <p className="adm-note" data-testid="tasks-empty">
+              Задачи не выбраны: проверка совместимости идёт без них. Выберите и нажмите «Запомнить задачи» — смета
+              пересчитается.
+            </p>
+          ) : null}
+        </ActionForm>
+      ) : null}
 
       <h2>Итоги расчёта</h2>
       {quote ? (

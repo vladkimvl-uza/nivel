@@ -276,6 +276,28 @@ describe("what the actions pass on", () => {
   });
 });
 
+describe("the tasks of the build", () => {
+  it("recalculates with them and goes back to the editor with them in the address, after a success only", async () => {
+    calls.outcome = { ok: true, message: "Смета пересчитана." };
+    const data = new FormData();
+    data.append("change", "recalc");
+    data.append("tasks", "gaming");
+    data.append("tasks", "office");
+    data.append("tasks", "nonsense");
+    data.append("q", "rtx 5060");
+    await expect(actions.rememberTasksAction(O, IDLE, data)).rejects.toMatchObject({
+      to: `/orders/${O}/quote?tasks=gaming&tasks=office&q=rtx+5060`,
+    });
+    expect(calls.commands.map((c) => c.fn)).toEqual(["rebuildQuote"]);
+    expect(calls.specs[0]).toMatchObject({ name: "orders.quote_build", entity: "sales.quotes" });
+    calls.outcome = { ok: false, message: "Нужна хотя бы одна строка." };
+    await expect(actions.rememberTasksAction(O, IDLE, data)).resolves.toEqual({
+      ok: false,
+      message: "Нужна хотя бы одна строка.",
+    });
+  });
+});
+
 describe("taking a request into work", () => {
   it("goes to the new order after a success, and stays where it is after a refusal", async () => {
     calls.outcome = { ok: true, message: "Заказ создан.", id: "order-9" };
