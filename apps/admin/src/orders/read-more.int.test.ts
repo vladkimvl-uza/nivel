@@ -1,5 +1,6 @@
 // Integration: requests, customers, the dashboard, the registry and the writes that have no scenario of the services.
 
+import { marketPrices } from "@nivel/db";
 import { leads, orders, payments, threshold } from "@nivel/services";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPgAuditSink } from "../auth/audit.ts";
@@ -168,6 +169,32 @@ describe("the estimate editor reads", () => {
     const gpu = (await searchCatalog(w.db, "rtx"))[0];
     expect(gpu).toMatchObject({ category: "gpu", title: "Gigabyte RTX 5060", priceSum: 3_600_000, confidence: "high" });
     expect(await searchCatalog(w.db, "%")).toEqual([]);
+  });
+
+  it("offers the positions that are only for the owner's hand too (not in the auto-build), with the price from the lower bound", async () => {
+    const { rows } = await w.db.$client.query<{ id: string }>(
+      `insert into catalog.products (slug, category_code, brand, model, specs, status, manual_only)
+       select 'ddr5-128-manual-test', category_code, 'Kingston', 'Fury 128GB DDR5', specs, 'verified', true
+         from catalog.products where category_code = 'ram' and not manual_only limit 1
+       returning id`,
+    );
+    const id = rows[0]?.id as string;
+    await w.db.insert(marketPrices).values({
+      productId: id,
+      asOf: "2026-10-12",
+      fromSum: 9_900_000,
+      offersN: 1,
+      vendorsN: 1,
+      maxAgeDays: 1,
+      confidence: "low",
+    });
+    const found = (await searchCatalog(w.db, "Fury 128")).find((c) => c.id === id);
+    expect(found).toMatchObject({
+      category: "ram",
+      title: "Kingston Fury 128GB DDR5",
+      priceSum: 9_900_000,
+      manualOnly: true,
+    });
   });
 });
 

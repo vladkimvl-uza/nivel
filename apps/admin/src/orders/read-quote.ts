@@ -53,9 +53,14 @@ export interface CatalogChoice {
   priceSum: number | null;
   confidence: string | null;
   priceDate: string | null;
+  /** Left out of the auto-build: the owner picks it by hand, and the price may be a lower bound only. */
+  manualOnly: boolean;
 }
 
-/** Verified positions with a current market price; a text narrows by brand, model or category. */
+/**
+ * Verified positions with their current market price; a text narrows by brand, model or category. The positions that
+ * are "only by hand" (the auto-build and the assistant skip them) are here: the owner is who picks them.
+ */
 export async function searchCatalog(db: Db, q: string | undefined, limit = 30): Promise<CatalogChoice[]> {
   const like = q?.trim() ? `%${escapeLike(q.trim())}%` : null;
   const { rows } = await db.$client.query<{
@@ -63,16 +68,17 @@ export async function searchCatalog(db: Db, q: string | undefined, limit = 30): 
     category_code: string;
     brand: string;
     model: string;
+    manual_only: boolean;
     median_sum: string | null;
     from_sum: string | null;
     confidence: string | null;
     as_of: string | null;
   }>(
-    `select p.id, p.category_code, p.brand, p.model, m.median_sum::text as median_sum, m.from_sum::text as from_sum,
+    `select p.id, p.category_code, p.brand, p.model, p.manual_only, m.median_sum::text as median_sum, m.from_sum::text as from_sum,
             m.confidence, m.as_of::text as as_of
        from catalog.products p
        left join pricing.v_market_price_current m on m.product_id = p.id
-      where p.status = 'verified' and not p.manual_only
+      where p.status = 'verified'
         and ($1::text is null or p.brand ilike $1 escape '\\' or p.model ilike $1 escape '\\'
              or p.category_code ilike $1 escape '\\')
       order by p.category_code, p.brand, p.model
@@ -86,6 +92,7 @@ export async function searchCatalog(db: Db, q: string | undefined, limit = 30): 
     priceSum: r.median_sum !== null ? num(r.median_sum) : r.from_sum !== null ? num(r.from_sum) : null,
     confidence: r.confidence,
     priceDate: r.as_of,
+    manualOnly: r.manual_only,
   }));
 }
 

@@ -236,7 +236,10 @@ export default async function QuoteEditorPage({
                 ) : (
                   found.map((p) => (
                     <tr key={p.id}>
-                      <td>{p.title}</td>
+                      <td>
+                        {p.title}
+                        {p.manualOnly ? <span className="adm-note"> · только вручную</span> : null}
+                      </td>
                       <td>{p.category}</td>
                       <td className="adm-num">{formatSum(p.priceSum)}</td>
                       <td>
