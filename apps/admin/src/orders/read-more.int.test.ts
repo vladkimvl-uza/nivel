@@ -478,6 +478,8 @@ describe("the passport of a build", () => {
   it("refuses what is not a serial list, a test that is not minutes, a role that may not, an order that does not exist", async () => {
     const o = await assemblingOrder(w, "Паспорт плохой");
     expect((await savePassport(writer(), o.orderId, form({ serials: `${"x".repeat(100)}: 1` }))).ok).toBe(false);
+    const many = Array.from({ length: 101 }, (_, i) => `Деталь ${i}: SN${i}`).join("\n");
+    expect((await savePassport(writer(), o.orderId, form({ serials: many }))).ok).toBe(false);
     expect((await savePassport(writer(), o.orderId, form({ minutes: "много" }))).ok).toBe(false);
     expect((await savePassport(writer(), o.orderId, form({ minutes: "9999" }))).ok).toBe(false);
     expect((await savePassport(writer(), o.orderId, form({ peakTempC: "500" }))).ok).toBe(false);
