@@ -1,0 +1,7 @@
+# Reviewed false positives (by fingerprint). Each line: why it is not a secret.
+# WP-10 tests and constants, checked 07.10.2026: GPS marker strings in metadata-removal tests,
+# the password generator alphabet, and the base32 RFC 6238 sample secret of a TOTP test.
+ee5cc4edcd8f5772d4dcd4414683ed91cdd8754c:apps/admin/src/kit/upload/image.shapes.test.ts:generic-api-key:13
+ad33a77cc905a24714552b49f22acc7b63c46e12:apps/admin/src/kit/upload/image.test.ts:generic-api-key:384
+1efac93aeec45b48ec684beb85e8247ff37cacee:apps/admin/src/auth/password.ts:generic-api-key:113
+1efac93aeec45b48ec684beb85e8247ff37cacee:apps/admin/src/auth/secrets.test.ts:generic-api-key:17
