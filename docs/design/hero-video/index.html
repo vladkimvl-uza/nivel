@@ -1561,7 +1561,7 @@ main,.ftr{position:relative;z-index:1}
     /* финал: стоп-кадр и медленное приближение в последних 8 % */
     var z=Math.min(1,Math.max(0,(p-NV.HOLD)/(1-NV.HOLD)));media.style.setProperty('--z',(z*z*(3-2*z)).toFixed(3));
     /* стык с фоном: стоп-кадр гаснет «выключателем» на 93–100 % трека — ступени по прокрутке, к 100 % — тёмный */
-    var o=NV.offAt(p);if(o!==lastOff){heroOff.style.opacity=o;hfoot.style.opacity=vcolBox.style.opacity=(1-o).toFixed(3);lastOff=o}
+    var o=NV.offAt(p);if(o!==lastOff){heroOff.style.opacity=o;hfoot.style.opacity=(1-o).toFixed(3);if(vcolBox)vcolBox.style.opacity=hfoot.style.opacity;lastOff=o}
     if(p>=.6&&NV.loadBg)NV.loadBg();
     if(NV.mode==='video'){V.target=NV.tFromP(p);kick();clearTimeout(V.mt);V.mt=setTimeout(magnet,160)}
   };
