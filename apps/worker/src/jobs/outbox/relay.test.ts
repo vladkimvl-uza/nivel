@@ -335,10 +335,32 @@ describe("relayOnce: jobs", () => {
       {
         queue: "payment.expect",
         data: { job: "payment.expect", orderId: "order-1", paymentKind: "fee_advance", amountSum: 1_000_000 },
-        opts: { singletonKey: "ord:1:pay:fee_advance" },
+        opts: { id: row.id, singletonKey: "ord:1:pay:fee_advance" },
       },
     ]);
     expect(t.store.get(row.id).status).toBe("sent");
+  });
+
+  it("gives pg-boss the id of the row as the id of the job: a second hand-over of the same row cannot make a second job", async () => {
+    const t = setup();
+    t.jobs.queues.add("ledger.append");
+    const row = t.store.add("job", { job: "ledger.append", orderId: "order-1", fund: "warranty" });
+    await relayOnce(t.deps);
+    expect(t.jobs.sent[0]?.opts?.id).toBe(row.id);
+  });
+
+  it("refuses a job whose name is not a plain name of a queue, without putting the name into the error whole", async () => {
+    const t = setup();
+    const long = "a".repeat(150_000);
+    t.store.add("job", { job: long });
+    t.store.add("job", { job: "pay ment;drop" });
+    t.store.add("job", { job: "outbox.relay" });
+    const started = performance.now();
+    const stats = await relayOnce(t.deps);
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(stats.dead).toBe(3);
+    expect(t.jobs.sent).toEqual([]);
+    for (const r of t.store.rows) expect((r.lastError ?? "").length).toBeLessThanOrEqual(500);
   });
 
   it("uses the id of the row as the key when the row has no dedupe key", async () => {
@@ -346,7 +368,7 @@ describe("relayOnce: jobs", () => {
     t.jobs.queues.add("threshold.check");
     const row = t.store.add("job", { job: "threshold.check", orderId: "order-1" });
     await relayOnce(t.deps);
-    expect(t.jobs.sent[0]?.opts?.singletonKey).toBe(row.id);
+    expect(t.jobs.sent[0]?.opts).toEqual({ id: row.id, singletonKey: row.id });
   });
 
   it("sends the jobs of the order calendar to one queue and keeps the name of the job in the data", async () => {

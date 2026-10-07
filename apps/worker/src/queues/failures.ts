@@ -7,11 +7,14 @@ import { ops } from "@nivel/db/repos";
 import { isoDateInTashkent } from "@nivel/domain/calendar";
 
 const MAX_MESSAGE = 500;
+/** How much of a raw text the masks may look at: a row of the outbox may carry a name of hundreds of kilobytes (no ReDoS). */
+const RAW_LOOKAHEAD = 4;
 
 const MASKS: readonly [RegExp, string][] = [
   // the token of a bot: <digits>:<35 letters, digits, - and _>
-  [/\b\d{6,}:[A-Za-z0-9_-]{30,}\b/g, "<token>"],
-  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>"],
+  [/\b\d{6,20}:[A-Za-z0-9_-]{30,}\b/g, "<token>"],
+  // every part has a bound, so the time stays linear in the text however long a run of letters is
+  [/[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,24}/g, "<email>"],
   // a phone number: + and 9 to 15 digits with the usual separators
   [/\+\d[\d\s().-]{7,17}\d/g, "<phone>"],
   // a card number: four groups of four digits
@@ -34,7 +37,8 @@ export function sanitizeMessage(error: unknown, limit = MAX_MESSAGE): string {
     }
   }
   if (text.trim() === "") return "unknown error";
-  let out = text;
+  // Cut first, mask after: what the limit drops is never looked at, and the masks stay fast on any input.
+  let out = text.length > limit * RAW_LOOKAHEAD ? text.slice(0, limit * RAW_LOOKAHEAD) : text;
   for (const [re, mask] of MASKS) out = out.replace(re, mask);
   return out.length > limit ? `${out.slice(0, limit - 1)}…` : out;
 }

@@ -3,6 +3,7 @@
 // have changed since it was queued (the report accepted, the money received), and then there is nothing to do.
 import type { WorkCalendar } from "@nivel/domain/calendar";
 import { PermanentJobError } from "../../queues/define.ts";
+import { isUuid } from "../../queues/ids.ts";
 import { OUTBOX_JOB } from "../outbox/routes.ts";
 import { type RemindersDeps, remindAftercare, remindRefundDue, remindReportDue } from "./reminders.ts";
 import { deemAccepted, expireEstimate, remindAccept, type TermsDeps } from "./terms.ts";
@@ -15,7 +16,7 @@ const HOUR_MS = 3_600_000;
 
 export async function handleScheduled(deps: ScheduledDeps, data: Record<string, unknown>): Promise<void> {
   const { job, orderId } = data;
-  if (typeof job !== "string" || typeof orderId !== "string") {
+  if (typeof job !== "string" || !isUuid(orderId)) {
     throw new PermanentJobError("orders.scheduled: the job must name itself and the order");
   }
   const at = typeof data.at === "string" && !Number.isNaN(Date.parse(data.at)) ? new Date(data.at) : deps.now();

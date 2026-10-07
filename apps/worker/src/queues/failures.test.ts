@@ -22,6 +22,21 @@ describe("sanitizeMessage: the error table has no personal data (DATA-MAP: no PD
     expect(out.length).toBeLessThanOrEqual(200);
   });
 
+  it("stays fast on a huge text with no spaces: a row of the outbox may carry a name of 150 000 characters (no ReDoS)", () => {
+    for (const raw of ["a".repeat(150_000), "1".repeat(150_000), `${"1".repeat(1000)}${"a.".repeat(70_000)}`]) {
+      const started = performance.now();
+      const out = sanitizeMessage(`outbox job ${raw}: the queue ${raw} does not exist`);
+      expect(performance.now() - started).toBeLessThan(250);
+      expect(out.length).toBeLessThanOrEqual(500);
+    }
+  });
+
+  it("still masks an e-mail address of ordinary length inside a long text", () => {
+    const out = sanitizeMessage(`${"x ".repeat(100)}write to ivan.petrov@example.uz now`, 1000);
+    expect(out).toContain("<email>");
+    expect(out).not.toContain("example.uz");
+  });
+
   it("answers a text for anything: an Error, a string, an object, nothing", () => {
     expect(sanitizeMessage(undefined)).toBe("unknown error");
     expect(sanitizeMessage(null)).toBe("unknown error");

@@ -39,6 +39,8 @@ export function createTelegramGateway(o: TelegramOptions): TelegramGateway {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), o.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     let response: Response;
+    let answer: ApiAnswer<T> | null = null;
+    // The timer runs until the body is read: a server that sends the head of the answer and goes silent must not hold the pass.
     try {
       response = await o.fetch(`${API}/bot${o.token}/${method}`, {
         method: "POST",
@@ -46,18 +48,19 @@ export function createTelegramGateway(o: TelegramOptions): TelegramGateway {
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+      try {
+        answer = (await response.json()) as ApiAnswer<T>;
+      } catch {
+        // not JSON: handled below by the status; but a body that was cut by the timeout is a timeout
+        if (controller.signal.aborted) throw new Error("aborted");
+        answer = null;
+      }
     } catch (error) {
       // The message of a network error can name the URL, and the URL holds the token: say only what kind of failure it was.
-      const aborted = error instanceof Error && error.name === "AbortError";
+      const aborted = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
       throw new TelegramError(aborted ? `${method}: timeout` : `${method}: network error`, null);
     } finally {
       clearTimeout(timer);
-    }
-    let answer: ApiAnswer<T> | null = null;
-    try {
-      answer = (await response.json()) as ApiAnswer<T>;
-    } catch {
-      answer = null;
     }
     if (!response.ok || answer?.ok !== true || answer.result === undefined) {
       const description = (answer?.description ?? "no description").replaceAll(o.token, "<token>");

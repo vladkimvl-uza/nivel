@@ -144,6 +144,8 @@ describe("handleLedgerAppend: the contribution is the domain's, from the receipt
       { orderId: ORDER },
       { orderId: ORDER, fund: "salary" },
       { orderId: 12, fund: "warranty" },
+      { orderId: "order-1", fund: "warranty" },
+      { orderId: "9".repeat(150_000), fund: "warranty" },
     ]) {
       await expect(t.run(data)).rejects.toBeInstanceOf(PermanentJobError);
     }

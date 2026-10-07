@@ -88,7 +88,13 @@ describe("handlePaymentExpect: the sum is the database's, the payload is a hint"
 
   it("refuses a payload without an order or a kind, and never calls the scenario", async () => {
     const expectFromJob = vi.fn();
-    for (const data of [{}, { orderId: ORDER }, { paymentKind: "fee_advance" }, { orderId: 5, paymentKind: "x" }]) {
+    for (const data of [
+      {},
+      { orderId: ORDER },
+      { paymentKind: "fee_advance" },
+      { orderId: 5, paymentKind: "x" },
+      { orderId: "order-1", paymentKind: "fee_advance" },
+    ]) {
       await expect(run(expectFromJob, data).promise).rejects.toBeInstanceOf(PermanentJobError);
     }
     expect(expectFromJob).not.toHaveBeenCalled();

@@ -1,9 +1,18 @@
 import type { ops } from "@nivel/db/repos";
 import { describe, expect, it, vi } from "vitest";
+import { jobIdOf } from "../../queues/ids.ts";
 import { FakeClock, FakeJobs, recordingLogger } from "../../queues/test-support/fakes.ts";
 import { QUEUE } from "../outbox/routes.ts";
 import type { OrderFacts, OrdersStore } from "./store.ts";
-import { deemAccepted, expireEstimate, remindAccept, sweepDeemed, sweepExpiry, type TermsDeps } from "./terms.ts";
+import {
+  deemAccepted,
+  expireEstimate,
+  failIfSweepFailed,
+  remindAccept,
+  sweepDeemed,
+  sweepExpiry,
+  type TermsDeps,
+} from "./terms.ts";
 
 const ORDER = "6b1f8f9e-0c3a-4a58-9a0e-3f2d8c1f7a11";
 const UNTIL = new Date("2026-10-15T10:00:00+05:00");
@@ -81,6 +90,7 @@ describe("deemAccepted: REPORT_DEEMED_ACCEPTED strictly after the window of obje
           at: new Date(UNTIL.getTime() + 1000).toISOString(),
         },
         opts: {
+          id: jobIdOf(`objection_window:${ORDER}:${UNTIL.getTime() + 1000}`),
           singletonKey: `objection_window:${ORDER}:${UNTIL.getTime() + 1000}`,
           startAfter: new Date(UNTIL.getTime() + 1000),
         },
@@ -251,5 +261,17 @@ describe("remindAccept: the reminder 24 hours after ACCEPT", () => {
       expect(await remindAccept(t.deps, ORDER)).toEqual({ outcome: "not_needed" });
       expect(t.enqueued).toEqual([]);
     }
+  });
+});
+
+describe("failIfSweepFailed: an order that cannot be taken by the sweep is a failure of the job, not only a line of the log", () => {
+  it("does nothing when no order failed", () => {
+    expect(() => failIfSweepFailed("orders.reminders", { failed: 0 })).not.toThrow();
+  });
+
+  it("throws a text with the number of orders, and no order data, when some failed", () => {
+    expect(() => failIfSweepFailed("orders.reminders", { failed: 2 })).toThrow(
+      "orders.reminders: 2 orders could not be processed (see the log of the worker)",
+    );
   });
 });

@@ -144,29 +144,36 @@ export async function handleCrmSync(
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), deps.timeoutMs ?? TIMEOUT_MS);
-  let response: Response;
+  let status: number;
+  let answer: { ok?: unknown; result?: unknown; error?: unknown };
+  // The timer runs until the body is read: a server that sends the head of the answer and goes silent must not hold the queue.
   try {
-    response = await deps.fetch(request.url, {
+    const response = await deps.fetch(request.url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: request.body,
       signal: controller.signal,
     });
+    status = response.status;
+    if (status >= 500) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error(`crm.sync: the CRM answered HTTP ${status}`);
+    }
+    try {
+      answer = (await response.json()) as typeof answer;
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      throw new Error(`crm.sync: the answer of the CRM is not JSON (HTTP ${status})`);
+    }
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("crm.sync:")) throw error;
     // The address of the request holds the signature: only the kind of the failure is written.
-    const aborted = error instanceof Error && error.name === "AbortError";
+    const aborted = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
     throw new Error(
       `crm.sync: no answer from the CRM (${aborted ? "timeout" : sanitizeMessage(error).replaceAll(config.secret, "<key>")})`,
     );
   } finally {
     clearTimeout(timer);
-  }
-  if (response.status >= 500) throw new Error(`crm.sync: the CRM answered HTTP ${response.status}`);
-  let answer: { ok?: unknown; result?: unknown; error?: unknown };
-  try {
-    answer = (await response.json()) as typeof answer;
-  } catch {
-    throw new Error(`crm.sync: the answer of the CRM is not JSON (HTTP ${response.status})`);
   }
   if (typeof answer !== "object" || answer === null || typeof answer.ok !== "boolean") {
     throw new Error("crm.sync: the answer of the CRM has no ok");

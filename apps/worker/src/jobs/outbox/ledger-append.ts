@@ -9,6 +9,7 @@ import { type Bp, bp, sum } from "@nivel/domain/money";
 import { taxRiskReserve, warrantyReserveContribution } from "@nivel/domain/reserve";
 import type { Logger } from "pino";
 import { PermanentJobError } from "../../queues/define.ts";
+import { isUuid } from "../../queues/ids.ts";
 
 const FUNDS = ["warranty", "tax_risk"] as const;
 type Fund = (typeof FUNDS)[number];
@@ -50,8 +51,10 @@ export function lossesBpOf(losses: number, purchased: number): Bp {
 
 export async function handleLedgerAppend(deps: LedgerDeps, data: Record<string, unknown>): Promise<LedgerResult> {
   const { orderId, fund } = data;
-  if (typeof orderId !== "string" || typeof fund !== "string" || !(FUNDS as readonly string[]).includes(fund)) {
-    throw new PermanentJobError("ledger.append: the job must name the order and a fund (warranty or tax_risk)");
+  if (!isUuid(orderId) || typeof fund !== "string" || !(FUNDS as readonly string[]).includes(fund)) {
+    throw new PermanentJobError(
+      "ledger.append: the job must name the order (its id) and a fund (warranty or tax_risk)",
+    );
   }
   const f = fund as Fund;
   const { port, log } = deps;

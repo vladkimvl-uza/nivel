@@ -5,7 +5,7 @@
 //  - without BOT_TOKEN a row is skipped with its reason written on it; a template the worker does not know is skipped too
 //    (the texts of the order automaton come with the bot);
 //  - the limits are the throttle's: a short wait is waited out here, a long one puts the row back in the outbox;
-//  - a job is handed to its queue of pg-boss under the key of the row; `act.sign` is refused, `pdf.render` waits for the flag
+//  - a job is handed to its queue of pg-boss under the id of the row; `act.sign` is refused, `pdf.render` waits for the flag
 //    `feature.pdf` and for the queue of WP-12.
 import type { Logger } from "pino";
 import type { FailureSink } from "../../queues/failures.ts";
@@ -13,7 +13,7 @@ import { sanitizeMessage } from "../../queues/failures.ts";
 import type { JobSink, Lang, MessageRenderer, TelegramGateway } from "../../queues/runtime.ts";
 import { TelegramError } from "../../queues/telegram.ts";
 import type { Throttle } from "../../queues/throttle.ts";
-import { OUTBOX_JOB, queueOfJob, REFUSED_JOBS } from "./routes.ts";
+import { INTERNAL_QUEUES, JOB_NAME, OUTBOX_JOB, queueOfJob, REFUSED_JOBS } from "./routes.ts";
 import type { OutboxRow, OutboxStore } from "./store.ts";
 
 /** Attempts a row gets before it is `failed` for good. */
@@ -221,6 +221,15 @@ async function processJob(deps: RelayDeps, row: OutboxRow): Promise<Outcome> {
   const p = row.payload;
   const job = str(p.job);
   if (job === undefined) return { kind: "dead", error: new Error("outbox job: the payload names no job") };
+  // The row may come from the site or the bot (they may insert into the outbox): the name is checked before it goes into any text.
+  if (!JOB_NAME.test(job))
+    return { kind: "dead", error: new Error("outbox job: the name of the job is not a plain name") };
+  if (INTERNAL_QUEUES.has(job)) {
+    return {
+      kind: "dead",
+      error: new Error(`outbox job: ${job} runs by the clock of the worker, not from the outbox`),
+    };
+  }
   const refused = REFUSED_JOBS[job];
   if (refused !== undefined) return { kind: "dead", error: new Error(refused) };
 
@@ -240,7 +249,9 @@ async function processJob(deps: RelayDeps, row: OutboxRow): Promise<Outcome> {
       error: new Error(`outbox job ${job}: the queue ${queue} does not exist (is its domain deployed?)`),
     };
   }
-  // A null answer means pg-boss has the job under this key already: the row is done all the same.
-  await deps.jobs.send(queue, data, { singletonKey: row.dedupeKey ?? row.id });
+  // The id of the row is the id of the job: a row handed over twice (a crash between the send and `markSent`, a lease that ran
+  // out) is one job, and a null answer means pg-boss has it already, so the row is done all the same. The key alone would not
+  // do it: the queues have the standard policy, which does not look at it.
+  await deps.jobs.send(queue, data, { id: row.id, singletonKey: row.dedupeKey ?? row.id });
   return { kind: "sent" };
 }

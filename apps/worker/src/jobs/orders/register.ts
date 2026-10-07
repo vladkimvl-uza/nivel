@@ -9,7 +9,7 @@ import { createPgEsfReader, handleEsfReminders } from "./esf.ts";
 import { sweepLeadReminders } from "./reminders.ts";
 import { handleScheduled, type ScheduledDeps } from "./scheduled.ts";
 import { createPgOrdersStore } from "./store.ts";
-import { sweepDeemed, sweepExpiry } from "./terms.ts";
+import { failIfSweepFailed, sweepDeemed, sweepExpiry } from "./terms.ts";
 
 export const ORDERS_QUEUE = {
   estimateExpiry: "orders.estimate.expiry",
@@ -57,6 +57,7 @@ export async function register(raw: JobContext): Promise<void> {
     handler: async () => {
       const done = await sweepExpiry(deps);
       if (done.expired + done.failed > 0) ctx.runtime.log.info(done, "orders.estimate.expiry");
+      failIfSweepFailed("orders.estimate.expiry", done);
     },
   });
 
@@ -65,7 +66,11 @@ export async function register(raw: JobContext): Promise<void> {
     cron: "*/5 * * * *",
     handler: async () => {
       // The sweeps are independent: a failure of one must not hide the others, and it is still a failure of the job.
-      const results = await Promise.allSettled([sweepDeemed(deps), sweepLeadReminders(deps), handleEsfReminders(esf)]);
+      const results = await Promise.allSettled([
+        sweepDeemed(deps).then((done) => failIfSweepFailed("orders.reminders", done)),
+        sweepLeadReminders(deps),
+        handleEsfReminders(esf),
+      ]);
       const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
       if (failed.length > 0) throw failed[0]?.reason;
     },

@@ -75,6 +75,8 @@ export async function handleRevalidate(deps: RevalidateDeps, data: Record<string
       signal: controller.signal,
     });
     status = response.status;
+    // The answer is not read: letting the body go frees the connection.
+    await response.body?.cancel().catch(() => undefined);
   } catch (error) {
     // The text of a network error is cleaned of the key before it goes anywhere.
     const aborted = error instanceof Error && error.name === "AbortError";

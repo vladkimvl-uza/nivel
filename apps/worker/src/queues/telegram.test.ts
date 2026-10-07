@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTelegramGateway, disabledTelegram, TelegramError } from "./telegram.ts";
+import { fetchWithHangingBody } from "./test-support/fakes.ts";
 
 const TOKEN = "123456789:AAE-test-token-not-a-real-one-0123456789"; // gitleaks:allow fake token of the unit test
 
@@ -15,6 +16,16 @@ function fakeFetch(answer: { status: number; body: unknown; headers?: Record<str
   }) as typeof fetch;
   return { impl, calls };
 }
+
+describe("createTelegramGateway: a server that stops in the middle of the answer", () => {
+  it("gives up after the timeout, whole request included the body", async () => {
+    const hang = fetchWithHangingBody();
+    const tg = createTelegramGateway({ token: TOKEN, fetch: hang.impl, timeoutMs: 30 });
+    const error = await tg.sendMessage({ chatId: 5, text: "x" }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TelegramError);
+    expect((error as TelegramError).message).toContain("timeout");
+  }, 3000);
+});
 
 describe("createTelegramGateway.sendMessage", () => {
   it("posts the text to the chat and answers the id of the message", async () => {

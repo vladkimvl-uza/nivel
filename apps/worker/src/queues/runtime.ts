@@ -30,7 +30,15 @@ export interface WorkerSettings {
 
 /** Sends a job to a queue of pg-boss; the real one is a thin cover over the `PgBoss` of the process. */
 export interface JobSink {
-  send(queue: string, data: object, opts?: { singletonKey?: string; startAfter?: Date }): Promise<string | null>;
+  /**
+   * `id` is the id of the job (a UUID): a second send under the same id makes no second job and answers `null`. `singletonKey`
+   * alone does not do that on a queue with the standard policy, so whoever needs "once" passes an id.
+   */
+  send(
+    queue: string,
+    data: object,
+    opts?: { id?: string; singletonKey?: string; startAfter?: Date },
+  ): Promise<string | null>;
   /** Whether another domain has made the queue already (pdf.render is made by WP-12). */
   hasQueue(queue: string): Promise<boolean>;
   /** Queues whose oldest ready job has waited more than `seconds` (nobody takes it: ops.selfcheck). */

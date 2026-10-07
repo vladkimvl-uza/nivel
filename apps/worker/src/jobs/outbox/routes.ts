@@ -58,3 +58,20 @@ export const REFUSED_JOBS: Readonly<Record<string, string>> = {
   [OUTBOX_JOB.ACT_SIGN]:
     "act.sign is reserved: the bot signs an act through sales.sign_act, and a job never carries a signature",
 };
+
+/** The name of a job in a row of the outbox: a plain name of a queue, short, with no spaces and no marks. */
+export const JOB_NAME = /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/;
+
+/** Queues that run by the clock of the worker; a row of the outbox never starts them. */
+export const INTERNAL_QUEUES: ReadonlySet<string> = new Set([
+  QUEUE.relay,
+  "retention.purge",
+  "ops.selfcheck",
+  "ops.error_digest",
+  "ops.fee_scale.promote",
+  "orders.reminders",
+  "orders.estimate.expiry",
+  "warranty.sla",
+  "warranty.vendor_expiry",
+  "crm.collect",
+]);

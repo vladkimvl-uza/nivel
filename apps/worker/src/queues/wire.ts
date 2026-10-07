@@ -26,6 +26,7 @@ export function createJobSink(boss: Pick<PgBoss, "send" | "getQueue" | "getQueue
   return {
     async send(queue, data, opts) {
       return boss.send(queue, data, {
+        ...(opts?.id === undefined ? {} : { id: opts.id }),
         ...(opts?.singletonKey === undefined ? {} : { singletonKey: opts.singletonKey }),
         ...(opts?.startAfter === undefined ? {} : { startAfter: opts.startAfter }),
       });

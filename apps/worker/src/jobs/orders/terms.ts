@@ -7,6 +7,7 @@
 import type { ops } from "@nivel/db/repos";
 import type { GuardError, OrderStatus } from "@nivel/domain/order";
 import type { Logger } from "pino";
+import { jobIdOf } from "../../queues/ids.ts";
 import type { JobSink } from "../../queues/runtime.ts";
 import { QUEUE } from "../outbox/routes.ts";
 import type { OrderFacts, OrdersStore } from "./store.ts";
@@ -32,10 +33,12 @@ const RETRY_AFTER_MS = 1000;
 /** Sends a job of the order calendar to come back at `at`: the term has not ended by the clock of this process yet. */
 async function comeBackAt(deps: TermsDeps, job: string, order: OrderFacts, at: Date): Promise<void> {
   const when = new Date(at.getTime() + RETRY_AFTER_MS);
+  const key = `${job}:${order.id}:${when.getTime()}`;
   await deps.jobs.send(
     QUEUE.ordersScheduled,
     { job, orderId: order.id, orderNumber: order.number, at: when.toISOString() },
-    { singletonKey: `${job}:${order.id}:${when.getTime()}`, startAfter: when },
+    // The id comes from the key: the same term asked twice (two sweeps, a retry) is one job.
+    { id: jobIdOf(key), singletonKey: key, startAfter: when },
   );
 }
 
@@ -67,6 +70,15 @@ export async function deemAccepted(deps: TermsDeps, orderId: string): Promise<{ 
   // The report is accepted already, or the order has gone on: nothing to say.
   if (result.error === "invalid_transition") return { outcome: "not_applicable" };
   throw new Error(`REPORT_DEEMED_ACCEPTED of ${order.number} was refused: ${result.error}`);
+}
+
+/**
+ * A sweep goes on after an order that fails (one order must not hide the rest), but the failure is the job's too: it is retried
+ * and, if it stays, written to ops.app_errors with an alert. The text has the number only, no order data.
+ */
+export function failIfSweepFailed(job: string, count: { failed: number }): void {
+  if (count.failed > 0)
+    throw new Error(`${job}: ${count.failed} orders could not be processed (see the log of the worker)`);
 }
 
 export async function sweepDeemed(deps: TermsDeps): Promise<Record<DeemedOutcome | "failed", number>> {

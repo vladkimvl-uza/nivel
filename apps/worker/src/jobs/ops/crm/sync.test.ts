@@ -1,7 +1,7 @@
 import type { ops } from "@nivel/db/repos";
 import { describe, expect, it } from "vitest";
 import { PermanentJobError } from "../../../queues/define.ts";
-import { FakeClock, recordingLogger } from "../../../queues/test-support/fakes.ts";
+import { FakeClock, fetchWithHangingBody, recordingLogger } from "../../../queues/test-support/fakes.ts";
 import { signCrm } from "./events.ts";
 import {
   type CrmConfig,
@@ -64,6 +64,19 @@ function setup(
   };
   return { deps, clock, calls, lines };
 }
+
+describe("handleCrmSync: a server that stops in the middle of the answer", () => {
+  it("gives up after the timeout, whole request included the body, and asks for a retry (not a refusal)", async () => {
+    const hang = fetchWithHangingBody();
+    const t = setup();
+    t.deps.fetch = hang.impl;
+    t.deps.timeoutMs = 30;
+    const error = await handleCrmSync(t.deps, { type: "lead.created", ref: "l-1" }, JOB).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(PermanentJobError);
+    expect((error as Error).message).toContain("timeout");
+  }, 3000);
+});
 
 describe("isCrmUrl: only the web app of an Apps Script of Google", () => {
   it("takes https://script.google.com/macros/s/<id>/exec", () => {

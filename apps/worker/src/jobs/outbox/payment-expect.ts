@@ -6,6 +6,7 @@ import { DbRuleError } from "@nivel/db/repos";
 import { orders, type payments } from "@nivel/services";
 import type { Logger } from "pino";
 import { PermanentJobError } from "../../queues/define.ts";
+import { isUuid } from "../../queues/ids.ts";
 
 type ExpectFromJob = typeof payments.expectFromJob;
 
@@ -24,7 +25,7 @@ export async function handlePaymentExpect(
   data: Record<string, unknown>,
 ): Promise<PaymentExpectResult> {
   const { orderId, paymentKind, amountSum } = data;
-  if (typeof orderId !== "string" || typeof paymentKind !== "string") {
+  if (!isUuid(orderId) || typeof paymentKind !== "string") {
     throw new PermanentJobError("payment.expect: the job must name the order and the kind of the payment");
   }
   if (amountSum !== undefined && !(typeof amountSum === "number" && Number.isSafeInteger(amountSum) && amountSum > 0)) {

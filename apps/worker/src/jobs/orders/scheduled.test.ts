@@ -126,6 +126,10 @@ describe("handleScheduled: the jobs of the order calendar", () => {
       PermanentJobError,
     );
     await expect(handleScheduled(t.deps, { job: "objection_window" })).rejects.toBeInstanceOf(PermanentJobError);
+    // an id that is no UUID never reaches the database (its text would come back in the error of Postgres)
+    await expect(
+      handleScheduled(t.deps, { job: "objection_window", orderId: "x".repeat(5000) }),
+    ).rejects.toBeInstanceOf(PermanentJobError);
     await expect(handleScheduled(t.deps, { job: "objection_window", orderId: 5 })).rejects.toBeInstanceOf(
       PermanentJobError,
     );

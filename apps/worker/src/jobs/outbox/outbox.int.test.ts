@@ -237,6 +237,9 @@ describe("outbox.relay on the real outbox", () => {
     await relayOnce(t.deps);
     expect(t.jobs.sent).toHaveLength(1);
     expect(t.jobs.sent[0]?.opts?.singletonKey).toBe("j-1");
+    // the job carries the id of the row of the database: that is what makes a second hand-over of the row one job
+    const [row] = await q<{ id: string }>("select id from ops.outbox where dedupe_key = 'j-1'");
+    expect(t.jobs.sent[0]?.opts?.id).toBe(row?.id);
     expect(await q("select status from ops.outbox where dedupe_key = 'j-1'")).toEqual([{ status: "sent" }]);
   });
 

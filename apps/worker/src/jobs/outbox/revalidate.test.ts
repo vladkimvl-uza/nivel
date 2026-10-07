@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { PermanentJobError } from "../../queues/define.ts";
-import { FakeClock, recordingLogger } from "../../queues/test-support/fakes.ts";
+import { FakeClock, fetchWithHangingBody, recordingLogger } from "../../queues/test-support/fakes.ts";
 import {
   handleRevalidate,
   REVALIDATE_MAX_AGE_MS,
@@ -34,6 +34,15 @@ function setup(answer: { status: number } | Error = { status: 200 }) {
   };
   return { deps, clock, site, lines };
 }
+
+describe("handleRevalidate: the body of the answer is not kept open", () => {
+  it("lets go of the body of an answer it does not read", async () => {
+    const hang = fetchWithHangingBody(200);
+    const t = setup();
+    await handleRevalidate({ ...t.deps, fetch: hang.impl }, { tags: ["prices"] });
+    expect(hang.cancelled()).toBe(1);
+  });
+});
 
 describe("signRevalidate and verifyRevalidate", () => {
   it("signs <timestamp>.<body> with HMAC-SHA256 and writes the signature as hex", () => {

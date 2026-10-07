@@ -9,6 +9,7 @@ import { relayDepsOf } from "../jobs/outbox/register.ts";
 import { relayOnce } from "../jobs/outbox/relay.ts";
 import { queueOptions } from "../queue.ts";
 import { registerQueue } from "./define.ts";
+import { jobIdOf } from "./ids.ts";
 import { Lifecycle, type WorkerContext } from "./runtime.ts";
 import { acceptedOrder } from "./test-support/flow.ts";
 import { testRuntime } from "./test-support/runtime.ts";
@@ -161,6 +162,26 @@ describe("a job from the outbox to its handler through pg-boss", () => {
       { kind: "purchase_funds", amount_sum: String(o.quote.totals.purchaseLimit), status: "expected" },
     ]);
   }, 60_000);
+});
+
+describe("one fact, one job: the id of the job", () => {
+  it("makes one job when the same row of the outbox is handed over twice (a crash between the send and markSent)", async () => {
+    const id = jobIdOf("test:hand-over:1");
+    await boss.createQueue("test.once");
+    const first = await t.rt.jobs.send("test.once", { n: 1 }, { id, singletonKey: "k" });
+    const second = await t.rt.jobs.send("test.once", { n: 1 }, { id, singletonKey: "k" });
+    expect(first).toBe(id);
+    expect(second).toBeNull();
+    const counted = await boss.getDb().executeSql("select count(*)::int as n from pgboss.job where name = 'test.once'");
+    expect(counted.rows[0]).toEqual({ n: 1 });
+  });
+
+  it("does not make one job of two sends that only share a singletonKey on a standard queue: that is why the id is passed", async () => {
+    await boss.createQueue("test.key.only");
+    const a = await t.rt.jobs.send("test.key.only", { n: 1 }, { singletonKey: "same" });
+    const b = await t.rt.jobs.send("test.key.only", { n: 1 }, { singletonKey: "same" });
+    expect([a, b].every((v) => typeof v === "string")).toBe(true);
+  });
 });
 
 describe("a job that fails every time", () => {

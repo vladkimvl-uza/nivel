@@ -74,12 +74,38 @@ export class FakeTelegram implements TelegramGateway {
   }
 }
 
+/**
+ * A fetch that answers the headers at once and then never finishes the body, until the request is aborted (a server that
+ * sent the head of the answer and went silent). `cancelled` counts the bodies that were given up on.
+ */
+export function fetchWithHangingBody(status = 200): { impl: typeof fetch; cancelled: () => number } {
+  let cancelled = 0;
+  const impl = (async (_url: string | URL | Request, init?: RequestInit) => {
+    const signal = init?.signal;
+    return {
+      status,
+      ok: status >= 200 && status < 300,
+      body: {
+        cancel: async () => {
+          cancelled += 1;
+        },
+      },
+      json: () =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+        }),
+    } as unknown as Response;
+  }) as typeof fetch;
+  return { impl, cancelled: () => cancelled };
+}
+
 export class FakeJobs implements JobSink {
-  sent: { queue: string; data: object; opts: { singletonKey?: string; startAfter?: Date } | undefined }[] = [];
+  sent: { queue: string; data: object; opts: { id?: string; singletonKey?: string; startAfter?: Date } | undefined }[] =
+    [];
   queues = new Set<string>();
   /** The answer of the next `send`; `null` means pg-boss found the job already queued. */
   answers: (string | null)[] = [];
-  async send(queue: string, data: object, opts?: { singletonKey?: string; startAfter?: Date }) {
+  async send(queue: string, data: object, opts?: { id?: string; singletonKey?: string; startAfter?: Date }) {
     this.sent.push({ queue, data, opts });
     return this.answers.length > 0 ? (this.answers.shift() as string | null) : `job-${this.sent.length}`;
   }
