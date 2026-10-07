@@ -1,11 +1,11 @@
 // Steps of the life of an order for the integration tests of the bot, built from the scenarios themselves. What the
 // admin panel does in production (convert a lead, build and send the quote, confirm the money, record a purchase) is
 // done here with the admin runtime; what the bot does is done by the bot under test.
-import { consents, dispatch, leads, quotes } from "@nivel/services";
+import { consents, dispatch, leads, payments, purchases, quotes, reports } from "@nivel/services";
 import { openLeadTopic } from "../topics.ts";
 import type { Person } from "./fake-telegram.ts";
 import { type Harness, onboard } from "./harness.ts";
-import { type BotWorld, pcLines } from "./world.ts";
+import { type BotWorld, newFile, PC_CATALOG, pcLines } from "./world.ts";
 
 export const ownerActor = (w: BotWorld) => ({ kind: "owner" as const, id: w.owner.id });
 
@@ -82,5 +82,105 @@ export async function acceptedOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrd
     w.bot,
   );
   if (!r.ok) throw new Error(`the estimate was not accepted: ${r.error}`);
+  return o;
+}
+
+/** The advance and the money for purchases are paid and confirmed by the owner (the admin panel), both flags are up. */
+export async function paidOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
+  w.clock.set(new Date("2026-10-12T10:00:00+05:00"));
+  const o = await acceptedOrder(w, c);
+  const advance = await payments.expect({ orderId: o.orderId, kind: "fee_advance" }, ownerActor(w), w.admin);
+  const funds = await payments.expect({ orderId: o.orderId, kind: "purchase_funds" }, ownerActor(w), w.admin);
+  await payments.confirm(
+    { paymentId: advance.paymentId, fiscalReceiptNo: `FR-${advance.paymentId.slice(-8)}` },
+    ownerActor(w),
+    w.admin,
+  );
+  await payments.confirm(
+    { paymentId: funds.paymentId, bankDocNo: `PP-${funds.paymentId.slice(-8)}` },
+    ownerActor(w),
+    w.admin,
+  );
+  const a = await dispatch(o.orderId, { type: "FEE_PREPAID", paymentId: advance.paymentId }, ownerActor(w), w.admin);
+  const f = await dispatch(
+    o.orderId,
+    { type: "FUNDS_RECEIVED", paymentIds: [funds.paymentId], receivedAt: w.clock.now() },
+    ownerActor(w),
+    w.admin,
+  );
+  if (!a.ok || !f.ok) throw new Error(`the payments were not accepted: ${JSON.stringify([a, f])}`);
+  return o;
+}
+
+let receiptNo = 7000;
+
+/** The next working day has come, the purchase starts and every position is bought with a receipt and a photo. */
+export async function purchasedOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
+  const o = await paidOrder(w, c);
+  w.clock.set(new Date("2026-10-13T10:00:00+05:00"));
+  const start = await dispatch(o.orderId, { type: "START_PURCHASE" }, ownerActor(w), w.admin);
+  if (!start.ok) throw new Error(`the purchase did not start: ${start.error}`);
+  for (const p of PC_CATALOG) {
+    const { rows } = await w.db.$client.query(
+      "select id from sales.quote_lines where quote_id = $1 and product_id = $2",
+      [o.quoteId, w.products[p.key].id],
+    );
+    receiptNo += 1;
+    const r = await purchases.record(
+      {
+        orderId: o.orderId,
+        vendorId: w.vendorId,
+        quoteLineId: rows[0].id,
+        productId: w.products[p.key].id,
+        qty: 1,
+        amountSum: p.price,
+        paidVia: "bank_transfer",
+        receiptKind: "fiscal",
+        receiptNo: `CH-${receiptNo}`,
+        receiptFileIds: [await newFile(w)],
+      },
+      ownerActor(w),
+      w.admin,
+    );
+    if (!r.ok) throw new Error(`the purchase of ${p.key} was refused: ${r.error}`);
+  }
+  const done = await dispatch(o.orderId, { type: "PURCHASE_DONE" }, ownerActor(w), w.admin);
+  if (!done.ok) throw new Error(`the purchases were not closed: ${done.error}`);
+  return o;
+}
+
+/** The owner sends the report of the commission (status report_sent). */
+export async function reportSentOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
+  const o = await purchasedOrder(w, c);
+  const report = await reports.generate({ orderId: o.orderId }, ownerActor(w), w.admin);
+  const sent = await reports.send({ orderId: o.orderId, reportId: report.reportId }, ownerActor(w), w.admin);
+  if (!sent.ok) throw new Error(`the report was not sent: ${sent.error}`);
+  return o;
+}
+
+/** The customer has accepted the report and the remainder is returned: settled with the customer. */
+export async function settledOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
+  const o = await reportSentOrder(w, c);
+  const accepted = await reports.accept({ orderId: o.orderId }, { kind: "customer", id: o.customerId }, w.bot);
+  if (!accepted.ok) throw new Error(`the report was not accepted: ${accepted.error}`);
+  const refund = (
+    await w.db.$client.query("select id from sales.payments where order_id = $1 and kind = 'remainder_refund'", [
+      o.orderId,
+    ])
+  ).rows[0];
+  if (refund) {
+    await payments.confirm(
+      { paymentId: refund.id, bankDocNo: `PP-${String(refund.id).slice(-8)}` },
+      ownerActor(w),
+      w.admin,
+    );
+  }
+  const settled = await dispatch(
+    o.orderId,
+    { type: "REMAINDER_SETTLED", ...(refund ? { refundPaymentId: refund.id } : {}) },
+    ownerActor(w),
+    w.admin,
+  );
+  if (!settled.ok) throw new Error(`the remainder was not settled: ${settled.error}`);
   return o;
 }

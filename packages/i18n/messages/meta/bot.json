@@ -439,6 +439,11 @@
     "maxLen": 110,
     "status": "draft"
   },
+  "my.purchases": {
+    "context": "summary of the purchases of the order in the card (from the database)",
+    "maxLen": 70,
+    "status": "draft"
+  },
   "my.quote_expired": {
     "context": "the quote is out of date",
     "maxLen": 80,

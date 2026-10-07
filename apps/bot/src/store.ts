@@ -1,7 +1,7 @@
 // The queries of the bot that no repository of @nivel/db has. Reads go through the relational API of the schema; the few
 // writes the role `nivel_bot` is granted (DATA-MAP 2) are plain statements with parameters, kept here and nowhere else.
 import type { Db } from "@nivel/db";
-import { DbRuleError, sales } from "@nivel/db/repos";
+import { content, DbRuleError, sales } from "@nivel/db/repos";
 import type { AppLocale } from "@nivel/i18n";
 
 export type CustomerView = NonNullable<Awaited<ReturnType<typeof sales.findCustomerByTelegramId>>>;
@@ -183,4 +183,34 @@ export async function markFirstResponse(db: Db, leadId: string): Promise<void> {
     "update sales.leads set first_response_at = now() where id = $1 and first_response_at is null",
     [leadId],
   );
+}
+
+// ---- offers and consents of an order --------------------------------------------------------------------------
+/** Both offers (uz and ru) are published: until then the estimate goes out with a watermark and cannot be accepted. */
+export async function offersPublished(db: Db): Promise<boolean> {
+  const [uz, ru] = await Promise.all([
+    content.getPublishedLegalDocument(db, "offer", "uz"),
+    content.getPublishedLegalDocument(db, "offer", "ru"),
+  ]);
+  return uz !== null && ru !== null;
+}
+
+/** The newest consent of a kind: for the order, or for the customer in general (a consent given before the order). */
+export async function latestConsent(
+  db: Db,
+  customerId: string,
+  kind: "pd_processing" | "supplier_data_transfer" | "non_returnable",
+  orderId: string | null,
+): Promise<{ id: string; granted: boolean } | null> {
+  const row = await db.query.consents.findFirst({
+    columns: { id: true, granted: true },
+    where: (t, { and, eq, isNull }) =>
+      and(
+        eq(t.customerId, customerId),
+        eq(t.kind, kind),
+        orderId === null ? isNull(t.orderId) : eq(t.orderId, orderId),
+      ),
+    orderBy: (t, { desc }) => [desc(t.at), desc(t.id)],
+  });
+  return row ?? null;
 }

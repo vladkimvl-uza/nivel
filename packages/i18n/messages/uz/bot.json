@@ -114,6 +114,7 @@
     },
     "card": "{number} · {status}",
     "quote": "Smeta: xizmat haqi {fee}, xarid limiti {limit}.\nAmal qilish muddati: {until}.",
+    "purchases": "Xaridlar: {count} ta, chek boʻyicha jami {sum}.",
     "quote_expired": "Smeta muddati tugagan: narxlar oʻzgargan boʻlishi mumkin.",
     "quote_watermark": "Smeta oferta emas: oferta hali eʼlon qilinmagan.",
     "accept_button": "Oferta va smetani qabul qilaman",
