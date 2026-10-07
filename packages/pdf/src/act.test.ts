@@ -89,9 +89,9 @@ describe("the acts (renderAct)", () => {
       await expect(
         renderAct("material_acceptance", actFixture({ receiptsTotal: 13_650_001 }), opts("uz")),
       ).rejects.toThrow(DocumentDataError);
-      await expect(
-        renderAct("material_acceptance", actFixture({ receiptsTotal: null }), opts("uz")),
-      ).rejects.toThrow(/total of the receipts/);
+      await expect(renderAct("material_acceptance", actFixture({ receiptsTotal: null }), opts("uz"))).rejects.toThrow(
+        /total of the receipts/,
+      );
       await expect(
         renderAct("material_acceptance", actFixture({ receiptsTotal: 1.5, receipts: [] }), opts("uz")),
       ).rejects.toThrow(RangeError);
