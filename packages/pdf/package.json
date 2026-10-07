@@ -5,12 +5,19 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testkit": "./src/testkit.ts"
   },
   "dependencies": {
     "@nivel/contracts": "workspace:*",
     "@nivel/domain": "workspace:*",
     "@nivel/i18n": "workspace:*",
-    "@nivel/ui": "workspace:*"
+    "@nivel/ui": "workspace:*",
+    "@react-pdf/renderer": "catalog:",
+    "qrcode": "catalog:",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:"
   }
 }

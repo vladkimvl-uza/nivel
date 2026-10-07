@@ -1,0 +1,270 @@
+{
+  "common": {
+    "brand": "Nivel · Toshkent · nivel.uz",
+    "page": "{page} / {total}",
+    "watermark": "NAMUNA / ОБРАЗЕЦ",
+    "notice_stub": "Oferta-zagʻlushka: hujjat imzolash uchun emas va oferta hisoblanmaydi.",
+    "notice_demo": "Namuna: hujjat demo-maʼlumotlar asosida tuzilgan.",
+    "pending": "roʻyxatdan oʻtgach",
+    "customer": "Mijoz",
+    "issued": "Tuzilgan",
+    "version": "{version}-versiya",
+    "sum_unit": "soʻm",
+    "unknown_customer": "koʻrsatilmagan"
+  },
+  "requisites": {
+    "title": "Xarid uchun mablagʻ rekvizitlari",
+    "note": "Xarid uchun mablagʻ faqat YaTT hisob raqamiga pul oʻtkazish yoʻli bilan qabul qilinadi.",
+    "holder": "Oluvchi",
+    "inn": "STIR",
+    "bank": "Bank",
+    "account": "Hisob raqami",
+    "mfo": "MFO",
+    "purpose": "Toʻlov maqsadi",
+    "purpose_default": "Komitent mablagʻlari xarid uchun, {number} buyurtma shartnomasi boʻyicha. QQSsiz",
+    "fee_channel": "Xizmat haqi bu hisob raqamiga emas, QR Xolis orqali, chek bilan toʻlanadi."
+  },
+  "quote": {
+    "title": "Smeta",
+    "price_date": "Narxlar sanasi",
+    "valid_until": "Amal qilish muddati",
+    "fx": "Kurs",
+    "fx_value": "1 {ccy} = {rate} soʻm ({date})",
+    "group": {
+      "pc": "Kompyuter va butlovchi qismlar",
+      "mount": "Montaj va ish joyi",
+      "outside_scale": "Haq shkalasidan tashqari: litsenziya, yetkazib berish, hamkor ishlari",
+      "customer_owned": "Mijozning oʻz qismlari: xarid qilinmaydi, hisobga kirmaydi"
+    },
+    "col": {
+      "n": "№",
+      "item": "Pozitsiya",
+      "qty": "Soni",
+      "price": "Narxi",
+      "sum": "Summa"
+    },
+    "line": {
+      "price_date": "{date} holatiga",
+      "vendor": "sotuvchi: {name}",
+      "confidence": {
+        "high": "ishonch yuqori",
+        "medium": "ishonch oʻrtacha",
+        "low": "ishonch past"
+      },
+      "no_return": "qaytarilmaydi",
+      "return_unknown": "qaytarish shartlari aniqlanadi"
+    },
+    "totals": {
+      "title": "Hisob-kitob",
+      "components": "Butlovchi qismlar va montaj (haq asosi)",
+      "outside": "Shkaladan tashqari pozitsiyalar",
+      "reserve": "Narx oshishi zaxirasi, {rate}",
+      "limit": "Xarid limiti",
+      "limit_note": "Limitdan oshgan xarid faqat sizning yozma roziligingiz bilan amalga oshiriladi. Sarflanmagan qoldiq hisobotdan keyin qaytariladi."
+    },
+    "fee": {
+      "title": "Xizmat haqi",
+      "base": "Asos",
+      "rate": "Stavka",
+      "amount": "Summa",
+      "rule": {
+        "pc_low": "Kompyuter, past stavka",
+        "pc_high": "Kompyuter, yuqori summa uchun stavka",
+        "pc_high_min": "Kompyuter, eng kam haq",
+        "mount": "Montaj",
+        "complex": "Murakkab yigʻish"
+      },
+      "commission": "Xarid va kafolat uchun haq",
+      "works": "Ishlar",
+      "total": "Xizmat haqi jami"
+    },
+    "stages": {
+      "title": "Toʻlov bosqichlari",
+      "advance": "Oldindan toʻlov: smeta tasdiqlanganda",
+      "final": "Yakuniy toʻlov: topshirilganda"
+    },
+    "total": {
+      "grand": "Jami: xarid limiti va xizmat haqi"
+    },
+    "nonreturn": {
+      "title": "Qaytarilmaydigan pozitsiyalar",
+      "body": "Doʻkon bu pozitsiyalarni qaytarib olmaydi. Ularni xarid qilish uchun alohida rozilik kerak."
+    },
+    "stamp_checked": "Qoʻlda tekshirilgan",
+    "expiry": "Narxlar {date} gacha amal qiladi, keyin oʻzgarishi mumkin."
+  },
+  "report": {
+    "title": "Komissioner hisoboti",
+    "basis": "Hisobot ommaviy oferta shartlariga koʻra tuzilgan; tarkibi — VMQ № 489 Nizomining 28-bandi boʻyicha.",
+    "meta": {
+      "sent": "Yuborilgan"
+    },
+    "parties": {
+      "title": "1. Taraflar",
+      "commissioner": "Komissioner",
+      "status": "yakka tartibdagi tadbirkor",
+      "contract": "Shartnoma (buyurtma)",
+      "quote": "Smeta"
+    },
+    "items": {
+      "title": "2. Xaridlar jadvali"
+    },
+    "col": {
+      "item": "Nomi va seriya raqami",
+      "shop": "Doʻkon, sana",
+      "doc": "Chek / ESF",
+      "qty": "Soni",
+      "sum": "Summa",
+      "warranty": "Doʻkon kafolati"
+    },
+    "item": {
+      "serial": "S/N {serial}",
+      "inn": "STIR {inn}",
+      "vat": "QQS {sum}",
+      "fiscal": "chek № {no}",
+      "esf": "ESF № {no}",
+      "no_receipt": "chek yoʻq (rozilik)",
+      "return": "doʻkonga qaytarish",
+      "warranty_months": "{months} oy",
+      "warranty_until": "{date} gacha",
+      "files": "ilova: {n}",
+      "none": "Xaridlar hali yoʻq"
+    },
+    "discounts": {
+      "title": "3. Chegirmalar, bonuslar, tejash: mijoz foydasiga",
+      "body": "Xariddan olingan barcha foyda mijozga tegishli.",
+      "sum": "Chegirmalar jami",
+      "none": "Chegirma va bonuslar boʻlmadi.",
+      "bonus": "{title}: {note}"
+    },
+    "money": {
+      "title": "4. Mablagʻlar",
+      "received": "Xarid uchun olingan",
+      "spent": "Sarflangan (chek boʻyicha)",
+      "refunds": "shundan doʻkonlar qaytargani",
+      "limit": "Smeta boʻyicha xarid limiti",
+      "remainder": "Qaytariladigan qoldiq",
+      "refund_due": "Qaytarish muddati: {date}"
+    },
+    "fee": {
+      "title": "5. Xizmat haqi",
+      "advance": "Oldindan toʻlov: Xolis cheki № {no}",
+      "final": "Yakuniy toʻlov: Xolis cheki № {no}",
+      "unpaid_advance": "Oldindan toʻlov: toʻlanmagan",
+      "unpaid_final": "Yakuniy toʻlov: toʻlanmagan",
+      "no_vat": "Haq QQSsiz: YaTT QQS toʻlovchisi emas."
+    },
+    "attachments": {
+      "title": "6. Ilovalar",
+      "body": "Chek va ESF nusxalari, kafolat talonlari va seriya raqamli qutilar suratlari hisobotga ilova qilinadi. Ilovalar soni: {n}."
+    },
+    "confirm": {
+      "title": "7. Mijozning tasdigʻi",
+      "body": "Hisobotni botdagi «Tasdiqlayman» tugmasi bilan tasdiqlang yoki «Savol bor» tugmasi bilan savol bering. Eʼtiroz muddati — {until} gacha (yuborilgandan keyin 3 ish kuni). Muddat oʻtgach hisobot qabul qilingan hisoblanadi.",
+      "body_no_date": "Hisobotni botdagi «Tasdiqlayman» tugmasi bilan tasdiqlang yoki «Savol bor» tugmasi bilan savol bering. Eʼtiroz muddati — yuborilgandan keyin 3 ish kuni. Muddat oʻtgach hisobot qabul qilingan hisoblanadi.",
+      "accepted": "Mijoz tasdiqladi: {date}",
+      "deemed": "Hisobot muddat boʻyicha qabul qilingan: {date}"
+    }
+  },
+  "act": {
+    "title": {
+      "material_acceptance": "Mijoz materialini qabul qilish dalolatnomasi",
+      "customer_parts": "Mijoz qismlarini qaytarish dalolatnomasi",
+      "handover": "Topshirish dalolatnomasi"
+    },
+    "intro": {
+      "material_acceptance": "Komissioner xarid qilib bergan butlovchi qismlar mijoz materiali sifatida yigʻishga qabul qilinadi (FK 661-moddasi). Narxlar chek boʻyicha.",
+      "customer_parts": "Buyurtma bekor qilingani sababli mijozga unga tegishli qismlar qaytariladi.",
+      "handover": "Tayyor kompyuter mijozga topshiriladi. Sinov bayonnomasi kompyuter pasportida."
+    },
+    "lines": {
+      "title": "Pozitsiyalar",
+      "none": "Pozitsiyalar koʻrsatilmagan."
+    },
+    "col": {
+      "item": "Nomi",
+      "qty": "Soni",
+      "serial": "Seriya raqami",
+      "doc": "Chek",
+      "sum": "Summa"
+    },
+    "receipts": {
+      "title": "Narxlar chek boʻyicha",
+      "total": "Chek boʻyicha jami",
+      "none": "Chek boʻyicha xaridlar yoʻq."
+    },
+    "handover": {
+      "warranty": "Kafolat muddati: {date} gacha",
+      "warranty_pending": "Kafolat topshirilgan kundan boshlanadi.",
+      "passport": "Kompyuter pasporti ilova qilingan.",
+      "claims": "Mijoz tashqi koʻrinish va butlikka eʼtiroz bildirmaydi."
+    },
+    "sign": {
+      "title": "Imzolar",
+      "ip": "Komissioner / ijrochi (YaTT)",
+      "customer": "Mijoz",
+      "signed": "Imzolangan: {at}, {via}",
+      "unsigned": "Hali imzolanmagan",
+      "via": {
+        "tg_button": "Telegram tugmasi orqali",
+        "paper_photo": "qogʻoz dalolatnomaning fotosi",
+        "site_button": "sayt tugmasi orqali"
+      }
+    }
+  },
+  "passport": {
+    "title": "Kompyuter pasporti",
+    "dates": {
+      "title": "Muhim sanalar",
+      "estimate": "Smeta",
+      "tests": "Sinov",
+      "act": "Topshirish dalolatnomasi",
+      "warranty": "Kafolat"
+    },
+    "spec": {
+      "title": "Spetsifikatsiya va seriya raqamlari",
+      "empty": "Seriya raqamlari kiritilmagan."
+    },
+    "bios": "BIOS versiyasi",
+    "os": "Operatsion tizim",
+    "tests": {
+      "title": "Sinov bayonnomasi",
+      "tool": "Dastur",
+      "scenario": "Stsenariy",
+      "duration": "Davomiyligi",
+      "duration_value": "{hours} soat {minutes} daqiqa",
+      "peak": "Eng yuqori harorat",
+      "peak_value": "{temp} °C",
+      "errors": "Xatolar",
+      "errors_none": "xatolar yoʻq: norma",
+      "errors_count": "xatolar soni: {n}",
+      "none": "Sinov maʼlumotlari kiritilmagan."
+    },
+    "attachments": "Ilova: sinov suratlari — {photos}, muhr suratlari — {seals}",
+    "label": "Yorliq kodi",
+    "notes": "Izohlar",
+    "qr": "Pasport kodi",
+    "master": "Usta imzosi",
+    "stamp": {
+      "word": "Sinovdan oʻtdi"
+    }
+  },
+  "warranty": {
+    "title": "Kafolat majburiyati",
+    "intro": "Nivel {number} buyurtma boʻyicha yigʻilgan kompyuter uchun «bitta oyna» tamoyilida kafolat beradi: murojaat Nivelga yoʻllanadi, qolganini oʻzimiz hal qilamiz.",
+    "p1": "Kafolat muddati — 12 oy, topshirilgan kundan boshlab. Ishlab chiqaruvchi kafolati uzoqroq qismlar uchun — shu muddat tugaguncha Nivel orqali.",
+    "p2": "Murojaatga javob — 1 ish kuni, diagnostika — 2 ish kuni.",
+    "p3": "Almashtiruvchi mahsulot — 3 sutkagacha.",
+    "p4": "Bartaraf etish: ish boʻyicha — 10 ish kuni, qismlar boʻyicha — 20 kun.",
+    "p5": "Rad etish faqat mijozning harakatlari bilan sababiy bogʻliqlik boʻlganda: zarba, suyuqlik, overklokking, uchinchi shaxs qismlarni almashtirgani. Rad etish dalillar bilan rasmiylashtiriladi.",
+    "p6": "Murojaatlar aniq vaqti bilan jurnalga yoziladi. Muammo haqida botda «Muammo haqida xabar berish» tugmasi orqali yozing.",
+    "until": "Kafolat: {date} gacha",
+    "until_pending": "Kafolat topshirilgan kundan boshlanadi",
+    "stamp": "Kafolat",
+    "items": {
+      "title": "Kafolat ostidagi qismlar",
+      "vendor_until": "doʻkon kafolati {date} gacha",
+      "none": "Qismlar roʻyxati hali yoʻq."
+    }
+  }
+}

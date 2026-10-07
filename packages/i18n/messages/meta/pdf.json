@@ -1,0 +1,942 @@
+{
+  "common.brand": {
+    "context": "footer line of every page of every document",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "common.page": {
+    "context": "page number in the footer: page of pages",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "common.watermark": {
+    "context": "diagonal watermark of a sample document: the same bilingual text in both languages (stub offer or demo data)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "common.notice_stub": {
+    "context": "footer notice while the offer of the order is a placeholder (R-25)",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "common.notice_demo": {
+    "context": "footer notice on a document built on demo data",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "common.pending": {
+    "context": "placeholder for a requisite of the sole proprietor that does not exist yet (the IP is not registered): 'after registration'",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "common.customer": {
+    "context": "label before the name of the customer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "common.issued": {
+    "context": "label before the date the document was made",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "common.version": {
+    "context": "version number of an estimate or a report",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "common.sum_unit": {
+    "context": "unit of the sums in the heading of a column of a table",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "common.unknown_customer": {
+    "context": "customer without a name in the order",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.title": {
+    "context": "heading of the block with the account of the sole proprietor",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "requisites.note": {
+    "context": "line under the requisites: the money for purchases goes to the account of the IP only",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "requisites.holder": {
+    "context": "requisite: payee",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.inn": {
+    "context": "requisite: taxpayer number",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.bank": {
+    "context": "requisite: bank",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.account": {
+    "context": "requisite: settlement account",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.mfo": {
+    "context": "requisite: bank code",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "requisites.purpose": {
+    "context": "label before the purpose of the payment",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "requisites.purpose_default": {
+    "context": "standard purpose of the payment when the owner has not written his own; {number} is the number of the order; 'without VAT' at the end",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "requisites.fee_channel": {
+    "context": "line under the requisites: the fee is paid by QR Xolis with a receipt, a different flow of money",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "quote.title": {
+    "context": "title of the estimate document",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.price_date": {
+    "context": "metadata label: date of the prices",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.valid_until": {
+    "context": "metadata label: the estimate is valid until",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fx": {
+    "context": "metadata label: exchange rate of the Central Bank",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fx_value": {
+    "context": "exchange rate: {ccy} is the code of the currency (given by the program), {rate} the rate, {date} its date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.group.pc": {
+    "context": "heading of the group of lines: computer and parts",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.group.mount": {
+    "context": "heading of the group of lines: mounting and workplace",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.group.outside_scale": {
+    "context": "heading of the group of lines outside the fee scale (no fee is charged on them)",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "quote.group.customer_owned": {
+    "context": "heading of the group of lines the customer owns",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "quote.col.n": {
+    "context": "table column: row number",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.item": {
+    "context": "table column: item",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.qty": {
+    "context": "table column: quantity",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.price": {
+    "context": "table column: unit price, sums",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.sum": {
+    "context": "table column: sum of the line, sums",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.price_date": {
+    "context": "note under a line: the price is the median on the date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.vendor": {
+    "context": "note under a line: the seller of reference (shown only when the seller allows his name)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.line.confidence.high": {
+    "context": "note under a line: confidence of the price is high",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.confidence.medium": {
+    "context": "note under a line: confidence of the price is medium",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.line.confidence.low": {
+    "context": "note under a line: confidence of the price is low",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.no_return": {
+    "context": "note under a line: the shop does not take the item back",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.line.return_unknown": {
+    "context": "note under a line: return terms are not known yet",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.totals.title": {
+    "context": "heading of the block of totals",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.totals.components": {
+    "context": "row of totals: the sum the fee is counted from",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "quote.totals.outside": {
+    "context": "row of totals: lines outside the fee scale",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.totals.reserve": {
+    "context": "row of totals: reserve against price growth, {rate} is the rate in percent",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.totals.limit": {
+    "context": "row of totals: the limit of the purchase (money for purchases)",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.totals.limit_note": {
+    "context": "note under the limit: over the limit only with written consent; the rest is returned after the report",
+    "maxLen": 170,
+    "status": "draft"
+  },
+  "quote.fee.title": {
+    "context": "heading of the block of the fee",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.base": {
+    "context": "column of the fee table: base of the rate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.rate": {
+    "context": "column of the fee table: rate in percent",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.amount": {
+    "context": "column of the fee table: amount",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.rule.pc_low": {
+    "context": "fee rule: computer below the threshold",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fee.rule.pc_high": {
+    "context": "fee rule: computer from the threshold",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.fee.rule.pc_high_min": {
+    "context": "fee rule: the minimum fee for a computer from the threshold",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fee.rule.mount": {
+    "context": "fee rule: mounting of a workplace",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.rule.complex": {
+    "context": "fee rule: complex build",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fee.commission": {
+    "context": "line of the fee 1: reward for the purchase and the guarantee",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "quote.fee.works": {
+    "context": "line of the fee 2: works",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.total": {
+    "context": "total of the fee",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.stages.title": {
+    "context": "heading of the block with the two stages of the fee",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.stages.advance": {
+    "context": "stage 1 of the fee",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.stages.final": {
+    "context": "stage 2 of the fee",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.total.grand": {
+    "context": "grand total: the limit of the purchase plus the fee",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.nonreturn.title": {
+    "context": "heading of the list of lines the shop does not take back",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.nonreturn.body": {
+    "context": "text over the list of non-returnable lines: separate consent is needed",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "quote.stamp_checked": {
+    "context": "word of the stamp on the estimate: the owner has checked it by hand before sending",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.expiry": {
+    "context": "note at the end of the estimate: prices hold until the date",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "report.title": {
+    "context": "title of the report of the commission agent",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.basis": {
+    "context": "line under the title: the report is made by the offer, the content follows item 28 of the Regulation (decision of the Cabinet No. 489)",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "report.meta.sent": {
+    "context": "metadata label: date the report was sent to the customer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.parties.title": {
+    "context": "section 1 of the report: parties",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.parties.commissioner": {
+    "context": "label: commission agent (the sole proprietor)",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.parties.status": {
+    "context": "status of the commission agent",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.parties.contract": {
+    "context": "label: the contract is the order",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.parties.quote": {
+    "context": "label: the estimate the report refers to",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.items.title": {
+    "context": "section 2 of the report: the table of purchases",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.col.item": {
+    "context": "table column: name and serial number",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.col.shop": {
+    "context": "table column: shop and date of the purchase",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.doc": {
+    "context": "table column: receipt or electronic invoice",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.qty": {
+    "context": "table column: quantity",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.sum": {
+    "context": "table column: sum of the purchase",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.warranty": {
+    "context": "table column: warranty of the shop",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.item.serial": {
+    "context": "serial number under the name of an item",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.inn": {
+    "context": "taxpayer number of the shop",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.vat": {
+    "context": "VAT included in the price, shown when the receipt shows it",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.fiscal": {
+    "context": "kind of the document: fiscal receipt of the cash register; short, the column is narrow",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.esf": {
+    "context": "kind of the document: electronic invoice",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.no_receipt": {
+    "context": "kind of the document: there is no receipt, the customer agreed to it (consent none_with_consent); short, the column is narrow",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.item.return": {
+    "context": "mark of a line: return of the item to the shop (the sum is negative)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.item.warranty_months": {
+    "context": "warranty of the shop in months",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.warranty_until": {
+    "context": "warranty of the shop until a date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.files": {
+    "context": "number of attached files (receipt, ESF, warranty card, photo of the box) of a line",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.none": {
+    "context": "table of purchases is empty",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.discounts.title": {
+    "context": "section 3 of the report: discounts and bonuses go to the customer",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "report.discounts.body": {
+    "context": "statement: every benefit of the purchase belongs to the customer",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "report.discounts.sum": {
+    "context": "total of the discounts",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.discounts.none": {
+    "context": "there were no discounts or bonuses",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.discounts.bonus": {
+    "context": "a bonus of a line: the item and the note",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.money.title": {
+    "context": "section 4 of the report: money",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.money.received": {
+    "context": "money row: received for purchases",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.money.spent": {
+    "context": "money row: spent by receipts",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.money.refunds": {
+    "context": "money row: of the spent, what the shops returned",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "report.money.limit": {
+    "context": "money row: the limit of the estimate",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.money.remainder": {
+    "context": "money row: the remainder to be returned to the customer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.money.refund_due": {
+    "context": "note: the remainder is returned by the date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.fee.title": {
+    "context": "section 5 of the report: the fee in two lines and how it was paid",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.fee.advance": {
+    "context": "stage of the fee paid, with the number of the receipt of Xolis",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "report.fee.final": {
+    "context": "second stage of the fee paid, with the number of the receipt of Xolis",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "report.fee.unpaid_advance": {
+    "context": "stage of the fee not paid yet",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.fee.unpaid_final": {
+    "context": "second stage of the fee not paid yet",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.fee.no_vat": {
+    "context": "note: the fee has no VAT, the sole proprietor does not pay it",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "report.attachments.title": {
+    "context": "section 6 of the report: attachments",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.attachments.body": {
+    "context": "attachments of the report: copies of receipts, invoices, warranty cards, photos of the boxes; {n} is their number",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "report.confirm.title": {
+    "context": "section 7 of the report: confirmation of the customer",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.confirm.body": {
+    "context": "how the customer confirms or objects; {until} is the end of the term of objections",
+    "maxLen": 290,
+    "status": "draft"
+  },
+  "report.confirm.body_no_date": {
+    "context": "the same text while the report is not sent yet and the end of the term is not known",
+    "maxLen": 270,
+    "status": "draft"
+  },
+  "report.confirm.accepted": {
+    "context": "status: the customer confirmed the report on the date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.confirm.deemed": {
+    "context": "status: the report is considered accepted by the term on the date",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "act.title.material_acceptance": {
+    "context": "title of the act of acceptance of the customer's materials into work",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "act.title.customer_parts": {
+    "context": "title of the act of return of the customer's parts (the order is cancelled)",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "act.title.handover": {
+    "context": "title of the act of handover of the finished computer",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "act.intro.material_acceptance": {
+    "context": "intro of the act of acceptance: the parts bought by the agent are taken as the customer's material",
+    "maxLen": 190,
+    "status": "draft"
+  },
+  "act.intro.customer_parts": {
+    "context": "intro of the act of return: the order is cancelled, the customer's parts go back",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "act.intro.handover": {
+    "context": "intro of the act of handover",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "act.lines.title": {
+    "context": "heading of the list of items of the act",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.col.item": {
+    "context": "table column: name",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.col.qty": {
+    "context": "table column: quantity",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.col.serial": {
+    "context": "table column: serial number",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.col.doc": {
+    "context": "table column: receipt",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.col.sum": {
+    "context": "table column: sum by the receipt",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.receipts.title": {
+    "context": "heading of the table of prices by receipts",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "act.receipts.total": {
+    "context": "total by the receipts",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "act.receipts.none": {
+    "context": "there are no purchases by receipts",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "act.lines.none": {
+    "context": "the act has no items",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "act.handover.warranty": {
+    "context": "handover: the warranty lasts until the date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "act.handover.warranty_pending": {
+    "context": "handover: the warranty starts on the day of handover (the date is not known yet)",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "act.handover.passport": {
+    "context": "handover: the passport of the build is attached",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "act.handover.claims": {
+    "context": "handover: the customer has no claims to the look and the completeness",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "act.sign.title": {
+    "context": "heading of the block of signatures",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.sign.ip": {
+    "context": "signature: the sole proprietor",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "act.sign.customer": {
+    "context": "signature: the customer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.sign.signed": {
+    "context": "status: signed at the time, in the way {via}",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "act.sign.unsigned": {
+    "context": "status: not signed yet",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "act.sign.via.tg_button": {
+    "context": "the way of signing: the button in Telegram",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "act.sign.via.paper_photo": {
+    "context": "the way of signing: the photo of the paper act",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "act.sign.via.site_button": {
+    "context": "the way of signing: the button of the site",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.title": {
+    "context": "title of the passport of the build",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.dates.title": {
+    "context": "heading of the block of dates",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.dates.estimate": {
+    "context": "date of the estimate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.dates.tests": {
+    "context": "date of the tests",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.dates.act": {
+    "context": "date of the act of handover",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.dates.warranty": {
+    "context": "warranty date: until",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.title": {
+    "context": "heading of the table of parts with serial numbers",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.spec.empty": {
+    "context": "the list of serial numbers is empty",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.bios": {
+    "context": "label: version of the BIOS",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.os": {
+    "context": "label: operating system (the licence is by the receipt)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.title": {
+    "context": "heading of the protocol of the tests",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.tool": {
+    "context": "label: tool of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.scenario": {
+    "context": "label: scenario of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.duration": {
+    "context": "label: duration of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.duration_value": {
+    "context": "duration: hours and minutes",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.tests.peak": {
+    "context": "label: highest temperature",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.peak_value": {
+    "context": "temperature in degrees Celsius",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.errors": {
+    "context": "label: errors of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.errors_none": {
+    "context": "result: no errors, the norm",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.errors_count": {
+    "context": "result: the number of errors",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.none": {
+    "context": "the data of the tests are not entered",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.attachments": {
+    "context": "attached photos: tests and seals",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "passport.label": {
+    "context": "label: code of the sticker on the case",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.notes": {
+    "context": "label: notes of the master",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.qr": {
+    "context": "caption under the QR code of the passport",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.master": {
+    "context": "line for the signature of the master",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.stamp.word": {
+    "context": "stamp: the tests are passed",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "warranty.title": {
+    "context": "title of the warranty obligation",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.intro": {
+    "context": "intro of the warranty: one window, the customer talks to Nivel only; {number} is the number of the order",
+    "maxLen": 210,
+    "status": "draft"
+  },
+  "warranty.p1": {
+    "context": "point 1: warranty period of 12 months from the day of handover",
+    "maxLen": 190,
+    "status": "draft"
+  },
+  "warranty.p2": {
+    "context": "point 2: reply in 1 working day, diagnosis in 2 working days",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "warranty.p3": {
+    "context": "point 3: a loaner within 3 days",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "warranty.p4": {
+    "context": "point 4: fix in 10 working days for work, 20 days for parts",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "warranty.p5": {
+    "context": "point 5: refusal only with a causal link to the customer's acts: impact, liquid, overclocking, replacement by a third party",
+    "maxLen": 250,
+    "status": "draft"
+  },
+  "warranty.p6": {
+    "context": "point 6: the cases are written to a journal with the exact time; how to report a problem in the bot",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "warranty.until": {
+    "context": "stamp line: warranty until the date",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "warranty.until_pending": {
+    "context": "stamp line: the date is not known yet",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "warranty.stamp": {
+    "context": "word of the stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "warranty.items.title": {
+    "context": "heading of the list of parts under warranty",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.items.vendor_until": {
+    "context": "warranty of the shop until a date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.items.none": {
+    "context": "the list of parts is empty",
+    "maxLen": 40,
+    "status": "draft"
+  }
+}
