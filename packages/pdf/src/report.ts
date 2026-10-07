@@ -133,7 +133,8 @@ function paymentRow(
   t: T,
   lang: PdfLang,
 ): ReactElement {
-  const p = payments.find((x) => x.kind === kind);
+  // the worker hands over the payments that stand, the oldest first: a fee paid again after a correction is the last of its kind
+  const p = payments.findLast((x) => x.kind === kind);
   const stage = kind === "fee_advance" ? "advance" : "final";
   if (p?.receiptNo) return amountRow(t(`report.fee.${stage}`, { no: p.receiptNo }), money(p.sum, lang));
   return amountRow(t(`report.fee.unpaid_${stage}`), p ? money(p.sum, lang) : "—");

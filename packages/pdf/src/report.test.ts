@@ -152,6 +152,18 @@ describe("the report of the commission agent (renderCommissionReport): the conte
     expect(text).toContain(flat(t("report.attachments.body", { n: 0 })));
   });
 
+  it("prints the newest payment of a kind when the worker hands over more than one (a fee paid again after a correction)", async () => {
+    const doc = reportFixture({
+      feePayments: [
+        { kind: "fee_advance", sum: 500_000, receiptNo: "XOL-OLD-1", at: "2026-10-05T11:00:00.000Z" },
+        { kind: "fee_advance", sum: 500_000, receiptNo: "XOL-NEW-2", at: "2026-10-06T11:00:00.000Z" },
+      ],
+    });
+    const { text } = await read(doc, opts("ru"));
+    expect(text).toContain("XOL-NEW-2");
+    expect(text).not.toContain("XOL-OLD-1");
+  });
+
   it("draws the watermark on a sample and not on a published offer; stays far under 300 KB", async () => {
     const clean = await read(reportFixture(), opts("uz"));
     expect(clean.text).not.toContain("NAMUNA / ОБРАЗЕЦ");
