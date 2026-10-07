@@ -177,6 +177,13 @@ export default async function RegistryPage({
             <div className="adm-grid">
               <TextField id="income-period" name="period" label="Месяц (ГГГГ-ММ)" placeholder={`${year}-10`} />
               <TextField id="income-sum" name="amountSum" label="Сумма, сумов" inputMode="numeric" />
+              <TextField
+                id="income-sum-again"
+                name="amountAgain"
+                label="Сумма ещё раз"
+                inputMode="numeric"
+                hint="Запись о доходе нельзя убрать: введите сумму повторно."
+              />
               <TextField id="income-note" name="note" label="Примечание" />
             </div>
           </ActionForm>

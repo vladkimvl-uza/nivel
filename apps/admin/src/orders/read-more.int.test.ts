@@ -300,7 +300,7 @@ describe("the registry", () => {
     const before = await threshold.status({ year: 2026 }, w.admin);
     const r = await addOtherIncome(
       writer(),
-      form({ period: "2026-09", amountSum: "12 000 000", note: "Другая деятельность ИП" }),
+      form({ period: "2026-09", amountSum: "12 000 000", amountAgain: "12000000", note: "Другая деятельность ИП" }),
     );
     expect(r).toMatchObject({ ok: true });
     const after = await threshold.status({ year: 2026 }, w.admin);
@@ -314,11 +314,31 @@ describe("the registry", () => {
     expect(await listRegistryYears(w.db, 2026)).toContain(2026);
   });
 
+  it("is written only when the sum is typed twice and the two agree: a wrong income cannot be taken back", async () => {
+    const before = await listOtherIncome(w.db, 2026);
+    const missing = await addOtherIncome(writer(), form({ period: "2026-09", amountSum: "120 000 000" }));
+    expect(missing).toMatchObject({ ok: false });
+    expect(missing.message).toContain("ещё раз");
+    const typo = await addOtherIncome(
+      writer(),
+      form({ period: "2026-09", amountSum: "120 000 000", amountAgain: "12 000 000" }),
+    );
+    expect(typo).toMatchObject({ ok: false });
+    expect(typo.message).toContain("не совпадают");
+    expect(await listOtherIncome(w.db, 2026)).toHaveLength(before.length);
+  });
+
   it("refuses wrong income and a role that may not", async () => {
-    expect((await addOtherIncome(writer(), form({ period: "26-9", amountSum: "5" }))).ok).toBe(false);
-    expect((await addOtherIncome(writer(), form({ period: "2026-09", amountSum: "0" }))).ok).toBe(false);
-    expect((await addOtherIncome(writer(), form({ period: "2026-09", amountSum: "1,5" }))).ok).toBe(false);
-    expect(await addOtherIncome(writer("assistant"), form({ period: "2026-09", amountSum: "5" }))).toMatchObject({
+    expect((await addOtherIncome(writer(), form({ period: "26-9", amountSum: "5", amountAgain: "5" }))).ok).toBe(false);
+    expect((await addOtherIncome(writer(), form({ period: "2026-09", amountSum: "0", amountAgain: "0" }))).ok).toBe(
+      false,
+    );
+    expect((await addOtherIncome(writer(), form({ period: "2026-09", amountSum: "1,5", amountAgain: "1,5" }))).ok).toBe(
+      false,
+    );
+    expect(
+      await addOtherIncome(writer("assistant"), form({ period: "2026-09", amountSum: "5", amountAgain: "5" })),
+    ).toMatchObject({
       denied: true,
     });
   });

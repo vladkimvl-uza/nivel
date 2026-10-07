@@ -295,6 +295,11 @@ export async function addOtherIncome(w: Writer, form: FormInput): Promise<Outcom
   if (!m) return fail("Период — месяц вида 2026-10.");
   const amount = parseSum(form.get("amountSum"));
   if (amount === null || amount < 1) return fail("Сумма — целое число сумов, больше нуля.");
+  // A row of this journal cannot be taken back (the sum must be above zero, so a reversal row is impossible): the sum is
+  // typed twice, and what is wrong is stopped here and not in the threshold of the year.
+  const again = parseSum(form.get("amountAgain"));
+  if (again === null) return fail("Введите сумму ещё раз в поле проверки: запись о доходе нельзя убрать.");
+  if (again !== amount) return fail("Суммы не совпадают: проверьте цифры и введите сумму заново.");
   const note = text(form, "note");
   if (note !== undefined && note.length > 500) return fail("Примечание длиннее 500 знаков.");
   const year = Number(m[1]);

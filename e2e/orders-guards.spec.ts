@@ -363,6 +363,7 @@ test.describe("заявки, порог, доска", () => {
     const income = page.getByTestId("income-form");
     await income.getByLabel("Месяц (ГГГГ-ММ)").fill(`${year}-09`);
     await income.getByLabel("Сумма, сумов").fill("12 000 000");
+    await income.getByLabel("Сумма ещё раз").fill("12 000 000");
     await income.getByLabel("Примечание").fill("Другая деятельность ИП");
     await income.getByRole("button", { name: "Внести доход" }).click();
     await expect(income.locator(".adm-flash--ok")).toContainText("Доход другой деятельности записан");
