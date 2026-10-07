@@ -151,6 +151,7 @@ Worker: каркас, outbox, напоминания, порог, очистка
 - `packages/services/src/prices/**`
 - `packages/contracts/src/pricing/**`
 - `apps/admin/app/(prices)/**`
+- `e2e/prices-*.spec.ts` (импорт CSV с предпросмотром, ручной ввод; добавлено интегратором 07.10.2026)
 
 ## WP-16
 

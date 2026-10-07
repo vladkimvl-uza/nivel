@@ -104,7 +104,9 @@ export async function startSiteHarness(parallelIndex: number): Promise<SiteHarne
 
 async function boot(parallelIndex: number, releaseSlot: () => void): Promise<SiteHarness> {
   const slot = Number(process.env.NIVEL_SLOT ?? "0");
-  const port = 3100 + 100 * slot + 20 + parallelIndex;
+  // The harness of the admin takes base + 10 + 2i and base + 11 + 2i (up to base + 25 with eight workers): the site keeps out of
+  // that range, or a site of worker 5 and an admin of worker 7 both asked for base + 25.
+  const port = 3100 + 100 * slot + 60 + parallelIndex;
   const releaseTemplate = await acquire(["template"], 5 * 60_000);
   try {
     await prepareTemplate();
