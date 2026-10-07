@@ -11,6 +11,8 @@
   "dependencies": {
     "@nivel/config": "workspace:*",
     "@nivel/db": "workspace:*",
+    "@nivel/domain": "workspace:*",
+    "@nivel/services": "workspace:*",
     "pg-boss": "catalog:",
     "pino": "catalog:"
   }
