@@ -544,7 +544,7 @@ NV_SCHEMA.clients = {
   keyCol: "code",
   freezeCols: 2,
   caption: '=COUNTA([[code]])&" клиентов · с заказами "&COUNTIF([[ordersN]];">0")',
-  captionRight: "минимум персональных данных: код K-, как обращаться, @ник, район",
+  captionRight: "минимум персональных данных: код K-, как обращаться, @ник, телефон, район",
   cols: [
     nvCol("code", "Код", "id", 100, { prot: "script" }),
     nvCol("name", "Как обращаться", "text", 170),
