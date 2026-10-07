@@ -68,6 +68,7 @@ export function startChrome(win: Win = window): () => void {
       win.location.reload();
     };
     toggle.addEventListener("click", click);
+    toggle.dataset.ready = "1";
     cleanups.push(() => toggle.removeEventListener("click", click));
   }
 

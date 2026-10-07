@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { alternatesFor } from "../../../src/i18n/paths.ts";
 import { buildSiteConfig } from "../../../src/i18n/site/client/config.ts";
 import { formatSumsOf } from "../../../src/i18n/site/format.ts";
 import { BG_LABEL_KEYS, buildLabels } from "../../../src/i18n/site/labels.ts";
@@ -24,7 +25,7 @@ import { getFeeScale } from "./_data/server.ts";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  return { alternates: { canonical: `/${locale}` } };
+  return { alternates: { ...alternatesFor(""), canonical: `/${locale}` } };
 }
 
 /** `/[locale]`: the one-page site of R0: the first screen, how we work, the three scenes of the order, the passport, prices and guarantee, the request, the finale. */

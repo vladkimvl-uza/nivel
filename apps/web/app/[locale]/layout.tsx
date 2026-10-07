@@ -58,6 +58,10 @@ const monoUz = localFont({
   variable: "--font-mono-uz",
 });
 
+/** The mark as a favicon, inline: the site has no file for it, and a request for /favicon.ico would be a 404 on every page. */
+const FAVICON =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23F1EFEA' d='M2 4h13v2h-13Z'/%3E%3Cpath fill='%23F06A30' d='M2 6L10 6L6 10Z'/%3E%3Cpath fill='%23F1EFEA' d='M1 10h14v2h-14Z'/%3E%3C/svg%3E";
+
 const FONT_CLASSES = [text, display, condensed, mono, monoUz].map((f) => f.variable).join(" ");
 
 /** Before the first paint: the page is `js` (it may run the pinned scroll) unless the visitor wants less motion or saves traffic. */
@@ -76,6 +80,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     ...(base ? { metadataBase: new URL(base) } : {}),
     title: { default: t("title"), template: "%s — Nivel" },
     description: t("description"),
+    icons: { icon: FAVICON },
     alternates: alternatesFor(""),
     openGraph: {
       title: t("title"),
