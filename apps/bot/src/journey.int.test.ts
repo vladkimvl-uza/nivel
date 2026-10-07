@@ -82,9 +82,9 @@ describe("the whole road of a customer through the bot", () => {
     expect(sent.ok).toBe(true);
     h.tg.reset();
     await press(`o:${order.number}:view`);
-    expect(lastButtons(h, ali.id).map(([, d]) => d)).toEqual([`o:${order.number}:acc`]);
-    await press(`o:${order.number}:acc`);
-    await press(`o:${order.number}:acc2`);
+    expect(lastButtons(h, ali.id).map(([, d]) => d)).toEqual([`o:${order.number}:acc:1`]);
+    await press(`o:${order.number}:acc:1`);
+    await press(`o:${order.number}:acc2:1`);
     expect((await q("select status from sales.orders where id = $1", [order.orderId]))[0].status).toBe("accepted");
     expect(h.tg.textsTo(ali.id).at(-1)).toContain("Xolis QR");
 

@@ -135,7 +135,8 @@
       "screen": "{number}: ommaviy ofertani va smetani qabul qilasiz hamda maʼlumotlar doʻkonlarga uzatilishiga rozilik berasiz.",
       "non_returnable": "Smetada doʻkon qaytarib olmaydigan pozitsiyalar bor.",
       "confirm": "Ha, qabul qilaman",
-      "done": "Qabul qilindi. Toʻlov tartibi quyida."
+      "done": "Qabul qilindi. Toʻlov tartibi quyida.",
+      "changed": "Smeta oʻzgargan: yangi variantni koʻrib chiqing. Qabul qilish uchun uni qaytadan tasdiqlang."
     },
     "error": {
       "estimate_expired": "Smeta muddati tugagan: yangisini tayyorlaymiz.",

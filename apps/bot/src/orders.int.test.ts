@@ -1,10 +1,11 @@
 import { ops } from "@nivel/db/repos";
 import { formatDate, formatSum, formatTime } from "@nivel/i18n";
+import { dispatch, quotes } from "@nivel/services";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Person } from "./testing/fake-telegram.ts";
 import { customerWithLead, type LeadCase, ownerActor, reportSentOrder, sentOrder } from "./testing/flow.ts";
 import { createHarness, type Harness, lastButtons, newPerson } from "./testing/harness.ts";
-import { type BotWorld, createBotWorld, PC_CATALOG } from "./testing/world.ts";
+import { type BotWorld, createBotWorld, PC_CATALOG, pcLines } from "./testing/world.ts";
 
 // The roads of a whole order are long; a machine busy with other builds needs more than the 30 seconds of the project.
 vi.setConfig({ testTimeout: 180_000 });
@@ -87,7 +88,7 @@ describe("the card of an order for the customer", () => {
     expect(text).toContain(formatSum(Number(quote.fee_total), "uz"));
     expect(text).toContain(formatSum(Number(quote.purchase_limit), "uz"));
     expect(text).toContain(`${formatDate(quote.valid_until, "uz")} ${formatTime(quote.valid_until, "uz")}`);
-    expect(lastButtons(h, ali.id)).toEqual([["Oferta va smetani qabul qilaman", `o:${o.number}:acc`]]);
+    expect(lastButtons(h, ali.id)).toEqual([["Oferta va smetani qabul qilaman", `o:${o.number}:acc:1`]]);
   });
 
   it("a number that is not his is not found, and a made-up one too", async () => {
@@ -114,17 +115,17 @@ describe("the card of an order for the customer", () => {
 describe("the acceptance of the offer and the estimate", () => {
   it("asks once more on a screen with the consents, naming the non-returnable lines", async () => {
     const o = await sentOrder(w, lead);
-    await press(`o:${o.number}:acc`);
+    await press(`o:${o.number}:acc:1`);
     const text = String(h.tg.lastSend(ali.id)?.payload.text);
     expect(text).toContain(o.number);
     expect(text).toContain("qaytarib olmaydigan");
-    expect(lastButtons(h, ali.id)).toEqual([["Ha, qabul qilaman", `o:${o.number}:acc2`]]);
+    expect(lastButtons(h, ali.id)).toEqual([["Ha, qabul qilaman", `o:${o.number}:acc2:1`]]);
   });
 
   it("the confirmation records the consents of the order and dispatches ACCEPT as the customer", async () => {
     const o = await sentOrder(w, lead);
-    await press(`o:${o.number}:acc`);
-    await press(`o:${o.number}:acc2`);
+    await press(`o:${o.number}:acc:1`);
+    await press(`o:${o.number}:acc2:1`);
     expect(
       (await q("select status, offer_version_uz_id from sales.orders where id = $1", [o.orderId]))[0],
     ).toMatchObject({
@@ -150,8 +151,8 @@ describe("the acceptance of the offer and the estimate", () => {
 
   it("shows how to pay: the advance by the QR with a receipt, the money for purchases to the account of the sole proprietor", async () => {
     const o = await sentOrder(w, lead);
-    await press(`o:${o.number}:acc`);
-    await press(`o:${o.number}:acc2`);
+    await press(`o:${o.number}:acc:1`);
+    await press(`o:${o.number}:acc2:1`);
     const expected = await q("select kind, amount_sum from sales.payments where order_id = $1 order by kind", [
       o.orderId,
     ]);
@@ -175,8 +176,8 @@ describe("the acceptance of the offer and the estimate", () => {
     await ops.setSetting(w.db, "requisites.ip", { holder: "Karta 8600 1234 5678 9012" }, "test");
     try {
       const o = await sentOrder(w, lead);
-      await press(`o:${o.number}:acc`);
-      await press(`o:${o.number}:acc2`);
+      await press(`o:${o.number}:acc:1`);
+      await press(`o:${o.number}:acc2:1`);
       for (const t of h.tg.textsTo(ali.id)) expect(t).not.toMatch(/(?<!\d)\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}(?!\d)/);
       expect(h.tg.textsTo(ali.id).at(-1)).toContain("Pulni shaxsiy kartaga oʻtkazmang.");
     } finally {
@@ -198,9 +199,9 @@ describe("the acceptance of the offer and the estimate", () => {
 
   it("a second press of the confirmation changes nothing and records nothing twice", async () => {
     const o = await sentOrder(w, lead);
-    await press(`o:${o.number}:acc`);
-    await press(`o:${o.number}:acc2`);
-    await press(`o:${o.number}:acc2`);
+    await press(`o:${o.number}:acc:1`);
+    await press(`o:${o.number}:acc2:1`);
+    await press(`o:${o.number}:acc2:1`);
     expect(await q("select 1 from ops.consents where order_id = $1", [o.orderId])).toHaveLength(2);
     expect(
       await q("select 1 from sales.order_events where order_id = $1 and event ->> 'type' = 'ACCEPT'", [o.orderId]),
@@ -212,11 +213,62 @@ describe("the acceptance of the offer and the estimate", () => {
 
   it("after the end of the term the answer says the estimate is out of date, and nothing is recorded as accepted", async () => {
     const o = await sentOrder(w, lead);
-    await press(`o:${o.number}:acc`);
+    await press(`o:${o.number}:acc:1`);
     w.clock.advance(100 * 3_600_000);
-    await press(`o:${o.number}:acc2`);
+    await press(`o:${o.number}:acc2:1`);
     expect(h.tg.textsTo(ali.id).at(-1)).toBe("Smeta muddati tugagan: yangisini tayyorlaymiz.");
     expect((await q("select status from sales.orders where id = $1", [o.orderId]))[0].status).toBe("estimate_sent");
+  });
+
+  it("the screen of the confirmation shows the fee, the limit and the term the customer is about to accept", async () => {
+    const o = await sentOrder(w, lead);
+    await press(`o:${o.number}:acc:1`);
+    const [quote] = await q("select fee_total, purchase_limit from sales.quotes where id = $1", [o.quoteId]);
+    const text = String(h.tg.lastSend(ali.id)?.payload.text);
+    expect(text).toContain(formatSum(Number(quote.fee_total), "uz"));
+    expect(text).toContain(formatSum(Number(quote.purchase_limit), "uz"));
+  });
+
+  it("an estimate revised after the customer saw it is not accepted by his old button: the fresh card is shown instead", async () => {
+    const o = await sentOrder(w, lead);
+    await press(`o:${o.number}:acc:1`);
+    // The owner revises and sends the second version; the customer presses the confirmation of the first one.
+    const rev = await dispatch(o.orderId, { type: "REVISE" }, ownerActor(w), w.admin);
+    expect(rev.ok).toBe(true);
+    const lines = pcLines(w).map((l, i) => (i === 2 ? { ...l, qty: 2 } : l));
+    const built = await quotes.build({ orderId: o.orderId, lines, tasks: ["gaming"] }, ownerActor(w), w.admin);
+    const sent = await quotes.send({ orderId: o.orderId, quoteId: built.quoteId }, ownerActor(w), w.admin);
+    expect(sent.ok).toBe(true);
+    h.tg.reset();
+    await press(`o:${o.number}:acc2:1`);
+    expect((await q("select status from sales.orders where id = $1", [o.orderId]))[0].status).toBe("estimate_sent");
+    expect(
+      await q("select 1 from sales.order_events where order_id = $1 and event ->> 'type' = 'ACCEPT'", [o.orderId]),
+    ).toHaveLength(0);
+    expect(await q("select 1 from ops.consents where order_id = $1", [o.orderId])).toHaveLength(0);
+    const texts = h.tg.textsTo(ali.id);
+    expect(texts[0]).toContain("Smeta oʻzgargan");
+    // The fresh card carries the new version in its button.
+    expect(lastButtons(h, ali.id)).toEqual([["Oferta va smetani qabul qilaman", `o:${o.number}:acc:2`]]);
+    // The old screen's first button does the same, and the new one leads to a screen that accepts.
+    await press(`o:${o.number}:acc:1`);
+    expect(String(h.tg.textsTo(ali.id).at(-2))).toContain("Smeta oʻzgargan");
+    await press(`o:${o.number}:acc:2`);
+    expect(lastButtons(h, ali.id)).toEqual([["Ha, qabul qilaman", `o:${o.number}:acc2:2`]]);
+    await press(`o:${o.number}:acc2:2`);
+    expect((await q("select status from sales.orders where id = $1", [o.orderId]))[0].status).toBe("accepted");
+    const [accepted] = await q(
+      "select event from sales.order_events where order_id = $1 and event ->> 'type' = 'ACCEPT'",
+      [o.orderId],
+    );
+    expect(accepted.event.quoteId).toBe(built.quoteId);
+  });
+
+  it("a confirmation without a version (a button made by hand or by an old release) accepts nothing", async () => {
+    const o = await sentOrder(w, lead);
+    await press(`o:${o.number}:acc2`);
+    expect((await q("select status from sales.orders where id = $1", [o.orderId]))[0].status).toBe("estimate_sent");
+    expect(await q("select 1 from ops.consents where order_id = $1", [o.orderId])).toHaveLength(0);
   });
 
   it("the customer of another order cannot accept this one", async () => {
@@ -224,8 +276,8 @@ describe("the acceptance of the offer and the estimate", () => {
     const bob = newPerson("Bob", "bob", "uz");
     await customerWithLead(w, h, bob);
     h.tg.reset();
-    await press(`o:${o.number}:acc`, bob);
-    await press(`o:${o.number}:acc2`, bob);
+    await press(`o:${o.number}:acc:1`, bob);
+    await press(`o:${o.number}:acc2:1`, bob);
     expect(h.tg.textsTo(bob.id)).toEqual(["Buyurtma topilmadi.", "Buyurtma topilmadi."]);
     expect((await q("select status from sales.orders where id = $1", [o.orderId]))[0].status).toBe("estimate_sent");
     expect(await q("select 1 from ops.consents where order_id = $1", [o.orderId])).toHaveLength(0);

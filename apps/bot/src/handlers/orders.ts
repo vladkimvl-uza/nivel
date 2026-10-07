@@ -80,21 +80,16 @@ async function showCard(ctx: BotContext, view: View) {
   const rows: InlineButton[][] = [];
   const quote = view.quote;
   if (quote !== null) {
-    lines.push(
-      t("my.quote", {
-        fee: sumText(quote.feeTotal, ctx.lang),
-        limit: sumText(quote.purchaseLimit, ctx.lang),
-        until: quote.validUntil === null ? "—" : when(ctx, quote.validUntil),
-      }),
-    );
+    lines.push(quoteLine(ctx, quote));
     if (quote.watermarkDraft) lines.push(t("my.quote_watermark"));
   }
   if (view.status === "estimate_sent" || view.status === "estimate_expired") {
     if (view.status === "estimate_expired" || expired(ctx, view)) {
       lines.push(t("my.quote_expired"));
-    } else if (await canAccept(ctx)) {
-      rows.push([button(t("my.accept_button"), orderCallback(view.number, "acc"))]);
-    } else {
+    } else if (quote !== null && (await canAccept(ctx))) {
+      // The button carries the version of the estimate on this screen (see `acceptance`).
+      rows.push([button(t("my.accept_button"), orderCallback(view.number, "acc", String(quote.version)))]);
+    } else if (quote !== null) {
       lines.push(t("my.accept_after_publication"));
     }
   }
@@ -154,7 +149,20 @@ async function orderConsent(
   return id;
 }
 
-async function acceptance(ctx: BotContext, number: string, confirm: boolean) {
+/** The sums of the estimate: the same lines as in the card. */
+const quoteLine = (ctx: BotContext, quote: NonNullable<View["quote"]>): string =>
+  ctx.t("my.quote", {
+    fee: sumText(quote.feeTotal, ctx.lang),
+    limit: sumText(quote.purchaseLimit, ctx.lang),
+    until: quote.validUntil === null ? "—" : when(ctx, quote.validUntil),
+  });
+
+/**
+ * The acceptance is of the version of the estimate the customer saw: the buttons carry its number. An older button
+ * (the estimate was revised and sent again) accepts nothing; the customer gets the fresh card to look at.
+ * A confirmation without a version is no confirmation: only a button of ours carries one.
+ */
+async function acceptance(ctx: BotContext, number: string, confirm: boolean, seen: string | undefined) {
   const found = await orderOf(ctx, number);
   if (found === null) return say(ctx, ctx.t("my.not_found"));
   const { view, customerId } = found;
@@ -166,15 +174,21 @@ async function acceptance(ctx: BotContext, number: string, confirm: boolean) {
   if (view.status !== "estimate_sent" || quote === null) return say(ctx, ctx.t("my.error.invalid_transition"));
   if (expired(ctx, view)) return say(ctx, ctx.t("my.error.estimate_expired"));
   if (!(await canAccept(ctx))) return say(ctx, ctx.t("my.error.offer_not_published"));
+  const seenVersion = seen !== undefined && /^[0-9]{1,9}$/.test(seen) ? Number(seen) : undefined;
+  if (seenVersion === undefined ? confirm : seenVersion !== quote.version) {
+    await say(ctx, ctx.t("my.accept.changed"));
+    return showCard(ctx, view);
+  }
   const hasNonReturnable = quote.lines.some((l) => l.returnable === "no" && !l.customerOwned);
   if (!confirm) {
     const text = [
       ctx.t("my.accept.screen", { number: view.number }),
+      quoteLine(ctx, quote),
       hasNonReturnable ? ctx.t("my.accept.non_returnable") : "",
     ]
       .filter((l) => l !== "")
       .join("\n");
-    return say(ctx, text, [[button(ctx.t("my.accept.confirm"), orderCallback(view.number, "acc2"))]]);
+    return say(ctx, text, [[button(ctx.t("my.accept.confirm"), orderCallback(view.number, "acc2", String(quote.version)))]]);
   }
   const pd = await latestConsent(ctx.deps.db, customerId, "pd_processing", null);
   if (pd === null || !pd.granted) return say(ctx, ctx.t("my.error.consent_missing"));
@@ -200,7 +214,7 @@ myOrders.callbackQuery("m:order", showList);
 
 myOrders.callbackQuery(/^o:/, async (ctx) => {
   const data = decodeCallback(ctx.callbackQuery.data);
-  const [number, action] = data?.args ?? [];
+  const [number, action, arg] = data?.args ?? [];
   if (number === undefined) return ack(ctx);
   await ack(ctx);
   switch (action) {
@@ -209,9 +223,9 @@ myOrders.callbackQuery(/^o:/, async (ctx) => {
       return found === null ? say(ctx, ctx.t("my.not_found")) : showCard(ctx, found.view);
     }
     case "acc":
-      return acceptance(ctx, number, false);
+      return acceptance(ctx, number, false, arg);
     case "acc2":
-      return acceptance(ctx, number, true);
+      return acceptance(ctx, number, true, arg);
     case "rok": {
       const found = await orderOf(ctx, number);
       if (found === null) return say(ctx, ctx.t("my.not_found"));

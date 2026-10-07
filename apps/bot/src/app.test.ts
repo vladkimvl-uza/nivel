@@ -194,6 +194,62 @@ describe("BOT_MODE=webhook", () => {
     expect(handle).toHaveBeenCalledTimes(1);
   });
 
+  it("initialises a bot that knows nothing of itself (getMe) before it takes the first update, so the update is really answered", async () => {
+    const log = logger();
+    const tg = new FakeTelegram();
+    // Without botInfo, like the process of the bot (main.ts): grammY refuses every update until init() is called.
+    const bare = new Bot<BotContext>(TOKEN);
+    bare.on("message", (ctx) => ctx.reply("pong"));
+    tg.install(bare);
+    const app = await startApp({
+      env: envOf(env),
+      db: {} as Db,
+      rt: {} as never,
+      log: log as never,
+      port: 0,
+      ping: async () => ({ ok: true, ms: 1, queueSchema: true }),
+      botFactory: () => bare,
+      sweep: async () => 0,
+    });
+    running.push(app);
+    expect(tg.of("getMe")).toHaveLength(1);
+    // The bot knows itself before the address is given to Telegram: no update can arrive before that.
+    const order = tg.calls.map((c) => c.method);
+    expect(order.indexOf("getMe")).toBeLessThan(order.indexOf("setWebhook"));
+    const res = await fetch(`http://127.0.0.1:${app.port}${webhookPath(SECRET)}`, {
+      method: "POST",
+      headers: { "x-telegram-bot-api-secret-token": SECRET },
+      body: JSON.stringify({
+        update_id: 91,
+        message: { message_id: 1, date: 1, chat: { id: 5, type: "private" }, from: { id: 5, is_bot: false, first_name: "A" }, text: "x" },
+      }),
+    });
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => expect(tg.of("sendMessage")).toHaveLength(1));
+    expect(tg.of("sendMessage")[0]?.payload).toMatchObject({ chat_id: 5, text: "pong" });
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it("does not take the address when the bot cannot be initialised: the process fails loudly, not silently mute", async () => {
+    const tg = new FakeTelegram();
+    const bare = new Bot<BotContext>(TOKEN);
+    tg.install(bare);
+    tg.failNext("getMe", { error_code: 401, description: "Unauthorized" });
+    await expect(
+      startApp({
+        env: envOf(env),
+        db: {} as Db,
+        rt: {} as never,
+        log: logger() as never,
+        port: 0,
+        ping: async () => ({ ok: true, ms: 1, queueSchema: true }),
+        botFactory: () => bare,
+        sweep: async () => 0,
+      }),
+    ).rejects.toThrow();
+    expect(tg.of("setWebhook")).toHaveLength(0);
+  });
+
   it("an update that fails in the bot is logged, not answered with an error", async () => {
     const r = await start(env);
     vi.spyOn(r.bot, "handleUpdate").mockRejectedValue(new Error("boom"));

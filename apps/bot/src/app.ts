@@ -9,6 +9,7 @@ import type { Db } from "@nivel/db";
 import type { DbHealth } from "@nivel/db/health";
 import type { orders } from "@nivel/services";
 import type { Bot } from "grammy";
+import type { Update } from "grammy/types";
 import type { Logger } from "pino";
 import { createBot } from "./bot.ts";
 import { configureBot } from "./configure.ts";
@@ -65,8 +66,11 @@ export async function startApp(o: AppOptions): Promise<StartedApp> {
     log.warn("disabled: no BOT_TOKEN");
   } else {
     bot = (o.botFactory ?? ((d, token) => createBot(d, { token })))(deps, env.BOT_TOKEN);
-    bot.api.config.use(autoRetry());
+    bot.api.config.use(autoRetry({ maxRetryAttempts: 3, maxDelaySeconds: 30 }));
     state = env.BOT_MODE === "webhook" ? "webhook" : "polling";
+    // grammY refuses every update of a bot that does not know itself. The runner asks `getMe` in polling; with a webhook
+    // nobody does, so it is asked here, before the port is opened and before Telegram is given the address.
+    if (state === "webhook") await bot.init();
   }
 
   const webhook =
@@ -74,7 +78,7 @@ export async function startApp(o: AppOptions): Promise<StartedApp> {
       ? {
           path: webhookPath(env.BOT_WEBHOOK_SECRET),
           secret: env.BOT_WEBHOOK_SECRET,
-          onUpdate: (update: unknown) => (bot as Bot<BotContext>).handleUpdate(update as never),
+          onUpdate: (update: unknown) => bot?.handleUpdate(update as Update) ?? Promise.resolve(),
         }
       : undefined;
 

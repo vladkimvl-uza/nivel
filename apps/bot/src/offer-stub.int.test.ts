@@ -54,8 +54,8 @@ describe("the offer is a stub (production mode)", () => {
 
   it("a button made by hand does not accept either: the answer says the offer is not published and nothing is recorded", async () => {
     const o = await sentOrder(w, lead);
-    await press(`o:${o.number}:acc`);
-    await press(`o:${o.number}:acc2`);
+    await press(`o:${o.number}:acc:1`);
+    await press(`o:${o.number}:acc2:1`);
     expect(h.tg.textsTo(ali.id)).toEqual([
       "Oferta hali eʼlon qilinmagan: qabul qilish keyinroq ochiladi.",
       "Oferta hali eʼlon qilinmagan: qabul qilish keyinroq ochiladi.",
@@ -74,9 +74,9 @@ describe("the development mode lets the stub through to try the flow", () => {
     const o = await sentOrder(w, l);
     dh.tg.reset();
     await dh.send(dh.tg.press(bob, bob.id, 4000, `o:${o.number}:view`));
-    expect(lastButtons(dh, bob.id)).toEqual([["Oferta va smetani qabul qilaman", `o:${o.number}:acc`]]);
-    await dh.send(dh.tg.press(bob, bob.id, 4000, `o:${o.number}:acc`));
-    await dh.send(dh.tg.press(bob, bob.id, 4000, `o:${o.number}:acc2`));
+    expect(lastButtons(dh, bob.id)).toEqual([["Oferta va smetani qabul qilaman", `o:${o.number}:acc:1`]]);
+    await dh.send(dh.tg.press(bob, bob.id, 4000, `o:${o.number}:acc:1`));
+    await dh.send(dh.tg.press(bob, bob.id, 4000, `o:${o.number}:acc2:1`));
     expect((await q("select status from sales.orders where id = $1", [o.orderId]))[0].status).toBe("accepted");
   });
 });

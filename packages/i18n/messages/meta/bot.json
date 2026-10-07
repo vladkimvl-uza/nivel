@@ -534,6 +534,11 @@
     "maxLen": 50,
     "status": "draft"
   },
+  "my.accept.changed": {
+    "context": "the estimate was revised after the customer saw the screen: the old button does not accept the new one",
+    "maxLen": 100,
+    "status": "draft"
+  },
   "my.error.estimate_expired": {
     "context": "answer to the customer: the quote has expired",
     "maxLen": 60,
