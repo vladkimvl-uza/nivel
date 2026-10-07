@@ -733,5 +733,210 @@
     "context": "the way of signing: the button of the site",
     "maxLen": 30,
     "status": "draft"
+  },
+  "passport.title": {
+    "context": "title of the passport of the build",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.dates.title": {
+    "context": "heading of the block of dates",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.dates.estimate": {
+    "context": "date of the estimate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.dates.tests": {
+    "context": "date of the tests",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.dates.act": {
+    "context": "date of the act of handover",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.dates.warranty": {
+    "context": "warranty date: until",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.spec.title": {
+    "context": "heading of the table of parts with serial numbers",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.spec.empty": {
+    "context": "the list of serial numbers is empty",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.bios": {
+    "context": "label: version of the BIOS",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.os": {
+    "context": "label: operating system (the licence is by the receipt)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.title": {
+    "context": "heading of the protocol of the tests",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.tool": {
+    "context": "label: tool of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.scenario": {
+    "context": "label: scenario of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.duration": {
+    "context": "label: duration of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.duration_value": {
+    "context": "duration: hours and minutes",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "passport.tests.peak": {
+    "context": "label: highest temperature",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.peak_value": {
+    "context": "temperature in degrees Celsius",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.errors": {
+    "context": "label: errors of the test",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.tests.errors_none": {
+    "context": "result: no errors, the norm",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.errors_count": {
+    "context": "result: the number of errors",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "passport.tests.none": {
+    "context": "the data of the tests are not entered",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "passport.attachments": {
+    "context": "attached photos: tests and seals",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "passport.label": {
+    "context": "label: code of the sticker on the case",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.notes": {
+    "context": "label: notes of the master",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.qr": {
+    "context": "caption under the QR code of the passport",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.master": {
+    "context": "line for the signature of the master",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "passport.stamp.word": {
+    "context": "stamp: the tests are passed",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "warranty.title": {
+    "context": "title of the warranty obligation",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.intro": {
+    "context": "intro of the warranty: one window, the customer talks to Nivel only; {number} is the number of the order",
+    "maxLen": 210,
+    "status": "draft"
+  },
+  "warranty.p1": {
+    "context": "point 1: warranty period of 12 months from the day of handover",
+    "maxLen": 190,
+    "status": "draft"
+  },
+  "warranty.p2": {
+    "context": "point 2: reply in 1 working day, diagnosis in 2 working days",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "warranty.p3": {
+    "context": "point 3: a loaner within 3 days",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "warranty.p4": {
+    "context": "point 4: fix in 10 working days for work, 20 days for parts",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "warranty.p5": {
+    "context": "point 5: refusal only with a causal link to the customer's acts: impact, liquid, overclocking, replacement by a third party",
+    "maxLen": 250,
+    "status": "draft"
+  },
+  "warranty.p6": {
+    "context": "point 6: the cases are written to a journal with the exact time; how to report a problem in the bot",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "warranty.until": {
+    "context": "stamp line: warranty until the date",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "warranty.until_pending": {
+    "context": "stamp line: the date is not known yet",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "warranty.stamp": {
+    "context": "word of the stamp",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "warranty.items.title": {
+    "context": "heading of the list of parts under warranty",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.items.vendor_until": {
+    "context": "warranty of the shop until a date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.items.none": {
+    "context": "the list of parts is empty",
+    "maxLen": 40,
+    "status": "draft"
   }
 }

@@ -337,6 +337,7 @@ export function warrantyFixture(over: Partial<WarrantyDoc> = {}): WarrantyDoc {
     issuedAt: "2026-10-12T09:20:00.000Z",
     handedOverAt: "2026-10-12T09:15:00.000Z",
     warrantyUntil: "2027-10-12",
+    ip: IP_REQUISITES,
     items: [
       { title: "AMD Ryzen 5 9600X", serial: "CPU-9600X-001122", vendorWarrantyUntil: "2029-10-08" },
       { title: "GeForce RTX 5070 12 GB", serial: "GPU-5070-778899", vendorWarrantyUntil: null },

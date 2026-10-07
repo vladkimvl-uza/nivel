@@ -210,4 +210,6 @@ export interface WarrantyDoc {
   handedOverAt?: IsoStamp | null;
   warrantyUntil?: IsoDay | null;
   items: readonly WarrantyItemDoc[];
+  /** The sole proprietor who gives the warranty: the holder of the account. */
+  ip?: IpRequisites | null;
 }

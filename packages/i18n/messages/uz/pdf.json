@@ -211,5 +211,60 @@
         "site_button": "sayt tugmasi orqali"
       }
     }
+  },
+  "passport": {
+    "title": "Kompyuter pasporti",
+    "dates": {
+      "title": "Muhim sanalar",
+      "estimate": "Smeta",
+      "tests": "Sinov",
+      "act": "Topshirish dalolatnomasi",
+      "warranty": "Kafolat"
+    },
+    "spec": {
+      "title": "Spetsifikatsiya va seriya raqamlari",
+      "empty": "Seriya raqamlari kiritilmagan."
+    },
+    "bios": "BIOS versiyasi",
+    "os": "Operatsion tizim",
+    "tests": {
+      "title": "Sinov bayonnomasi",
+      "tool": "Dastur",
+      "scenario": "Stsenariy",
+      "duration": "Davomiyligi",
+      "duration_value": "{hours} soat {minutes} daqiqa",
+      "peak": "Eng yuqori harorat",
+      "peak_value": "{temp} °C",
+      "errors": "Xatolar",
+      "errors_none": "xatolar yoʻq: norma",
+      "errors_count": "xatolar soni: {n}",
+      "none": "Sinov maʼlumotlari kiritilmagan."
+    },
+    "attachments": "Ilova: sinov suratlari — {photos}, muhr suratlari — {seals}",
+    "label": "Yorliq kodi",
+    "notes": "Izohlar",
+    "qr": "Pasport kodi",
+    "master": "Usta imzosi",
+    "stamp": {
+      "word": "Sinovdan oʻtdi"
+    }
+  },
+  "warranty": {
+    "title": "Kafolat majburiyati",
+    "intro": "Nivel {number} buyurtma boʻyicha yigʻilgan kompyuter uchun «bitta oyna» tamoyilida kafolat beradi: murojaat Nivelga yoʻllanadi, qolganini oʻzimiz hal qilamiz.",
+    "p1": "Kafolat muddati — 12 oy, topshirilgan kundan boshlab. Ishlab chiqaruvchi kafolati uzoqroq qismlar uchun — shu muddat tugaguncha Nivel orqali.",
+    "p2": "Murojaatga javob — 1 ish kuni, diagnostika — 2 ish kuni.",
+    "p3": "Almashtiruvchi mahsulot — 3 sutkagacha.",
+    "p4": "Bartaraf etish: ish boʻyicha — 10 ish kuni, qismlar boʻyicha — 20 kun.",
+    "p5": "Rad etish faqat mijozning harakatlari bilan sababiy bogʻliqlik boʻlganda: zarba, suyuqlik, overklokking, uchinchi shaxs qismlarni almashtirgani. Rad etish dalillar bilan rasmiylashtiriladi.",
+    "p6": "Murojaatlar aniq vaqti bilan jurnalga yoziladi. Muammo haqida botda «Muammo haqida xabar berish» tugmasi orqali yozing.",
+    "until": "Kafolat: {date} gacha",
+    "until_pending": "Kafolat topshirilgan kundan boshlanadi",
+    "stamp": "Kafolat",
+    "items": {
+      "title": "Kafolat ostidagi qismlar",
+      "vendor_until": "doʻkon kafolati {date} gacha",
+      "none": "Qismlar roʻyxati hali yoʻq."
+    }
   }
 }

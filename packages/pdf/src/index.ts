@@ -4,8 +4,10 @@
 
 export { ACT_KINDS, renderAct } from "./act.ts";
 export { DocumentDataError } from "./guards.ts";
+export { renderPassport } from "./passport.ts";
 export { renderQuote } from "./quote.ts";
 export { PDF_MAX_BYTES, PdfTooLargeError } from "./render.ts";
 export { renderCommissionReport } from "./report.ts";
 export { CardNumberError } from "./requisites.ts";
 export type * from "./types.ts";
+export { renderWarrantyCard } from "./warranty.ts";
