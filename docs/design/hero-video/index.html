@@ -55,7 +55,7 @@ html[lang="uz-Latn"]{--mono:"Noto Sans Mono", ui-monospace, Consolas, monospace}
 }
 
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;scroll-padding-top:var(--head)}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:calc(var(--head) + 30px)}
 html.lenis,html.lenis body{height:auto}
 .lenis.lenis-smooth{scroll-behavior:auto!important}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;overflow-x:hidden;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
@@ -313,12 +313,7 @@ main,.ftr{overflow-x:clip}
 .dstamp .stamp-r em{font-size:10.5px}
 .dstamp .stamp-r > span{padding:5px 12px 6px}
 .paper .sample-mk{position:absolute;right:16px;top:-12px;background:var(--doc-ink);color:var(--doc);font:500 10.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:5px 8px}
-/* ночью документы лежат под лампой: тёплое пятно на фоне, без свечения текста */
-.docs::before,.pass-grid::before{content:"";position:absolute;z-index:-1;pointer-events:none;opacity:0;transition:opacity var(--dur-theme) var(--ease-io)}
-.docs::before{inset:-12% -8% -10%;background:radial-gradient(48% 52% at 50% 42%,rgba(255,196,130,.11),rgba(255,196,130,.04) 55%,rgba(255,196,130,0) 75%)}
-.pass-grid{position:relative;isolation:isolate}
-.pass-grid::before{inset:-14% -6% -14% 30%;background:radial-gradient(46% 50% at 56% 46%,rgba(255,196,130,.12),rgba(255,196,130,.04) 55%,rgba(255,196,130,0) 76%)}
-.docs::before,.pass-grid::before{opacity:1}
+/* пятна лампы под документами и паспортом сняты 06.10.2026: свет даёт только сцена фона (один источник) */
 @media (max-width:960px){.docs{grid-template-columns:1fr}.paper.tilt-l,.paper.tilt-r{transform:none}}
 @media (max-width:520px){
   .paper{padding:16px 14px}
@@ -367,7 +362,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
 .kit[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);background:var(--surface)}
 @media (max-width:960px){.cfg{grid-template-columns:1fr}}
 @media (max-width:520px){.kits{grid-template-columns:1fr}}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--card-shadow);position:sticky;top:calc(var(--head) + 20px)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--card-shadow);position:sticky;top:calc(var(--head) + 50px)}
 .card-hd{padding:22px 26px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
 .card-hd h3{font-family:var(--display);font-weight:500;font-size:26px;line-height:1.15;margin:0}
 .card-sub{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-top:6px}
@@ -415,7 +410,8 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
 }
 
 /* ---------- паспорт ---------- */
-.pass{background:var(--wood);color:var(--wood-ink);overflow:hidden}
+/* тон паспорта и цен — вертикальный градиент с мягкими краями 140 px: без горизонтального шва на стыках */
+.pass{background:linear-gradient(180deg,rgba(30,23,18,0) 0,rgba(30,23,18,.55) 140px,rgba(30,23,18,.55) calc(100% - 140px),rgba(30,23,18,0) 100%);color:var(--wood-ink);overflow:hidden}
 .pass .kicker{color:var(--wood-ink-2)}
 .pass .lead{color:var(--wood-ink-2)}
 .pass-grid{display:grid;grid-template-columns:minmax(0,.78fr) minmax(0,1.22fr);gap:clamp(32px,5vw,80px);align-items:start}
@@ -487,7 +483,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
   .idea{flex:0 0 84%;scroll-snap-align:start}.idea-pic{aspect-ratio:4/3.4}}
 
 /* ---------- цены ---------- */
-.prices{background:var(--bg-2)}
+.prices{background:linear-gradient(180deg,rgba(23,21,19,0) 0,rgba(23,21,19,.4) 140px,rgba(23,21,19,.4) calc(100% - 140px),rgba(23,21,19,0) 100%)}
 .price-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(32px,5vw,80px)}
 .scale-t{width:100%;border-collapse:collapse}
 .scale-t th,.scale-t td{text-align:left;padding:16px 12px 16px 0;border-bottom:1px solid var(--line);vertical-align:baseline}
@@ -536,7 +532,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
 }
 
 /* ---------- подвал ---------- */
-.ftr{background:var(--foot);color:#E6E2DA;padding:clamp(64px,8vw,100px) 0 40px}
+.ftr{background:rgba(11,10,9,.8);color:#E6E2DA;padding:clamp(64px,8vw,100px) 0 40px}
 .ftr a{color:#F1EFEA;text-decoration:none;border-bottom:1px solid rgba(241,239,234,.25)}
 .ftr a:hover{border-bottom-color:#F1EFEA}
 .ftr-top{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.2fr;gap:40px;padding-bottom:52px;border-bottom:1px solid rgba(241,239,234,.15)}
@@ -554,6 +550,219 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
 @media (max-width:960px){.ftr-top{grid-template-columns:1fr 1fr}}
 @media (max-width:560px){.ftr-top{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.cap{transition:none}}
+
+/* =========================================================
+   ФОН НИЖЕ ПЕРВОГО ЭКРАНА: «Один заказ под лампой» (06.10.2026, раунд 9: реальные ролики вместо 3D-сцены; 07.10.2026, раунд 10: цвет первого экрана, 1280/540 px, полоса «04 Тест», «05 Монтаж» в «Идеях», лампа под актом и гарантией).
+   Прокрутка = время заказа NV-0001. Без прокрутки процесс идёт сам: курсор линейки, чеки, сборка, часы теста, чертёж; ролик этапа доигрывает.
+   За документами — ночные ролики этапов (закупка, сборка, тест, монтаж) с подписью «Иллюстрация»; сдача, акт, гарантия — без чужой съёмки.
+   Один фиксированный слой за <main>.
+   ========================================================= */
+main,.ftr{position:relative;z-index:1}
+.hero-off{position:absolute;inset:0;background:var(--stage);opacity:0;pointer-events:none}
+.ob{position:fixed;inset:0;z-index:0;pointer-events:none;contain:strict;background:var(--stage);visibility:hidden;--ol:1;--ou:0;--oc:0;--win:0}
+.ob.is-on{visibility:visible}
+.ob-sc{position:absolute;inset:0;overflow:hidden;opacity:.07;transition:opacity .3s linear;transform-origin:85% 61%;will-change:transform,opacity}
+.ob.is-lit .ob-sc{opacity:1}
+.ob.is-flick .ob-sc{animation:nv-flick .76s linear}
+/* щелчок рабочего света: кривая flick() из DESIGN_SYSTEM §4 — две вспышки за 260 мс, затем до полного за 500 мс */
+@keyframes nv-flick{0%{opacity:.07}0.1%{opacity:.35}7.9%{opacity:.35}8%{opacity:.05}15.7%{opacity:.05}15.8%{opacity:.6}23.6%{opacity:.6}23.7%{opacity:.4}34.2%{opacity:.4}100%{opacity:1}}
+.ob-sc img,.ob-sc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .45s var(--ease-io)}
+.ob-sc .is-on{opacity:1}
+/* ровное затемнение под текстом: левая колонка темнее, без пятен и размытия */
+.ob-sh{position:absolute;inset:0;transition:opacity .45s var(--ease-io)}
+.ob-sh.l{background:linear-gradient(90deg,rgba(18,17,16,.9) 0,rgba(18,17,16,.88) 44%,rgba(18,17,16,.62) 60%,rgba(18,17,16,.55) 100%);opacity:calc(var(--ol)*(1 - var(--win)))}
+.ob-sh.u{background:rgba(18,17,16,.84);opacity:calc(var(--ou)*(1 - var(--win)))}
+/* окно-пауза на телефоне: прозрачная полоса высотой с окно идёт вместе с ним (translateY), текст выше и ниже — на тёмном */
+.ob-sh.w{inset:-100vh 0 auto;height:300vh;background:linear-gradient(180deg,rgba(18,17,16,.9) 0,rgba(18,17,16,.9) calc(50% - 25vh),rgba(18,17,16,.18) calc(50% - 16vh),rgba(18,17,16,.18) calc(50% + 16vh),rgba(18,17,16,.9) calc(50% + 25vh),rgba(18,17,16,.9) 100%);opacity:var(--win);transition:none;will-change:transform}
+.ob[data-sh="u"]{--ou:1}
+.ob[data-sh="b"]{--ol:.32}
+/* цены, акт, гарантия: тёмный стол, тёплое пятно лампы справа внизу — затемнение слабее к правому краю, текст слева и в колонке на тёмном */
+.ob-sh.c{background:linear-gradient(90deg,rgba(18,17,16,.9) 0,rgba(18,17,16,.86) 46%,rgba(18,17,16,.74) 70%,rgba(18,17,16,.66) 88%,rgba(18,17,16,.46) 100%);opacity:calc(var(--oc)*(1 - var(--win)))}
+.ob[data-sh="c"]{--ol:0;--oc:1}
+/* зерно плёнки, как у роликов первого экрана: одна статичная плитка 7 КБ, обычное наложение, без анимации */
+.ob-gr{position:absolute;inset:0;background-size:128px 128px;opacity:.5}
+.ob.is-go .ob-gr{background-image:url(media/bg/grain.webp)}
+/* подпись под чужой съёмкой: видна, пока на фоне ролик этапа (закупка, сборка, тест, монтаж); вертикально в правом поле — не перекрывает текст */
+.ob-il{position:fixed;right:var(--gut);bottom:28px;z-index:44;margin:0;padding:4px 8px;border-radius:var(--r1);background:rgba(18,17,16,.82);font:400 11px/16px var(--mono);letter-spacing:.02em;color:var(--ink-2);white-space:nowrap;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s;pointer-events:none}
+.ob-il.is-in{opacity:1;visibility:visible;transition:opacity .3s}
+@media (max-width:859px){.ob-il{right:var(--gut);bottom:calc(12px + env(safe-area-inset-bottom,0px));font-size:10.5px;line-height:15px;padding:3px 7px}}
+@media (max-width:859px){.ob-sh.l{background:rgba(18,17,16,.8)}.ob[data-sh="b"]{--ol:.3}.ob-gr{background-size:64px 64px}}
+
+/* «Ход заказа»: линейка под шапкой — шесть шагов из «Как работаем» плюс заявка */
+.ord{position:fixed;left:0;right:0;top:var(--head);height:30px;z-index:45;contain:strict;background:var(--bg);border-bottom:1px solid var(--line);font:500 11.5px/1 var(--mono);color:var(--ink-2);opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
+.ord.is-on{opacity:1;visibility:visible;transition:opacity .3s}
+.ord-in{max-width:1440px;height:100%;margin:0 auto;padding:0 var(--gut);display:flex;align-items:center;gap:18px;white-space:nowrap;overflow:hidden}
+.ord-id{flex:none}.ord-id .l,.ord-id .sh{display:none}
+@media (min-width:860px){.ord-id .sh{display:inline}}
+@media (min-width:1280px){.ord-id .sh{display:none}.ord-id .l{display:inline}}
+.ord-t{display:flex;gap:2px;list-style:none;margin:0;padding:0}
+.ord-t li{display:flex;align-items:center;gap:6px;height:20px;padding:0 6px;color:#8E887D;border-radius:var(--r1)}
+.ord-t li span{display:none}
+.ord-t li.is-done{color:var(--ink-2)}
+.ord-t li.is-pv{color:var(--ink);box-shadow:inset 0 -1px 0 var(--ink-2)}
+.ord-t li.is-cur{color:var(--ink);background:var(--surface)}
+.ord-t li.is-cur span{display:inline}
+.ord-t li.is-cur::before{content:"";width:8px;height:8px;background:var(--accent);clip-path:polygon(0 0,100% 0,50% 100%)}
+.ord-s{margin-left:auto;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+/* курсор текущего шага: документ «пишется», пока раздел на экране */
+.ord-cw{flex:none;width:6px;height:12px;margin-left:-14px;background:var(--accent);opacity:0}
+.ord.is-cw .ord-cw{animation:nv-cw 1.1s steps(1,end) infinite}
+@keyframes nv-cw{0%{opacity:.9}50%{opacity:0}}
+.ord-st{flex:none;color:var(--accent-ink);border:1px solid currentColor;padding:4px 6px 3px;font:600 11.5px/1 var(--cond);letter-spacing:.08em;text-transform:uppercase;opacity:0}
+.ord-st.is-in{opacity:1}
+.ord-st.is-seat{animation:nv-seat .42s var(--ease-out) both}
+/* посадка по допуску: подход, провал заподлицо, отскок 1 px */
+@keyframes nv-seat{0%{opacity:0;transform:translateY(-7px) scale(1.12)}55%{opacity:1;transform:translateY(0) scale(1)}70%{transform:translateY(-1px)}84%,100%{opacity:1;transform:none}}
+.ord-lv{position:fixed;left:0;top:calc(var(--head) + 29px);width:100%;height:1px;z-index:46;background:var(--accent);opacity:0;transform-origin:0 0;will-change:transform;transform:scaleX(0);pointer-events:none}
+.nav a.is-cur{border-bottom-color:var(--accent)}
+@media (max-width:859px){
+  .ord{height:26px;font-size:11px}
+  .ord-in{gap:10px}
+  /* шесть шагов — полосы прогресса во всю ширину; пройденные светлые, текущий оранжевый */
+  .ord-t{position:absolute;left:0;right:0;bottom:-1px;gap:0;height:3px}
+  .ord-t li{flex:1;height:3px;padding:0;border-radius:0;background:var(--line-2);border-right:2px solid var(--bg)}
+  .ord-t li.is-done,.ord-t li.is-pv{background:var(--ink-2)}
+  .ord-t li.is-cur{background:var(--accent)}
+  .ord-t li::before,.ord-t li b,.ord-t li span{display:none!important}
+  .ord-st{display:none}
+  .ord-s{margin-left:0}
+  .ord-cw{margin-left:-6px;height:11px}
+  .ord-lv{top:calc(var(--head) + 25px)}
+}
+
+/* полосы-пролёты: «03 Xarid», «04 Yigʻish», финал. Сцена закреплена (sticky), пока идёт процесс */
+.band{position:relative}
+.band--x,.band--y,.band--t{height:150vh;height:150svh}
+.band-st{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
+.band-st .wrap{height:100%;position:relative}
+.band-l{position:absolute;left:var(--gut);top:calc(var(--head) + 54px);margin:0;display:flex;align-items:center;gap:10px;font:500 13px/1.4 var(--mono);color:var(--ink);background:var(--chip-bg);padding:8px 12px;border-radius:var(--r1)}
+/* чеки лежат на столе сцены: плоскость стола в перспективе, одна общая тень-контакт */
+.rcs{position:absolute;left:27%;top:61%;width:250px;height:178px;transform:perspective(1100px) rotateX(34deg) rotateZ(-5deg);transform-origin:50% 100%}
+.rcs::before{content:"";position:absolute;left:-6px;right:4px;top:30px;bottom:-6px;box-shadow:0 22px 34px 4px rgba(0,0,0,.62);background:rgba(0,0,0,.28)}
+.rc{position:absolute;left:0;top:0;width:230px;background:#ECE7DD;color:#2A2723;font:500 10.5px/1.45 var(--mono);padding:12px 14px 40px;box-shadow:0 1px 0 rgba(0,0,0,.35);clip-path:polygon(0 0,100% 0,100% calc(100% - 6px),94% 100%,88% calc(100% - 6px),82% 100%,76% calc(100% - 6px),70% 100%,64% calc(100% - 6px),58% 100%,52% calc(100% - 6px),46% 100%,40% calc(100% - 6px),34% 100%,28% calc(100% - 6px),22% 100%,16% calc(100% - 6px),10% 100%,4% calc(100% - 6px),0 100%);opacity:0;transform:translate(var(--x),calc(var(--y) - 46px)) rotate(var(--r))}
+.rc.is-in{opacity:1;transform:translate(var(--x),var(--y)) rotate(var(--r));animation:nv-rc .42s var(--ease-out)}
+@keyframes nv-rc{0%{opacity:0;transform:translate(var(--x),calc(var(--y) - 46px)) rotate(var(--r))}55%{opacity:1;transform:translate(var(--x),var(--y)) rotate(var(--r))}70%{transform:translate(var(--x),calc(var(--y) - 1px)) rotate(var(--r))}100%{transform:translate(var(--x),var(--y)) rotate(var(--r))}}
+.rc .h{display:flex;justify-content:space-between;border-bottom:1px dashed rgba(42,39,35,.4);padding-bottom:5px;margin-bottom:6px}
+.rc .i{display:flex;justify-content:space-between;gap:10px}
+.rc .i span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc .t{display:flex;justify-content:space-between;border-top:1px dashed rgba(42,39,35,.4);margin-top:6px;padding-top:5px;font-weight:600}
+/* штамп — в пустом поле под итогом, сумму не закрывает */
+.rc .nm{position:absolute;left:12px;bottom:12px;font:700 15px/1 var(--cond);letter-spacing:.16em;color:rgba(42,39,35,.55);border:2px solid currentColor;padding:3px 6px 2px;transform:rotate(-4deg)}
+/* последний чек «дописывается»: строки по очереди, затем итог и штамп */
+.rc.is-new .i,.rc.is-new .t,.rc.is-new .nm{animation:nv-ln .01s steps(1,end) both}
+.rc.is-new .i:nth-of-type(2){animation-delay:.5s}.rc.is-new .i:nth-of-type(3){animation-delay:1.1s}
+.rc.is-new .t{animation-delay:1.7s}.rc.is-new .nm{animation:nv-nm .32s var(--ease-stamp) 2.2s both}
+@keyframes nv-ln{0%{visibility:hidden}100%{visibility:visible}}
+@keyframes nv-nm{0%{opacity:0;transform:rotate(-4deg) scale(1.5)}100%{opacity:1;transform:rotate(-4deg) scale(1)}}
+.rcs-sum{position:absolute;left:27%;top:calc(61% - 70px);width:max-content;max-width:calc(100% - 2*var(--gut));font:500 12px/1.6 var(--mono);color:var(--ink);background:var(--chip-bg);padding:6px 10px;border-radius:var(--r1)}
+.rcs-sum .ret{display:block;color:var(--accent-ink);opacity:0;transition:opacity .3s}
+.rcs-sum.is-all .ret{opacity:1}
+/* сборка: те же детали, что в смете, по очереди */
+.asm{position:absolute;left:var(--gut);top:calc(var(--head) + 104px);margin:0;padding:10px 12px;list-style:none;background:var(--chip-bg);border-radius:var(--r1);font:500 12px/1.75 var(--mono);color:var(--ink-2);min-width:300px}
+.asm li{display:flex;gap:8px}
+.asm li::before{content:"";flex:none;width:8px;height:8px;margin-top:7px;border:1px solid var(--line-2)}
+.asm li.is-done{color:var(--ink)}
+.asm li.is-done::before{background:var(--ink-2);border-color:var(--ink-2)}
+.asm li.is-cur{color:var(--ink)}
+.asm li.is-cur::before{background:var(--accent);border-color:var(--accent);clip-path:polygon(0 0,100% 0,50% 100%);border:0;width:9px}
+@media (max-width:859px){
+  .band-l{right:var(--gut);font-size:12px;top:calc(var(--head) + 40px)}
+  .rcs{left:50%;top:auto;bottom:16%;margin-left:-125px;transform:perspective(900px) rotateX(30deg) rotateZ(-4deg) scale(.92)}
+  .rcs-sum{left:var(--gut);top:calc(var(--head) + 92px)}
+  .asm{top:auto;bottom:calc(46px + env(safe-area-inset-bottom,0px));right:var(--gut);min-width:0;font-size:11.5px}
+  .asm li:not(.is-cur){display:none}
+}
+/* 04 тест: часы 8-часового теста поверх корпуса под нагрузкой (корпус справа, часы слева) */
+.tclk{position:absolute;left:var(--gut);top:50%;margin:0;display:flex;flex-direction:column;gap:6px;padding:14px 16px 12px;background:var(--chip-bg);border-radius:var(--r1);font:500 12px/1.45 var(--mono);color:var(--ink-2);min-width:280px}
+.tclk .c{display:flex;align-items:baseline;gap:10px;color:var(--ink-2)}
+.tclk b{font:500 clamp(44px,4.6vw,68px)/1 var(--mono);color:var(--ink);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tclk .ok{color:var(--accent-ink);opacity:0;transition:opacity .3s}
+.tclk.is-done .ok{opacity:1}
+.tclk.is-done b{color:var(--accent-ink)}
+@media (max-width:859px){.tclk{top:auto;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:var(--gut);right:var(--gut);min-width:0;padding:10px 12px;font-size:11.5px}.tclk b{font-size:44px}}
+/* финал: фраза и кнопки, ниже — знак садится в гнёзда на чистом поле и остаётся бренд-блоком подвала */
+.band--fin{background:linear-gradient(180deg,rgba(11,10,9,0) 0,var(--foot) 180px);padding:clamp(72px,10vh,120px) 0 0}
+.fin-box{position:relative;padding:4px 0 4px 22px;border-left:1px solid var(--accent);max-width:560px}
+.fin-box h2{font-family:var(--display);font-weight:500;font-size:clamp(26px,2.8vw,40px);line-height:1.1;margin:0 0 6px}
+.fin-box p{margin:0 0 18px;color:#CBC3B6;font-size:16px}
+.fin-box .acts{display:flex;gap:10px;flex-wrap:wrap}
+.fin-st{position:relative;width:min(1120px,100%);aspect-ratio:1280/480;margin:clamp(12px,3vh,32px) auto 0;background:var(--foot);overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent),linear-gradient(180deg,transparent,#000 16%,#000 84%,transparent);-webkit-mask-composite:source-in;mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent),linear-gradient(180deg,transparent,#000 16%,#000 84%,transparent);mask-composite:intersect}
+.fin-st video,.fin-st img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .45s var(--ease-io)}
+.fin-st .is-on{opacity:1}
+.fin-st::after{content:"";position:absolute;inset:0;background-size:128px 128px;opacity:.5}
+.ob.is-go ~ main .fin-st::after{background-image:url(media/bg/grain.webp)}
+@media (max-width:859px){
+  .band--fin{padding-top:56px}
+  .fin-box .btn{min-height:44px;padding:0 14px;font-size:14.5px}
+  .fin-st{width:auto;margin:8px calc(-1*var(--gut)) 0;aspect-ratio:540/406}
+  .fin-st::after{background-size:64px 64px}
+}
+
+/* окна-паузы на телефоне: 50 vh открытой сцены между блоками, подпись — шаг заказа */
+.win{display:none}
+@media (max-width:859px){
+  .win{display:flex;align-items:center;height:50vh;height:50svh;min-height:300px}
+  .win p{margin:0;font:500 12px/1.45 var(--mono);color:var(--ink);background:var(--chip-bg);padding:7px 10px;border-radius:var(--r1);display:flex;gap:8px;align-items:baseline}
+  .win p .mk{flex:none;transform:translateY(1px)}
+}
+/* «Как работаем»: четыре шага первого экрана раскрываются в шесть шагов заказа */
+.rmap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));list-style:none;margin:0 0 10px;padding:0;font:500 12px/1.3 var(--mono);color:var(--ink-2)}
+.rmap li{display:flex;flex-direction:column;gap:6px;padding:0 10px 0 0}
+.rmap li i{display:block;height:1px;background:var(--ink-2);margin-right:6px}
+.rmap li b{font-weight:500;color:var(--ink)}
+.rmap li span{display:none}
+.rmap-l{margin:0 0 12px}
+@media (max-width:1180px){
+  .rmap{display:flex;flex-wrap:wrap;gap:4px 14px}
+  .rmap li{display:block;padding:0}
+  .rmap li i{display:none}
+  .rmap li span{display:inline}
+}
+
+/* паспорт: журнал теста в пустом поле под пунктами (только компьютер) */
+.tlog{margin:40px 0 0;max-width:420px;contain:layout paint}
+.tlog svg{width:100%;height:auto;overflow:visible}
+.tlog path{fill:none;stroke:var(--wood-ink);stroke-width:1.3;stroke-linejoin:round;opacity:.5;stroke-dasharray:1;stroke-dashoffset:var(--d,1)}
+.tlog line{stroke:var(--wood-line)}
+.tlog figcaption{display:flex;justify-content:space-between;gap:12px;font:500 11.5px/1.4 var(--mono);color:var(--wood-ink-2);margin-top:8px}
+.tlog b{font-weight:500;color:var(--wood-ink)}
+@media (max-width:960px){.tlog{display:none}}
+.js .rstamp{opacity:0;transform:rotate(-12deg) scale(1.5);transition:opacity .25s,transform .45s var(--ease-stamp)}
+.js .rstamp.is-in{opacity:1;transform:rotate(-12deg) scale(1)}
+
+/* идеи: чертёж монтажа дочерчивается, линия цвета бумаги, без голубого и свечения */
+.bp{display:none}
+@media (min-width:1100px){
+  #idei .sec-head{grid-template-columns:minmax(0,1fr) 400px}
+  #idei .sec-head > div{max-width:760px}
+  .bp{display:block;width:400px;height:auto;margin:0 0 18px;overflow:visible;contain:layout paint}
+  .bp path,.bp rect,.bp line{fill:none;stroke:var(--ink);stroke-width:1;opacity:.34;stroke-dasharray:1;stroke-dashoffset:var(--d,1);vector-effect:non-scaling-stroke}
+  .bp text{fill:var(--ink-2);font:500 9.5px var(--mono);opacity:var(--tx,0)}
+  .bp .lnk{opacity:calc(.34*var(--ax,1))}
+}
+
+/* подвал: знак уже стоит бренд-блоком прямо над ним; малый логотип не повторяем */
+.ftr{background:var(--foot)}
+.ftr-top .logo{display:none}
+.ftr .pr{margin-top:0}
+@media (min-width:860px){.ftr{padding-top:clamp(36px,4vw,56px)}}
+.ftr-d summary{list-style:none;cursor:pointer}
+.ftr-d summary::-webkit-details-marker{display:none}
+@media (min-width:860px){.ftr-d summary{pointer-events:none}}
+@media (max-width:859px){
+  .ftr{padding:20px 0 22px}
+  .ftr-top{gap:0;padding-bottom:6px}
+  /* обещание и кнопка уже стоят в финальной полосе прямо над подвалом */
+  .ftr-top > div:first-child{display:none}
+  .ftr-d{border-top:1px solid rgba(241,239,234,.15)}
+  .ftr-d summary{display:flex;justify-content:space-between;align-items:center;min-height:44px}
+  .ftr-d summary h4{margin:0}
+  .ftr-d summary::after{content:"+";font:400 16px var(--mono);color:#A9A398}
+  .ftr-d[open] summary::after{content:"−"}
+  .ftr-d > :not(summary){margin-bottom:14px}
+  .ftr-bot{padding-top:12px;font-size:12px;gap:10px}
+}
+.is-reduced .ob-sc,.is-reduced .ob-sc img,.is-reduced .ob-il,.is-reduced .fin-st *,.is-reduced .ob-sh,.is-reduced .rc,.is-reduced .rc *,.is-reduced .ord,.is-reduced .rstamp{transition:none!important;animation:none!important}
 </style>
 </head>
 <body>
@@ -597,6 +806,15 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
   <a class="btn" href="#konfigurator" data-mode="setup"><span class="mk" aria-hidden="true"></span><span data-i="cta">Рассчитать сетап</span></a>
 </div>
 
+<!-- ============ ФОН НИЖЕ ПЕРВОГО ЭКРАНА: ход заказа NV-0001 — документы-образцы и ночные ролики этапов (07.10.2026, раунд 10) ============ -->
+<div class="ob" id="ob" aria-hidden="true">
+  <div class="ob-sc" id="obSc"><img alt="" decoding="async"><img alt="" decoding="async"></div>
+  <div class="ob-sh l"></div><div class="ob-sh u"></div><div class="ob-sh c"></div><div class="ob-sh w"></div><div class="ob-gr"></div>
+</div>
+<div class="ord" id="ord" aria-hidden="true"><div class="ord-in"><span class="ord-id" id="ordId"></span><ol class="ord-t" id="ordT"></ol><span class="ord-s" id="ordS"></span><i class="ord-cw"></i><span class="ord-st" id="ordSt"></span></div></div>
+<i class="ord-lv" id="ordLv" aria-hidden="true"></i>
+<p class="ob-il" id="obIl" aria-hidden="true"></p>
+
 <main id="top">
 <!-- ============ ПЕРВЫЙ ЭКРАН: видео на прокрутке, четыре шага (монтаж v2, 06.10.2026) ============ -->
 <section class="hero" id="hero" aria-label="Сборка рабочего места" data-ia="aHero">
@@ -612,11 +830,15 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
         try{c=localStorage.getItem('nv-vcolor')}catch(e){}
         var qc=q.get('color');if(qc==='orig'||qc==='brand')c=qc;if(c!=='orig'&&c!=='brand')c='brand';
         d.setAttribute('data-vcolor',c);
+        /* без анимации постер шага 01 не нужен: список ниже грузит свои кадры (иначе лишние ≈117 КБ на телефоне) */
+        var mo=null;try{mo=localStorage.getItem('nv-motion')}catch(e){}
+        if(mo==='off'||q.get('motion')==='off'||(matchMedia('(prefers-reduced-motion: reduce)').matches&&q.get('hero')!=='video'))return;
         var s=(innerWidth<860||matchMedia('(pointer: coarse)').matches)?'m':((devicePixelRatio>=2&&innerWidth>=1600)?'1920':'1280');
         var im=document.querySelector('#pstack img');im.fetchPriority='high';im.src='media/posters/step01-'+c+'-'+s+'.webp';im.classList.add('is-on');
       })();
       </script>
       <div class="hero-shade" aria-hidden="true"></div>
+      <div class="hero-off" id="heroOff" aria-hidden="true"></div>
       <a class="skip" href="#kak-rabotaem"><span data-i="skip">Пропустить анимацию</span></a>
       <div class="hero-copy">
         <div class="cap is-on" data-cap="0">
@@ -656,7 +878,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
       </div>
       <aside class="paper hdoc" id="hdoc" aria-hidden="true"></aside>
       <!-- выбор цвета — инструмент владельца на время выбора; после решения убрать блок, оставить ?color= для проверки -->
-      <div class="vcol" id="vcolBox"><span data-i="vcolL">Цвет видео</span><span class="seg2" role="group" aria-label="Цвет видео" data-ia="aVcol" id="vcol"><button type="button" data-c="brand" aria-pressed="true"><span data-i="vcB">фирменный</span></button><button type="button" data-c="orig" aria-pressed="false"><span data-i="vcO">оригинал</span></button></span></div>
+      <!-- Цвет видео: выбран «фирменный» (владелец, 06.10.2026); переключатель снят, ?color=orig — только для проверки -->
       <div class="hfoot">
       <p class="ill" data-i="ill">Иллюстрация. Не работа студии</p>
       <ol class="steps" id="steps" aria-hidden="true">
@@ -685,6 +907,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
       <div><b data-i="pr2">Тесты до передачи.</b><p data-ih="pr2p"><span class="num">8</span> часов под нагрузкой, память — на ночь. Протокол, серийные номера и чеки — в паспорте сборки.</p></div>
       <div><b data-i="pr3">Одно окно за результат.</b><p data-ih="pr3p">Гарантия <span class="num">12</span> месяцев на весь сетап. По магазинам и сервисам ездим мы, не вы.</p></div>
     </div>
+    <div class="win" aria-hidden="true"><p><span class="mk"></span><span data-i="w1">00 Заявка · NV-0001 · 05.10 · образец</span></p></div>
     <div class="sec-head">
       <div>
         <p class="kicker"><span class="mk" aria-hidden="true"></span><span data-i="nav3">Как работаем</span></p>
@@ -692,6 +915,13 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
         <p class="lead" data-i="pathL">Деньги на детали и плата за работу идут разными строками. Ниже — пример заказа NV-0001: даты условные.</p>
       </div>
     </div>
+    <p class="note rmap-l" data-i="rmapL">Четыре шага первого экрана — это шесть шагов заказа:</p>
+    <ol class="rmap">
+      <li><i></i><b data-i="s0">01 Подбор</b><span>→ 01</span></li>
+      <li style="grid-column:span 2"><i></i><b data-i="s1">02 Закупка</b><span>→ 02–03</span></li>
+      <li><i></i><b data-i="s2">03 Сборка и тест</b><span>→ 04</span></li>
+      <li style="grid-column:span 2"><i></i><b data-i="s3">04 Сетап</b><span>→ 05–06</span></li>
+    </ol>
     <ol class="route" style="list-style:none;margin:0;padding:0">
       <li class="step"><span class="sstamp" aria-hidden="true"><b data-i="ss1">Утверждено</b><i>05.10</i></span><span class="n">01</span><h3 data-i="st1h">Смета</h3><p data-i="st1p">Позиции, магазины, цены с датой и временем. Три варианта бюджета. Плата за работу — отдельной строкой в сумах.</p>
         <dl><dt data-i="dtT">Срок</dt><dd data-i="st1t">1–2 рабочих дня, действует 24 ч</dd><dt data-i="dtM">Деньги</dt><dd data-i="st1m">0 сум</dd><dt data-i="dtD">Документ</dt><dd data-i="st1d">смета и оферта</dd></dl></li>
@@ -711,6 +941,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
       <div data-ih="rf2"><b>10–15 рабочих дней</b> <span>— сетап с мебелью</span></div>
       <div class="note" data-i="rf3">сроки от подтверждения сметы; мебель под заказ — до 4 недель</div>
     </div>
+    <div class="win" aria-hidden="true"><p><span class="mk"></span><span data-i="w2">6 шагов — 6 документов: смета, чек, отчёт, протокол, акт, гарантия</span></p></div>
 
     <div class="docs">
       <article class="paper tilt-l rv" aria-label="Образец сметы" data-ia="aEst" id="docEst"></article>
@@ -729,6 +960,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
         <p class="lead" data-i="cfgL">Задача, бюджет и стиль. Ниже — состав, цена каждой детали и плата за работу по шкале. Для сетапа добавьте рабочее место: монитор, стол, кресло и свет. Точную смету пришлём в Telegram после проверки наличия.</p>
       </div>
     </div>
+    <div class="win" aria-hidden="true"><p><span class="mk"></span><span data-i="w3">00 → 01 Смета: три ответа — и цена на дату</span></p></div>
     <div class="cfg">
       <form class="cfg-form" id="cfgForm" onsubmit="return false">
         <div class="modebar">
@@ -787,6 +1019,31 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
   </div>
 </section>
 
+<!-- ============ ПОЛОСА 03 ЗАКУПКА: чеки-образцы ложатся на стол, сцена закреплена ============ -->
+<section class="band band--x" id="xarid" aria-label="03 Закупка" data-ia="aXarid">
+  <div class="band-st"><div class="wrap">
+    <p class="band-l"><span class="mk" aria-hidden="true"></span><span id="bXl">03 Закупка · 06–07.10 · чеки 0/9 · образцы</span></p>
+    <div class="rcs-sum" id="rcsSum" aria-hidden="true"><span class="s"></span><span class="ret"></span></div>
+    <div class="rcs" id="rcs" aria-hidden="true"></div>
+  </div></div>
+</section>
+
+<!-- ============ ПОЛОСА 04 СБОРКА: детали из сметы входят в корпус, сцена открыта ============ -->
+<section class="band band--y" id="yigish" aria-label="04 Сборка" data-ia="aYig">
+  <div class="band-st"><div class="wrap">
+    <p class="band-l"><span class="mk" aria-hidden="true"></span><span id="bYl">04 Сборка · 08.10 · образец</span></p>
+    <ol class="asm" id="asm" aria-hidden="true"></ol>
+  </div></div>
+</section>
+
+<!-- ============ ПОЛОСА 04 ТЕСТ: корпус под нагрузкой, часы теста 8 ч идут поверх, сцена закреплена ============ -->
+<section class="band band--t" id="sinov" aria-label="04 Тест" data-ia="aSin">
+  <div class="band-st"><div class="wrap">
+    <p class="band-l"><span class="mk" aria-hidden="true"></span><span id="bTl">04 Тест · 09–10.10 · образец</span></p>
+    <p class="tclk" id="tclk" aria-hidden="true"><span class="c"><b id="tclkH">00:00</b><span>/ 08:00</span></span><span id="tclkL">тест под нагрузкой · CPU, GPU, БП</span><span class="ok" id="tclkO">0 ошибок · 0 перезагрузок</span></p>
+  </div></div>
+</section>
+
 <!-- ============ ПАСПОРТ СБОРКИ ============ -->
 <section class="sec pass" id="pasport">
   <div class="wrap pass-grid">
@@ -799,13 +1056,15 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
         <li><span data-i="pa2">Память — 4 прохода теста на ночь. Накопитель — скорость и состояние, часы работы около нуля.</span></li>
         <li><span data-i="pa3">Порты, Wi-Fi, сон и шум — проверены вручную.</span></li>
       </ul>
+      <figure class="tlog" aria-hidden="true"><svg viewBox="0 0 300 80"><line x1="0" x2="300" y1="79.5" y2="79.5"/><path id="tlogP" pathLength="1"/></svg>
+        <figcaption><span><b id="tlogC">00:00</b> / 08:00</span><span data-i="tlogL">журнал теста · CPU, макс. 77 °C · образец</span></figcaption></figure>
     </div>
     <article class="paper pp rv" aria-label="Образец паспорта сборки с протоколом тестов" data-ia="aPass">
       <div class="sample" data-i="sample">Образец</div>
       <div class="ph">
         <div>
           <h3><span data-i="docT">Паспорт сборки</span> <span style="white-space:nowrap">№ NV-0001</span></h3>
-          <div class="pm" data-i="docM">Игровой ПК, 2K · та же сборка, что в сцене, смете и отчёте по чекам</div>
+          <div class="pm" data-i="docM">Игровой ПК, 2K · та же сборка, что в смете и отчёте по чекам</div>
         </div>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><title>Nivel — Отметка уровня с полкой</title><path fill="#1D1D1B" d="M8 16h52v8h-52Z"/><path fill="#D9501A" d="M8 24L24 24L24 40Z"/><path fill="#1D1D1B" d="M24 24L40 24L24 40Z"/><path fill="#1D1D1B" d="M4 40h56v8h-56Z"/></svg>
       </div>
@@ -867,7 +1126,22 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
         <h2 class="h2" data-i="idH">Понравился чужой сетап — соберём похожий в Ташкенте</h2>
         <p class="lead" data-i="idL">Посты авторов показываем официальным встраиванием Instagram, только с их разрешения и с подписью. Для каждой идеи — разбор: что видно на фото и чем это заменить из магазинов Ташкента.</p>
       </div>
-      <p class="note" data-ih="idN">карточки — места для встраивания Instagram;<br>превью — наш чертёж-концепт, не фото автора</p>
+      <div>
+        <svg class="bp" id="bp" viewBox="0 0 400 250" aria-hidden="true">
+          <path pathLength="1" d="M70 132H330"/><path pathLength="1" d="M70 136H330"/>
+          <path pathLength="1" d="M84 136V236M316 136V236M70 236H98M302 236H330"/>
+          <rect pathLength="1" x="120" y="138" width="160" height="7"/>
+          <rect pathLength="1" x="150" y="44" width="92" height="52" rx="2"/>
+          <path pathLength="1" d="M196 96V104L236 110V132"/>
+          <path pathLength="1" d="M96 132l14-52 26 10M128 86l14 6-7 12z"/>
+          <path pathLength="1" d="M168 128h56"/>
+          <path class="lnk" pathLength="1" d="M70 246H330M70 241v10M330 241v10"/>
+          <path class="lnk" pathLength="1" d="M350 132V236M345 132h10M345 236h10"/>
+          <text x="200" y="244" text-anchor="middle" id="bpW">160 см</text><text x="358" y="188" id="bpH">76</text>
+          <text x="196" y="36" text-anchor="middle">27″</text><text x="200" y="157" text-anchor="middle" id="bpC">кабель-канал</text>
+        </svg>
+        <p class="note" data-ih="idN">карточки — места для встраивания Instagram;<br>превью — наш чертёж-концепт, не фото автора</p>
+      </div>
     </div>
     <div class="ideas-grid" id="ideas"></div>
   </div>
@@ -928,6 +1202,21 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
     </article>
   </div>
 </section>
+
+<!-- ============ ФИНАЛ: фраза и кнопки, затем знак садится в гнёзда — «Посадка по допуску» — и остаётся бренд-блоком подвала ============ -->
+<section class="band band--fin" id="yakun" aria-labelledby="finH">
+  <div class="wrap">
+    <div class="fin-box">
+      <h2 id="finH" data-i="finH">Каждая деталь — в своём гнезде.</h2>
+      <p data-i="finP">Смета до покупки, тест до передачи, гарантия 12 месяцев на весь сетап.</p>
+      <div class="acts">
+        <a class="btn" href="https://t.me/niveluzbot" target="_blank" rel="noopener"><span class="mk" aria-hidden="true"></span><span data-i="tg">Написать в Telegram</span></a>
+        <a class="btn btn--ghost" href="#konfigurator" data-mode="setup"><span data-i="finCfg">Открыть конфигуратор</span></a>
+      </div>
+    </div>
+    <div class="fin-st" id="finSt" role="img" aria-label="Nivel" data-ia="aFin"></div>
+  </div>
+</section>
 </main>
 
 <!-- ============ ПОДВАЛ ============ -->
@@ -941,31 +1230,30 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
         <p class="pr" data-i="promise">Смета до покупки. Тесты до передачи. Одно окно за результат.</p>
         <a class="btn" href="https://t.me/niveluzbot" target="_blank" rel="noopener"><span class="mk" aria-hidden="true"></span><span data-i="tg">Написать в Telegram</span></a>
       </div>
-      <div>
-        <h4 data-i="ftC">Связь</h4>
+      <details class="ftr-d" open><summary><h4 data-i="ftC">Связь</h4></summary>
         <ul>
           <li><a href="https://t.me/niveluzbot" target="_blank" rel="noopener" data-i="ftBot">Telegram-бот @niveluzbot</a></li>
           <li><a href="https://nivel.uz">nivel.uz</a></li>
           <li data-i="ftCity">Ташкент и область</li>
         </ul>
-      </div>
-      <div>
-        <h4 data-i="ftD">Документы</h4>
+      </details>
+      <details class="ftr-d" open><summary><h4 data-i="ftD">Документы</h4></summary>
         <ul>
           <li><a href="#oferta" data-i="ftOf">Оферта (UZ/RU)</a></li>
           <li><a href="#konfidencialnost" data-i="ftPd">Политика персональных данных</a></li>
           <li><a href="#garantiya" data-i="ftGr">Гарантия</a></li>
           <li><a href="#vozvrat" data-i="ftRt">Возврат</a></li>
         </ul>
-      </div>
-      <div>
-        <h4 data-i="ftR">Реквизиты</h4>
+      </details>
+      <details class="ftr-d" open><summary><h4 data-i="ftR">Реквизиты</h4></summary>
         <p class="req" data-ih="ftReq">ИП: <span>после регистрации</span><br>ИНН: <span>после регистрации</span><br>Расчётный счёт: <span>после регистрации</span><br>Адрес: <span>после регистрации</span></p>
-      </div>
+      </details>
     </div>
-    <p class="note srcs" data-ih="ftSrc">Видео первого экрана: Pexels — <a href="https://www.pexels.com/video/33356256/" rel="noopener">33356256</a> (автор уточняется), <a href="https://www.pexels.com/video/30518577/" rel="noopener">STUDIO LINE INDIA</a>, <a href="https://www.pexels.com/video/installing-a-processor-in-a-motherboard-socket-11537353/" rel="noopener">Joshua Malic</a>. Изменено: замена экранов, удаление логотипов, цвет и кадрирование.</p>
+    <details class="ftr-d" open><summary><h4 data-i="ftS">Источники</h4></summary>
+    <p class="note srcs" data-ih="ftSrc">Видео первого экрана: Pexels — <a href="https://www.pexels.com/video/33356256/" rel="noopener">33356256</a> (автор уточняется), <a href="https://www.pexels.com/video/30518577/" rel="noopener">STUDIO LINE INDIA</a>, <a href="https://www.pexels.com/video/installing-a-processor-in-a-motherboard-socket-11537353/" rel="noopener">Joshua Malic</a>. Фон ниже: те же ролики и Pexels — <a href="https://www.pexels.com/video/hand-holding-a-computer-processor-12611453/" rel="noopener">Sasha Poberailo</a>, <a href="https://www.pexels.com/video/close-up-of-a-person-building-a-pc-11537350/" rel="noopener">Joshua Malic</a>. Изменено: замена экранов, удаление логотипов, перевод в ночь, цвет и кадрирование. Документы-образцы и знак — свои, даты условные.</p>
+    </details>
     <div class="ftr-bot">
-      <span data-i="ftNote">© Nivel, 2026. Цены — пример на дату, не оферта. Видео первого экрана — иллюстрация со стоков, не работа студии; чертежи — визуализация.</span>
+      <span data-i="ftNote">© Nivel, 2026. Цены — пример на дату, не оферта. Видео на сайте — иллюстрация со стоков, не работа студии; документы и чертежи — образцы.</span>
       <span><button type="button" id="motionBtn">Без анимации</button></span>
     </div>
   </div>
@@ -1035,7 +1323,7 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
     pa1:'Protsessor, videokarta va quvvat bloki — 8 soat yuklama ostida, xato va qayta yuklanishlarsiz.',
     pa2:'Xotira — tun boʻyi 4 marta sinov. Disk — tezlik va holat, ishlagan soatlari nolga yaqin.',
     pa3:'Portlar, Wi-Fi, uyqu rejimi va shovqin — qoʻlda tekshiriladi.',
-    sample:'Namuna',docT:'Yigʻma pasporti',docM:'Oʻyin kompyuteri, 2K · sahna, smeta va cheklar hisobotidagi yigʻmaning oʻzi',
+    sample:'Namuna',docT:'Yigʻma pasporti',docM:'Oʻyin kompyuteri, 2K · smeta va cheklar hisobotidagi yigʻmaning oʻzi',
     pm1:'Smeta tasdiqlandi',pm2:'Sinovlar',pm3:'Dalolatnoma boʻyicha topshirildi',pm4:'Kafolat muddati',
     ds1:'1. Tizim',ds1b:'seriya raqamlari — 2-bet',
     spCpu:'Protsessor',spGpu:'Videokarta',spGpuV:'RTX 5070 12 GB',spRam:'Xotira',spRamV:'32 GB DDR5-6000',spSsd:'Disk',spSsdV:'SSD 2 TB NVMe',spBios:'BIOS versiyasi',spProf:'Xotira profili',spPsu:'Quvvat bloki',spPsuV:'750 W Gold',spRoom:'Xonada',
@@ -1073,8 +1361,12 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
     promise:'Xariddan oldin smeta. Topshirishdan oldin sinov. Natija uchun yagona darcha.',
     ftC:'Aloqa',ftBot:'Telegram-bot @niveluzbot',ftCity:'Toshkent va viloyat',ftD:'Hujjatlar',ftOf:'Oferta (UZ/RU)',ftPd:'Shaxsiy maʼlumotlar siyosati',ftGr:'Kafolat',ftRt:'Qaytarish',
     ftR:'Rekvizitlar',ftReq:'YaTT: <span>roʻyxatdan oʻtgach</span><br>STIR: <span>roʻyxatdan oʻtgach</span><br>Hisob raqami: <span>roʻyxatdan oʻtgach</span><br>Manzil: <span>roʻyxatdan oʻtgach</span>',
-    ftSrc:'Birinchi ekran videosi: Pexels — <a href="https://www.pexels.com/video/33356256/" rel="noopener">33356256</a> (muallif aniqlanmoqda), <a href="https://www.pexels.com/video/30518577/" rel="noopener">STUDIO LINE INDIA</a>, <a href="https://www.pexels.com/video/installing-a-processor-in-a-motherboard-socket-11537353/" rel="noopener">Joshua Malic</a>. Oʻzgartirilgan: ekranlar almashtirilgan, logotiplar olib tashlangan, rang va kadr tuzatilgan.',ftNote:'© Nivel, 2026. Narxlar — sanadagi misol, oferta emas. Birinchi ekran videosi — stok illyustratsiya, studiya ishi emas; chizmalar — vizualizatsiya.',
+    ftSrc:'Birinchi ekran videosi: Pexels — <a href="https://www.pexels.com/video/33356256/" rel="noopener">33356256</a> (muallif aniqlanmoqda), <a href="https://www.pexels.com/video/30518577/" rel="noopener">STUDIO LINE INDIA</a>, <a href="https://www.pexels.com/video/installing-a-processor-in-a-motherboard-socket-11537353/" rel="noopener">Joshua Malic</a>. Pastdagi fon: oʻsha videolar va Pexels — <a href="https://www.pexels.com/video/hand-holding-a-computer-processor-12611453/" rel="noopener">Sasha Poberailo</a>, <a href="https://www.pexels.com/video/close-up-of-a-person-building-a-pc-11537350/" rel="noopener">Joshua Malic</a>. Oʻzgartirilgan: ekranlar almashtirilgan, logotiplar olib tashlangan, tunga oʻtkazilgan, rang va kadr tuzatilgan. Hujjat namunalari va belgi — oʻzimizniki, sanalar shartli.',ftNote:'© Nivel, 2026. Narxlar — sanadagi misol, oferta emas. Saytdagi videolar — stok illyustratsiya, studiya ishi emas; hujjatlar va chizmalar — namuna.',
     cbT:'Jami · 05.10.2026 holatiga misol',cbB:'Smeta Telegramda',
+    aXarid:'03 Xarid',aYig:'04 Yigʻish',aSin:'04 Sinov',aFin:'Nivel',rmapL:'Birinchi ekrandagi toʻrt bosqich — buyurtmaning olti qadami:',
+    w1:'00 Buyurtma · NV-0001 · 05.10 · namuna',w2:'6 qadam — 6 hujjat: smeta, chek, hisobot, bayonnoma, dalolatnoma, kafolat',w3:'00 → 01 Smeta: uch javob — va sanadagi narx',
+    tlogL:'sinov jurnali · CPU, maks. 77 °C · namuna',ftS:'Manbalar',
+    finH:'Har bir qism — oʻz uyasida.',finP:'Xariddan oldin smeta, topshirishdan oldin sinov, butun setapga 12 oy kafolat.',finCfg:'Konfiguratorni ochish',
     docTitle:'Nivel — videoli birinchi ekran',
     docDesc:'Nivel — Toshkentda kompyuter va ish joylarini tanlash, xarid qilish, yigʻish, sinash va oʻrnatish. Xariddan oldin smeta. Topshirishdan oldin sinov. Natija uchun yagona darcha.',
     /* aria-label */
@@ -1191,7 +1483,8 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
   NV.size=function(){return NV.small()?'m':((devicePixelRatio>=2&&innerWidth>=1600)?'1920':'1280')};
   NV.posterSrc=function(i,c,s){return 'media/posters/step0'+(i+1)+'-'+(c||NV.vcolor)+'-'+(s||NV.size())+'.webp'};
   NV.videoSrc=function(c,s){return 'media/nivel-night-'+(c||NV.vcolor)+'-'+(s||NV.size())+'.mp4'};
-  var lastCap=-1,lastStep=-1;
+  var lastCap=-1,lastStep=-1,lastOff=-1,heroOff=document.getElementById('heroOff'),hfoot=document.querySelector('.hfoot'),vcolBox=document.getElementById('vcolBox');
+  NV.offAt=function(p){var x=(p-.93)/.07;if(x<=0)return 0;if(x>=1)return 1;var K=[[0,0],[.14,.45],[.2,.15],[.36,.72],[.46,.5],[.62,.8],[1,1]];for(var i=1;i<K.length;i++)if(x<=K[i][0]){var a=K[i-1],b=K[i];return +(a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0])).toFixed(3)}return 1};
   function stepName(i){return String(NV.t('s'+i)).replace(/^\d\d /,'')}
   function capIndex(p){var i=0;for(var k=1;k<5;k++)if(p>=NV.CAPB[k])i=k;return i}
   function stepIndex(p){var i=0;for(var k=1;k<4;k++)if(p>=NV.STEPS_P[k])i=k;return i}
@@ -1267,11 +1560,14 @@ input[type=range]::-moz-range-thumb{width:6px;height:24px;background:var(--ink);
     stepEls.forEach(function(s,k){var a=NV.STEPS_P[k],b=NV.STEPS_P[k+1];s.querySelector('b').style.transform='scaleX('+Math.min(1,Math.max(0,(p-a)/(b-a))).toFixed(3)+')'});
     /* финал: стоп-кадр и медленное приближение в последних 8 % */
     var z=Math.min(1,Math.max(0,(p-NV.HOLD)/(1-NV.HOLD)));media.style.setProperty('--z',(z*z*(3-2*z)).toFixed(3));
+    /* стык с фоном: стоп-кадр гаснет «выключателем» на 93–100 % трека — ступени по прокрутке, к 100 % — тёмный */
+    var o=NV.offAt(p);if(o!==lastOff){heroOff.style.opacity=o;hfoot.style.opacity=vcolBox.style.opacity=(1-o).toFixed(3);lastOff=o}
+    if(p>=.6&&NV.loadBg)NV.loadBg();
     if(NV.mode==='video'){V.target=NV.tFromP(p);kick();clearTimeout(V.mt);V.mt=setTimeout(magnet,160)}
   };
   /* «магнит»: прокрутка остановилась внутри растворения — показываем ближайший чистый кадр, без двойной экспозиции */
   function magnet(){var t=V.target;NV.DISS.forEach(function(w){if(t>w[0]&&t<w[1])V.target=(t-w[0]<w[1]-t)?w[0]-.06:w[1]+.06});if(V.target!==t)kick()}
-  document.addEventListener('nv-lang',function(){lastCap=-1;lastStep=-1;NV.setP(NV.p)});
+  document.addEventListener('nv-lang',function(){if(NV.mode==='reduced')return;lastCap=-1;lastStep=-1;NV.setP(NV.p)});
   var sk=NV.size();addEventListener('resize',function(){var k=NV.size();if(k!==sk){sk=k;pimgs.forEach(function(im){im.removeAttribute('src')});if(NV.mode!=='reduced'){NV.showPoster(lastStep<0?0:lastStep);if(NV.mode==='video')load(NV.vcolor)}}});
   NV.progress=function(){var r=track.getBoundingClientRect();var total=r.height-innerHeight;return Math.min(1,Math.max(0,-r.top/Math.max(1,total)))};
   NV.gotoP=function(p){var r=track.getBoundingClientRect(),top=r.top+scrollY,total=r.height-innerHeight;var y=top+p*total;if(NV.lenis)NV.lenis.scrollTo(y,{immediate:true});else scrollTo(0,y);NV.setP(p);V.cur=V.target;kick()};
@@ -1373,6 +1669,7 @@ window.NV_SKETCH=function(o){
   function draw(){
     var S=0,R=0;B.forEach(function(r){S+=r[3];R+=r[4]});
     var fee=S<20e6?S*.15:Math.max(S*.1,3e6);
+    NV.ORDER={B:B,S:S,R:R,fee:fee,L2:L2};
     var e='<span class="sample-mk">'+T('образец','namuna')+'</span><div class="ph"><div><h3>'+T('Смета','Smeta')+' № NV-0001</h3><div class="pm">'+T('цены на 05.10.2026, 14:20 · медиана трёх продавцов Ташкента<br>действует до 06.10.2026, 14:20 · пример, не оферта','narxlar 05.10.2026, 14:20 holatiga · Toshkentdagi uchta sotuvchi medianasi<br>06.10.2026, 14:20 gacha amal qiladi · misol, oferta emas')+'</div></div>'+mark+'</div>';
     e+='<table><thead><tr><th class="hide-s">№</th><th>'+T('Позиция','Pozitsiya')+'</th><th class="r">'+T('Цена, сум','Narx, soʻm')+'</th></tr></thead><tbody>';
     B.forEach(function(r,i){e+='<tr><td class="i">'+(i+1)+'</td><td>'+NV.esc(L2(r[1]))+'<small>'+NV.esc(L2(r[0])+' · '+L2(r[2]))+'</small></td><td class="r">'+f(r[3])+'</td></tr>'});
@@ -1609,6 +1906,7 @@ window.NV_SKETCH=function(o){
   var NV=window.NV,T=NV.T;
   function series(base,peak,seed){var a=[],s=seed;for(var i=0;i<=48;i++){s=(s*9301+49297)%233280;var n=s/233280-.5;var v=i===0?base:(i<2?base+(peak-base)*(i/2):peak-1.5+n*2.6+Math.sin(i/6)*.6);a.push(Math.round(v*10)/10)}return a}
   var sets=[[['Процессор','Protsessor'],series(39,76.5,7),'tCpu'],[['Видеокарта','Videokarta'],series(36,70.5,3),'tGpu']];
+  NV.TEMPS=sets;
   var W=300,H=120,ml=26,mr=8,mt=10,mb=20;
   function X(i){return ml+i/48*(W-ml-mr)}function Y(v){return mt+(1-(v-30)/60)*(H-mt-mb)}
   function draw(){document.getElementById('tempCharts').innerHTML=sets.map(function(s){
@@ -1641,6 +1939,21 @@ window.NV_SKETCH=function(o){
     '<a class="btn btn--ghost" href="#konfigurator" data-mode="setup"><span>'+E(T('Собрать похожий','Shunga oʻxshashini yigʻish'))+'</span></a></div></article>'}).join('');
   }
   draw();document.addEventListener('nv-lang',draw);
+})();
+
+/* =====================================================================
+   ФОН НИЖЕ ПЕРВОГО ЭКРАНА: «Один заказ под лампой» — скрипт bg.min.js (исходник bg.js, esbuild --minify) грузится лениво (06.10.2026, раунд 9):
+   после 60 % трека первого экрана, при прокрутке к разделам, при входе по якорю или через 5 с после load
+   ===================================================================== */
+(function(){
+  var NV=window.NV,tr=document.getElementById('heroTrack');
+  NV.loadBg=function(){if(NV.bgReq)return;NV.bgReq=1;removeEventListener('scroll',near);var s=document.createElement('script');s.src='bg.min.js';s.async=true;document.body.appendChild(s)};
+  function near(){var r=tr.getBoundingClientRect();if(r.bottom<2*innerHeight)NV.loadBg()}
+  addEventListener('scroll',near,{passive:true});
+  if(location.hash.length>1||NV.mode==='reduced')NV.loadBg();else near();
+  addEventListener('load',function(){setTimeout(NV.loadBg,5000)});
+  /* подвал на телефоне: группы свёрнуты */
+  if(NV.small())document.querySelectorAll('.ftr-d').forEach(function(d){d.open=false});
 })();
 
 if(document.documentElement.lang==='uz-Latn')window.NV.setLang('uz');
