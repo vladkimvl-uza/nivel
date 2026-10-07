@@ -376,3 +376,32 @@ describe("payment.confirmed never counts a pair that is not allowed", () => {
     expect(table(q, "payments").find((x) => x.id === "P-2026-0822").status).toBe("Подтверждён");
   });
 });
+
+describe("the refusals of the night are written when the job runs next", () => {
+  it("a flood at 02:00 is summarised by the job of 03:10, which is outside the hours of reply", () => {
+    const q = newProject();
+    q.env.now = new Date("2026-10-07T02:00:00+05:00");
+    const ts = String(Math.floor(q.env.now.getTime() / 1000));
+    for (let i = 0; i < 60; i++)
+      post(q, { e: { postData: { contents: "{}" }, parameter: { v: "1", ts, sig: "11".repeat(32) } } });
+    expect(table(q, "webhook")).toHaveLength(0);
+    q.env.now = new Date("2026-10-07T03:10:00+05:00");
+    const r = q.call("nvHourlyJob");
+    expect(r.skipped).toBe(true);
+    const rows = table(q, "webhook");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].summary).toContain("без верной подписи: 60");
+    // the next job does not write it again
+    q.env.now = new Date("2026-10-07T04:10:00+05:00");
+    q.call("nvHourlyJob");
+    expect(table(q, "webhook")).toHaveLength(1);
+  });
+
+  it("without refusals the job outside the hours still reads no sheet", () => {
+    const q = newProject();
+    q.env.now = new Date("2026-10-07T03:10:00+05:00");
+    const before = q.env.reads;
+    q.call("nvHourlyJob");
+    expect(q.env.reads - before).toBe(0);
+  });
+});

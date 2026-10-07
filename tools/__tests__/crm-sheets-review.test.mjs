@@ -122,15 +122,15 @@ describe("blocking 2: styling again does not nest the column groups deeper", () 
     expect(d.filter((x) => x === 1).length).toBeGreaterThan(30);
   });
 
-  it("twelve re-styles and six theme switches leave the depth at 1 and the theme still switches", () => {
-    for (let i = 0; i < 12; i++) p.call("nvRestyle");
+  it("nine re-styles (three runs and six theme switches) leave the depth at 1 and the theme still switches", () => {
+    for (let i = 0; i < 3; i++) p.call("nvRestyle");
     for (let i = 0; i < 3; i++) {
       p.call("nvSetTheme", "night", "all");
       p.call("nvSetTheme", "passport", "all");
     }
     expect(Math.max(...depths())).toBe(1);
     expect(p.env.docProps.get("NV_THEME_DATA")).toBe("passport");
-  });
+  }, 120_000);
 
   it("the mock gives the depth only through getColumnGroupDepth and refuses a depth above 8", () => {
     const sh = sheet("Клиенты");

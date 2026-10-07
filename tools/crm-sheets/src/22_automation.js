@@ -95,7 +95,13 @@ function nvHourlyJob(opts) {
   const o = opts || {};
   const now = nvNow();
   const result = { expired: 0, deemed: 0, closed: 0, reminders: 0, skipped: false, busy: false };
-  // The cheap exit first: Sunday and the hours outside the window are decided without reading a sheet (the window is
+  // The refusals of the webhook counted in the cache are written first, at any hour (it reads no sheet when there are none)
+  try {
+    nvWebhookFlush(now);
+  } catch (err) {
+    if (!nvIsLockError(err)) throw err;
+  }
+  // The cheap exit: Sunday and the hours outside the window are decided without reading a sheet (the window is
   // remembered in a document property each time the settings are read). Holidays can only shorten it, so a "no" here is final.
   if (!o.force) {
     const w = nvRememberedWindow();
@@ -136,7 +142,6 @@ function nvHourlyJob(opts) {
           }
         });
         result.reminders = nvUrgentReminders(now, s, holidays);
-        nvWebhookHourlySummary(now);
       });
       return result;
     });

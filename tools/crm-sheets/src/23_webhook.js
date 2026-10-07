@@ -137,6 +137,27 @@ function nvWebhookRejections(hourKey) {
   }
 }
 
+/** Hours (yyyyMMddHH) that have refusals in the cache and are not in the journal yet. Reads no sheet. */
+function nvWebhookPendingHours(now) {
+  const current = nvFormat(now, "yyyyMMddHH");
+  const last = String(nvScriptProps().getProperty("NV_WH_SUMMED") || "");
+  const out = [];
+  for (let back = 1; back <= 6; back++) {
+    const key = nvFormat(new Date(now.getTime() - back * 3600000), "yyyyMMddHH");
+    if (key < current && key > last && nvWebhookRejections(key).total > 0) out.push(key);
+  }
+  return out;
+}
+
+/**
+ * Writes the summary of the refusals if there is any, at any hour (the cache keeps six hours, and the night is longer than
+ * the hours of reply). With nothing to write it reads no sheet and takes no lock.
+ */
+function nvWebhookFlush(now) {
+  if (!nvWebhookPendingHours(now).length) return 0;
+  return nvCached(() => nvWithLock(() => nvWebhookHourlySummary(now)));
+}
+
 /** One row of the journal for each finished hour with refusals; the owner is told if there were many. */
 function nvWebhookHourlySummary(now) {
   const props = nvScriptProps();
