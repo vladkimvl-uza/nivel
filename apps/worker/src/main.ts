@@ -5,7 +5,7 @@ import { createDb } from "@nivel/db";
 import { pingDatabase } from "@nivel/db/health";
 import { PgBoss } from "pg-boss";
 import pino from "pino";
-import { readExtraEnv } from "./env.ts";
+import { readExtraEnv } from "./queues/env.ts";
 import { startHealthServer } from "./health.ts";
 import { registerAll } from "./jobs/index.ts";
 import { isCrmUrl } from "./jobs/ops/crm/sync.ts";
@@ -50,7 +50,7 @@ const runtime = createWorkerRuntime({
     revalidateKey: env.REVALIDATE_HMAC_KEY,
     botToken: env.BOT_TOKEN,
     filesDir: env.FILES_DIR,
-    // Not in the schema of the worker yet (request to the integrator): read and checked in env.ts.
+    // Not in the schema of the worker yet (request to the integrator): read and checked in queues/env.ts.
     botMode: extra.botMode,
     crm,
   },
