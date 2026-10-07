@@ -61,7 +61,6 @@ describe("dist/Nivel-CRM.gs", () => {
       "nvOnEdit",
       "nvHourlyJob",
       "nvDailyDigest",
-      "nvWeeklyBackup",
       "nvMonthlyJob",
       "nvSetup",
       "nvSetupContinue",
@@ -69,6 +68,8 @@ describe("dist/Nivel-CRM.gs", () => {
     ]) {
       expect(JSON.parse(one)).toContain(entry);
     }
+    // the copy of the book on the Drive was removed on 07.10.2026
+    expect(JSON.parse(one)).not.toContain("nvWeeklyBackup");
   });
 
   it("has no duplicate top-level names (a second declaration would stop the script in the editor)", () => {
@@ -108,26 +109,24 @@ describe("appsscript.json", () => {
     expect(manifest.webapp).toEqual({ executeAs: "USER_DEPLOYING", access: "ANYONE_ANONYMOUS" });
   });
 
-  it("asks for the few scopes the script uses and no broader ones", () => {
-    expect(manifest.oauthScopes.sort()).toEqual(
-      [
-        "https://www.googleapis.com/auth/drive",
-        "https://www.googleapis.com/auth/script.container.ui",
-        "https://www.googleapis.com/auth/script.external_request",
-        "https://www.googleapis.com/auth/script.scriptapp",
-        "https://www.googleapis.com/auth/script.send_mail",
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/userinfo.email",
-      ].sort(),
-    );
+  it("asks for the few scopes the script uses and no broader ones: each scope has the service that needs it", () => {
     const all = sources()
       .map(([, t]) => t)
       .join("\n");
-    // every service named in the sources has its scope
-    expect(all).toContain("UrlFetchApp.fetch");
-    expect(all).toContain("MailApp.sendEmail");
-    expect(all).toContain("DriveApp.");
-    expect(all).not.toMatch(/GmailApp|CalendarApp|DocumentApp|SlidesApp|ContactsApp/);
+    const needs = {
+      "https://www.googleapis.com/auth/spreadsheets": /SpreadsheetApp\.openById|Sheets\.Spreadsheets\./,
+      "https://www.googleapis.com/auth/script.container.ui": /SpreadsheetApp\.getUi\(\)/,
+      "https://www.googleapis.com/auth/script.scriptapp": /ScriptApp\.newTrigger/,
+      "https://www.googleapis.com/auth/script.external_request": /UrlFetchApp\.fetch/,
+      "https://www.googleapis.com/auth/script.send_mail": /MailApp\.sendEmail/,
+      "https://www.googleapis.com/auth/userinfo.email": /Session\.get(?:Active|Effective)User\(\)\.getEmail/,
+    };
+    // no scope without a user in the sources, and no service of Google without its scope
+    expect([...manifest.oauthScopes].sort()).toEqual(Object.keys(needs).sort());
+    for (const [scope, re] of Object.entries(needs)) expect(all, scope).toMatch(re);
+    // the Drive is not used at all (no copy of the book, no folder, no file): neither its scope nor its service
+    expect(all).not.toMatch(/DriveApp|GmailApp|CalendarApp|DocumentApp|SlidesApp|ContactsApp/);
+    expect(manifest.oauthScopes.filter((s) => /auth\/drive/.test(s))).toEqual([]);
   });
 });
 

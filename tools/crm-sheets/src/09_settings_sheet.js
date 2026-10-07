@@ -15,9 +15,39 @@ function nvSettingsLayout() {
   });
 }
 
+/**
+ * Settings that earlier versions had and this one has not: the weekly copy of the book on the Drive, removed on
+ * 07.10.2026. A book built before still holds their rows. Every row below them would stand two rows off the layout, and
+ * with it every name, rule and protection of the sheet, so the setup takes these rows out first. A new book never has them.
+ */
+const NV_RETIRED_SETTINGS = ["NV_BACKUP_ON", "NV_BACKUP_KEEP"];
+
+/** Takes the retired settings out of the sheet: their names and their rows (the rows below move up). Returns the number of rows. */
+function nvRetireSettings(ss, sh) {
+  const count = Math.max(0, sh.getMaxRows() - NV_LAYOUT.firstRow + 1);
+  if (!count) return 0;
+  const names = sh.getRange(NV_LAYOUT.firstRow, NV_SET_COLS.name, count, 1).getValues();
+  const rows = [];
+  names.forEach((r, i) => {
+    if (NV_RETIRED_SETTINGS.indexOf(nvStr(r[0])) >= 0) rows.push(NV_LAYOUT.firstRow + i);
+  });
+  const known = nvNamedMap(ss);
+  const gone = NV_RETIRED_SETTINGS.filter((name) => known[name]);
+  gone.forEach((name) => {
+    ss.removeNamedRange(name);
+  });
+  // From the lowest row up: a deletion moves only the rows below it
+  rows.reverse().forEach((row) => {
+    sh.deleteRow(row);
+  });
+  if (gone.length || rows.length) nvResetNamedCache();
+  return rows.length;
+}
+
 function nvBuildSettings() {
   const ss = nvSpreadsheet();
   const sh = nvSheet("settings");
+  nvRetireSettings(ss, sh);
   const L = NV_LAYOUT;
   const layout = nvSettingsLayout();
   const needRows = L.firstRow + layout.length + 6;

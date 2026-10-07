@@ -1,13 +1,13 @@
 /**
- * Automation: the installable triggers, the hourly transitions, the daily digest (Telegram or mail), the weekly copy
- * and the monthly cleaning. Secrets (bot token, chat id, mail, webhook key) live only in Script Properties.
+ * Automation: the installable triggers, the hourly transitions, the daily digest (Telegram or mail) and the monthly
+ * cleaning. Secrets (bot token, chat id, mail, webhook key) live only in Script Properties. The project does not touch
+ * the Google Drive at all (the weekly copy of the book was removed on 07.10.2026 at the owner's word).
  */
 
 const NV_TRIGGERS = [
   { handler: "nvOnEdit", kind: "edit" },
   { handler: "nvHourlyJob", kind: "hourly" },
   { handler: "nvDailyDigest", kind: "daily" },
-  { handler: "nvWeeklyBackup", kind: "weekly" },
   { handler: "nvMonthlyJob", kind: "monthly" },
 ];
 
@@ -31,14 +31,40 @@ function nvAssertTriggerOwner() {
     );
 }
 
-/** Installs exactly one trigger of each kind (the old ones of the project are removed first). */
+/**
+ * A trigger of ours (a handler named nv…) whose function the script no longer has: an earlier version had one more
+ * handler and left its trigger in the book (the weekly copy, removed on 07.10.2026). Such a trigger can only fail, and
+ * Google mails the owner about every failure. A handler of another name is not ours and is never touched.
+ */
+function nvIsDeadTrigger(trigger) {
+  const handler = trigger.getHandlerFunction();
+  return /^nv[A-Z]/.test(handler) && typeof globalThis[handler] !== "function";
+}
+
+/** Handlers of the dead triggers among the triggers of the current user (getProjectTriggers shows only his own). */
+function nvDeadTriggers() {
+  return ScriptApp.getProjectTriggers()
+    .filter(nvIsDeadTrigger)
+    .map((t) => t.getHandlerFunction());
+}
+
+/**
+ * Installs exactly one trigger of each kind: the old ones of the project are removed first, and the dead ones with
+ * them. Returns the labels of what was installed and the handlers of the dead triggers that were taken out.
+ */
 function nvInstallTriggers() {
   const ss = nvSpreadsheet();
   nvScriptProps().setProperty(NV_PROP.spreadsheetId, ss.getId());
   nvAssertTriggerOwner();
   const mine = NV_TRIGGERS.map((t) => t.handler);
+  const removed = [];
   ScriptApp.getProjectTriggers().forEach((t) => {
-    if (mine.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
+    if (mine.indexOf(t.getHandlerFunction()) >= 0) {
+      ScriptApp.deleteTrigger(t);
+    } else if (nvIsDeadTrigger(t)) {
+      removed.push(t.getHandlerFunction());
+      ScriptApp.deleteTrigger(t);
+    }
   });
   const installed = [];
   ScriptApp.newTrigger("nvOnEdit").forSpreadsheet(ss).onEdit().create();
@@ -48,16 +74,9 @@ function nvInstallTriggers() {
   ScriptApp.newTrigger("nvDailyDigest").timeBased().atHour(9).everyDays(1).inTimezone(NV_TZ).create();
   // The time of a daily trigger is chosen by Google within the hour: not 09:00 sharp
   installed.push("сводка с 9 до 10");
-  ScriptApp.newTrigger("nvWeeklyBackup")
-    .timeBased()
-    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
-    .atHour(3)
-    .inTimezone(NV_TZ)
-    .create();
-  installed.push("копия раз в неделю (воскресенье, с 3 до 4)");
   ScriptApp.newTrigger("nvMonthlyJob").timeBased().onMonthDay(1).atHour(3).inTimezone(NV_TZ).create();
   installed.push("раз в месяц (1-го числа, с 3 до 4)");
-  return { installed: installed };
+  return { installed: installed, removed: removed };
 }
 
 function nvTriggerCounts() {
@@ -467,42 +486,7 @@ function nvDailyDigest(opts) {
   return { sent: r.ok, reason: r.ok ? "" : "не заданы Telegram и почта", via: r.via, text: text };
 }
 
-/* ---------------------------------------------------------------- weekly copy and monthly cleaning */
-
-/**
- * A copy of the book in the Drive folder «Nivel CRM — копии»; the last eight are kept. This is the only thing in the project
- * that needs the full access to the Drive (the scope "drive": a copy into a folder and the removal of the old copies). If the
- * access is not given, or the copy fails, the owner is told once a week and the rest of the book works as it did.
- */
-function nvWeeklyBackup() {
-  const s = nvSettings();
-  if (s.backupOn !== true) return { ok: false, reason: "выключено" };
-  try {
-    const ss = nvSpreadsheet();
-    const folderName = "Nivel CRM — копии";
-    const it = DriveApp.getFoldersByName(folderName);
-    const folder = it.hasNext() ? it.next() : DriveApp.createFolder(folderName);
-    const name = "Nivel CRM " + nvFormat(nvNow(), "yyyy-MM-dd");
-    DriveApp.getFileById(ss.getId()).makeCopy(name, folder);
-    const files = [];
-    const iter = folder.getFiles();
-    while (iter.hasNext()) files.push(iter.next());
-    files.sort((a, b) => a.getDateCreated().getTime() - b.getDateCreated().getTime());
-    const keep = Math.max(1, Number(s.backupKeep) || 8);
-    files.slice(0, Math.max(0, files.length - keep)).forEach((f) => {
-      f.setTrashed(true);
-    });
-    return { ok: true, kept: Math.min(files.length, keep) };
-  } catch (err) {
-    const text = nvScrub(err?.message ? err.message : err);
-    Logger.log("Копия книги: " + text);
-    nvNotifyOwner(
-      "Копия книги на Диск не сделана: нет доступа к Диску или ошибка Google. Копию можно выключить в «Настройках» (Еженедельная копия книги на Drive). " +
-        text.slice(0, 150),
-    );
-    return { ok: false, reason: "нет доступа к Диску или ошибка: " + text.slice(0, 120) };
-  }
-}
+/* ---------------------------------------------------------------- monthly cleaning */
 
 /** On the first of the month: the journal of the webhook older than 12 months is cleaned; leads without an order are reminded. */
 function nvMonthlyJob() {

@@ -1,5 +1,5 @@
-// Timers, the digest, Telegram and mail, the copy of the book, the monthly cleaning, the self-check, the secrets,
-// the forms of the sidebars and the growth of the sheets.
+// Timers, the digest, Telegram and mail, the monthly cleaning, the self-check, the secrets, the forms of the sidebars
+// and the growth of the sheets.
 import vm from "node:vm";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createProject } from "../crm-sheets/scripts/env.mjs";
@@ -266,29 +266,7 @@ describe("the daily digest", () => {
   });
 });
 
-describe("the weekly copy and the monthly cleaning", () => {
-  it("makes a copy in the folder «Nivel CRM — копии» and keeps the last eight", () => {
-    for (let i = 0; i < 11; i++) {
-      setNow(new Date(Date.parse("2026-11-01T03:00:00+05:00") + i * 7 * 86_400_000).toISOString());
-      p.call("nvWeeklyBackup");
-    }
-    const folder = p.env.folders.get("Nivel CRM — копии");
-    expect(folder).toBeTruthy();
-    const alive = p.env.files.filter((f) => !f.trashed);
-    expect(alive).toHaveLength(8);
-    expect(p.env.files.filter((f) => f.trashed)).toHaveLength(3);
-    expect(p.env.files.every((f) => f.name.startsWith("Nivel CRM 20"))).toBe(true);
-  });
-
-  it("can be switched off in the settings", () => {
-    const row = JSON.parse(p.run("JSON.stringify(nvSettingsLayout())")).find((x) => x.def.name === "NV_BACKUP_ON").row;
-    sheet("Настройки").getRange(row, 3).setValue(false);
-    p.call("nvResetSettingsCache");
-    expect(p.call("nvWeeklyBackup").ok).toBe(false);
-    sheet("Настройки").getRange(row, 3).setValue(true);
-    p.call("nvResetSettingsCache");
-  });
-
+describe("the monthly cleaning", () => {
   it("cleans the journal of the webhook older than 12 months and tells about the old leads without an order", () => {
     setNow("2026-12-01T03:00:00+05:00");
     p.call("nvAppendRows", "webhook", [

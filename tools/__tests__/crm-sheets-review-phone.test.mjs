@@ -131,20 +131,3 @@ describe("the sheets for a phone", () => {
     ).toBe(false);
   });
 });
-
-describe("the weekly copy does not stop the book when the Drive is closed", () => {
-  it("a refusal of the Drive is told to the owner, and the job ends without an error", () => {
-    p.env.uiAvailable = true;
-    const drive = p.gas.globals.DriveApp;
-    const real = drive.getFileById;
-    drive.getFileById = () => {
-      throw new Error("Exception: Нет доступа: https://www.googleapis.com/auth/drive");
-    };
-    p.env.mails.length = 0;
-    const r = p.call("nvWeeklyBackup");
-    drive.getFileById = real;
-    expect(r.ok).toBe(false);
-    expect(r.reason).toContain("Диск");
-    expect(p.env.mails.length + p.env.fetches.length).toBeGreaterThan(0);
-  });
-});

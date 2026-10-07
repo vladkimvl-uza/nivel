@@ -623,24 +623,6 @@ const NV_SETTINGS = [
     type: "text",
     list: ["Telegram", "Почта"],
   },
-  {
-    key: "backupOn",
-    name: "NV_BACKUP_ON",
-    label: "Еженедельная копия книги на Drive",
-    value: true,
-    unit: "",
-    source: "решение владельца",
-    type: "bool",
-  },
-  {
-    key: "backupKeep",
-    name: "NV_BACKUP_KEEP",
-    label: "Копий хранить",
-    value: 8,
-    unit: "шт.",
-    source: "решение владельца",
-    type: "int",
-  },
 
   { group: "Интеграция с платформой" },
   {

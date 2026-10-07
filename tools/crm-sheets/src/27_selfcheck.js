@@ -178,6 +178,15 @@ function nvSelfCheckRows() {
         "; меню Настройка → Установить триггеры (считаются только триггеры текущего пользователя: проверяйте под учётной записью владельца)",
     );
   else ok("Триггеры", "установлены ровно по одному (считаются только триггеры текущего пользователя)");
+  // A trigger that an earlier version left: its function is gone, so every run of it ends in a failure mail from Google
+  const dead = nvDeadTriggers();
+  if (dead.length)
+    warn(
+      "Лишние триггеры",
+      "есть триггер на функцию, которой в скрипте больше нет: " +
+        dead.join(", ") +
+        "; меню Настройка → Установить триггеры его снимет",
+    );
 
   // Properties: only set / not set
   [

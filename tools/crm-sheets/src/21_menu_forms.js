@@ -90,7 +90,11 @@ function nvMenuInstallTriggers() {
     nvAsk("Триггеры", e?.message ? e.message : String(e), SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
-  nvToast("Триггеры установлены: " + r.installed.join(", "));
+  nvToast(
+    "Триггеры установлены: " +
+      r.installed.join(", ") +
+      (r.removed.length ? ". Снят лишний триггер (такой функции в скрипте больше нет): " + r.removed.join(", ") : ""),
+  );
 }
 function nvMenuSecretTelegram() {
   nvSecretTelegramUi();

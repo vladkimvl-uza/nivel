@@ -269,7 +269,7 @@ describe("group 6: triggers belong to the account that creates them", () => {
   it("an assistant cannot install triggers: no second set next to the owner's", () => {
     const owner = newProject();
     owner.call("nvInstallTriggers");
-    expect(owner.env.triggers).toHaveLength(5);
+    expect(owner.env.triggers).toHaveLength(4);
     const helper = createProject({
       now: T0,
       scriptProps: { OWNER_EMAIL: "owner@example.com" },
@@ -277,7 +277,7 @@ describe("group 6: triggers belong to the account that creates them", () => {
     });
     helper.env.triggers = owner.env.triggers; // the same project: the triggers of the owner exist already
     expect(() => helper.call("nvInstallTriggers")).toThrow(/владельц/);
-    expect(owner.env.triggers).toHaveLength(5);
+    expect(owner.env.triggers).toHaveLength(4);
   });
 
   it("from the menu the refusal is a message, not an exception", () => {
@@ -294,14 +294,14 @@ describe("group 6: triggers belong to the account that creates them", () => {
   it("without OWNER_EMAIL there is one user: any account may install", () => {
     const p = createProject({ now: T0, effectiveEmail: "someone@example.com" });
     p.call("nvInstallTriggers");
-    expect(p.env.triggers).toHaveLength(5);
+    expect(p.env.triggers).toHaveLength(4);
   });
 
   it("the owner installs; the second installation replaces the set, never doubles it", () => {
     const p = newProject();
     p.call("nvInstallTriggers");
     p.call("nvInstallTriggers");
-    expect(p.env.triggers).toHaveLength(5);
+    expect(p.env.triggers).toHaveLength(4);
   });
 
   it("the mock shows a user only his own triggers, as getProjectTriggers does", () => {

@@ -1,6 +1,7 @@
 // An in-memory imitation of the parts of Google Apps Script that the CRM uses: SpreadsheetApp (sheets, ranges, formats,
 // colours, widths, validations, rules, charts, protections, bandings, named ranges), Charts, Utilities, PropertiesService,
-// LockService, CacheService, ScriptApp, UrlFetchApp, MailApp, DriveApp, ContentService, HtmlService and Session.
+// LockService, CacheService, ScriptApp, UrlFetchApp, MailApp, ContentService, HtmlService and Session. There is no DriveApp:
+// the project does not use the Drive, so a call to it stops a test (ReferenceError), as it would stop the script without a scope.
 // It records what the script does, so tests and the preview can read the result. Formulas are stored, not evaluated.
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -853,9 +854,50 @@ class Sheet {
     this.maxCols += n;
     return this;
   }
-  deleteRows(_from, n) {
-    this.maxRows = Math.max(1, this.maxRows - n);
-    for (const k of [...this.cells.keys()]) if (Number(k.split(",")[0]) > this.maxRows) this.cells.delete(k);
+  /**
+   * Deletes rows as Sheets does: the rows below move up with what they hold (values, formulas, formats, heights, merges),
+   * and the named ranges of this sheet follow their cells; a name that sat only on deleted rows is gone. Rules,
+   * protections, bandings and charts are not moved here: the CRM builds them again after such a change.
+   */
+  deleteRows(from, n) {
+    if (!Number.isInteger(from) || !Number.isInteger(n) || from < 1 || n < 1)
+      throw new Error(
+        "Exception: The parameters do not match the method signature for SpreadsheetApp.Sheet.deleteRows.",
+      );
+    const last = from + n - 1;
+    if (last > this.maxRows) throw new Error("Exception: Those rows are out of bounds.");
+    if (n >= this.maxRows) throw new Error("Exception: You can't delete all the rows on the sheet.");
+    this.owner.env.dirty = true;
+    const deleted = (r) => r >= from && r <= last;
+    const up = (r) => (r > last ? r - n : r);
+    const cells = new Map();
+    for (const [k, cell] of this.cells) {
+      const [r, c] = k.split(",").map(Number);
+      if (!deleted(r)) cells.set(key(up(r), c), cell);
+    }
+    this.cells = cells;
+    this.rowH = new Map([...this.rowH].filter(([r]) => !deleted(r)).map(([r, h]) => [up(r), h]));
+    this.rowForced = new Set([...this.rowForced].filter((r) => !deleted(r)).map(up));
+    this.hiddenRows = new Set([...this.hiddenRows].filter((r) => !deleted(r)).map(up));
+    // A block of rows (a merge, a named range) loses the deleted rows and moves up with the rest; nothing left, nothing kept
+    const shrink = (block) => {
+      const top = block.row < from ? block.row : block.row > last ? block.row - n : from;
+      const bottomAt = block.row + block.numRows - 1;
+      const bottom = bottomAt < from ? bottomAt : bottomAt > last ? bottomAt - n : from - 1;
+      if (bottom < top) return false;
+      block.row = top;
+      block.numRows = bottom - top + 1;
+      return true;
+    };
+    this.merges = this.merges.filter((m) => shrink(m));
+    for (const [name, range] of [...this.owner.named]) {
+      if (range.sheet !== this) continue;
+      // A new Range: one that the code holds in a variable keeps the coordinates it had, as in Sheets
+      const moved = new Range(this, range.row, range.col, range.numRows, range.numCols);
+      if (shrink(moved)) this.owner.named.set(name, moved);
+      else this.owner.named.delete(name);
+    }
+    this.maxRows -= n;
     return this;
   }
   deleteColumns(_from, n) {
@@ -1431,8 +1473,6 @@ class Env {
     this.locked = false;
     this.lockHeldElsewhere = false;
     this.uuidCounter = 0;
-    this.folders = new Map();
-    this.files = [];
     this.logs = [];
     this.sidebars = [];
     this.menus = [];
@@ -1999,51 +2039,6 @@ export function createGas(opts = {}) {
     getRemainingDailyQuota: () => 100,
   };
 
-  const DriveApp = {
-    getFileById: (_id) => ({
-      getName: () => "Nivel CRM",
-      makeCopy: (name, folder) => {
-        const f = {
-          name,
-          folder,
-          trashed: false,
-          created: new Date(env.now),
-          setTrashed: (b) => (f.trashed = b),
-          getName: () => name,
-          getDateCreated: () => f.created,
-        };
-        env.files.push(f);
-        if (folder?._files) folder._files.push(f);
-        return f;
-      },
-    }),
-    getFoldersByName: (name) => {
-      const f = env.folders.get(name);
-      let used = false;
-      return {
-        hasNext: () => !!f && !used,
-        next: () => {
-          used = true;
-          return f;
-        },
-      };
-    },
-    createFolder: (name) => {
-      const f = {
-        name,
-        _files: [],
-        getFiles: () => {
-          let i = 0;
-          const list = f._files.filter((x) => !x.trashed);
-          return { hasNext: () => i < list.length, next: () => list[i++] };
-        },
-        getId: () => `folder-${name}`,
-      };
-      env.folders.set(name, f);
-      return f;
-    },
-  };
-
   const ContentService = {
     MimeType: enumOf(["JSON", "TEXT"]),
     createTextOutput: (text) => {
@@ -2109,7 +2104,6 @@ export function createGas(opts = {}) {
       Utilities,
       UrlFetchApp,
       MailApp,
-      DriveApp,
       ContentService,
       HtmlService,
       Session,

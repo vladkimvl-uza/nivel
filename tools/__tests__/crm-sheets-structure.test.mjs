@@ -643,7 +643,6 @@ describe("triggers", () => {
       nvOnEdit: 1,
       nvHourlyJob: 1,
       nvDailyDigest: 1,
-      nvWeeklyBackup: 1,
       nvMonthlyJob: 1,
     });
     const daily = p.env.triggers.find((t) => t.handler === "nvDailyDigest");
