@@ -6,7 +6,8 @@ services:
   postgres:
     image: postgres:18.6-trixie
     container_name: nivel-test-pg
-    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+    # Small WAL: with the default max_wal_size (1 GB) parallel runs overflowed the tmpfs ("No space left on device").
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off", "-c", "wal_level=minimal", "-c", "max_wal_senders=0", "-c", "max_wal_size=96MB", "-c", "min_wal_size=32MB"]
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run pnpm env:init}
       NIVEL_MIGRATOR_PASSWORD: ${NIVEL_MIGRATOR_PASSWORD:?}
@@ -18,10 +19,10 @@ services:
     ports:
       - "127.0.0.1:54339:5432"
     tmpfs:
-      - /var/lib/postgresql:size=256m
+      - /var/lib/postgresql:size=384m
     volumes:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
-    mem_limit: 512m
+    mem_limit: 640m
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d nivel"]
