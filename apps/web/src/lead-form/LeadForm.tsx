@@ -50,9 +50,19 @@ const textareaId = "lead-comment";
  * The request form of the one-page site. It checks nothing itself (`noValidate`): the server reads every field again and answers
  * with the words of the visitor's language, next to the field. Without a script the form still posts (a server action).
  */
-export function LeadForm({ labels, locale, utm, consentNote, botUrl }: LeadFormProps) {
+export function LeadForm(props: LeadFormProps) {
   const [state, action, pending] = useActionState<LeadActionState, FormData>(submitLead, IDLE);
+  return <LeadFormView {...props} state={state} action={action} pending={pending} />;
+}
 
+export interface LeadFormViewProps extends LeadFormProps {
+  state: LeadActionState;
+  action: (formData: FormData) => void;
+  pending: boolean;
+}
+
+/** What the visitor sees for a state of the form: the form itself, the form with the answer of the server, or the thanks. */
+export function LeadFormView({ labels, locale, utm, consentNote, botUrl, state, action, pending }: LeadFormViewProps) {
   if (state.status === "ok") {
     return (
       <div className="lead-ok" role="status">
