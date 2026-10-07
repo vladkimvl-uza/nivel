@@ -1,6 +1,7 @@
 import { orders } from "@nivel/services";
 import { describe, expect, it, vi } from "vitest";
 import type { Role } from "../auth/roles.ts";
+import { fromFormData } from "./build-event.ts";
 import type { Ctx, Svc } from "./commands.ts";
 import * as commands from "./commands.ts";
 import { GUARD_TEXT } from "./messages.ts";
@@ -25,7 +26,7 @@ function ctxOf(role: Role, svc: Partial<Svc> = {}): Ctx {
 const form = (entries: Record<string, string | string[]>) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(entries)) for (const x of Array.isArray(v) ? v : [v]) f.append(k, x);
-  return f;
+  return fromFormData(f);
 };
 
 describe("events of the order", () => {

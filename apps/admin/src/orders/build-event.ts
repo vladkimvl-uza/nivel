@@ -9,6 +9,15 @@ export interface FormInput {
   getAll(name: string): string[];
 }
 
+/** The text fields of a submitted form; a file part is not a text and reads as missing (files go through /files/upload). */
+export function fromFormData(data: FormData): FormInput {
+  const text = (v: FormDataEntryValue | null): string | null => (typeof v === "string" ? v : null);
+  return {
+    get: (name) => text(data.get(name)),
+    getAll: (name) => data.getAll(name).filter((v): v is string => typeof v === "string"),
+  };
+}
+
 export type BuiltEvent = { ok: true; event: OrderEvent } | { ok: false; message: string };
 
 /** A whole sum typed by a person: digits, spaces allowed between groups. Anything else is null. */
