@@ -126,6 +126,9 @@ const TEMPLATES: Record<string, Template> = {
       queue_stalled: "Очередь задач стоит",
       outbox_stalled: "Исходящие сообщения не уходят",
       webhook: "Ошибка вебхука Telegram",
+      backup_age_blind: "Проверка резервной копии не работает",
+      disk_blind: "Проверка диска не работает",
+      certificate_blind: "Проверка сертификата не работает",
     };
     return `${names[text(p.check)] ?? `Проверка ${text(p.check)} не пройдена`}: ${text(p.detail)}`;
   },

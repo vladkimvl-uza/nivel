@@ -1,7 +1,9 @@
 // ops.selfcheck (ARCHITECTURE 9, 10.3): every ten minutes the worker looks at what can stop the business without a sound: the age of the last
 // backup (over 26 hours), the disk (over 80 %), the certificate (under 14 days), a queue that stands for ten minutes, the outbox
 // that does not go out, and in the webhook mode the last error of the webhook. A check that fails writes an alert into the outbox
-// (a message to the owner's group), once in six hours for one check; a check the runtime cannot look at is "unknown", never an alarm.
+// (a message to the owner's group), once in six hours for one check. A check the runtime cannot look at is "unknown", not an alarm,
+// except in production: there a check that is blind (the mark of the backup, the data directory or the https address is not set)
+// is told to the owner once a day, so that a forgotten variable does not switch the check off for good.
 import type { ops } from "@nivel/db/repos";
 import { isoDateInTashkent, tashkentTime } from "@nivel/domain/calendar";
 import type { Logger } from "pino";
@@ -22,6 +24,8 @@ const BLOCK_HOURS = 6;
 export interface SelfcheckDeps {
   now(): Date;
   log: Logger;
+  /** Production: a probe that cannot answer is an alert of its own (see above). */
+  strict: boolean;
   probes: Probes;
   /** Queues of pg-boss whose oldest ready job has waited more than `seconds`. */
   stalledQueues(seconds: number): Promise<{ queue: string; seconds: number }[]>;
@@ -39,7 +43,10 @@ export interface CheckResult {
   detail?: string;
 }
 
-type Outcome = { state: "ok" } | { state: "alert"; detail: string } | { state: "unknown"; detail?: string };
+type Outcome =
+  | { state: "ok" }
+  | { state: "alert"; detail: string }
+  | { state: "unknown"; detail?: string; blind?: string };
 
 const minutes = (seconds: number): number => Math.round(seconds / 60);
 
@@ -56,13 +63,18 @@ export async function runSelfcheck(deps: SelfcheckDeps): Promise<CheckResult[]> 
       results.push({ check, state: "unknown", detail: sanitizeMessage(error) });
       return;
     }
-    results.push({ check, ...outcome });
+    const detail = outcome.state === "ok" ? undefined : outcome.detail;
+    results.push({ check, state: outcome.state, ...(detail === undefined ? {} : { detail }) });
     if (outcome.state === "alert") await alert(deps, now, check, outcome.detail);
+    else if (outcome.state === "unknown" && outcome.blind !== undefined && deps.strict) {
+      await alert(deps, now, `${check}_blind`, outcome.blind, "day");
+    }
   };
 
   await run("backup_age", async () => {
     const hours = await deps.probes.backupAgeHours();
-    if (hours === null) return { state: "unknown" };
+    if (hours === null)
+      return { state: "unknown", blind: "не задан BACKUP_MARK_FILE или нет доступа к файлу-отметке копии" };
     if (hours > SELFCHECK_LIMITS.backupMaxHours) {
       return { state: "alert", detail: Number.isFinite(hours) ? `${Math.floor(hours)} ч` : "копия не найдена" };
     }
@@ -71,7 +83,7 @@ export async function runSelfcheck(deps: SelfcheckDeps): Promise<CheckResult[]> 
 
   await run("disk", async () => {
     const used = await deps.probes.diskUsedPercent();
-    if (used === null) return { state: "unknown" };
+    if (used === null) return { state: "unknown", blind: "не задан FILES_DIR или каталог недоступен" };
     return used > SELFCHECK_LIMITS.diskMaxPercent
       ? { state: "alert", detail: `${Math.round(used)} %` }
       : { state: "ok" };
@@ -79,7 +91,12 @@ export async function runSelfcheck(deps: SelfcheckDeps): Promise<CheckResult[]> 
 
   await run("certificate", async () => {
     const days = await deps.probes.certDaysLeft();
-    if (days === null) return { state: "unknown" };
+    if (days === null) {
+      return {
+        state: "unknown",
+        blind: "сертификат не прочитан: PUBLIC_BASE_URL не https или сайт недоступен для worker",
+      };
+    }
     return days < SELFCHECK_LIMITS.certMinDays ? { state: "alert", detail: `${days} дн.` } : { state: "ok" };
   });
 
@@ -108,11 +125,17 @@ export async function runSelfcheck(deps: SelfcheckDeps): Promise<CheckResult[]> 
   return results;
 }
 
-async function alert(deps: SelfcheckDeps, now: Date, check: string, detail: string): Promise<void> {
+async function alert(
+  deps: SelfcheckDeps,
+  now: Date,
+  check: string,
+  detail: string,
+  every: "block" | "day" = "block",
+): Promise<void> {
   const block = Math.floor(tashkentTime(now).hour / BLOCK_HOURS);
   await deps.enqueue({
     kind: "telegram_message",
-    dedupeKey: `ops:alert:${check}:${isoDateInTashkent(now)}:${block}`,
+    dedupeKey: `ops:alert:${check}:${isoDateInTashkent(now)}${every === "block" ? `:${block}` : ""}`,
     priority: PRIORITY,
     payload: { target: "group", templateKey: "ops.alert", lang: "ru", params: { check, detail } },
   });

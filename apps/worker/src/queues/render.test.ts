@@ -131,6 +131,15 @@ describe("the texts of the owner (Russian: the owner reads the admin panel in Ru
     expect(text).toContain("30 ч");
   });
 
+  it("tells a check that went blind, by its own name, and says why", () => {
+    const text = r.render("ops.alert", "ru", {
+      check: "backup_age_blind",
+      detail: "не задан BACKUP_MARK_FILE",
+    }) as string;
+    expect(text).toContain("Проверка резервной копии не работает");
+    expect(text).toContain("BACKUP_MARK_FILE");
+  });
+
   it("tells reminders of the order for the owner", () => {
     expect(r.render("reminder.report_due", "ru", { number: "NV-2026-0007", last: false })).toContain("отчёт");
     expect(r.render("reminder.report_due", "ru", { number: "NV-2026-0007", last: true })).toContain("крайний");

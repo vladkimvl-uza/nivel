@@ -119,3 +119,41 @@ describe("the worker as a process", () => {
     expect(row.last_error).toBe("skipped: no BOT_TOKEN");
   }, 60_000);
 });
+
+describe("the worker with an environment it does not understand", () => {
+  it("does not start with BOT_MODE=Webhook (a typo) instead of falling back to polling and switching the webhook check off", async () => {
+    const main = fileURLToPath(new URL("../main.ts", import.meta.url));
+    const env: Record<string, string> = {
+      PATH: process.env.PATH ?? "",
+      SystemRoot: process.env.SystemRoot ?? "",
+      APP_MODE: "development",
+      NIVEL_SLOT: process.env.NIVEL_SLOT ?? "0",
+      PORT: String(await freePort()),
+      DATABASE_URL_WORKER: process.env.DATABASE_URL_WORKER as string,
+      PUBLIC_BASE_URL: "http://127.0.0.1:9",
+      REVALIDATE_HMAC_KEY: "smoke-test-key-0123456789-0123456789-0123456789", // gitleaks:allow fake key of the smoke test
+      BOT_MODE: "Webhook",
+    };
+    const bad = spawn(process.execPath, [main], { env, stdio: ["ignore", "pipe", "pipe"] });
+    let text = "";
+    bad.stdout?.on("data", (c) => {
+      text += c;
+    });
+    bad.stderr?.on("data", (c) => {
+      text += c;
+    });
+    const code = await new Promise<number | null>((resolve) => {
+      const timer = setTimeout(() => {
+        bad.kill();
+        resolve(null);
+      }, 30_000);
+      bad.on("exit", (c) => {
+        clearTimeout(timer);
+        resolve(c);
+      });
+    });
+    expect(code).not.toBe(0);
+    expect(code).not.toBeNull();
+    expect(text).toContain("BOT_MODE must be polling or webhook");
+  }, 60_000);
+});

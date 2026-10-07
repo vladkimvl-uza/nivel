@@ -5,10 +5,12 @@ import { createDb } from "@nivel/db";
 import { pingDatabase } from "@nivel/db/health";
 import { PgBoss } from "pg-boss";
 import pino from "pino";
+import { readExtraEnv } from "./env.ts";
 import { startHealthServer } from "./health.ts";
 import { registerAll } from "./jobs/index.ts";
 import { isCrmUrl } from "./jobs/ops/crm/sync.ts";
 import { queueOptions } from "./queue.ts";
+import { guardPool } from "./queues/pool.ts";
 import { Lifecycle, type WorkerContext } from "./queues/runtime.ts";
 import { createWorkerRuntime } from "./queues/wire.ts";
 
@@ -17,8 +19,8 @@ const log = pino({ name: "worker", redact: [...LOG_REDACT_PATHS] });
 
 // The CRM of the owner: both values, and the address of a web app of Google, or nothing is sent (the schema of the worker does not
 // list the two keys yet: request to the integrator).
-const sheetsUrl = process.env.NIVEL_SHEETS_URL?.trim();
-const sheetsSecret = process.env.NIVEL_SHEETS_SECRET?.trim();
+const extra = readExtraEnv();
+const { sheetsUrl, sheetsSecret } = extra;
 if ((sheetsUrl || sheetsSecret) && !(sheetsUrl && sheetsSecret && isCrmUrl(sheetsUrl))) {
   log.warn(
     "CRM: NIVEL_SHEETS_URL must be the address /exec of an Apps Script of Google and NIVEL_SHEETS_SECRET must be set; nothing is sent to the CRM",
@@ -37,6 +39,7 @@ queue = "started";
 
 // One pool of the role nivel_worker for the jobs; the services run on the same handle with the role `worker`.
 const db = createDb(env.DATABASE_URL_WORKER, { max: 8, applicationName: "nivel-worker-jobs" });
+guardPool(db, log);
 const runtime = createWorkerRuntime({
   db,
   boss,
@@ -47,12 +50,18 @@ const runtime = createWorkerRuntime({
     revalidateKey: env.REVALIDATE_HMAC_KEY,
     botToken: env.BOT_TOKEN,
     filesDir: env.FILES_DIR,
-    // Read from the environment as it is: the schema of the worker does not list them (request to the integrator).
-    botMode: process.env.BOT_MODE === "webhook" ? "webhook" : "polling",
+    // Not in the schema of the worker yet (request to the integrator): read and checked in env.ts.
+    botMode: extra.botMode,
     crm,
   },
-  backupMarkFile: process.env.BACKUP_MARK_FILE || undefined,
+  backupMarkFile: extra.backupMarkFile,
 });
+if (env.APP_MODE === "production") {
+  if (extra.backupMarkFile === undefined)
+    log.warn("BACKUP_MARK_FILE is not set: the age of the backup cannot be checked");
+  if (env.FILES_DIR === undefined)
+    log.warn("FILES_DIR is not set: the disk cannot be checked and the files are not purged");
+}
 if (!runtime.telegram.enabled) log.warn("disabled: no BOT_TOKEN, the messages of the outbox are skipped with a record");
 
 const lifecycle = new Lifecycle();

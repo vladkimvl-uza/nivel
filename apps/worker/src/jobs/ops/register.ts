@@ -31,6 +31,7 @@ export function selfcheckDepsOf(rt: WorkerRuntime): SelfcheckDeps {
   return {
     now: () => rt.now(),
     log: rt.log,
+    strict: rt.settings.appMode === "production",
     probes: rt.probes,
     stalledQueues: (seconds) => rt.jobs.stalled(seconds),
     async outboxStalledSeconds() {

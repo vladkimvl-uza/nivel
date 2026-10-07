@@ -12,6 +12,7 @@ function setup(
     outbox?: number | null;
     webhook?: { lastErrorDate: number | null; lastErrorMessage: string | null } | "off" | Error;
     now?: Date;
+    strict?: boolean;
   } = {},
 ) {
   const clock = new FakeClock(over.now ?? new Date("2026-10-12T10:00:00+05:00"));
@@ -20,6 +21,7 @@ function setup(
   const deps: SelfcheckDeps = {
     now: clock.now,
     log,
+    strict: over.strict ?? false,
     probes: {
       backupAgeHours: async () => (over.backup === undefined ? 3 : over.backup),
       diskUsedPercent: async () => (over.disk === undefined ? 40 : over.disk),
@@ -183,5 +185,38 @@ describe("runSelfcheck: the limits of ARCHITECTURE 9", () => {
     expect(t.enqueued.map((e) => alertOf(e).check).sort()).toEqual(
       ["backup_age", "certificate", "disk", "outbox_stalled", "queue_stalled"].sort(),
     );
+  });
+
+  it("in production a check that cannot be made is itself an alert, once a day: a forgotten BACKUP_MARK_FILE must not switch the copy check off for good", async () => {
+    const t = setup({ strict: true, backup: null, disk: null, cert: null });
+    const results = await runSelfcheck(t.deps);
+    expect(results.filter((r) => r.state === "unknown").map((r) => r.check)).toEqual([
+      "backup_age",
+      "disk",
+      "certificate",
+    ]);
+    expect(t.enqueued.map((e) => alertOf(e).check)).toEqual(["backup_age_blind", "disk_blind", "certificate_blind"]);
+    expect(t.enqueued[0]).toMatchObject({
+      kind: "telegram_message",
+      payload: { target: "group", templateKey: "ops.alert" },
+    });
+    expect(t.enqueued.map((e) => e.dedupeKey)).toEqual([
+      "ops:alert:backup_age_blind:2026-10-12",
+      "ops:alert:disk_blind:2026-10-12",
+      "ops:alert:certificate_blind:2026-10-12",
+    ]);
+    expect(alertOf(t.enqueued[0] as ops.OutboxInput).detail).toMatch(/BACKUP_MARK_FILE/);
+  });
+
+  it("outside production the same silence is only 'unknown': a development machine has no backup", async () => {
+    const t = setup({ strict: false, backup: null, disk: null, cert: null });
+    await runSelfcheck(t.deps);
+    expect(t.enqueued).toEqual([]);
+  });
+
+  it("does not turn a check that failed with an error into a 'blind' alert: that is the other kind of trouble and is logged", async () => {
+    const t = setup({ strict: true, webhook: new Error("getWebhookInfo: timeout") });
+    await runSelfcheck(t.deps);
+    expect(t.enqueued).toEqual([]);
   });
 });
