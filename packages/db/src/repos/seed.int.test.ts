@@ -66,7 +66,13 @@ describe("rule seed", () => {
       );
       expect(fee.value).toMatchObject({ pcLowRateBp: 1500, minFullCyclePc: 6_700_000, afterTestsRetainBp: 8500 });
       const flags = await c.query("select key, value from ops.settings where key like 'feature.%' order by key");
-      expect(flags.rows.map((x) => x.value)).toEqual([false, false, false, false]);
+      expect(flags.rows.map((x) => [x.key, x.value])).toEqual([
+        ["feature.ai", false],
+        ["feature.miniApp", false],
+        ["feature.scene", false],
+        ["feature.setupConfigurator", false],
+        ["feature.webLeadForm", false],
+      ]);
       // The reserve of the tax risk runs until the tax authority answers in writing (DECISIONS R-7).
       const taxRisk = await one<{ value: unknown }>(
         c,
