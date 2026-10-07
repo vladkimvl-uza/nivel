@@ -15,7 +15,6 @@ import type {
   ReportLineDoc,
   WarrantyDoc,
 } from "@nivel/pdf";
-import { DocumentDataError } from "@nivel/pdf";
 import type { PdfDoc, PdfRequest } from "./payload.ts";
 import type {
   ActRow,
@@ -38,6 +37,14 @@ export type LinkTarget =
   | { table: "commission_reports"; keyColumn: "id"; key: string }
   | { table: "acts"; keyColumn: "id"; key: string }
   | { table: "build_passports"; keyColumn: "order_id"; key: string };
+
+/** The data of the order are damaged or do not fit the document: a second try gives the same answer. */
+export class BuildDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BuildDataError";
+  }
+}
 
 /** The order has not got the document yet (a report that comes a moment later): the job may try again. */
 export class NotReadyError extends Error {
@@ -77,7 +84,7 @@ export interface BuildContext {
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
 const int = (v: unknown, label: string): number => {
-  if (typeof v !== "number" || !Number.isSafeInteger(v)) throw new DocumentDataError(`${label} is not a whole number`);
+  if (typeof v !== "number" || !Number.isSafeInteger(v)) throw new BuildDataError(`${label} is not a whole number`);
   return v;
 };
 const isoStamp = (d: Date): string => d.toISOString();
@@ -105,7 +112,7 @@ export function parseRequisites(value: unknown): IpRequisites | null {
 /** "11772.9500" -> "11 772,95": the rate as a string, no float. */
 export function rateText(rate: string): string {
   const m = /^(\d+)(?:\.(\d+))?$/.exec(rate.trim());
-  if (!m) throw new DocumentDataError(`the rate ${rate} is not a number`);
+  if (!m) throw new BuildDataError(`the rate ${rate} is not a number`);
   const whole = (m[1] as string).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const frac = (m[2] ?? "").replace(/0+$/, "").padEnd(2, "0");
   return `${whole},${frac}`;
@@ -122,7 +129,7 @@ export function quoteDoc(
   const stored = isRecord(quote.totals) && isRecord(quote.totals.totals) ? quote.totals.totals : null;
   const fee = stored && isRecord(stored.fee) ? stored.fee : null;
   if (!stored || !fee || !Array.isArray(fee.parts))
-    throw new DocumentDataError("the stored totals of the quote have no fee");
+    throw new BuildDataError("the stored totals of the quote have no fee");
   const grandTotal = int(stored.grandTotal, "grandTotal");
   const priceDates = lines.map((l) => l.priceDate).filter((d): d is string => d !== null);
   const docLines: QuoteLineDoc[] = lines.map((l) => ({
@@ -155,7 +162,7 @@ export function quoteDoc(
       reserveSum: quote.reserveSum,
       purchaseLimit: quote.purchaseLimit,
       feeParts: (fee.parts as unknown[]).map((p, i) => {
-        if (!isRecord(p)) throw new DocumentDataError(`fee part ${i} is not an object`);
+        if (!isRecord(p)) throw new BuildDataError(`fee part ${i} is not an object`);
         return {
           group: p.group === "mount" ? ("mount" as const) : ("pc" as const),
           base: int(p.base, `fee part ${i} base`),
@@ -191,14 +198,14 @@ interface SnapshotLine {
 
 /** The snapshot of the purchases the report was made from (services/reports: `lines`). */
 export function readSnapshot(lines: unknown): SnapshotLine[] {
-  if (!Array.isArray(lines)) throw new DocumentDataError("the lines of the report are not a list");
+  if (!Array.isArray(lines)) throw new BuildDataError("the lines of the report are not a list");
   return lines.map((l, i) => {
     if (!isRecord(l) || typeof l.purchaseId !== "string" || typeof l.boughtAt !== "string") {
-      throw new DocumentDataError(`line ${i} of the report is not a purchase`);
+      throw new BuildDataError(`line ${i} of the report is not a purchase`);
     }
     const kind = l.receiptKind;
     if (kind !== "fiscal" && kind !== "esf" && kind !== "none_with_consent") {
-      throw new DocumentDataError(`line ${i} of the report has no kind of receipt`);
+      throw new BuildDataError(`line ${i} of the report has no kind of receipt`);
     }
     return {
       purchaseId: l.purchaseId,
@@ -291,9 +298,9 @@ export function actDoc(
   purchases: readonly PurchaseRow[],
   requisites: IpRequisites | null,
 ): ActDoc {
-  if (!Array.isArray(act.lines)) throw new DocumentDataError("the lines of the act are not a list");
+  if (!Array.isArray(act.lines)) throw new BuildDataError("the lines of the act are not a list");
   const lines = (act.lines as unknown[]).map((l, i) => {
-    if (!isRecord(l) || typeof l.title !== "string") throw new DocumentDataError(`line ${i} of the act has no title`);
+    if (!isRecord(l) || typeof l.title !== "string") throw new BuildDataError(`line ${i} of the act has no title`);
     return { title: l.title, qty: int(l.qty, `line ${i} qty`), serial: str(l.serial) };
   });
   return {
@@ -390,7 +397,7 @@ export function warrantyDoc(
 
 // ---- the choice ------------------------------------------------------------------------------------------------------------
 
-/** Loads what the document needs and decides how it is named, kept and linked. Throws `DocumentDataError` for an order that cannot have it. */
+/** Loads what the document needs and decides how it is named, kept and linked. Throws `BuildDataError` for an order that cannot have it. */
 export async function build(req: PdfRequest, rows: PdfRows, ctx: BuildContext, now: Date): Promise<Built> {
   const order = await rows.order(req.orderId);
   if (!order) throw new NotReadyError(`the order ${req.orderId} does not exist`);
@@ -442,7 +449,7 @@ export async function build(req: PdfRequest, rows: PdfRows, ctx: BuildContext, n
       const kind = ACT_OF_DOC[req.doc];
       const act = await rows.act(order.id, req.actId, kind);
       if (!act) throw new NotReadyError(`the order ${order.number} has no act ${kind}`);
-      if (act.kind !== kind) throw new DocumentDataError(`the act ${act.id} is ${act.kind}, not ${kind}`);
+      if (act.kind !== kind) throw new BuildDataError(`the act ${act.id} is ${act.kind}, not ${kind}`);
       const purchases = kind === "material_acceptance" ? await rows.purchasesOfOrder(order.id) : [];
       return {
         prepared: {

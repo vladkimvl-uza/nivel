@@ -1,7 +1,6 @@
 import {
   type ActKind,
   type CommissionReportDoc,
-  DocumentDataError,
   type PassportDoc,
   type QuoteDoc,
   renderAct,
@@ -12,7 +11,16 @@ import {
   type WarrantyDoc,
 } from "@nivel/pdf";
 import { describe, expect, it } from "vitest";
-import { build, offersAreStub, parseRequisites, quoteDoc, REQUISITES_KEY, rateText, readSnapshot } from "./build.ts";
+import {
+  BuildDataError,
+  build,
+  offersAreStub,
+  parseRequisites,
+  quoteDoc,
+  REQUISITES_KEY,
+  rateText,
+  readSnapshot,
+} from "./build.ts";
 import type { PdfRequest } from "./payload.ts";
 import {
   ACT_ID,
@@ -100,8 +108,8 @@ describe("the rate of the Central Bank as a text", () => {
   });
 
   it("refuses what is not a number", () => {
-    expect(() => rateText("abc")).toThrow(DocumentDataError);
-    expect(() => rateText("1e5")).toThrow(DocumentDataError);
+    expect(() => rateText("abc")).toThrow(BuildDataError);
+    expect(() => rateText("1e5")).toThrow(BuildDataError);
   });
 });
 
@@ -153,7 +161,7 @@ describe("the estimate", () => {
   });
 
   it("refuses totals that were not stored whole", () => {
-    expect(() => quoteDoc(order(), quote({ totals: {} }), quoteLines(), null)).toThrow(DocumentDataError);
+    expect(() => quoteDoc(order(), quote({ totals: {} }), quoteLines(), null)).toThrow(BuildDataError);
     expect(() => quoteDoc(order(), quote({ totals: { totals: { fee: { parts: [] } } } }), quoteLines(), null)).toThrow(
       /grandTotal/,
     );
@@ -202,7 +210,7 @@ describe("the report", () => {
   });
 
   it("refuses a snapshot that is not a list of purchases", () => {
-    expect(() => readSnapshot("x")).toThrow(DocumentDataError);
+    expect(() => readSnapshot("x")).toThrow(BuildDataError);
     expect(() => readSnapshot([{}])).toThrow(/not a purchase/);
     expect(() =>
       readSnapshot([{ purchaseId: P1, boughtAt: "2026-10-08T00:00:00Z", receiptKind: "cash", qty: 1, amountSum: 1 }]),

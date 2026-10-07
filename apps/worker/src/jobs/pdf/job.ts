@@ -2,21 +2,10 @@
 // asks @nivel/pdf for the Uzbek and the Russian paper, writes the bytes under FILES_DIR, registers them in ops.files and writes their
 // ids into the row of the document. It can run twice or stop half way: a file that is registered under its key is not made again,
 // and the links, written once, keep what they have.
-
 import type { ActDoc, CommissionReportDoc, PassportDoc, QuoteDoc, RenderOptions, WarrantyDoc } from "@nivel/pdf";
-import {
-  CardNumberError,
-  DocumentDataError,
-  PdfTooLargeError,
-  renderAct,
-  renderCommissionReport,
-  renderPassport,
-  renderQuote,
-  renderWarrantyCard,
-} from "@nivel/pdf";
 import type { Logger } from "pino";
 import { PermanentJobError } from "../../queues/define.ts";
-import { type BuildContext, type Built, build } from "./build.ts";
+import { type BuildContext, BuildDataError, type Built, build } from "./build.ts";
 import { type DocFiles, type LinkResult, sha256Of, storageKeyOf } from "./files.ts";
 import { parsePdfRequest } from "./payload.ts";
 import type { PdfRows } from "./rows.ts";
@@ -42,30 +31,43 @@ export interface PdfJobResult {
 
 const LANGS = ["uz", "ru"] as const;
 
-function render(b: Built, options: RenderOptions): Promise<Buffer> {
+/**
+ * The renderers load on the first document, not at the start of the worker: the package brings the layout engine (wasm) and the
+ * fonts, some 50 MB and half a second, which a worker with the flag `feature.pdf` off should not pay.
+ */
+let loaded: Promise<typeof import("@nivel/pdf")> | undefined;
+const pdfPackage = (): Promise<typeof import("@nivel/pdf")> => {
+  loaded ??= import("@nivel/pdf");
+  return loaded;
+};
+
+async function render(b: Built, options: RenderOptions): Promise<Buffer> {
+  const pdf = await pdfPackage();
   switch (b.prepared.doc) {
     case "quote":
-      return renderQuote(b.data as QuoteDoc, options);
+      return pdf.renderQuote(b.data as QuoteDoc, options);
     case "commission_report":
-      return renderCommissionReport(b.data as CommissionReportDoc, options);
+      return pdf.renderCommissionReport(b.data as CommissionReportDoc, options);
     case "act_materials":
     case "act_customer_parts":
     case "act_handover":
-      return renderAct(b.actKind as NonNullable<Built["actKind"]>, b.data as ActDoc, options);
+      return pdf.renderAct(b.actKind as NonNullable<Built["actKind"]>, b.data as ActDoc, options);
     case "passport":
-      return renderPassport(b.data as PassportDoc, options);
+      return pdf.renderPassport(b.data as PassportDoc, options);
     case "warranty":
-      return renderWarrantyCard(b.data as WarrantyDoc, options);
+      return pdf.renderWarrantyCard(b.data as WarrantyDoc, options);
   }
 }
+
+/** The names of the errors the package raises for data that no second try can mend (matched by name: the package is not loaded yet). */
+const PERMANENT_NAMES: ReadonlySet<string> = new Set(["DocumentDataError", "CardNumberError", "PdfTooLargeError"]);
 
 /** What no second try can mend (the data do not add up, a card number, a document too heavy) stops the job for good. */
 function permanent(error: unknown): unknown {
   if (
-    error instanceof DocumentDataError ||
-    error instanceof CardNumberError ||
-    error instanceof PdfTooLargeError ||
-    error instanceof RangeError
+    error instanceof BuildDataError ||
+    error instanceof RangeError ||
+    (error instanceof Error && PERMANENT_NAMES.has(error.name))
   ) {
     return new PermanentJobError(`${error.name}: ${error.message}`);
   }
