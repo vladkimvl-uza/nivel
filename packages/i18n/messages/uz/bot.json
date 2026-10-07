@@ -1,0 +1,316 @@
+{
+  "cmd": {
+    "start": "Boshlash",
+    "language": "Tilni oʻzgartirish",
+    "order": "Mening buyurtmam",
+    "support": "Aloqa va ish vaqti",
+    "terms": "Ish shartlari",
+    "privacy": "Maxfiylik siyosati",
+    "stop": "Xabarnomalarni toʻxtatish"
+  },
+  "profile": {
+    "short": "Kompyuter va ish joyini tanlash, xarid qilish va yigʻish.",
+    "description": "Nivel: kompyuter va ish joyini tanlash, doʻkonlardan xarid qilish, yigʻish va topshirish. Bu yerda variant tanlaysiz, ariza qoldirasiz, smeta, chek va hisobotni olasiz."
+  },
+  "start": {
+    "choose_language": "Tilni tanlang / Выберите язык",
+    "language_uz": "Oʻzbekcha",
+    "language_ru": "Русский",
+    "language_saved": "Til saqlandi: oʻzbekcha.",
+    "welcome": "Nivel: kompyuter va ish joyini tanlash, xarid va yigʻish. Bu yerda variant tanlaysiz, ariza qoldirasiz, smeta, chek va hisobotni olasiz.",
+    "consent": "Davom etish uchun shaxsga doir maʼlumotlarni qayta ishlashga rozilik kerak: Telegram identifikatoringiz, ismingiz va ariza maʼlumotlari faqat buyurtmani bajarish uchun ishlatiladi. Siyosat, versiya {version}: {url}",
+    "consent_button": "Roziman",
+    "consent_recorded": "Rahmat, rozilik qabul qilindi.",
+    "consent_needed": "Davom etish uchun rozilik kerak."
+  },
+  "menu": {
+    "title": "Nima qilamiz?",
+    "select": "Kompyuter tanlash",
+    "order": "Mening buyurtmam",
+    "support": "Aloqa",
+    "warranty": "Muammo haqida xabar berish",
+    "language": "Til / Язык"
+  },
+  "select": {
+    "task": {
+      "ask": "Kompyuter qaysi vazifa uchun?",
+      "gaming": "Oʻyinlar",
+      "streaming": "Striming",
+      "design3d": "Dizayn va 3D",
+      "programming": "Dasturlash",
+      "office": "Ofis va oʻqish"
+    },
+    "band": {
+      "ask": "Byudjet qancha?",
+      "lt_6_7m": "6,7 mln soʻmgacha",
+      "6_7m_12m": "6,7–12 mln soʻm",
+      "12m_20m": "12–20 mln soʻm",
+      "20m_35m": "20–35 mln soʻm",
+      "gte_35m": "35 mln soʻmdan"
+    },
+    "scope": {
+      "ask": "Nima kerak?",
+      "pc": "Faqat kompyuter",
+      "pc_periph": "Kompyuter va periferiya",
+      "setup": "Setap (ish joyi)"
+    },
+    "wishes": {
+      "ask": "Istaklar: kerakligini belgilang, keyin «Tayyor» tugmasini bosing.",
+      "quiet": "Sokin",
+      "compact": "Ixcham",
+      "rgb": "Yoritishli",
+      "white": "Oq korpus",
+      "done": "Tayyor",
+      "mark": "✓ {label}"
+    },
+    "result": {
+      "header": "Mos variantlar:",
+      "title": "{task} · {tier}-daraja",
+      "price": "Taxminiy narx: {sum}",
+      "price_uncertain": "Narx usta tomonidan aniqlanadi.",
+      "disclaimer": "Bu yoʻnalish, oferta emas: yakuniy narx smetada."
+    },
+    "demo": "Demo maʼlumotlar: tarkib va narxlar haqiqiy emas.",
+    "pick": "Shu variantga ariza",
+    "restart": "Qaytadan",
+    "none": "Bunday shartlar uchun tayyor variant yoʻq. Ariza qoldiring — usta shaxsan tanlaydi.",
+    "setup": "Setap alohida hisoblanadi: ariza qoldiring, usta oʻzi bogʻlanadi.",
+    "leave_request": "Ariza qoldirish"
+  },
+  "request": {
+    "contact_ask": "Aloqa uchun kontaktingizni ulashing (ixtiyoriy).",
+    "contact_button": "Kontaktni ulashish",
+    "contact_skip": "Oʻtkazib yuborish",
+    "district_ask": "Qaysi tumandasiz? Faqat tuman, manzil emas.",
+    "district_invalid": "Tuman nomini matn bilan yozing (80 belgigacha).",
+    "term_ask": "Qachongacha kerak?",
+    "term": {
+      "asap": "Imkon qadar tez",
+      "week": "Bir hafta ichida",
+      "month": "Bir oy ichida",
+      "later": "Keyinroq aytaman"
+    },
+    "created": "Ariza {number} qabul qilindi. {reply}",
+    "reply_default": "Usta ish vaqtida (du–sha 10:00–19:00, Toshkent) 2 soat ichida javob beradi.",
+    "limit": "Bir kunda 3 tadan ortiq ariza qabul qilmaymiz. Ertaga yozing yoki joriy arizalarga javob kuting.",
+    "failed": "Arizani saqlab boʻlmadi. Birozdan soʻng qayta urinib koʻring.",
+    "comment": "Vazifa: {task}. Byudjet: {band}. Tarkib: {scope}. Istaklar: {wishes}.",
+    "wishes_none": "yoʻq"
+  },
+  "my": {
+    "empty": "Hozircha buyurtmalaringiz yoʻq.",
+    "list_title": "Buyurtmalaringiz:",
+    "open": "Ochish",
+    "status": {
+      "submitted": "Smeta",
+      "estimate_confirmed": "Oldindan toʻlovni kutamiz",
+      "prepaid": "Oldindan toʻlov olindi",
+      "purchasing": "Xarid",
+      "receipts_summary": "Cheklar boʻyicha yakun",
+      "assembly_test": "Yigʻish va sinov",
+      "ready": "Topshirishga tayyor",
+      "handed_over": "Topshirildi",
+      "cancelled": "Bekor qilindi"
+    },
+    "card": "{number} · {status}",
+    "quote": "Smeta: xizmat haqi {fee}, xarid limiti {limit}.\nAmal qilish muddati: {until}.",
+    "quote_expired": "Smeta muddati tugagan: narxlar oʻzgargan boʻlishi mumkin.",
+    "quote_watermark": "Smeta oferta emas: oferta hali eʼlon qilinmagan.",
+    "accept_button": "Oferta va smetani qabul qilaman",
+    "accept_after_publication": "Qabul qilish oferta eʼlon qilingandan keyin ochiladi.",
+    "report_ok": "Tasdiqlayman",
+    "report_question": "Savol bor",
+    "warranty_button": "Muammo haqida xabar berish",
+    "payment_title": "Toʻlov tartibi:",
+    "pay": {
+      "advance": "Oldindan toʻlov: {sum} — Xolis QR orqali, chek bilan.",
+      "funds": "Xarid uchun pul: {sum} — faqat YaTT hisobiga bank oʻtkazmasi bilan.",
+      "requisites": "Rekvizitlar: {requisites}",
+      "purpose": "Toʻlov maqsadi: {purpose}",
+      "no_card": "Pulni shaxsiy kartaga oʻtkazmang.",
+      "owner_confirms": "Tushumni egasi tasdiqlaydi."
+    },
+    "accept": {
+      "screen": "{number}: ommaviy ofertani va smetani qabul qilasiz hamda maʼlumotlar doʻkonlarga uzatilishiga rozilik berasiz.",
+      "non_returnable": "Smetada doʻkon qaytarib olmaydigan pozitsiyalar bor.",
+      "confirm": "Ha, qabul qilaman",
+      "done": "Qabul qilindi. Toʻlov tartibi quyida."
+    },
+    "error": {
+      "estimate_expired": "Smeta muddati tugagan: yangisini tayyorlaymiz.",
+      "offer_not_published": "Oferta hali eʼlon qilinmagan: qabul qilish keyinroq ochiladi.",
+      "consent_missing": "Rozilik yozilmadi. Qaytadan urinib koʻring.",
+      "invalid_transition": "Hozir bu amal mumkin emas: buyurtma boshqa holatda.",
+      "other": "Amalni bajarib boʻlmadi. Usta bilan bogʻlaning."
+    },
+    "not_found": "Buyurtma topilmadi.",
+    "report": {
+      "ok_done": "Hisobot tasdiqlandi. Rahmat.",
+      "ask": "Savolingizni bitta xabarda yozing.",
+      "sent": "Savol egasiga yuborildi. Javob 3 ish kuni ichida.",
+      "closed": "Savol berish muddati tugagan."
+    }
+  },
+  "act": {
+    "kind": {
+      "material_acceptance": "materiallarni qabul qilish",
+      "customer_parts": "buyurtmachi qismlarini qaytarish",
+      "handover": "topshirish"
+    },
+    "sign_request": "{number} buyurtmasi boʻyicha {kind} dalolatnomasi. Imzolash uchun tugmani bosing.",
+    "sign_button": "Qabul qildim",
+    "signed": "Imzolandi: {time}.",
+    "already": "Dalolatnoma allaqachon imzolangan.",
+    "not_yours": "Bu dalolatnoma sizning buyurtmangizga tegishli emas.",
+    "error": "Imzolab boʻlmadi. Egasiga murojaat qiling."
+  },
+  "warranty": {
+    "pick_order": "Qaysi buyurtma boʻyicha?",
+    "describe": "Muammoni yozing, kerak boʻlsa foto yuboring. Tugagach «Tayyor» tugmasini bosing.",
+    "done_button": "Tayyor",
+    "received": "Murojaat qabul qilindi: {time}. Usta javob beradi.",
+    "no_orders": "Kafolat murojaati uchun topshirilgan buyurtma kerak.",
+    "empty": "Avval muammoni yozing.",
+    "owner_card": "Garantiya murojaati {number}: {time}."
+  },
+  "support": {
+    "text": "Savollar uchun shu yerga yozing. Ish vaqti: du–sha 10:00–19:00 (Toshkent). {reply}"
+  },
+  "legal": {
+    "terms_fallback": "Ish shartlari tez orada eʼlon qilinadi.",
+    "privacy_fallback": "Maxfiylik siyosati tez orada eʼlon qilinadi.",
+    "draft_note": "(qoralama)"
+  },
+  "stop": {
+    "done": "Xabarnomalar toʻxtatildi. Buyurtma boʻyicha xizmat xabarlari kelishda davom etadi."
+  },
+  "autoreply": {
+    "closed": "Hozir ish vaqti emas. Biz du–sha 10:00–19:00 (Toshkent) javob beramiz. Xabaringiz yetkazildi, {next} javob beramiz."
+  },
+  "common": {
+    "unknown": "Tugmalardan foydalaning yoki /start ni bosing.",
+    "error": "Xatolik yuz berdi. Qayta urinib koʻring.",
+    "cancelled": "Bekor qilindi.",
+    "send_as_photo": "Rasmni fayl sifatida emas, foto sifatida yuboring: HEIC fayl ochilmaydi.",
+    "relayed": "Xabaringiz ustaga yuborildi.",
+    "no_topic": "Xabaringiz qabul qilindi; usta tez orada javob beradi."
+  },
+  "owner": {
+    "unauthorized": "Guruhdagi buyruqlarni faqat egasi va yordamchi bajaradi.",
+    "card": {
+      "order": "{number} · {status}\nToʻlov: {fee}; xarid limiti: {limit}\nXarid uchun olingan: {funds}; cheklar: {receipts}",
+      "no_order": "Bu mavzu uchun buyurtma hali yoʻq: arizani adminkada oching.",
+      "no_topic": "Bu buyruq mavzu ichida ishlaydi.",
+      "refresh": "Yangilash"
+    },
+    "event": {
+      "START_PURCHASE": "Xaridni boshlash",
+      "MEETING_DONE": "Uchrashuv boʻldi",
+      "PURCHASE_DONE": "Xaridlar tugadi",
+      "ASSEMBLED": "Yigʻildi",
+      "DISPATCH": "Mijozga yuborish",
+      "REVISE": "Yangi smeta versiyasi",
+      "done": "Bajarildi: {event} → {status}",
+      "refused": "Rad etildi: {reason}"
+    },
+    "error": {
+      "actor_not_allowed": "Bu amal sizga ruxsat etilmagan.",
+      "invalid_transition": "Bu holatda bunday amal mumkin emas.",
+      "estimate_expired": "Smeta muddati tugagan.",
+      "manual_check_missing": "Smeta qoʻlda tekshirilgan deb belgilanmagan.",
+      "compat_block": "Yigʻma mos emas: yuborish taqiqlangan.",
+      "not_eligible": "Buyurtma minimal smeta shartiga mos kelmaydi.",
+      "offer_not_published": "Oferta oʻzbek va rus tillarida eʼlon qilinmagan.",
+      "consent_missing": "Mijozning kerakli roziligi yoʻq.",
+      "payments_incomplete": "Tasdiqlangan toʻlovlar yoʻq.",
+      "purchase_too_early": "Pul kelgandan keyingi ish kunidan oldin xarid qilib boʻlmaydi.",
+      "meeting_required": "15 mln dan birinchi buyurtma: uchrashuv yoki video qoʻngʻiroq kerak.",
+      "limit_exceeded": "Xaridlar mijoz roziligisiz limitdan oshadi.",
+      "funds_exceeded": "Cheklar olingan puldan oshadi.",
+      "purchases_incomplete": "Hamma pozitsiyalar xarid qilinmagan.",
+      "not_reconciled": "Pul solishtirilmagan: kelgan = xarid + qaytarilgan emas.",
+      "report_objection_open": "Mijozning ochiq eʼtirozi bor.",
+      "final_payment_missing": "Xizmat haqining ikkinchi qismi toʻlovi tasdiqlanmagan.",
+      "act_missing": "Imzolangan dalolatnoma yoʻq.",
+      "passport_missing": "Kompyuter pasporti toʻldirilmagan.",
+      "other": "Amalni bajarib boʻlmadi: adminkada tekshiring."
+    },
+    "status": {
+      "estimate_draft": "Smeta qoralamasi",
+      "estimate_sent": "Smeta yuborildi",
+      "estimate_expired": "Smeta muddati tugadi",
+      "accepted": "Qabul qilindi, toʻlovni kutamiz",
+      "purchasing": "Xarid",
+      "report_due": "Hisobotni yuborish kerak",
+      "report_sent": "Hisobot yuborildi",
+      "settled": "Mijoz bilan hisob-kitob yopildi",
+      "assembling": "Yigʻish",
+      "testing": "Sinov",
+      "ready": "Tayyor",
+      "delivering": "Yetkazib berish",
+      "handed_over": "Topshirildi",
+      "closed": "Yopildi",
+      "podbor_delivered": "Tanlov topshirildi",
+      "cancelling": "Bekor qilish rasmiylashtirilmoqda",
+      "cancelled": "Bekor qilindi"
+    },
+    "lead": {
+      "work": "Ishga olish",
+      "spam": "Spam",
+      "address": "Manzil",
+      "in_work": "Ariza {number} ishda.",
+      "spam_done": "Ariza {number} spam deb belgilandi.",
+      "address_value": "Mijoz manzili: {address}",
+      "address_none": "Manzil koʻrsatilmagan: adminkada kiriting.",
+      "not_open": "Ariza allaqachon yopilgan."
+    },
+    "copy": {
+      "failed": "Yetkazilmadi: mijoz botni ishga tushirmagan yoki bloklagan.",
+      "no_customer": "Bu mavzuga mijoz biriktirilmagan."
+    },
+    "receipt": {
+      "card": "Chek: {sum} · {vendor}\nBuyurtma {number}. Xarid limiti: {limit}, sarflangan: {spent}.",
+      "pick_line": "Smetaning qaysi qatoriga?",
+      "outside": "Smetadan tashqari",
+      "cancel": "Bekor qilish",
+      "over_limit": "Diqqat: bu chek bilan xarid {limit} limitdan oshadi; mijoz roziligi kerak.",
+      "saved": "Xarid qoralamasi qabul qilindi: {sum} · {vendor}. Adminkada (xaridlar) rasmiylashtiring: mijozga foto yozuvdan keyin ketadi.",
+      "wrong_status": "Chek «Xarid» holatida qabul qilinadi; hozir {number}: {status}.",
+      "no_order": "Bu mavzu uchun buyurtma yoʻq.",
+      "expired": "Qoralama eskirgan: chekni qayta yuboring.",
+      "no_lines": "Smetada ochiq qatorlar yoʻq: «Smetadan tashqari»ni tanlang."
+    },
+    "act_photo": {
+      "card": "{number} buyurtmasi qogʻoz dalolatnomasining fotosi: tasdiqlaysizmi?",
+      "confirm": "Tasdiqlash",
+      "saved": "Akt fotosi qabul qilindi: adminkada imzoni (qogʻoz akt) kiriting.",
+      "no_act": "{number} buyurtmasida imzolanmagan akt yoʻq."
+    }
+  },
+  "lead": {
+    "created": "Yangi ariza {number}\n{scope} · tuman: {district} · byudjet: {budget}",
+    "created_empty": "—"
+  },
+  "order": {
+    "estimate_sent": "{number} smetasi tayyor. Tarkibni koʻrib, ofertani qabul qilishingiz mumkin.",
+    "estimate_expired": "{number} smetasining muddati tugadi: narxlar oʻzgargan boʻlishi mumkin. Yangisini tayyorlaymiz.",
+    "accepted": "{number} smetasi qabul qilindi. Toʻlov tartibi buyurtma kartasida.",
+    "purchase_recorded": "{number} buyurtmasi boʻyicha xarid yozildi: chek va foto kartada.",
+    "report_sent": "{number} buyurtmasi boʻyicha hisobot tayyor. Tasdiqlang yoki 3 ish kuni ichida savol bering.",
+    "report_objection": "{number} hisoboti boʻyicha mijoz savol berdi. Muddat — 3 ish kuni.",
+    "assembly_photos": "{number} buyurtmasi: yigʻish bosqichlari fotosi.",
+    "ready": "{number} buyurtmasi yigʻildi va sinovdan oʻtdi; kompyuter pasporti ilova qilingan. Yetkazib berish vaqtini kelishamiz.",
+    "delivering": "{number} buyurtmasi yoʻlda.",
+    "handed_over": "{number} buyurtmasi topshirildi. Kafolat hujjatlari kartada; muammo boʻlsa shu yerda yozing.",
+    "podbor_delivered": "{number} boʻyicha tanlov topshirildi. Xizmat haqi keyingi buyurtmaga hisobga olinadi.",
+    "cancelling": "{number} buyurtmasini bekor qilish rasmiylashtirilmoqda; hisob-kitob kartada.",
+    "cancelled": "{number} buyurtmasi bekor qilindi, hisob-kitoblar yakunlandi."
+  },
+  "accountant": {
+    "income_adjustment": "{number} buyurtmasi bekor qilindi: daromadni tuzatish (Soliq kodeksi 466-m.) — buxgalterga xabar bering."
+  },
+  "quote": {
+    "price_uncertain": "Pozitsiya narxi aniqlanmoqda: usta tekshiradi.",
+    "demo_data": "Demo maʼlumotlar: tarkib va narxlar haqiqiy emas."
+  }
+}

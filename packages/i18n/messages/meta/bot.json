@@ -1,0 +1,1182 @@
+{
+  "cmd.start": {
+    "context": "command /start in the menu of Telegram (3-32 chars)",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "cmd.language": {
+    "context": "command /language in the menu of Telegram",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "cmd.order": {
+    "context": "command /order in the menu of Telegram",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "cmd.support": {
+    "context": "command /support in the menu of Telegram",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "cmd.terms": {
+    "context": "command /terms in the menu of Telegram",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "cmd.privacy": {
+    "context": "command /privacy in the menu of Telegram",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "cmd.stop": {
+    "context": "command /stop in the menu of Telegram",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "profile.short": {
+    "context": "short description of the bot (setMyShortDescription, up to 120 chars)",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "profile.description": {
+    "context": "description of the bot on its start screen (setMyDescription, up to 512 chars)",
+    "maxLen": 220,
+    "status": "draft"
+  },
+  "start.choose_language": {
+    "context": "first screen: the same bilingual line in both files",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "start.language_uz": {
+    "context": "button of the language choice, always in Uzbek",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "start.language_ru": {
+    "context": "button of the language choice, always in Russian",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "start.language_saved": {
+    "context": "confirmation after the language was chosen",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "start.welcome": {
+    "context": "greeting after the consent",
+    "maxLen": 180,
+    "status": "draft"
+  },
+  "start.consent": {
+    "context": "short notice before the consent; {version} is the version of the policy, {url} its page",
+    "maxLen": 280,
+    "status": "draft"
+  },
+  "start.consent_button": {
+    "context": "button that records the consent pd_processing",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "start.consent_recorded": {
+    "context": "after the consent was recorded",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "start.consent_needed": {
+    "context": "the customer wrote without the consent",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "menu.title": {
+    "context": "title of the main menu",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "menu.select": {
+    "context": "menu button: start the selection",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "menu.order": {
+    "context": "menu button: my orders",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "menu.support": {
+    "context": "menu button: contact",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "menu.warranty": {
+    "context": "menu button: report a warranty problem",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "menu.language": {
+    "context": "menu button: change the language",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.task.ask": {
+    "context": "selection, step 1",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "select.task.gaming": {
+    "context": "task button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.task.streaming": {
+    "context": "task button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.task.design3d": {
+    "context": "task button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.task.programming": {
+    "context": "task button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.task.office": {
+    "context": "task button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.band.ask": {
+    "context": "selection, step 2",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.band.lt_6_7m": {
+    "context": "budget band button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.band.6_7m_12m": {
+    "context": "budget band button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.band.12m_20m": {
+    "context": "budget band button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.band.20m_35m": {
+    "context": "budget band button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.band.gte_35m": {
+    "context": "budget band button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.scope.ask": {
+    "context": "selection, step 3",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.scope.pc": {
+    "context": "scope button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.scope.pc_periph": {
+    "context": "scope button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.scope.setup": {
+    "context": "scope button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.wishes.ask": {
+    "context": "selection, step 4",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "select.wishes.quiet": {
+    "context": "wish button",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "select.wishes.compact": {
+    "context": "wish button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.wishes.rgb": {
+    "context": "wish button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.wishes.white": {
+    "context": "wish button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.wishes.done": {
+    "context": "button that ends the wishes",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "select.wishes.mark": {
+    "context": "a chosen wish button",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.result.header": {
+    "context": "above the cards of the builds",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.result.title": {
+    "context": "title of a build card",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.result.price": {
+    "context": "price line of a build card",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.result.price_uncertain": {
+    "context": "price line when the price is unknown",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "select.result.disclaimer": {
+    "context": "under the cards",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "select.demo": {
+    "context": "plate on cards made of demo data (not in production)",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "select.pick": {
+    "context": "button under a build card",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "select.restart": {
+    "context": "button: start the selection again",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "select.none": {
+    "context": "no template fits",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "select.setup": {
+    "context": "scope setup has no templates",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "select.leave_request": {
+    "context": "button: leave a request without a build",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "request.contact_ask": {
+    "context": "request step: contact",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "request.contact_button": {
+    "context": "button that sends the phone of the customer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "request.contact_skip": {
+    "context": "button: no phone",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "request.district_ask": {
+    "context": "request step: district",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "request.district_invalid": {
+    "context": "the district is not a short text",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "request.term_ask": {
+    "context": "request step: term",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "request.term.asap": {
+    "context": "term button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "request.term.week": {
+    "context": "term button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "request.term.month": {
+    "context": "term button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "request.term.later": {
+    "context": "term button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "request.created": {
+    "context": "the answer after the request was created; {reply} is the response time",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "request.reply_default": {
+    "context": "response time when the owner has not set a text",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "request.limit": {
+    "context": "the daily limit of requests",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "request.failed": {
+    "context": "the request could not be saved",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "request.comment": {
+    "context": "comment of the request made from the selection (read by the owner in Russian)",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "request.wishes_none": {
+    "context": "no wishes were marked",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "my.empty": {
+    "context": "/order without orders",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "my.list_title": {
+    "context": "title of the list of orders",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.open": {
+    "context": "button: open the order",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "my.status.submitted": {
+    "context": "status of the order for the customer",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "my.status.estimate_confirmed": {
+    "context": "status of the order for the customer",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "my.status.prepaid": {
+    "context": "status of the order for the customer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.status.purchasing": {
+    "context": "status of the order for the customer",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "my.status.receipts_summary": {
+    "context": "status of the order for the customer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.status.assembly_test": {
+    "context": "status of the order for the customer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.status.ready": {
+    "context": "status of the order for the customer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.status.handed_over": {
+    "context": "status of the order for the customer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "my.status.cancelled": {
+    "context": "status of the order for the customer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "my.card": {
+    "context": "head of the card of an order",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.quote": {
+    "context": "summary of the quote in the card; every number comes from the database",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "my.quote_expired": {
+    "context": "the quote is out of date",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "my.quote_watermark": {
+    "context": "the offer is a stub",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "my.accept_button": {
+    "context": "button: acceptance (shown only when the offers are published)",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "my.accept_after_publication": {
+    "context": "no button while the offer is a stub",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "my.report_ok": {
+    "context": "button: the report is confirmed",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "my.report_question": {
+    "context": "button: a question about the report",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "my.warranty_button": {
+    "context": "button in the card of a handed over order",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "my.payment_title": {
+    "context": "head of the payment instruction",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "my.pay.advance": {
+    "context": "payment instruction: the fee is paid by QR",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "my.pay.funds": {
+    "context": "payment instruction: money for the purchases goes to the account of the sole proprietor",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "my.pay.requisites": {
+    "context": "requisites of the account of the sole proprietor, from the settings of the owner",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "my.pay.purpose": {
+    "context": "ready purpose of the payment",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "my.pay.no_card": {
+    "context": "warning in the payment instruction",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "my.pay.owner_confirms": {
+    "context": "who confirms the money",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "my.accept.screen": {
+    "context": "acceptance screen before the confirmation",
+    "maxLen": 150,
+    "status": "draft"
+  },
+  "my.accept.non_returnable": {
+    "context": "added to the acceptance screen when the quote has non-returnable lines",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "my.accept.confirm": {
+    "context": "button: confirm the acceptance",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.accept.done": {
+    "context": "after ACCEPT was done",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "my.error.estimate_expired": {
+    "context": "answer to the customer: the quote has expired",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "my.error.offer_not_published": {
+    "context": "answer to the customer: the offer is a stub",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "my.error.consent_missing": {
+    "context": "answer to the customer: a consent is missing",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "my.error.invalid_transition": {
+    "context": "answer to the customer: wrong status",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "my.error.other": {
+    "context": "answer to the customer: any other refusal",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "my.not_found": {
+    "context": "the order is not the customer's or does not exist",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "my.report.ok_done": {
+    "context": "the customer confirmed the report",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "my.report.ask": {
+    "context": "the customer pressed «a question»",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "my.report.sent": {
+    "context": "the question was queued for the owner",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "my.report.closed": {
+    "context": "the window of objections is over",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "act.kind.material_acceptance": {
+    "context": "kind of the act, in the genitive",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "act.kind.customer_parts": {
+    "context": "kind of the act, in the genitive",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "act.kind.handover": {
+    "context": "kind of the act, in the genitive",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.sign_request": {
+    "context": "message with the button under an act (template of the relay)",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "act.sign_button": {
+    "context": "button: the customer signs the act",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "act.signed": {
+    "context": "the act was signed by the button",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "act.already": {
+    "context": "the act was signed before",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "act.not_yours": {
+    "context": "somebody else pressed the button",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "act.error": {
+    "context": "the signature failed",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "warranty.pick_order": {
+    "context": "the customer has several orders",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.describe": {
+    "context": "warranty report: the description",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "warranty.done_button": {
+    "context": "button: the description is complete",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "warranty.received": {
+    "context": "the report was received at the exact time",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "warranty.no_orders": {
+    "context": "the customer has no handed over order",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "warranty.empty": {
+    "context": "«Done» without a description",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "warranty.owner_card": {
+    "context": "header of the report in the topic of the owner",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "support.text": {
+    "context": "answer to /support; {reply} is the response time",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "legal.terms_fallback": {
+    "context": "/terms when no text is published",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "legal.privacy_fallback": {
+    "context": "/privacy when no text is published",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "legal.draft_note": {
+    "context": "mark after the text of a policy that is a stub",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "stop.done": {
+    "context": "answer to /stop",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "autoreply.closed": {
+    "context": "automatic answer outside the hours; {next} is the next opening time",
+    "maxLen": 150,
+    "status": "draft"
+  },
+  "common.unknown": {
+    "context": "free text the bot cannot use",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "common.error": {
+    "context": "unexpected error",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "common.cancelled": {
+    "context": "an action was cancelled",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "common.send_as_photo": {
+    "context": "a document with a format that cannot be read",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "common.relayed": {
+    "context": "the message of the customer was copied to the topic",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "common.no_topic": {
+    "context": "no topic yet, the message waits for the owner",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "owner.unauthorized": {
+    "context": "a stranger pressed a button or wrote a command in the group",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "owner.card.order": {
+    "context": "card of the order in the topic",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "owner.card.no_order": {
+    "context": "/card in a topic of a lead without an order",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "owner.card.no_topic": {
+    "context": "/card outside of a topic",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.card.refresh": {
+    "context": "button: refresh the card",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.event.START_PURCHASE": {
+    "context": "button of the owner: event START_PURCHASE",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.event.MEETING_DONE": {
+    "context": "button of the owner: event MEETING_DONE",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.event.PURCHASE_DONE": {
+    "context": "button of the owner: event PURCHASE_DONE",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.event.ASSEMBLED": {
+    "context": "button: event ASSEMBLED",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.event.DISPATCH": {
+    "context": "button of the owner: event DISPATCH",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.event.REVISE": {
+    "context": "button of the owner: event REVISE",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.event.done": {
+    "context": "answer after an event was dispatched",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.event.refused": {
+    "context": "answer after an event was refused",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.error.actor_not_allowed": {
+    "context": "text of the refusal actor_not_allowed of the order automaton, shown in the owner's group",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.error.invalid_transition": {
+    "context": "text of the refusal invalid_transition of the order automaton, shown in the owner's group",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.error.estimate_expired": {
+    "context": "text of the refusal estimate_expired of the order automaton, shown in the owner's group",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.error.manual_check_missing": {
+    "context": "text of the refusal manual_check_missing of the order automaton, shown in the owner's group",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.error.compat_block": {
+    "context": "text of the refusal compat_block of the order automaton, shown in the owner's group",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.error.not_eligible": {
+    "context": "text of the refusal not_eligible of the order automaton, shown in the owner's group",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.error.offer_not_published": {
+    "context": "text of the refusal offer_not_published of the order automaton, shown in the owner's group",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "owner.error.consent_missing": {
+    "context": "text of the refusal consent_missing of the order automaton, shown in the owner's group",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.error.payments_incomplete": {
+    "context": "text of the refusal payments_incomplete of the order automaton, shown in the owner's group",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.error.purchase_too_early": {
+    "context": "text of the refusal purchase_too_early of the order automaton, shown in the owner's group",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "owner.error.meeting_required": {
+    "context": "text of the refusal meeting_required of the order automaton, shown in the owner's group",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "owner.error.limit_exceeded": {
+    "context": "text of the refusal limit_exceeded of the order automaton, shown in the owner's group",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.error.funds_exceeded": {
+    "context": "text of the refusal funds_exceeded of the order automaton, shown in the owner's group",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.error.purchases_incomplete": {
+    "context": "text of the refusal purchases_incomplete of the order automaton, shown in the owner's group",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.error.not_reconciled": {
+    "context": "text of the refusal not_reconciled of the order automaton, shown in the owner's group",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "owner.error.report_objection_open": {
+    "context": "text of the refusal report_objection_open of the order automaton, shown in the owner's group",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.error.final_payment_missing": {
+    "context": "text of the refusal final_payment_missing of the order automaton, shown in the owner's group",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "owner.error.act_missing": {
+    "context": "text of the refusal act_missing of the order automaton, shown in the owner's group",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.error.passport_missing": {
+    "context": "text of the refusal passport_missing of the order automaton, shown in the owner's group",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.error.other": {
+    "context": "any other failure of an owner's button",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.status.estimate_draft": {
+    "context": "status estimate_draft of the order in the card of the owner",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.status.estimate_sent": {
+    "context": "status estimate_sent of the order in the card of the owner",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.status.estimate_expired": {
+    "context": "status estimate_expired of the order in the card of the owner",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.status.accepted": {
+    "context": "status accepted of the order in the card of the owner",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.status.purchasing": {
+    "context": "status purchasing of the order in the card of the owner",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.status.report_due": {
+    "context": "status report_due of the order in the card of the owner",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.status.report_sent": {
+    "context": "status report_sent of the order in the card of the owner",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.status.settled": {
+    "context": "status settled of the order in the card of the owner",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.status.assembling": {
+    "context": "status assembling of the order in the card of the owner",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.status.testing": {
+    "context": "status testing of the order in the card of the owner",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.status.ready": {
+    "context": "status ready of the order in the card of the owner",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.status.delivering": {
+    "context": "status delivering of the order in the card of the owner",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.status.handed_over": {
+    "context": "status handed_over of the order in the card of the owner",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.status.closed": {
+    "context": "status closed of the order in the card of the owner",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.status.podbor_delivered": {
+    "context": "status podbor_delivered of the order in the card of the owner",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.status.cancelling": {
+    "context": "status cancelling of the order in the card of the owner",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.status.cancelled": {
+    "context": "status cancelled of the order in the card of the owner",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.lead.work": {
+    "context": "button of the card of a lead",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.lead.spam": {
+    "context": "button of the card of a lead",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.lead.address": {
+    "context": "button of the card of a lead: show the address",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.lead.in_work": {
+    "context": "the lead was taken",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.lead.spam_done": {
+    "context": "the lead was marked as spam",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.lead.address_value": {
+    "context": "the address from the database",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.lead.address_none": {
+    "context": "the customer has no address yet",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.lead.not_open": {
+    "context": "the lead is not new or in review any more",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.copy.failed": {
+    "context": "the copy to the customer failed",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "owner.copy.no_customer": {
+    "context": "a topic without a customer",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "owner.receipt.card": {
+    "context": "draft of a purchase made from the photo of a receipt",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "owner.receipt.pick_line": {
+    "context": "ask the line of the quote",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.receipt.outside": {
+    "context": "button: the purchase is outside of the quote",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "owner.receipt.cancel": {
+    "context": "button: cancel the draft",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.receipt.over_limit": {
+    "context": "warning on the card of the draft",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "owner.receipt.saved": {
+    "context": "the draft was queued for the worker and the admin",
+    "maxLen": 170,
+    "status": "draft"
+  },
+  "owner.receipt.wrong_status": {
+    "context": "a receipt came in a wrong status",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "owner.receipt.no_order": {
+    "context": "a receipt in a topic without an order",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "owner.receipt.expired": {
+    "context": "the draft was not found",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.receipt.no_lines": {
+    "context": "every line of the quote is bought",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "owner.act_photo.card": {
+    "context": "photo of a paper act",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "owner.act_photo.confirm": {
+    "context": "button: confirm the photo of the act",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.act_photo.saved": {
+    "context": "the photo was queued for the worker and the admin",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "owner.act_photo.no_act": {
+    "context": "no unsigned act",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "lead.created": {
+    "context": "card of a new lead in the owner's group (outbox template lead.created)",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "lead.created_empty": {
+    "context": "value of the district or the budget that the request does not have",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "order.estimate_sent": {
+    "context": "to the customer: the estimate was sent",
+    "maxLen": 100,
+    "status": "draft"
+  },
+  "order.estimate_expired": {
+    "context": "to the customer: the estimate has expired",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "order.accepted": {
+    "context": "to the customer: acceptance",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "order.purchase_recorded": {
+    "context": "to the customer: a purchase with its receipt",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "order.report_sent": {
+    "context": "to the customer: the report with the two buttons",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "order.report_objection": {
+    "context": "to the owner's topic: the customer has a question",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "order.assembly_photos": {
+    "context": "to the customer: photos of the assembly",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "order.ready": {
+    "context": "to the customer: the PC is ready",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "order.delivering": {
+    "context": "to the customer: delivery",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "order.handed_over": {
+    "context": "to the customer: handover",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "order.podbor_delivered": {
+    "context": "to the customer: the selection was delivered",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "order.cancelling": {
+    "context": "to the customer: cancellation",
+    "maxLen": 110,
+    "status": "draft"
+  },
+  "order.cancelled": {
+    "context": "to the customer: cancelled",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "accountant.income_adjustment": {
+    "context": "to the owner's topic: a task for the accountant",
+    "maxLen": 140,
+    "status": "draft"
+  },
+  "quote.price_uncertain": {
+    "context": "warning under the estimate (computeQuote: quote.price_uncertain)",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "quote.demo_data": {
+    "context": "warning under the estimate (computeQuote: quote.demo_data)",
+    "maxLen": 70,
+    "status": "draft"
+  }
+}
