@@ -2,11 +2,7 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "root": true,
   "extends": ["./packages/config/biome.base.json"],
-  "vcs": {
-    "enabled": true,
-    "clientKind": "git",
-    "useIgnoreFile": true
-  },
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "includes": [
       "**",
@@ -21,25 +17,14 @@
   "overrides": [
     {
       "includes": ["tools/**"],
-      "linter": {
-        "rules": {
-          "suspicious": {
-            "noConsole": "off"
-          }
-        }
-      }
+      "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
     },
     {
       "includes": ["tools/crm-sheets/src/**"],
       "linter": {
         "rules": {
-          "correctness": {
-            "noUnusedVariables": "off",
-            "noUnusedFunctionParameters": "off"
-          },
-          "style": {
-            "useTemplate": "off"
-          }
+          "correctness": { "noUnusedVariables": "off", "noUnusedFunctionParameters": "off" },
+          "style": { "useTemplate": "off" }
         }
       }
     }

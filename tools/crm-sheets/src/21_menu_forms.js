@@ -54,7 +54,7 @@ function nvBuildMenu() {
 /* ---------------------------------------------------------------- menu handlers (global names are required by the menu) */
 
 function nvMenuSetup() {
-  nvSetup();
+  nvSetupFromMenu();
 }
 function nvMenuThemePassport() {
   nvSetTheme("passport", "all");
@@ -217,6 +217,20 @@ function nvActiveOrderNumber() {
 
 const NV_FORMS = {
   lead: {
+    names: [
+      "channel",
+      "source",
+      "name",
+      "tg",
+      "lang",
+      "district",
+      "scope",
+      "band",
+      "budget",
+      "wanted",
+      "config",
+      "note",
+    ],
     title: "Новая заявка",
     fields: () => [
       { name: "channel", label: "Канал", type: "select", options: nvDictValues("NVD_CHANNEL"), required: true },
@@ -234,15 +248,18 @@ const NV_FORMS = {
     ],
   },
   convert: {
+    names: ["lead"],
     title: "Заявку в заказ",
     fields: () => [{ name: "lead", label: "Заявка", type: "select", options: nvOpenLeadNumbers(), required: true }],
   },
   action: {
+    names: ["order"],
     title: "Действие по заказу",
     fields: () => [{ name: "order", label: "Заказ", type: "select", options: nvOpenOrderNumbers(), required: true }],
     custom: true,
   },
   payment: {
+    names: ["order", "kind", "method", "amount", "status", "date", "receipt", "bankDoc", "payerIsClient", "thirdParty"],
     title: "Записать платёж",
     fields: () => [
       { name: "order", label: "Заказ", type: "select", options: nvOpenOrderNumbers(), required: true },
@@ -263,6 +280,21 @@ const NV_FORMS = {
     ],
   },
   purchase: {
+    names: [
+      "order",
+      "item",
+      "category",
+      "shop",
+      "qty",
+      "amount",
+      "paidWith",
+      "docKind",
+      "receipt",
+      "esf",
+      "discount",
+      "warrantyMonths",
+      "bought",
+    ],
     title: "Записать чек закупки",
     fields: () => [
       {
@@ -287,6 +319,7 @@ const NV_FORMS = {
     ],
   },
   warranty: {
+    names: ["order", "channel", "desc", "fixType"],
     title: "Гарантийный случай",
     fields: () => [
       { name: "order", label: "Заказ", type: "select", options: nvAllOrderNumbers(), required: true },
@@ -376,16 +409,23 @@ function nvFormHtml(kind) {
   const body = fields.map((f) => '<div class="row">' + nvFieldHtml(f) + "</div>").join("");
   let script;
   if (form.custom) {
+    // Everything that comes from the sheet (status, event, checks, hints) is put in as text, never as HTML
     script =
-      "var order='';function load(){var n=document.getElementById('f_order').value;order=n;if(!n){return;}" +
+      "var order='';" +
+      "function el(tag,cls,text){var e=document.createElement(tag);if(cls){e.className=cls;}if(text!==undefined){e.textContent=text;}return e;}" +
+      "function load(){var n=document.getElementById('f_order').value;order=n;if(!n){return;}" +
       "google.script.run.withSuccessHandler(show).nvOrderPanelInfo(n);}" +
-      "function show(info){var h='<p><b>'+info.status+'</b></p>';if(!info.events.length){h+='<p>Действий нет.</p>';}" +
-      "info.events.forEach(function(e){h+='<p><b>'+e.label+'</b>';if(e.violations.length){h+='<ul class=err>';e.violations.forEach(function(v){h+='<li>'+v+'</li>';});h+='</ul>';}" +
-      "if(e.input){h+='<input id=\"in_'+e.code+'\" placeholder=\"'+e.input+'\">';}" +
-      "h+='<button onclick=\"run(\\''+e.code+'\\')\">Выполнить</button></p>';});document.getElementById('panel').innerHTML=h;}" +
+      "function show(info){var box=document.getElementById('panel');box.textContent='';" +
+      "var head=el('p');head.appendChild(el('b',null,info.status));box.appendChild(head);" +
+      "if(!info.events.length){box.appendChild(el('p',null,'Действий нет.'));}" +
+      "info.events.forEach(function(e){var p=el('p');p.appendChild(el('b',null,e.label));" +
+      "if(e.violations.length){var ul=el('ul','err');e.violations.forEach(function(v){ul.appendChild(el('li',null,v));});p.appendChild(ul);}" +
+      "if(e.input){var i=el('input');i.id='in_'+e.code;i.setAttribute('placeholder',e.input);p.appendChild(i);}" +
+      "var btn=el('button',null,'Выполнить');btn.addEventListener('click',function(){run(e.code);});p.appendChild(btn);" +
+      "box.appendChild(p);});}" +
       "function run(code){var i=document.getElementById('in_'+code);var v=i?i.value:'';var r='';" +
       "google.script.run.withSuccessHandler(function(res){if(res.needConfirm){if(confirm('Не выполнено: '+res.text+'\\nПринудительно с причиной?')){r=prompt('Причина');if(r){google.script.run.withSuccessHandler(done).nvOrderPanelRun(order,code,v,true,r);}}}else{done(res);}}).nvOrderPanelRun(order,code,v,false,'');}" +
-      "function done(res){document.getElementById('msg').className=res.ok?'ok':'err';document.getElementById('msg').textContent=res.ok?'Готово: '+res.label:res.text;if(res.ok)load();}";
+      "function done(res){var m=document.getElementById('msg');m.className=res.ok?'ok':'err';m.textContent=res.ok?'Готово: '+res.label:res.text;if(res.ok){load();}}";
   } else {
     script =
       "function send(){var f=document.getElementById('form');var v={};for(var i=0;i<f.elements.length;i++){var e=f.elements[i];if(!e.name)continue;v[e.name]=e.type==='checkbox'?e.checked:e.value;}" +
@@ -446,8 +486,20 @@ function nvOrderPanelRun(num, code, input, force, reason) {
   return JSON.parse(JSON.stringify(res));
 }
 
+/** Only the fields a form declares are taken from the client: "demo", "src", "number", "status" never come from a form. */
+function nvPickFields(kind, values) {
+  const form = NV_FORMS[kind];
+  const out = {};
+  if (!form || !values || typeof values !== "object") return out;
+  form.names.forEach((name) => {
+    if (Object.hasOwn(values, name)) out[name] = values[name];
+  });
+  return out;
+}
+
 /** Submit of a form: returns {ok, text}. */
-function nvFormSubmit(kind, v) {
+function nvFormSubmit(kind, values) {
+  const v = nvPickFields(kind, values);
   const num = (x) => {
     const n = nvNum(x);
     return Number.isFinite(n) ? n : 0;

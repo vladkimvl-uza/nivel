@@ -70,14 +70,31 @@ function nvIsoOf(date) {
   return date ? nvIsoDate(date) : "";
 }
 
-/** Runs fn under the document lock (re-entrant: an inner call reuses the outer lock). */
+/** The error of a busy lock. It carries a mark: the code never looks for a word in the text (the interface is Russian). */
+function nvLockError() {
+  const err = new Error("Книга занята другим действием: повторите через минуту");
+  err.nvLock = true;
+  return err;
+}
+
+function nvIsLockError(err) {
+  return !!err && err.nvLock === true;
+}
+
+/**
+ * Runs fn under the script lock (re-entrant: an inner call reuses the outer lock). tryLock answers true or false, so a
+ * busy lock is a mark of our own, not an exception whose text could be in any language. Nothing that waits for a person
+ * (a dialog) may run inside: ask first, then take the lock for the short change.
+ */
 let nvLockDepth = 0;
 function nvWithLock(fn, waitMs) {
   if (nvLockDepth > 0) return fn();
   // One lock for every execution of the project (the edit trigger, the web app, the timers): the script lock
   // also works in a web app execution, where the document lock is not available.
   const lock = LockService.getScriptLock();
-  lock.waitLock(waitMs || 30000);
+  if (!lock.tryLock(waitMs || 30000)) throw nvLockError();
+  // Another execution may have written while this one waited: what was read before is not to be trusted
+  nvInvalidate();
   nvLockDepth++;
   try {
     return fn();
@@ -85,6 +102,45 @@ function nvWithLock(fn, waitMs) {
     nvLockDepth--;
     lock.releaseLock();
   }
+}
+
+/** Is the code inside nvWithLock now (a dialog must never be shown then). */
+function nvInLock() {
+  return nvLockDepth > 0;
+}
+
+/* ---------------------------------------------------------------- table cache of one execution */
+
+let nvTableCache = null;
+
+/**
+ * Inside fn a table is read from the sheet once: the quota of the triggers (90 minutes a day for all of them) is spent on
+ * reads, and one edit used to read the 98 columns of the orders several times. Every writer of the tables below calls
+ * nvInvalidate, so the next read sees the change. Outside nvCached nothing is cached.
+ */
+function nvCached(fn) {
+  if (nvTableCache) return fn();
+  nvTableCache = {};
+  try {
+    return fn();
+  } finally {
+    nvTableCache = null;
+  }
+}
+
+function nvInvalidate(sheetKey) {
+  if (!nvTableCache) return;
+  if (sheetKey) delete nvTableCache[sheetKey];
+  else nvTableCache = {};
+}
+
+/** Cuts secrets out of a text before it is written to a log: the token of a bot inside an address, and the given values. */
+function nvScrub(text, secrets) {
+  let out = String(text === undefined || text === null ? "" : text);
+  (secrets || []).forEach((s) => {
+    if (s) out = out.split(String(s)).join("***");
+  });
+  return out.replace(/bot\d+:[A-Za-z0-9_-]+/g, "bot***").replace(/\d{6,}:[A-Za-z0-9_-]{20,}/g, "***");
 }
 
 function nvDocProps() {
@@ -184,8 +240,21 @@ function nvSettings(fresh) {
     });
   }
   s.alerts = [s.alert1, s.alert2, s.alert3, s.alert4, s.alert5].map(Number).filter((x) => x > 0);
+  if (sheet) nvRememberWindow(s);
   nvSettingsCache = s;
   return s;
+}
+
+/** Keeps the response window in a document property, so a trigger can decide "not now" without reading the sheets. */
+function nvRememberWindow(s) {
+  try {
+    const value = nvStr(s.responseFrom) + "-" + nvStr(s.responseTo);
+    if (!/^\d\d:\d\d-\d\d:\d\d$/.test(value)) return;
+    const props = nvDocProps();
+    if (props.getProperty("NV_RESP_WINDOW") !== value) props.setProperty("NV_RESP_WINDOW", value);
+  } catch (e) {
+    // a property is a convenience, never a reason to stop
+  }
 }
 
 /** A Date of any realm (the test environment makes dates in another context). */
@@ -243,8 +312,15 @@ function nvNextRow(sheetKey) {
   return NV_LAYOUT.firstRow + last + 1;
 }
 
-/** All filled rows of a table as {row, ...values by key} (one batch read). */
+/** All filled rows of a table as {row, ...values by key} (one batch read; once per execution inside nvCached). */
 function nvReadTable(sheetKey) {
+  if (nvTableCache?.[sheetKey]) return nvTableCache[sheetKey];
+  const rows = nvReadTableRaw(sheetKey);
+  if (nvTableCache) nvTableCache[sheetKey] = rows;
+  return rows;
+}
+
+function nvReadTableRaw(sheetKey) {
   const def = NV_SCHEMA[sheetKey];
   const sh = nvSheet(sheetKey);
   const next = nvNextRow(sheetKey);
@@ -271,6 +347,7 @@ function nvFindRow(sheetKey, keyValue, rows) {
 
 /** Writes values of the given keys into a row (one setValues per run of adjacent columns). */
 function nvWriteCells(sheetKey, row, values) {
+  nvInvalidate(sheetKey);
   const def = NV_SCHEMA[sheetKey];
   const sh = nvSheet(sheetKey);
   const keys = Object.keys(values).filter((k) => def.cols.some((c) => c.key === k));
@@ -292,6 +369,7 @@ function nvWriteCells(sheetKey, row, values) {
 
 /** Appends a whole row (by keys) at the next free row and returns its number. */
 function nvAppendRow(sheetKey, values) {
+  nvInvalidate(sheetKey);
   const row = nvNextRow(sheetKey);
   nvEnsureCapacity(sheetKey, row);
   const def = NV_SCHEMA[sheetKey];
@@ -319,6 +397,7 @@ function nvAppendRow(sheetKey, values) {
 
 /** Writes the values of a row-matrix into the columns of the table that are not calculated, run by run. */
 function nvWriteRowsMatrix(sheetKey, row, objects) {
+  nvInvalidate(sheetKey);
   const def = NV_SCHEMA[sheetKey];
   const sh = nvSheet(sheetKey);
   const cols = def.cols;

@@ -6,7 +6,8 @@
 /** The theme name chosen for a sheet: "Панель" has its own choice, all other sheets share one. */
 function nvThemeNameFor(sheetKey) {
   const props = nvDocProps();
-  const name = props.getProperty(sheetKey === "panel" ? NV_PROP.themePanel : NV_PROP.themeData);
+  // The sheet for a phone follows the panel: it shows the same figures
+  const name = props.getProperty(sheetKey === "panel" || sheetKey === "phone" ? NV_PROP.themePanel : NV_PROP.themeData);
   return name && NV_THEMES[name] ? name : "passport";
 }
 
@@ -208,10 +209,8 @@ function nvStyleGroups(sheetKey) {
     if (!idx.length) return;
     const first = idx[0];
     const last = idx[idx.length - 1];
-    if (sh.colGroups) {
-      // Already grouped on an earlier run: do not deepen the group again.
-      if (sh.colGroups.get(first)) return;
-    }
+    // Already grouped on an earlier run: do not deepen the group again (the depth is limited to 8 columns deep).
+    if (sh.getColumnGroupDepth(first) > 0) return;
     sh.getRange(1, first, 1, last - first + 1).shiftColumnGroupDepth(1);
   });
   if (typeof sh.setColumnGroupControlPosition === "function") {

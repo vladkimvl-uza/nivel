@@ -3,6 +3,9 @@
 // LockService, CacheService, ScriptApp, UrlFetchApp, MailApp, DriveApp, ContentService, HtmlService and Session.
 // It records what the script does, so tests and the preview can read the result. Formulas are stored, not evaluated.
 import crypto from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const MAX_ROWS = 1000;
@@ -264,6 +267,7 @@ class Range {
     return this;
   }
   getValues() {
+    this.sheet.owner.env.reads += 1;
     const out = [];
     for (let r = 0; r < this.numRows; r++) {
       const row = [];
@@ -586,8 +590,14 @@ class Range {
     return this.sheet.filter;
   }
   shiftColumnGroupDepth(d) {
+    // Real Sheets: the depth is between 0 and 8, a shift outside it is an error
     for (let c = this.col; c < this.col + this.numCols; c++) {
-      this.sheet.colGroups.set(c, (this.sheet.colGroups.get(c) || 0) + d);
+      const next = (this.sheet._groupDepth.get(c) || 0) + d;
+      if (next < 0 || next > 8)
+        throw new Error(`Exception: The column group depth must be between 0 and 8, got ${next}`);
+    }
+    for (let c = this.col; c < this.col + this.numCols; c++) {
+      this.sheet._groupDepth.set(c, (this.sheet._groupDepth.get(c) || 0) + d);
     }
     return this;
   }
@@ -669,7 +679,8 @@ class Sheet {
     this.images = [];
     this.bandings = [];
     this.filter = null;
-    this.colGroups = new Map();
+    // Not part of the Apps Script API: the code under test asks getColumnGroupDepth, never this map
+    this._groupDepth = new Map();
     this.collapsedCols = new Set();
     this.sheetProtection = null;
     this.filterViews = [];
@@ -938,8 +949,13 @@ class Sheet {
   setColumnGroupControlPosition() {
     return this;
   }
+  getColumnGroupDepth(col) {
+    if (!Number.isInteger(col) || col < 1)
+      throw new Error("Exception: The parameters do not match getColumnGroupDepth(Integer)");
+    return this._groupDepth.get(col) || 0;
+  }
   collapseAllColumnGroups() {
-    for (const c of this.colGroups.keys()) this.collapsedCols.add(c);
+    for (const [c, depth] of this._groupDepth) if (depth > 0) this.collapsedCols.add(c);
     return this;
   }
   activate() {
@@ -1031,6 +1047,7 @@ class Spreadsheet {
     this.id = "mock-spreadsheet-id";
     this.touches = [];
     this.onTouch = null;
+    env.reads = 0;
     this.insertSheet("Sheet1");
   }
   _touch(sheet, range) {
@@ -1111,20 +1128,55 @@ class Spreadsheet {
   }
   getSpreadsheetTheme() {
     const self = this;
+    const types = new Set([
+      "TEXT",
+      "BACKGROUND",
+      "ACCENT1",
+      "ACCENT2",
+      "ACCENT3",
+      "ACCENT4",
+      "ACCENT5",
+      "ACCENT6",
+      "HYPERLINK",
+    ]);
+    const bad = (what) =>
+      new Error(
+        `Exception: The parameters (${what}) don't match the method signature for SpreadsheetApp.SpreadsheetTheme.setConcreteColor.`,
+      );
     return {
       setFontFamily(f) {
+        if (typeof f !== "string" || f === "")
+          throw new Error("Exception: The parameters do not match setFontFamily(String)");
         self.themeFont = f;
         return this;
       },
       getFontFamily: () => self.themeFont,
-      setConcreteColor(type, color) {
-        self.themeColors[type] = color;
+      // Real overloads: (ThemeColorType, Color) and (ThemeColorType, Integer, Integer, Integer). A hex string is refused.
+      setConcreteColor(type, a, b, c) {
+        if (!types.has(type)) throw bad(String(type));
+        let hex;
+        if (a && typeof a === "object" && a._isColor === true && b === undefined) hex = a._hex;
+        else if ([a, b, c].every((x) => Number.isInteger(x) && x >= 0 && x <= 255))
+          hex =
+            "#" +
+            [a, b, c]
+              .map((x) => x.toString(16).padStart(2, "0"))
+              .join("")
+              .toUpperCase();
+        else throw bad(`(String, ${typeof a === "string" ? "String" : typeof a})`);
+        self.themeColors[type] = hex;
         return this;
       },
       getConcreteColor: (type) => ({ asRgbColor: () => ({ asHexString: () => self.themeColors[type] }) }),
     };
   }
-  setRecalculationInterval() {}
+  setRecalculationInterval(v) {
+    if (!["ON_CHANGE", "MINUTE", "HOUR"].includes(v)) throw new Error(`Exception: Invalid RecalculationInterval ${v}`);
+    this.recalc = v;
+  }
+  getRecalculationInterval() {
+    return this.recalc || "ON_CHANGE";
+  }
   rename(n) {
     this.name = n;
   }
@@ -1152,7 +1204,13 @@ class Env {
     this.prompts = [];
     this.alertAnswers = [];
     this.promptAnswers = [];
-    this.userEmail = opts.userEmail || "owner@example.com";
+    this.userEmail = opts.userEmail === undefined ? "owner@example.com" : opts.userEmail;
+    // Scopes of the manifest of the project: Session.getActiveUser().getEmail() needs userinfo.email among them
+    this.scopes = opts.scopes || readManifest().oauthScopes || [];
+    // false imitates a context without a UI (the phone app, a trigger of another user): alert and prompt fail
+    this.uiAvailable = true;
+    this.dialogsUnderLock = [];
+    this.lockEvents = [];
     this.locked = false;
     this.lockHeldElsewhere = false;
     this.uuidCounter = 0;
@@ -1164,6 +1222,11 @@ class Env {
     this.dialogs = [];
     this.webAppUrl = "https://script.google.com/macros/s/MOCK/exec";
   }
+}
+
+function readManifest() {
+  const dir = dirname(fileURLToPath(import.meta.url));
+  return JSON.parse(readFileSync(join(dir, "..", "src", "appsscript.json"), "utf8"));
 }
 
 const _hex = (buf) => Buffer.from(buf).toString("hex");
@@ -1223,10 +1286,14 @@ export function createGas(opts = {}) {
         return api;
       },
       alert: (title, text, buttons) => {
+        if (!env.uiAvailable) throw new Error("Exception: Cannot call SpreadsheetApp.getUi() from this context.");
+        if (env.locked) env.dialogsUnderLock.push(title);
         env.alerts.push({ title, text, buttons });
         return env.alertAnswers.length ? env.alertAnswers.shift() : "YES";
       },
       prompt: (title, text) => {
+        if (!env.uiAvailable) throw new Error("Exception: Cannot call SpreadsheetApp.getUi() from this context.");
+        if (env.locked) env.dialogsUnderLock.push(title);
         env.prompts.push({ title, text });
         const a = env.promptAnswers.length ? env.promptAnswers.shift() : "";
         return {
@@ -1240,6 +1307,29 @@ export function createGas(opts = {}) {
       Button: enumOf(["OK", "CANCEL", "YES", "NO", "CLOSE"]),
     }),
     newDataValidation: () => new DataValidationBuilder(),
+    newColor: () => {
+      const st = { hex: null };
+      const api = {
+        setRgbColor(h) {
+          if (typeof h !== "string" || !/^#[0-9a-fA-F]{6}$/.test(h)) throw new Error(`Exception: Invalid color ${h}`);
+          st.hex = h.toUpperCase();
+          return api;
+        },
+        setThemeColor() {
+          throw new Error("setThemeColor is not used by the CRM");
+        },
+        build() {
+          if (!st.hex) throw new Error("Exception: the color has no value");
+          return {
+            _isColor: true,
+            _hex: st.hex,
+            asRgbColor: () => ({ asHexString: () => st.hex }),
+            getColorType: () => "RGB",
+          };
+        },
+      };
+      return api;
+    },
     newConditionalFormatRule: () => new CfBuilder(),
     newRichTextValue: () => new RichTextBuilder(),
     newTextStyle: () => new TextStyleBuilder(),
@@ -1270,6 +1360,7 @@ export function createGas(opts = {}) {
       "ACCENT6",
       "HYPERLINK",
     ]),
+    RecalculationInterval: enumOf(["ON_CHANGE", "MINUTE", "HOUR"]),
     WrapStrategy: enumOf(["WRAP", "OVERFLOW", "CLIP"]),
     GroupControlTogglePosition: enumOf(["BEFORE", "AFTER"]),
     Dimension: enumOf(["ROWS", "COLUMNS"]),
@@ -1309,7 +1400,9 @@ export function createGas(opts = {}) {
   const LockService = {
     _make: () => ({
       waitLock(_ms) {
-        if (env.lockHeldElsewhere) throw new Error("Lock timeout: another process holds the lock");
+        // The text is Russian on purpose: the owner's interface is Russian, and the code must not look for a word in it
+        if (env.lockHeldElsewhere)
+          throw new Error("Превышено время ожидания: другой процесс слишком долго удерживал доступ");
         if (env.locked) throw new Error("Lock is already held by this execution");
         env.locked = true;
       },
@@ -1337,7 +1430,11 @@ export function createGas(opts = {}) {
   const CacheService = {
     getScriptCache: () => ({
       get: (k) => (env.cache.has(k) ? env.cache.get(k) : null),
-      put: (k, v) => env.cache.set(k, String(v)),
+      put: (k, v) => {
+        if (String(k).length > 250) throw new Error("Exception: Argument too large: key");
+        if (String(v).length > 100 * 1024) throw new Error("Exception: Argument too large: value");
+        env.cache.set(k, String(v));
+      },
       remove: (k) => env.cache.delete(k),
     }),
     getDocumentCache: () => CacheService.getScriptCache(),
@@ -1437,12 +1534,19 @@ export function createGas(opts = {}) {
 
   const Utilities = {
     formatDate: (d, tz, pattern) => formatDate(d, tz, pattern),
-    computeHmacSha256Signature: (value, key) => {
+    // The CRM must name the encoding of text it signs or hashes: the default one is not documented, and the platform
+    // signs UTF-8 bytes. A text argument without a Charset is refused here so that no code can rely on the default.
+    computeHmacSha256Signature: (value, key, charset) => {
+      const needs = typeof value === "string" || typeof key === "string";
+      if (needs && charset !== "UTF_8")
+        throw new Error("Exception: computeHmacSha256Signature of text needs Utilities.Charset.UTF_8");
       const k = typeof key === "string" ? Buffer.from(key, "utf8") : Buffer.from(key);
       const v = typeof value === "string" ? Buffer.from(value, "utf8") : Buffer.from(value);
       return [...crypto.createHmac("sha256", k).update(v).digest()].map((b) => (b > 127 ? b - 256 : b));
     },
-    computeDigest: (_alg, value) => {
+    computeDigest: (_alg, value, charset) => {
+      if (typeof value === "string" && charset !== "UTF_8")
+        throw new Error("Exception: computeDigest of text needs Utilities.Charset.UTF_8");
       const v = typeof value === "string" ? Buffer.from(value, "utf8") : Buffer.from(value);
       return [...crypto.createHash("sha256").update(v).digest()].map((b) => (b > 127 ? b - 256 : b));
     },
@@ -1565,7 +1669,13 @@ export function createGas(opts = {}) {
   };
 
   const Session = {
-    getActiveUser: () => ({ getEmail: () => env.userEmail }),
+    getActiveUser: () => ({
+      getEmail: () => {
+        if (!env.scopes.includes("https://www.googleapis.com/auth/userinfo.email"))
+          throw new Error("Exception: You do not have permission to call Session.getActiveUser (needs userinfo.email)");
+        return env.userEmail;
+      },
+    }),
     getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }),
     getScriptTimeZone: () => "Asia/Tashkent",
   };

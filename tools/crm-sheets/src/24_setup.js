@@ -4,7 +4,13 @@
  * of Apps Script, it saves the step and a timer continues it a minute later.
  */
 
-const NV_SETUP_BUDGET_MS = 270000;
+/**
+ * The time after which a run saves its step and hands the rest to a timer. Google stops a run at six minutes, and one step
+ * ("Лист Заказы": 98 columns with checks, rules and protection) can take up to about 90 seconds, so the budget leaves it room.
+ */
+const NV_SETUP_BUDGET_MS = 180000;
+/** A saved step older than this is a trace of an old stopped run, not something to continue. */
+const NV_SETUP_RESUME_MS = 30 * 60000;
 
 /** Sheets of the book in order; the default empty sheet of a new book is removed. */
 function nvEnsureSheets() {
@@ -25,15 +31,28 @@ function nvEnsureSheets() {
   ss.setActiveSheet(ss.getSheetByName(NV_SN.panel));
 }
 
-/** The theme of the book: Fira Sans and the brand colours (the new charts never take the default rainbow). */
+/**
+ * The theme of the book: the brand colours (the new charts never take the default rainbow) and Fira Sans.
+ * setConcreteColor takes a Color object (or three integers), never a text like "#D9501A". The font of the theme is
+ * limited to a list of Google; if it is refused, the cells still carry Fira Sans one by one, so the failure is only logged.
+ */
 function nvApplyBookTheme() {
   const ss = nvSpreadsheet();
   ss.setSpreadsheetTimeZone(NV_TZ);
   ss.setSpreadsheetLocale(NV_LOCALE);
+  // Every 60 minutes: TODAY() and NOW() of the formulas ("Сегодня", the panel) are then never older than an hour
+  ss.setRecalculationInterval(SpreadsheetApp.RecalculationInterval.HOUR);
   const theme = ss.getSpreadsheetTheme();
-  theme.setFontFamily(NV_FONT_TEXT);
+  try {
+    theme.setFontFamily(NV_FONT_TEXT);
+  } catch (e) {
+    Logger.log("Шрифт темы не принят: " + (e?.message ? e.message : e));
+  }
   Object.keys(NV_BOOK_THEME).forEach((k) => {
-    theme.setConcreteColor(SpreadsheetApp.ThemeColorType[k], NV_BOOK_THEME[k]);
+    theme.setConcreteColor(
+      SpreadsheetApp.ThemeColorType[k],
+      SpreadsheetApp.newColor().setRgbColor(NV_BOOK_THEME[k]).build(),
+    );
   });
 }
 
@@ -118,6 +137,7 @@ function nvProtectSpecial() {
   ]);
   lock("calc", "ввод только в светлые ячейки", ["C6:C13", "C23:C24"]);
   lock("today", "список собирают формулы; мои задачи справа", ["M6:Q" + 305]);
+  lock("phone", "только чтение: цифры берутся из тех же ячеек, что и на панели", []);
   lock("data", "служебный лист", []);
   lock("tasks", "служебный лист", []);
 }
@@ -223,6 +243,13 @@ function nvSetupSteps() {
     },
   ]);
   steps.push([
+    "Телефон",
+    () => {
+      nvBuildPhone();
+      nvStylePhone();
+    },
+  ]);
+  steps.push([
     "Защита",
     () => {
       nvProtectPanel();
@@ -244,7 +271,26 @@ function nvSetupSteps() {
   return steps;
 }
 
-/** Builds the book. opts.budgetMs: the time after which the run saves its step and a timer continues it. */
+/** Arms exactly one timer that continues the setup after ms (the old ones of the same kind are removed). */
+function nvArmSetupTimer(ms) {
+  ScriptApp.getProjectTriggers().forEach((t) => {
+    if (t.getHandlerFunction() === "nvSetupContinue") ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("nvSetupContinue").timeBased().after(ms).create();
+}
+
+function nvDisarmSetupTimer() {
+  ScriptApp.getProjectTriggers().forEach((t) => {
+    if (t.getHandlerFunction() === "nvSetupContinue") ScriptApp.deleteTrigger(t);
+  });
+}
+
+/**
+ * Builds the book. opts.budgetMs: the time after which the run saves its step and a timer continues it; opts.resume:
+ * go on from the saved step. The number of a step is saved BEFORE the step starts and a timer is armed for after the
+ * six minutes of Google: if the run is cut in the middle of a step, the timer repeats that step (every step can be
+ * repeated without harm).
+ */
 function nvSetup(opts) {
   const o = opts || {};
   nvResetNamedCache();
@@ -254,29 +300,54 @@ function nvSetup(opts) {
   const steps = nvSetupSteps();
   let i = o.resume ? Number(props.getProperty("NV_SETUP_STEP") || 0) : 0;
   const log = [];
+  const pause = (at) => {
+    props.setProperty("NV_SETUP_STEP", String(at));
+    props.setProperty("NV_SETUP_STEP_AT", String(Date.now()));
+    nvArmSetupTimer(60000);
+    nvToast("Оформление продолжится само через минуту: шаг " + (at + 1) + " из " + steps.length);
+    return { done: false, step: at, total: steps.length, log: log };
+  };
+  nvArmSetupTimer(8 * 60000);
   while (i < steps.length) {
-    if (i > 0 && Date.now() - started >= budget) {
-      props.setProperty("NV_SETUP_STEP", String(i));
-      ScriptApp.newTrigger("nvSetupContinue").timeBased().after(60000).create();
-      nvToast("Оформление продолжится само через минуту: шаг " + (i + 1) + " из " + steps.length);
-      return { done: false, step: i, total: steps.length, log: log };
-    }
+    if (i > 0 && Date.now() - started >= budget) return pause(i);
     const step = steps[i];
+    // Before the step: where we are (the timer armed at the start repeats this step if Google stops the run inside it)
+    props.setProperty("NV_SETUP_STEP", String(i));
+    props.setProperty("NV_SETUP_STEP_AT", String(Date.now()));
     nvToast(step[0], "Оформление " + (i + 1) + "/" + steps.length, 3);
-    nvWithLock(() => step[1](), 60000);
+    try {
+      nvWithLock(() => step[1](), 60000);
+    } catch (err) {
+      // The book is busy for a minute: the same step is tried again by the timer
+      if (nvIsLockError(err)) return pause(i);
+      throw err;
+    }
     log.push(step[0]);
     i += 1;
   }
   props.deleteProperty("NV_SETUP_STEP");
+  props.deleteProperty("NV_SETUP_STEP_AT");
+  nvDisarmSetupTimer();
   nvToast("Книга построена. Проверьте: Nivel CRM → Самопроверка", "Оформление");
   return { done: true, step: steps.length, total: steps.length, log: log };
 }
 
+/** A start from the menu: continues from the saved step when it is fresh, otherwise builds from the first step. */
+function nvSetupFromMenu() {
+  const props = nvDocProps();
+  const at = Number(props.getProperty("NV_SETUP_STEP_AT") || 0);
+  const saved = props.getProperty("NV_SETUP_STEP");
+  const fresh = saved !== null && saved !== undefined && at > 0 && Date.now() - at < NV_SETUP_RESUME_MS;
+  if (!fresh) {
+    props.deleteProperty("NV_SETUP_STEP");
+    props.deleteProperty("NV_SETUP_STEP_AT");
+  }
+  return nvSetup({ resume: fresh });
+}
+
 /** The timer after a paused setup. */
 function nvSetupContinue() {
-  ScriptApp.getProjectTriggers().forEach((t) => {
-    if (t.getHandlerFunction() === "nvSetupContinue") ScriptApp.deleteTrigger(t);
-  });
+  nvDisarmSetupTimer();
   return nvSetup({ resume: true });
 }
 
@@ -313,5 +384,6 @@ function nvRestyle(only) {
     nvStyleSettings();
   }
   nvStylePanel();
+  nvStylePhone();
   nvBuildCharts();
 }

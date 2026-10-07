@@ -9,6 +9,7 @@ export function createProject(opts = {}) {
     now: opts.now,
     scriptProps: opts.scriptProps,
     userEmail: opts.userEmail,
+    scopes: opts.scopes,
     fetchHandler: opts.fetchHandler,
   });
   const ctx = loadSources(gas.globals);

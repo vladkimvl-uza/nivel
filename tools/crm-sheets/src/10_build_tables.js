@@ -35,7 +35,12 @@ function nvColumnValidation(sheetKey, col) {
   // Checkboxes are put on the rows that exist (nvFlagValidations): an empty row shows no boxes.
   if (col.type === "flag") return null;
   if (col.list)
-    return b().requireValueInRange(nvDictRange(col.list), true).setHelpText("Выберите значение из списка").build();
+    // A "soft" list is a hint: any other text is accepted (the name of a shop comes from the platform as it is)
+    return b()
+      .requireValueInRange(nvDictRange(col.list), true)
+      .setAllowInvalid(col.soft === true)
+      .setHelpText(col.soft ? "Подсказка: можно выбрать из списка или написать своё" : "Выберите значение из списка")
+      .build();
   if (col.orderList) {
     const orders = nvSheet("orders");
     const c = nvColIndex("orders", "num");

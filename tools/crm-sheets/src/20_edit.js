@@ -19,7 +19,11 @@ function nvColKeyAt(sheetKey, colIndex) {
   return i >= 0 && i < def.cols.length ? def.cols[i].key : null;
 }
 
-/** Who is working: the owner, or the assistant (an account other than OWNER_EMAIL). */
+/**
+ * Who is working: the owner, or the assistant (any account other than OWNER_EMAIL). Without OWNER_EMAIL the book has one
+ * user, the owner. With it, an address that cannot be read is NOT the owner: on a personal account the installed trigger
+ * of an editor gets an empty address, and the money events must stay closed to such a person.
+ */
 function nvActor() {
   const owner = nvScriptProps().getProperty(NV_PROP.ownerEmail);
   if (!owner) return "owner";
@@ -29,7 +33,7 @@ function nvActor() {
   } catch (e) {
     me = "";
   }
-  return me && me.toLowerCase() !== owner.toLowerCase() ? "assistant" : "owner";
+  return me && me.toLowerCase() === owner.toLowerCase() ? "owner" : "assistant";
 }
 
 const NV_NUMBERED = {
@@ -157,90 +161,172 @@ function nvAssignNumbers(sheetKey, rowFrom, rowTo) {
   return issued;
 }
 
-/** Shows an alert (the owner's dialog); in a context without a UI returns the default answer. */
-function nvAsk(title, text, buttons) {
+/**
+ * Shows an alert (the owner's dialog). Returns the name of the button ("YES", "NO", "OK"), or "NO_UI" when this
+ * execution has no window: the phone app, a trigger of another user. Never call it inside nvWithLock: the lock would be
+ * held until a person answers.
+ */
+function nvAskEx(title, text, buttons) {
   try {
     const ui = SpreadsheetApp.getUi();
     // The answer is an enum of the UI; its name ("YES", "NO", "OK") is what the code compares
     return String(ui.alert(title, text, buttons || ui.ButtonSet.YES_NO));
   } catch (e) {
-    return "NO";
+    return "NO_UI";
+  }
+}
+
+function nvAsk(title, text, buttons) {
+  const a = nvAskEx(title, text, buttons);
+  return a === "NO_UI" ? "NO" : a;
+}
+
+/** Asks for a line of text: {state: "ok", text} | {state: "cancel"} | {state: "no_ui"}. */
+function nvPromptEx(title, text) {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const r = ui.prompt(title, text, ui.ButtonSet.OK_CANCEL);
+    if (r.getSelectedButton() !== ui.Button.OK) return { state: "cancel", text: "" };
+    return { state: "ok", text: r.getResponseText() };
+  } catch (e) {
+    return { state: "no_ui", text: "" };
   }
 }
 
 /** Asks for a line of text; null when cancelled or no UI. */
 function nvPrompt(title, text) {
-  try {
-    const ui = SpreadsheetApp.getUi();
-    const r = ui.prompt(title, text, ui.ButtonSet.OK_CANCEL);
-    if (r.getSelectedButton() !== ui.Button.OK) return null;
-    return r.getResponseText();
-  } catch (e) {
-    return null;
-  }
+  const r = nvPromptEx(title, text);
+  return r.state === "ok" ? r.text : null;
+}
+
+/** The note of the last action in the row: when, what, and what came of it (it works where a message cannot be shown). */
+function nvActionNote(label, text, now) {
+  return nvFormat(now || nvNow(), "dd.MM HH:mm") + " · " + label + ": " + text;
 }
 
 /**
- * The owner picked an event of an order (in the "Действие" column or in the panel): asks for the text the event needs,
- * applies it, and when a check fails offers "Принудительно с причиной". Returns the result of the last call.
+ * The owner picked an event of an order (in the "Действие" column, in the panel or in the menu).
+ * No dialog is shown while the lock is held: the text the event needs and the answers are collected first, the change
+ * is applied under the lock in its own short call. When the text is in the column "Текст к действию", or when this
+ * execution has no window (the phone app), no dialog is needed; the result is always written to "Итог действия".
+ * opts: rowNo (to clear the cell and write the note). Returns the result of the last call.
  */
-function nvRunOrderAction(num, eventLabel) {
+function nvRunOrderAction(num, eventLabel, opts) {
+  const o = opts || {};
   const ev = nvEventByLabel(eventLabel);
-  if (!ev) {
-    nvToast("Неизвестное действие: " + eventLabel);
-    return { ok: false, error: "unknown_event" };
-  }
+  const now = nvNow();
+  const done = (res, text) => {
+    if (o.rowNo) {
+      const set = { action: "", lastResult: nvActionNote(ev ? ev.label : eventLabel, text, now) };
+      if (res.ok) set.actionText = "";
+      nvWithLock(() => nvWriteCells("orders", o.rowNo, set));
+    }
+    nvToast(text, num, res.ok ? 6 : 10);
+    return res;
+  };
+  if (!ev) return done({ ok: false, error: "unknown_event" }, "Неизвестное действие: " + eventLabel);
   const actor = nvActor();
+  const order = nvReadTable("orders").find((r) => r.num === num);
   let input = "";
   if (NV_EVENT_INPUT[ev.code]) {
-    input = nvPrompt(ev.label + " · " + num, NV_EVENT_INPUT[ev.code]);
-    if (input === null) return { ok: false, error: "cancelled" };
+    const typed = order ? nvStr(order.actionText) : "";
+    if (typed) input = typed;
+    else {
+      const asked = nvPromptEx(ev.label + " · " + num, NV_EVENT_INPUT[ev.code]);
+      if (asked.state === "cancel") return done({ ok: false, error: "cancelled" }, "Отменено");
+      if (asked.state === "no_ui")
+        return done(
+          { ok: false, error: "input_missing" },
+          "Нужен текст: впишите «" +
+            NV_EVENT_INPUT[ev.code] +
+            "» в колонку «Текст к действию» и выберите действие снова",
+        );
+      input = asked.text;
+    }
   }
   let res = nvApplyOrderEvent(num, ev.code, { actor: actor, input: input, how: "Вручную" });
   if (res.needConfirm) {
-    const answer = nvAsk(
+    const answer = nvAskEx(
       "Не выполнено",
       "Не выполнено: " + res.text + "\n\nДа — принудительно с причиной (запишется в «Историю»).\nНет — отмена.",
     );
-    if (answer !== "YES") return { ok: false, error: "cancelled" };
-    const reason = nvPrompt("Принудительно · " + num, "Причина, по которой правило нарушено (запишется в «Историю»)");
-    if (!nvStr(reason)) return { ok: false, error: "force_reason_missing" };
-    res = nvApplyOrderEvent(num, ev.code, { actor: actor, input: input, how: "Вручную", force: true, reason: reason });
+    if (answer === "NO_UI") return done(res, "Не выполнено: " + res.text + ". Принудительно — только на компьютере");
+    if (answer !== "YES") return done({ ok: false, error: "cancelled" }, "Отменено: " + res.text);
+    const reason = nvPromptEx("Принудительно · " + num, "Причина, по которой правило нарушено (запишется в «Историю»)");
+    if (reason.state !== "ok" || !nvStr(reason.text))
+      return done({ ok: false, error: "force_reason_missing" }, "Принудительно без причины нельзя");
+    res = nvApplyOrderEvent(num, ev.code, {
+      actor: actor,
+      input: input,
+      how: "Вручную",
+      force: true,
+      reason: reason.text,
+    });
   }
-  if (res.ok) nvToast(ev.label + ": " + res.label, num);
-  else nvToast(res.text || res.error, num, 10);
-  return res;
+  return done(res, res.ok ? "выполнено → " + res.label : res.text || res.error);
 }
 
 /** The same for a warranty case. */
-function nvRunWarrantyAction(num, eventLabel) {
+function nvRunWarrantyAction(num, eventLabel, opts) {
+  const o = opts || {};
   const ev = NV_WARRANTY_EVENTS.find((e) => e.label === eventLabel || e.code === eventLabel);
-  if (!ev) return { ok: false, error: "unknown_event" };
-  const res = nvApplyWarrantyEvent(num, ev.code, { actor: nvActor() });
-  nvToast(res.ok ? ev.label + ": " + res.status : res.text || res.error, num, res.ok ? 6 : 10);
+  const now = nvNow();
+  const res = ev ? nvApplyWarrantyEvent(num, ev.code, { actor: nvActor() }) : { ok: false, error: "unknown_event" };
+  const text = res.ok ? "выполнено → " + res.status : res.text || res.error;
+  if (o.rowNo)
+    nvWithLock(() =>
+      nvWriteCells("warranty", o.rowNo, {
+        action: "",
+        lastResult: nvActionNote(ev ? ev.label : eventLabel, text, now),
+      }),
+    );
+  nvToast(res.ok ? (ev ? ev.label : "") + ": " + res.status : text, num, res.ok ? 6 : 10);
   return res;
 }
 
-/** The platform-field rows: a manual change asks for a confirmation (the platform is the senior source). */
+/**
+ * The platform-field rows: a manual change asks for a confirmation (the platform is the senior source). The question is
+ * put outside the lock. Returns true when the change may go on. When no dialog can be shown, the change is taken back
+ * and the reason goes to a toast: nothing happens silently.
+ */
 function nvGuardPlatformField(sheetKey, colKey, rowNo, e) {
   const def = NV_SCHEMA[sheetKey];
   const col = def.cols.find((c) => c.key === colKey);
   if (!col?.plat) return true;
+  if (def.cols.every((c) => c.key !== "src")) return true;
   const sh = nvSheet(sheetKey);
   const src = sh.getRange(rowNo, nvColIndex(sheetKey, "src")).getValue();
-  if (def.cols.every((c) => c.key !== "src") || src !== "Платформа") return true;
-  const answer = nvAsk(
+  if (src !== "Платформа") return true;
+  const answer = nvAskEx(
     "Поле платформы",
     "Строка пришла от платформы, поле «" + col.title + "» ведёт она. Изменить вручную?",
   );
   if (answer === "YES") return true;
-  e.range.setValue(e.oldValue === undefined ? "" : e.oldValue);
+  nvWithLock(() => {
+    nvInvalidate();
+    e.range.setValue(e.oldValue === undefined ? "" : e.oldValue);
+  });
+  nvToast(
+    answer === "NO_UI"
+      ? "Правка отклонена: поле «" +
+          col.title +
+          "» ведёт платформа, а здесь нельзя спросить подтверждение. Измените поле на компьютере."
+      : "Правка отклонена: поле «" + col.title + "» ведёт платформа",
+    "Поле платформы",
+    10,
+  );
   return false;
 }
 
 /** Entry point of the installable edit trigger. */
 function nvOnEdit(e) {
   if (!e?.range) return;
+  // The duration of every run is in the list of the executions of Apps Script (all the triggers of a personal account
+  // share 90 minutes a day: look there after the first working week)
+  nvCached(() => nvOnEditCached(e));
+}
+
+function nvOnEditCached(e) {
   const range = e.range;
   const sheetName = range.getSheet().getName();
   const sheetKey = nvSheetKeyByName(sheetName);
@@ -251,14 +337,30 @@ function nvOnEdit(e) {
   const c1 = range.getLastColumn();
   nvResetSettingsCache();
   try {
+    // 1. What needs a person is done before the lock is taken: the dialogs of an action and of a platform field.
+    const isTable = !!NV_SCHEMA[sheetKey] && sheetKey !== "settings" && sheetKey !== "today";
+    const single = r0 === r1 && c0 === c1;
+    if (isTable && single && r0 >= NV_LAYOUT.firstRow) {
+      const colKey = nvColKeyAt(sheetKey, c0);
+      if ((sheetKey === "orders" || sheetKey === "warranty") && colKey === "action") {
+        if (nvStr(e.value) === "") return;
+        const row = nvReadTable(sheetKey).find((x) => x._row === r0);
+        if (!row) return;
+        if (sheetKey === "orders") nvRunOrderAction(row.num, e.value, { rowNo: r0 });
+        else nvRunWarrantyAction(row.num, e.value, { rowNo: r0 });
+        return;
+      }
+      if (colKey && !nvGuardPlatformField(sheetKey, colKey, r0, e)) return;
+    }
+    // 2. The change itself: short, under the lock.
     nvWithLock(() => {
+      nvInvalidate();
       if (sheetKey === "settings") return nvOnSettingsEdit(range, e);
       if (sheetKey === "today") return nvOnTodayEdit(range);
       if (!NV_SCHEMA[sheetKey]) return null;
       if (r1 < NV_LAYOUT.firstRow) return null;
       const def = NV_SCHEMA[sheetKey];
       const first = Math.max(r0, NV_LAYOUT.firstRow);
-      const single = r0 === r1 && c0 === c1;
       const keyCol = nvColIndex(sheetKey, def.keyCol);
       // A number is issued by the script: a hand-typed number is taken back.
       if (NV_NUMBERED[sheetKey] && c0 <= keyCol && keyCol <= c1) {
@@ -275,7 +377,6 @@ function nvOnEdit(e) {
       }
       const colKey = nvColKeyAt(sheetKey, c0);
       if (!colKey) return null;
-      if (!nvGuardPlatformField(sheetKey, colKey, r0, e)) return null;
       const oldValue = e.oldValue;
       switch (sheetKey) {
         case "leads":
@@ -301,7 +402,11 @@ function nvOnEdit(e) {
       }
     });
   } catch (err) {
-    Logger.log("nvOnEdit: " + (err?.stack ? err.stack : err));
+    if (nvIsLockError(err)) {
+      nvToast("Книга занята другим действием: повторите правку через минуту", "Nivel CRM", 10);
+      return;
+    }
+    Logger.log("nvOnEdit: " + nvScrub(err?.stack ? err.stack : err));
     nvToast("Ошибка: " + (err?.message ? err.message : err), "Nivel CRM", 10);
   }
 }
@@ -347,12 +452,6 @@ function nvOnOrdersEdit(rowNo, colKey, value, justCreated) {
   if (justCreated) return null;
   const order = nvReadTable("orders").find((o) => o._row === rowNo);
   if (!order) return null;
-  if (colKey === "action") {
-    if (nvStr(value) === "") return null;
-    nvWriteCells("orders", rowNo, { action: "" });
-    nvRunOrderAction(order.num, value);
-    return null;
-  }
   nvWriteCells("orders", rowNo, { updated: nvNow() });
   if (colKey === "meetingDone") nvSyncAcceptedFlags(order.num);
   if (
@@ -372,12 +471,6 @@ function nvOnOrdersEdit(rowNo, colKey, value, justCreated) {
 function nvOnWarrantyEdit(rowNo, colKey, value) {
   const w = nvReadTable("warranty").find((x) => x._row === rowNo);
   if (!w) return null;
-  if (colKey === "action") {
-    if (nvStr(value) === "") return null;
-    nvWriteCells("warranty", rowNo, { action: "" });
-    nvRunWarrantyAction(w.num, value);
-    return null;
-  }
   return nvToastAll(nvWarrantyAfterEdit(rowNo, colKey));
 }
 

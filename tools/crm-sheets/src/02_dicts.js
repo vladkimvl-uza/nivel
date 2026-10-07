@@ -336,7 +336,7 @@ const NV_WEBHOOK_TYPES = [
   "purchase.recorded",
   "warranty.case_opened",
 ];
-const NV_WEBHOOK_ERRORS = ["bad_signature", "stale", "bad_payload", "unknown_type", "wrong_env", "locked"];
+const NV_WEBHOOK_ERRORS = ["bad_signature", "stale", "bad_payload", "unknown_type", "wrong_env", "locked", "internal"];
 const NV_WEBHOOK_RESULTS = ["Применено", "Повтор", "Устарело", "Отклонено"];
 const NV_PERIODS = ["Этот месяц", "Прошлый месяц", "Квартал", "С начала года", "12 месяцев", "Всё время"];
 const NV_YEARS = [2026, 2027, 2028, 2029, 2030];

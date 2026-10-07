@@ -84,16 +84,19 @@ beforeEach(() => {
 });
 
 describe("the signature and the envelope", () => {
-  it("answers JSON, always as a text output; an unsigned or wrongly signed request is refused and written to the journal", () => {
+  it("answers JSON, always as a text output; an unsigned or wrongly signed request is refused and only counted", () => {
     const req = request("lead.created", leadData("L-2026-0100"), { sig: "00".repeat(32) });
+    const reads = p.env.reads;
     const r = send(req);
     expect(r.mime).toBe("JSON");
     // The body is not read before the signature is checked, so the answer has no id yet
     expect(r.answer).toEqual({ ok: false, id: null, result: null, error: "bad_signature" });
-    expect(r.journal).toHaveLength(1);
-    expect(r.journal[0].result).toBe("Отклонено");
-    expect(r.journal[0].error).toBe("bad_signature");
+    // Nothing is written to a sheet for a request that is not signed: only a counter in the cache
+    expect(r.journal).toHaveLength(0);
+    const hour = p.call("nvFormat", p.env.now, "yyyyMMddHH");
+    expect(p.call("nvWebhookRejections", hour).by.bad_signature).toBeGreaterThan(0);
     expect(read("leads")).toHaveLength(0);
+    void reads;
   });
 
   it("a signature made with a changed body does not pass (the raw body is signed, byte for byte)", () => {
@@ -112,11 +115,14 @@ describe("the signature and the envelope", () => {
 
   it("without a stored key nothing is accepted", () => {
     p.env.scriptProps.delete("NIVEL_HMAC_SECRET");
-    const req = request("lead.created", leadData("L-2026-0103"));
-    const r = send(req);
-    expect(r.answer.error).toBe("bad_signature");
-    expect(r.journal[0].summary).toContain("ключ вебхука не задан");
-    p.env.scriptProps.set("NIVEL_HMAC_SECRET", SECRET);
+    try {
+      const req = request("lead.created", leadData("L-2026-0103"));
+      const r = send(req);
+      expect(r.answer.error).toBe("bad_signature");
+      expect(r.journal).toHaveLength(0);
+    } finally {
+      p.env.scriptProps.set("NIVEL_HMAC_SECRET", SECRET);
+    }
   });
 
   it("a stale or a future time stamp is refused (300 seconds)", () => {
@@ -146,6 +152,7 @@ describe("the signature and the envelope", () => {
       request("lead.created", leadData("L-2026-0108"), { sentAt: iso(p.env.now.getTime() - 60_000) }),
     );
     expect(mismatched.answer.error).toBe("bad_payload");
+    // The signature is valid here, so the sender is known and the refusal is written
     expect(mismatched.journal[0].summary).toBe("поле sent_at");
   });
 
@@ -197,10 +204,28 @@ describe("the signature and the envelope", () => {
     p.env.scriptProps.delete("NIVEL_HMAC_SECRET_PREV");
   });
 
-  it("more than 30 rejections in a minute are not written to the journal again (a flood cannot fill the sheet)", () => {
+  it("a flood of unsigned requests writes nothing to the sheet and takes no lock; an hour later one summary row says how many", () => {
     const before = read("webhook").length;
-    for (let i = 0; i < 45; i++) send(request("lead.created", leadData(`L-2026-02${i}`), { sig: "11".repeat(32) }));
-    expect(read("webhook").length - before).toBe(30);
+    const sheetRows = p.env.ss.getSheetByName("Журнал вебхука").getMaxRows();
+    const reads = p.env.reads;
+    for (let i = 0; i < 600; i++) {
+      const out = p.call("doPost", request("lead.created", leadData(`L-2026-02${i}`), { sig: "11".repeat(32) }).e);
+      expect(JSON.parse(out.getContent()).error).toBe("bad_signature");
+    }
+    // Not one read of a sheet, not one write
+    expect(p.env.reads - reads).toBe(0);
+    expect(read("webhook").length).toBe(before);
+    expect(p.env.ss.getSheetByName("Журнал вебхука").getMaxRows()).toBe(sheetRows);
+    p.env.now = new Date(p.env.now.getTime() + 3600_000 * 1.2);
+    const written = p.call("nvWebhookHourlySummary", p.env.now);
+    expect(written).toBeGreaterThanOrEqual(1);
+    const rows = read("webhook").slice(before);
+    expect(rows.length).toBe(written);
+    expect(rows[0].summary).toContain("без верной подписи");
+    expect(rows[0].summary).toMatch(/подпись \d+/);
+    expect(p.env.mails.length + p.env.fetches.length).toBeGreaterThan(0); // 50 or more in an hour: the owner is told
+    // the same hour is not written twice
+    expect(p.call("nvWebhookHourlySummary", p.env.now)).toBe(0);
   });
 });
 
@@ -701,7 +726,7 @@ describe("warranty.case_opened", () => {
 describe("what the platform sends is documented as it is accepted", () => {
   it("the journal sheet lists the answers and the errors of the documentation", () => {
     expect(JSON.parse(p.run("JSON.stringify(NV_WEBHOOK_ERRORS)")).sort()).toEqual(
-      ["bad_payload", "bad_signature", "locked", "stale", "unknown_type", "wrong_env"].sort(),
+      ["bad_payload", "bad_signature", "internal", "locked", "stale", "unknown_type", "wrong_env"].sort(),
     );
     expect(JSON.parse(p.run("JSON.stringify(NV_WEBHOOK_TYPES)"))).toEqual([
       "lead.created",
