@@ -13,6 +13,7 @@
     "@nivel/config": "workspace:*",
     "@nivel/db": "workspace:*",
     "@nivel/i18n": "workspace:*",
+    "@nivel/services": "workspace:*",
     "@nivel/ui": "workspace:*",
     "next": "catalog:",
     "next-intl": "catalog:",
@@ -20,6 +21,7 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@nivel/testing": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:"
   }

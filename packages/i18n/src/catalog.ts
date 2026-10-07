@@ -7,18 +7,20 @@ import ruBot from "../messages/ru/bot.json" with { type: "json" };
 import ruCommon from "../messages/ru/common.json" with { type: "json" };
 import ruCompat from "../messages/ru/compat.json" with { type: "json" };
 import ruQuote from "../messages/ru/quote.json" with { type: "json" };
+import ruSite from "../messages/ru/site.json" with { type: "json" };
 import uzBot from "../messages/uz/bot.json" with { type: "json" };
 import uzCommon from "../messages/uz/common.json" with { type: "json" };
 import uzCompat from "../messages/uz/compat.json" with { type: "json" };
 import uzQuote from "../messages/uz/quote.json" with { type: "json" };
+import uzSite from "../messages/uz/site.json" with { type: "json" };
 import type { AppLocale } from "./locales.ts";
 import type { MessageTree } from "./messages-check.ts";
 
 export type Messages = MessageTree;
 
 const catalog = {
-  uz: { bot: uzBot, common: uzCommon, compat: uzCompat, quote: uzQuote },
-  ru: { bot: ruBot, common: ruCommon, compat: ruCompat, quote: ruQuote },
+  uz: { bot: uzBot, common: uzCommon, compat: uzCompat, quote: uzQuote, site: uzSite },
+  ru: { bot: ruBot, common: ruCommon, compat: ruCompat, quote: ruQuote, site: ruSite },
 } satisfies Record<AppLocale, Record<string, MessageTree>>;
 
 export type Namespace = keyof (typeof catalog)["uz"];

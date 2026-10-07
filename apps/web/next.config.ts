@@ -9,7 +9,15 @@ const config: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: monorepoRoot,
   turbopack: { root: monorepoRoot },
-  transpilePackages: ["@nivel/config", "@nivel/db", "@nivel/i18n", "@nivel/ui"],
+  transpilePackages: [
+    "@nivel/config",
+    "@nivel/contracts",
+    "@nivel/db",
+    "@nivel/domain",
+    "@nivel/i18n",
+    "@nivel/services",
+    "@nivel/ui",
+  ],
   poweredByHeader: false,
   reactStrictMode: true,
   // Next 16.3 writes AGENTS.md/CLAUDE.md into the app on `next dev`; project rules live in the root CLAUDE.md.

@@ -866,6 +866,8 @@ export const SETTINGS: Record<string, unknown> = {
   "feature.setupConfigurator": false,
   "feature.scene": false,
   "feature.miniApp": false,
+  // Lead form on the site (WP-16): on once the consent and privacy texts are published.
+  "feature.webLeadForm": false,
 };
 
 // ---- applying -----------------------------------------------------------------------------------------------------

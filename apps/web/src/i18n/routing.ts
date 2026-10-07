@@ -6,4 +6,6 @@ export const routing = defineRouting({
   locales,
   defaultLocale,
   localePrefix: "always",
+  // hreflang comes from the metadata of the pages (x-default is the Uzbek page, not the root that redirects to it)
+  alternateLinks: false,
 });

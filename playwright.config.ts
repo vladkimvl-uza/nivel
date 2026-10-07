@@ -23,6 +23,9 @@ export default defineConfig({
     url: `${baseURL}/healthz`,
     reuseExistingServer: false,
     timeout: 60_000,
-    env: { PORT: String(port), HOSTNAME: "127.0.0.1", NEXT_TELEMETRY_DISABLED: "1" },
+    // DATA_ENC_KEY is blank on purpose: without it the request form has no gateway to the services and answers "unavailable",
+    // so the default site of the e2e never writes a request into the dev database that .env.local points at.
+    // The site with a database of its own and the key is started by e2e/site-lead-flow.spec.ts.
+    env: { PORT: String(port), HOSTNAME: "127.0.0.1", NEXT_TELEMETRY_DISABLED: "1", DATA_ENC_KEY: "" },
   },
 });

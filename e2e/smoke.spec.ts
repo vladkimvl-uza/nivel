@@ -1,9 +1,10 @@
 import { expect, test } from "./fixtures.ts";
 
-// WP-00 smoke: both locales render, uz first, CSP nonce on scripts, no console errors.
-for (const [path, lang, lead] of [
-  ["/uz", "uz-Latn", /yigʻib beramiz/],
-  ["/ru", "ru", /Соберём компьютер/],
+// WP-00 smoke: both locales render, uz first, CSP nonce on scripts, no console errors. Since WP-16 the home page is the one-page
+// site: the checks keep their meaning (language, night theme, one h1, no errors) and name the headline of the new page.
+for (const [path, lang, headline] of [
+  ["/uz", "uz-Latn", /Vazifangizga mos ish joyi/],
+  ["/ru", "ru", /Рабочее место под вашу задачу/],
 ] as const) {
   test(`${path} renders`, async ({ page }) => {
     const errors: string[] = [];
@@ -15,8 +16,7 @@ for (const [path, lang, lead] of [
     expect(response?.headers()["content-security-policy"]).toMatch(/script-src 'self' 'nonce-/);
     await expect(page.locator("html")).toHaveAttribute("lang", lang);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Nivel");
-    await expect(page.locator("p.lead")).toHaveText(lead);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(headline);
     expect(errors).toEqual([]);
   });
 }
