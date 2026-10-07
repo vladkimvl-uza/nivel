@@ -12,6 +12,7 @@
     "@nivel/config": "workspace:*",
     "@nivel/db": "workspace:*",
     "@nivel/domain": "workspace:*",
+    "@nivel/pdf": "workspace:*",
     "@nivel/services": "workspace:*",
     "pg-boss": "catalog:",
     "pino": "catalog:"

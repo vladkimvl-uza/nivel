@@ -11,6 +11,12 @@
     "@nivel/contracts": "workspace:*",
     "@nivel/domain": "workspace:*",
     "@nivel/i18n": "workspace:*",
-    "@nivel/ui": "workspace:*"
+    "@nivel/ui": "workspace:*",
+    "@react-pdf/renderer": "catalog:",
+    "qrcode": "catalog:",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:"
   }
 }
