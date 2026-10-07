@@ -7,6 +7,7 @@
     "notice_demo": "Namuna: hujjat demo-maʼlumotlar asosida tuzilgan.",
     "pending": "roʻyxatdan oʻtgach",
     "customer": "Mijoz",
+    "issued": "Tuzilgan",
     "version": "{version}-versiya",
     "sum_unit": "soʻm",
     "unknown_customer": "koʻrsatilmagan"
@@ -91,5 +92,78 @@
     },
     "stamp_checked": "Qoʻlda tekshirilgan",
     "expiry": "Narxlar {date} gacha amal qiladi, keyin oʻzgarishi mumkin."
+  },
+  "report": {
+    "title": "Komissioner hisoboti",
+    "basis": "Hisobot ommaviy oferta shartlariga koʻra tuzilgan; tarkibi — VMQ № 489 Nizomining 28-bandi boʻyicha.",
+    "meta": {
+      "sent": "Yuborilgan"
+    },
+    "parties": {
+      "title": "1. Taraflar",
+      "commissioner": "Komissioner",
+      "status": "yakka tartibdagi tadbirkor",
+      "contract": "Shartnoma (buyurtma)",
+      "quote": "Smeta"
+    },
+    "items": {
+      "title": "2. Xaridlar jadvali"
+    },
+    "col": {
+      "item": "Nomi va seriya raqami",
+      "shop": "Doʻkon, sana",
+      "doc": "Chek / ESF",
+      "qty": "Soni",
+      "sum": "Summa",
+      "warranty": "Doʻkon kafolati"
+    },
+    "item": {
+      "serial": "S/N {serial}",
+      "inn": "STIR {inn}",
+      "vat": "QQS {sum}",
+      "fiscal": "chek № {no}",
+      "esf": "ESF № {no}",
+      "no_receipt": "chek yoʻq (rozilik)",
+      "return": "doʻkonga qaytarish",
+      "warranty_months": "{months} oy",
+      "warranty_until": "{date} gacha",
+      "files": "ilova: {n}",
+      "none": "Xaridlar hali yoʻq"
+    },
+    "discounts": {
+      "title": "3. Chegirmalar, bonuslar, tejash: mijoz foydasiga",
+      "body": "Xariddan olingan barcha foyda mijozga tegishli.",
+      "sum": "Chegirmalar jami",
+      "none": "Chegirma va bonuslar boʻlmadi.",
+      "bonus": "{title}: {note}"
+    },
+    "money": {
+      "title": "4. Mablagʻlar",
+      "received": "Xarid uchun olingan",
+      "spent": "Sarflangan (chek boʻyicha)",
+      "refunds": "shundan doʻkonlar qaytargani",
+      "limit": "Smeta boʻyicha xarid limiti",
+      "remainder": "Qaytariladigan qoldiq",
+      "refund_due": "Qaytarish muddati: {date}"
+    },
+    "fee": {
+      "title": "5. Xizmat haqi",
+      "advance": "Oldindan toʻlov: Xolis cheki № {no}",
+      "final": "Yakuniy toʻlov: Xolis cheki № {no}",
+      "unpaid_advance": "Oldindan toʻlov: toʻlanmagan",
+      "unpaid_final": "Yakuniy toʻlov: toʻlanmagan",
+      "no_vat": "Haq QQSsiz: YaTT QQS toʻlovchisi emas."
+    },
+    "attachments": {
+      "title": "6. Ilovalar",
+      "body": "Chek va ESF nusxalari, kafolat talonlari va seriya raqamli qutilar suratlari hisobotga ilova qilinadi. Ilovalar soni: {n}."
+    },
+    "confirm": {
+      "title": "7. Mijozning tasdigʻi",
+      "body": "Hisobotni botdagi «Tasdiqlayman» tugmasi bilan tasdiqlang yoki «Savol bor» tugmasi bilan savol bering. Eʼtiroz muddati — {until} gacha (yuborilgandan keyin 3 ish kuni). Muddat oʻtgach hisobot qabul qilingan hisoblanadi.",
+      "body_no_date": "Hisobotni botdagi «Tasdiqlayman» tugmasi bilan tasdiqlang yoki «Savol bor» tugmasi bilan savol bering. Eʼtiroz muddati — yuborilgandan keyin 3 ish kuni. Muddat oʻtgach hisobot qabul qilingan hisoblanadi.",
+      "accepted": "Mijoz tasdiqladi: {date}",
+      "deemed": "Hisobot muddat boʻyicha qabul qilingan: {date}"
+    }
   }
 }

@@ -34,6 +34,11 @@
     "maxLen": 20,
     "status": "draft"
   },
+  "common.issued": {
+    "context": "label before the date the document was made",
+    "maxLen": 20,
+    "status": "draft"
+  },
   "common.version": {
     "context": "version number of an estimate or a report",
     "maxLen": 30,
@@ -332,6 +337,261 @@
   "quote.expiry": {
     "context": "note at the end of the estimate: prices hold until the date",
     "maxLen": 80,
+    "status": "draft"
+  },
+  "report.title": {
+    "context": "title of the report of the commission agent",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.basis": {
+    "context": "line under the title: the report is made by the offer, the content follows item 28 of the Regulation (decision of the Cabinet No. 489)",
+    "maxLen": 130,
+    "status": "draft"
+  },
+  "report.meta.sent": {
+    "context": "metadata label: date the report was sent to the customer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.parties.title": {
+    "context": "section 1 of the report: parties",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.parties.commissioner": {
+    "context": "label: commission agent (the sole proprietor)",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.parties.status": {
+    "context": "status of the commission agent",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.parties.contract": {
+    "context": "label: the contract is the order",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.parties.quote": {
+    "context": "label: the estimate the report refers to",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.items.title": {
+    "context": "section 2 of the report: the table of purchases",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.col.item": {
+    "context": "table column: name and serial number",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.col.shop": {
+    "context": "table column: shop and date of the purchase",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.doc": {
+    "context": "table column: receipt or electronic invoice",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.qty": {
+    "context": "table column: quantity",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.sum": {
+    "context": "table column: sum of the purchase",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.col.warranty": {
+    "context": "table column: warranty of the shop",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.item.serial": {
+    "context": "serial number under the name of an item",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.inn": {
+    "context": "taxpayer number of the shop",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.vat": {
+    "context": "VAT included in the price, shown when the receipt shows it",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.fiscal": {
+    "context": "kind of the document: fiscal receipt of the cash register; short, the column is narrow",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.esf": {
+    "context": "kind of the document: electronic invoice",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.no_receipt": {
+    "context": "kind of the document: there is no receipt, the customer agreed to it (consent none_with_consent); short, the column is narrow",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.item.return": {
+    "context": "mark of a line: return of the item to the shop (the sum is negative)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.item.warranty_months": {
+    "context": "warranty of the shop in months",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.warranty_until": {
+    "context": "warranty of the shop until a date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.files": {
+    "context": "number of attached files (receipt, ESF, warranty card, photo of the box) of a line",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.item.none": {
+    "context": "table of purchases is empty",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.discounts.title": {
+    "context": "section 3 of the report: discounts and bonuses go to the customer",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "report.discounts.body": {
+    "context": "statement: every benefit of the purchase belongs to the customer",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "report.discounts.sum": {
+    "context": "total of the discounts",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.discounts.none": {
+    "context": "there were no discounts or bonuses",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.discounts.bonus": {
+    "context": "a bonus of a line: the item and the note",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.money.title": {
+    "context": "section 4 of the report: money",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.money.received": {
+    "context": "money row: received for purchases",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.money.spent": {
+    "context": "money row: spent by receipts",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.money.refunds": {
+    "context": "money row: of the spent, what the shops returned",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "report.money.limit": {
+    "context": "money row: the limit of the estimate",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.money.remainder": {
+    "context": "money row: the remainder to be returned to the customer",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.money.refund_due": {
+    "context": "note: the remainder is returned by the date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.fee.title": {
+    "context": "section 5 of the report: the fee in two lines and how it was paid",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "report.fee.advance": {
+    "context": "stage of the fee paid, with the number of the receipt of Xolis",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "report.fee.final": {
+    "context": "second stage of the fee paid, with the number of the receipt of Xolis",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "report.fee.unpaid_advance": {
+    "context": "stage of the fee not paid yet",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.fee.unpaid_final": {
+    "context": "second stage of the fee not paid yet",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.fee.no_vat": {
+    "context": "note: the fee has no VAT, the sole proprietor does not pay it",
+    "maxLen": 70,
+    "status": "draft"
+  },
+  "report.attachments.title": {
+    "context": "section 6 of the report: attachments",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "report.attachments.body": {
+    "context": "attachments of the report: copies of receipts, invoices, warranty cards, photos of the boxes; {n} is their number",
+    "maxLen": 160,
+    "status": "draft"
+  },
+  "report.confirm.title": {
+    "context": "section 7 of the report: confirmation of the customer",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.confirm.body": {
+    "context": "how the customer confirms or objects; {until} is the end of the term of objections",
+    "maxLen": 290,
+    "status": "draft"
+  },
+  "report.confirm.body_no_date": {
+    "context": "the same text while the report is not sent yet and the end of the term is not known",
+    "maxLen": 270,
+    "status": "draft"
+  },
+  "report.confirm.accepted": {
+    "context": "status: the customer confirmed the report on the date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "report.confirm.deemed": {
+    "context": "status: the report is considered accepted by the term on the date",
+    "maxLen": 60,
     "status": "draft"
   }
 }

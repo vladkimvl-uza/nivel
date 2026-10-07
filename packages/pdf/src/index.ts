@@ -5,5 +5,6 @@
 export { DocumentDataError } from "./guards.ts";
 export { renderQuote } from "./quote.ts";
 export { PDF_MAX_BYTES, PdfTooLargeError } from "./render.ts";
+export { renderCommissionReport } from "./report.ts";
 export { CardNumberError } from "./requisites.ts";
 export type * from "./types.ts";
