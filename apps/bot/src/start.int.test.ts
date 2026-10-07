@@ -213,3 +213,18 @@ describe("a failure inside the bot", () => {
     expect(broken.tg.of("sendMessage")).toHaveLength(0);
   });
 });
+
+describe("two updates of one person at once", () => {
+  it("are handled one after the other: a double tap on «Agree» records one consent", async () => {
+    await h.send(h.tg.text(ALI, "/start"));
+    await h.send(h.tg.press(ALI, ALI.id, 1001, "lg:uz"));
+    await Promise.all([
+      h.send(h.tg.press(ALI, ALI.id, 1002, "cn:ok")),
+      h.send(h.tg.press(ALI, ALI.id, 1002, "cn:ok")),
+      h.send(h.tg.press(ALI, ALI.id, 1002, "cn:ok")),
+    ]);
+    expect(
+      await q("select 1 from ops.consents where evidence ->> 'telegramUserId' = $1", [String(ALI.id)]),
+    ).toHaveLength(1);
+  });
+});

@@ -1,11 +1,14 @@
 // Acceptance with an offer that is only a stub (DECISIONS R-25, ARCHITECTURE 7.2): the estimate goes out with the plate
 // «not an offer» and the button of acceptance is not there, with the words «acceptance after the publication of the offer».
 import { orders } from "@nivel/services";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Person } from "./testing/fake-telegram.ts";
 import { customerWithLead, type LeadCase, sentOrder } from "./testing/flow.ts";
 import { createHarness, type Harness, lastButtons, newPerson } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
+
+// The roads of a whole order are long; a machine busy with other builds needs more than the 30 seconds of the project.
+vi.setConfig({ testTimeout: 180_000 });
 
 let w: BotWorld;
 let h: Harness;

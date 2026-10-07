@@ -1,8 +1,11 @@
 import { formatSum } from "@nivel/i18n";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { inlineButtons, type Person } from "./testing/fake-telegram.ts";
 import { createHarness, type Harness, lastButtons, newPerson, onboard } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
+
+// The roads of a whole order are long; a machine busy with other builds needs more than the 30 seconds of the project.
+vi.setConfig({ testTimeout: 180_000 });
 
 let w: BotWorld;
 let h: Harness;

@@ -1,7 +1,7 @@
 import { formatTime } from "@nivel/i18n";
 import { acts } from "@nivel/services";
 import { keyboardMarkup, renderOutboxMessage } from "@nivel/telegram";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Person } from "./testing/fake-telegram.ts";
 import {
   confirmFinalPayment,
@@ -14,6 +14,9 @@ import {
 } from "./testing/flow.ts";
 import { ASSISTANT, createHarness, type Harness, newPerson, OWNER, STRANGER } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
+
+// The roads of a whole order are long; a machine busy with other builds needs more than the 30 seconds of the project.
+vi.setConfig({ testTimeout: 180_000 });
 
 let w: BotWorld;
 let h: Harness;

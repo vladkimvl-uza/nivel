@@ -1,6 +1,8 @@
 // The bot (ARCHITECTURE 7): one program, one client bot and the closed group of the owner. Updates go through three gates:
 // each is handled once (`bot.processed_updates`), groups other than the owner's are not answered, and the private chat
 // has a session (`bot.sessions`) and a customer who has agreed before anything else is done.
+
+import { sequentialize } from "@grammyjs/runner";
 import { bot as botRepo } from "@nivel/db/repos";
 import { botTranslator } from "@nivel/telegram";
 import { Bot, Composer, session } from "grammy";
@@ -76,6 +78,10 @@ function customerComposer(deps: BotDeps): Composer<BotContext> {
 export function createBot(deps: BotDeps, opts: CreateBotOptions): Bot<BotContext> {
   const bot = new Bot<BotContext>(opts.token, opts.botInfo === undefined ? {} : { botInfo: opts.botInfo });
   const customer = customerComposer(deps);
+
+  // The updates of one chat go one after the other, in every mode: a double tap must not pass the same check twice
+  // (two consents, two acceptances) and two writes of the session must not overwrite each other.
+  bot.use(sequentialize((ctx) => ctx.chat?.id.toString()));
 
   bot.use(async (ctx, next) => {
     ctx.deps = deps;
