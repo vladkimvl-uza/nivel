@@ -289,6 +289,9 @@ importers:
       '@nivel/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@nivel/services':
+        specifier: workspace:*
+        version: link:../../packages/services
       '@nivel/ui':
         specifier: workspace:*
         version: link:../../packages/ui
