@@ -332,15 +332,37 @@ importers:
       '@nivel/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@nivel/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@nivel/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nivel/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@nivel/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@nivel/services':
+        specifier: workspace:*
+        version: link:../../packages/services
+      '@nivel/telegram':
+        specifier: workspace:*
+        version: link:../../packages/telegram
       grammy:
         specifier: 'catalog:'
         version: 1.46.0
       pino:
         specifier: 'catalog:'
         version: 10.4.0
+    devDependencies:
+      '@nivel/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      msw:
+        specifier: 'catalog:'
+        version: 3.0.2(@types/node@24.19.1)(typescript@6.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))
 
   apps/web:
     dependencies:
