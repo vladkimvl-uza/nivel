@@ -70,6 +70,24 @@ describe("LeadFormView", () => {
     expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*name="consent"/);
   });
 
+  it("keeps the consent ticked after an answer of the server that did not refuse it", () => {
+    const html = view({
+      status: "error",
+      code: "invalid",
+      fields: { phone: "phone_invalid" },
+      values: { phone: "12345", consent: "on" },
+    });
+    expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*name="consent"[^>]*checked/);
+    const refused = view({
+      status: "error",
+      code: "invalid",
+      fields: { consent: "consent_required" },
+      values: { phone: "+998901234567" },
+    });
+    expect(refused).not.toMatch(/<input[^>]*name="consent"[^>]*checked/);
+    expect(view({ status: "idle" })).not.toMatch(/<input[^>]*name="consent"[^>]*checked/);
+  });
+
   it("hides the trap for bots from screen readers and the keyboard", () => {
     const html = view({ status: "idle" });
     expect(html).toMatch(/<div class="hp" aria-hidden="true">/);

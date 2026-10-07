@@ -1,8 +1,9 @@
 import type { AppLocale } from "@nivel/i18n";
-import { Mark } from "@nivel/ui/react";
+import { Button, Mark } from "@nivel/ui/react";
 import { getTranslations } from "next-intl/server";
 import { LeadForm, type LeadFormLabels } from "../../../../src/lead-form/LeadForm.tsx";
 import type { FieldErrorCode } from "../../../../src/lead-form/types.ts";
+import { getLeadFormEnabled } from "../_data/server.ts";
 import { BOT_URL } from "./SiteFooter.tsx";
 
 const FIELD_ERRORS: readonly FieldErrorCode[] = [
@@ -20,6 +21,7 @@ const FIELD_ERRORS: readonly FieldErrorCode[] = [
 /** «Request»: the form that creates a lead (`submitLead`) and, beside it, the bot. */
 export async function RequestSection({ locale, utm }: { locale: AppLocale; utm: Record<string, string> }) {
   const t = await getTranslations({ locale, namespace: "site" });
+  const enabled = await getLeadFormEnabled().catch(() => false);
   const labels: LeadFormLabels = {
     name: t("form.name"),
     phone: t("form.phone"),
@@ -72,7 +74,17 @@ export async function RequestSection({ locale, utm }: { locale: AppLocale; utm: 
           </div>
         </div>
         <div className="lead-box">
-          <LeadForm labels={labels} locale={locale} utm={utm} consentNote={consentNote} botUrl={BOT_URL} />
+          {enabled ? (
+            <LeadForm labels={labels} locale={locale} utm={utm} consentNote={consentNote} botUrl={BOT_URL} />
+          ) : (
+            <div className="lead-ok" data-lead-off>
+              <h3>{t("form.offTitle")}</h3>
+              <p>{t("form.offText")}</p>
+              <Button href={BOT_URL} target="_blank" rel="noopener" mark>
+                {t("cta.telegram")}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { readFeeScale, resolveLegal, todayInTashkent } from "./data.ts";
+import { readFeatureFlag, readFeeScale, resolveLegal, todayInTashkent } from "./data.ts";
 import { DEFAULT_FEE_SCALE } from "./fee-scale.ts";
 import type { LegalRow } from "./legal.ts";
 
@@ -54,6 +54,30 @@ describe("readFeeScale", () => {
   });
 });
 
+describe("readFeatureFlag", () => {
+  it("is on only when the owner switched it on", async () => {
+    expect(await readFeatureFlag(async () => ({ value: true }))).toBe(true);
+  });
+
+  it.each([false, "true", 1, null, {}, [], "on"])("is off for the stored value %j", async (value) => {
+    expect(await readFeatureFlag(async () => ({ value }))).toBe(false);
+  });
+
+  it("is off when the setting does not exist (unfinished work is merged switched off)", async () => {
+    expect(await readFeatureFlag(async () => null)).toBe(false);
+  });
+
+  it("is off, and says so without details, when the database does not answer", async () => {
+    const log = vi.fn();
+    const on = await readFeatureFlag(async () => {
+      throw new Error("connect ECONNREFUSED 127.0.0.1:54329 password=secret");
+    }, log);
+    expect(on).toBe(false);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
+  });
+});
+
 const row = (o: Partial<LegalRow> = {}): LegalRow => ({
   kind: "privacy",
   version: "3",
@@ -61,6 +85,7 @@ const row = (o: Partial<LegalRow> = {}): LegalRow => ({
   bodyMd: "# Политика",
   status: "published",
   textSha256: "b".repeat(64),
+  id: "00000000-0000-4000-8000-000000000002",
   effectiveFrom: "2026-10-01",
   createdAt: new Date("2026-10-01T00:00:00Z"),
   ...o,
@@ -75,6 +100,7 @@ describe("resolveLegal", () => {
       effectiveFrom: "2026-10-01",
       sha256: "b".repeat(64),
       bodyMd: "# Политика",
+      id: "00000000-0000-4000-8000-000000000002",
     });
   });
 

@@ -128,6 +128,37 @@ describe("parseLeadForm", () => {
     expect(parseLeadForm(form({ ...valid, comment: "a".repeat(2000) })).kind).toBe("ok");
   });
 
+  it("refuses control characters in free text (a NUL would break the insert and slip past the limit)", () => {
+    for (const field of ["name", "district", "comment", "telegram"] as const) {
+      for (const bad of ["a\u0000b", "a\u0007b", "a\u001fb", "a\u007fb"]) {
+        const over = field === "telegram" ? { phone: "", telegram: `nick${bad}` } : { [field]: bad };
+        const r = parseLeadForm(form({ ...valid, ...over }));
+        expect(r.kind, `${field} ${JSON.stringify(bad)}`).toBe("invalid");
+      }
+    }
+    expect(parseLeadForm(form({ ...valid, name: "a\u0000b" }))).toMatchObject({ fields: { name: "rejected" } });
+  });
+
+  it("lets a comment keep its line breaks and tabs", () => {
+    const r = parseLeadForm(form({ ...valid, comment: "one\r\ntwo\n\tthree" }));
+    expect(r).toMatchObject({ kind: "ok", command: { comment: "one\r\ntwo\n\tthree" } });
+  });
+
+  it("drops a campaign mark with control characters", () => {
+    const r = parseLeadForm(form({ ...valid, utm_source: "ads\u0000", utm_medium: "cpc" }));
+    expect(r).toMatchObject({ kind: "ok", command: { utm: { utm_medium: "cpc" } } });
+  });
+
+  it("gives the ticked consent back with the typed text, so that an error does not take the tick away", () => {
+    const r = parseLeadForm(form({ ...valid, phone: "1", consent: "on" }));
+    expect(r.kind).toBe("invalid");
+    if (r.kind !== "invalid") return;
+    expect(r.values.consent).toBe("on");
+    const none = parseLeadForm(form({ ...valid, phone: "1", consent: "" }));
+    if (none.kind !== "invalid") throw new Error("invalid expected");
+    expect(none.values.consent).toBeUndefined();
+  });
+
   it("reports every problem at once and gives the typed text back", () => {
     const r = parseLeadForm(form({ ...valid, phone: "1", consent: "", scope: "x", name: "N" }));
     expect(r.kind).toBe("invalid");

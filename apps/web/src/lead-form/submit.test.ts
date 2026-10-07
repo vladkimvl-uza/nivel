@@ -133,9 +133,9 @@ describe("processLeadForm", () => {
     }
   });
 
-  it("shows the field the services refused, and gives the place back", async () => {
+  it("shows the field the services refused, and counts the try (a refused form is not a free one)", async () => {
     const { deps, advance } = setup({ ok: false, reason: "invalid", fields: { phone: "rejected" } });
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       advance(60_000);
       expect(await processLeadForm(good, { ip: null }, deps)).toMatchObject({
         status: "error",
@@ -144,6 +144,90 @@ describe("processLeadForm", () => {
         values: { phone: "+998901234567" },
       });
     }
+    advance(60_000);
+    expect(await processLeadForm(good, { ip: null }, deps)).toMatchObject({ code: "rate_limited" });
+  });
+
+  it("counts a try that made the gateway throw (a request that breaks the insert is not a free one)", async () => {
+    const { deps, advance } = setup(() => Promise.reject(new Error("boom")));
+    for (let i = 0; i < 3; i++) {
+      advance(60_000);
+      expect(await processLeadForm(good, { ip: null }, deps)).toMatchObject({ code: "failed" });
+    }
+    advance(60_000);
+    expect(await processLeadForm(good, { ip: null }, deps)).toMatchObject({ code: "rate_limited" });
+  });
+
+  it("does not let a visitor with a whole /64 of IPv6 addresses start from a new one every time", async () => {
+    const { deps, advance } = setup();
+    for (let i = 0; i < 3; i++) {
+      advance(60_000);
+      const phone = `+99890123456${i}`;
+      expect(
+        await processLeadForm({ ...good, phone }, { ip: `2001:db8:1:2:${i}:${i + 1}:${i + 2}:${i + 3}` }, deps),
+      ).toMatchObject({ status: "ok" });
+    }
+    advance(60_000);
+    expect(
+      await processLeadForm({ ...good, phone: "+998901234569" }, { ip: "2001:db8:1:2:ffff::1" }, deps),
+    ).toMatchObject({ code: "rate_limited" });
+  });
+
+  it("limits a Telegram nickname whatever the case of its letters", async () => {
+    const { deps, advance } = setup();
+    const tg = { ...good, phone: "" };
+    const nicks = ["Nivel_User", "nivel_user", "NIVEL_USER"];
+    for (const [i, telegram] of nicks.entries()) {
+      advance(60_000);
+      expect(await processLeadForm({ ...tg, telegram }, { ip: `203.0.113.${i + 1}` }, deps)).toMatchObject({
+        status: "ok",
+      });
+    }
+    advance(60_000);
+    expect(await processLeadForm({ ...tg, telegram: "nIvEl_uSeR" }, { ip: "203.0.113.50" }, deps)).toMatchObject({
+      code: "rate_limited",
+    });
+  });
+
+  it("writes the consent of the text the page shows: the document and its fingerprint", async () => {
+    const calls: LeadCommand[] = [];
+    const deps = createSubmitDeps({
+      gateway: {
+        submit: async (c) => {
+          calls.push(c);
+          return { ok: true as const, number: "L-1" };
+        },
+      },
+      consentFor: async (lang) => ({ textVersion: `db-${lang}`, textSha256: "f".repeat(64), documentId: "doc-1" }),
+    });
+    await processLeadForm({ ...good, locale: "ru" }, { ip: null }, deps);
+    expect(calls[0]?.consent).toEqual({
+      kind: "pd_processing",
+      granted: true,
+      textVersion: "db-ru",
+      textSha256: "f".repeat(64),
+      documentId: "doc-1",
+    });
+  });
+
+  it("falls back to the built-in text of the consent when its document cannot be found out", async () => {
+    const calls: LeadCommand[] = [];
+    const deps = createSubmitDeps({
+      gateway: {
+        submit: async (c) => {
+          calls.push(c);
+          return { ok: true as const, number: "L-1" };
+        },
+      },
+      consentFor: async () => {
+        throw new Error("db down");
+      },
+      log: vi.fn(),
+    });
+    await processLeadForm(good, { ip: null }, deps);
+    expect(calls[0]?.consent.textVersion).toBe("builtin-2026-10-07");
+    expect(calls[0]?.consent.textSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(calls[0]?.consent.documentId).toBeUndefined();
   });
 
   it("answers a failure of the gateway with a plain error and logs no personal data", async () => {

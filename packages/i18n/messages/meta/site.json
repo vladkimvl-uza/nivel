@@ -2208,5 +2208,15 @@
     "context": "note under the requisites table",
     "maxLen": 160,
     "status": "draft"
+  },
+  "form.offTitle": {
+    "context": "title of the card that stands in for the request form while the form is switched off",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "form.offText": {
+    "context": "text of that card: the form is not connected yet, write to the bot",
+    "maxLen": 150,
+    "status": "draft"
   }
 }

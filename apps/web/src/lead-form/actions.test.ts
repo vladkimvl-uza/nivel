@@ -6,6 +6,9 @@ import { IDLE } from "./types.ts";
 const requestHeaders = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => requestHeaders.current }));
 
+// the consent text of the page comes from the database; these tests have none
+vi.mock("../../app/[locale]/(marketing)/_data/server.ts", () => ({ getLegalRows: async () => [] }));
+
 const shared = globalThis as { __nivelLeadDeps?: unknown };
 
 function form(over: Record<string, string> = {}): FormData {
@@ -54,5 +57,28 @@ describe("submitLead", () => {
   it("tells the visitor the truth while the services are not connected", async () => {
     const state = await submitLead(IDLE, form());
     expect(state).toMatchObject({ status: "error", code: "unavailable" });
+  });
+
+  it("answers a second argument that is not a form with the plain error of an empty form, not with a crash", async () => {
+    const submit = vi.fn();
+    configureLeadGateway({ submit });
+    for (const bad of [null, undefined, "phone=1", { phone: "+998901234567" }]) {
+      const state = await submitLead(IDLE, bad as unknown as FormData);
+      expect(state).toMatchObject({ status: "error", code: "invalid", fields: {}, values: {} });
+    }
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("writes the built-in consent text when the database has no document of it", async () => {
+    const seen: { consent: { textVersion: string; documentId?: string } }[] = [];
+    configureLeadGateway({
+      submit: async (command) => {
+        seen.push(command);
+        return { ok: true, number: "L-0008" };
+      },
+    });
+    await submitLead(IDLE, form({ phone: "+998 90 555 44 33" }));
+    expect(seen[0]?.consent.textVersion).toBe("builtin-2026-10-07");
+    expect(seen[0]?.consent.documentId).toBeUndefined();
   });
 });

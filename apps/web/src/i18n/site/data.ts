@@ -28,6 +28,23 @@ export async function readFeeScale(
   return { scale: { ...DEFAULT_FEE_SCALE }, source: "default" };
 }
 
+/** The flag of the request form: until the owner switches it on, the page shows the bot instead (CLAUDE.md, feature flags). */
+export const LEAD_FORM_FLAG = "feature.webLeadForm";
+
+/** A feature flag of `ops.settings`: on only for the value `true`; a missing setting, another value or a dead database is off. */
+export async function readFeatureFlag(
+  read: () => Promise<{ value: unknown } | null>,
+  log: (message: string) => void = (m) => console.error(m),
+): Promise<boolean> {
+  try {
+    const row = await read();
+    return row !== null && row.value === true;
+  } catch {
+    log("site: a feature flag could not be read; it counts as switched off");
+    return false;
+  }
+}
+
 export type LegalResolution =
   | {
       source: "db";
@@ -36,6 +53,8 @@ export type LegalResolution =
       effectiveFrom: string | null;
       sha256: string;
       bodyMd: string;
+      /** content.legal_documents.id */
+      id: string;
     }
   /** No document in the database in this language: the page shows the text built into the site (a draft). */
   | { source: "builtin"; draft: true };
@@ -55,6 +74,7 @@ export function resolveLegal(
     effectiveFrom: row.effectiveFrom,
     sha256: row.textSha256,
     bodyMd: row.bodyMd,
+    id: row.id,
   };
 }
 

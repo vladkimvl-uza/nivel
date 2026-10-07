@@ -10,6 +10,8 @@ import { clientIp, processLeadForm } from "./submit.ts";
 import type { LeadActionState } from "./types.ts";
 
 export async function submitLead(_previous: LeadActionState, formData: FormData): Promise<LeadActionState> {
+  // A server action is a public entry: its arguments come from the body of a request, whatever the types say.
+  if (!(formData instanceof FormData)) return { status: "error", code: "invalid", fields: {}, values: {} };
   const h = await headers();
   return processLeadForm(formData, { ip: clientIp(h) }, leadDeps());
 }

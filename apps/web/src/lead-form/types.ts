@@ -29,6 +29,8 @@ export interface LeadFormValues {
   district: string;
   budget: string;
   comment: string;
+  /** "on" when the consent was ticked: the form shows it ticked again after an answer, since React resets the form. */
+  consent?: "on";
 }
 
 /** The request as the services want it from the site: no ids of customers, no Telegram id (the database refuses them). */
@@ -43,7 +45,16 @@ export interface LeadCommand {
   utm?: Record<string, string>;
   customer: { displayName?: string; phoneE164?: string; telegramUsername?: string };
   /** The consent to the processing of personal data, ticked in the form (`ops.consents`, kind pd_processing). */
-  consent: { kind: "pd_processing"; granted: true; textVersion: string };
+  consent: {
+    kind: "pd_processing";
+    granted: true;
+    /** The version of the text the visitor was shown: of the document of the database, else of the built-in text. */
+    textVersion: string;
+    /** SHA-256 of that text (ARCHITECTURE 10.2); set by processLeadForm, not by the parser. */
+    textSha256?: string;
+    /** content.legal_documents.id of the document, when the page showed one of the database. */
+    documentId?: string;
+  };
 }
 
 export type LeadActionState =

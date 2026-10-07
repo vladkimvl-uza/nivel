@@ -4,7 +4,7 @@
 import { createDb, type Db } from "@nivel/db";
 import { ops } from "@nivel/db/repos";
 import { unstable_cache } from "next/cache";
-import { type FeeScaleResult, readFeeScale } from "../../../../src/i18n/site/data.ts";
+import { type FeeScaleResult, LEAD_FORM_FLAG, readFeatureFlag, readFeeScale } from "../../../../src/i18n/site/data.ts";
 import type { LegalKind, LegalRow } from "../../../../src/i18n/site/legal.ts";
 
 const FEE_SETTINGS_KEY = "money.fee_settings";
@@ -30,10 +30,18 @@ export const getFeeScale: () => Promise<FeeScaleResult> = unstable_cache(
   { tags: ["fee", "settings"], revalidate: 300 },
 );
 
+/** Whether the request form is shown: the flag `feature.webLeadForm`, off until the services are connected and the owner says so. */
+export const getLeadFormEnabled: () => Promise<boolean> = unstable_cache(
+  () => readFeatureFlag(() => ops.getSetting(db(), LEAD_FORM_FLAG)),
+  ["site:lead-form-flag"],
+  { tags: ["settings"], revalidate: 60 },
+);
+
 const legalRowsOf = unstable_cache(
   async (kind: LegalKind): Promise<LegalRow[]> => {
     const rows = await db().query.legalDocuments.findMany({
       columns: {
+        id: true,
         kind: true,
         version: true,
         lang: true,

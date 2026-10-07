@@ -27,6 +27,8 @@ export function legalMessageKey(slug: string): string | null {
 }
 
 export interface LegalRow {
+  /** content.legal_documents.id: the evidence of a consent names the document by it. */
+  id: string;
   kind: string;
   version: string;
   lang: "uz" | "ru";
@@ -81,7 +83,8 @@ export type Block =
 export function safeHref(href: string): string | null {
   if ([...href].some((c) => c.charCodeAt(0) < 32)) return null;
   if (/^(?:https?:\/\/|mailto:|tel:)\S+$/i.test(href)) return href;
-  if (/^\/(?!\/)\S*$/.test(href) || /^#\S*$/.test(href)) return href;
+  // a backslash after the slash is read by browsers as a second slash: "/\host" is "//host"
+  if (/^\/(?![/\\])[^\s\\]*$/.test(href) || /^#\S*$/.test(href)) return href;
   return null;
 }
 

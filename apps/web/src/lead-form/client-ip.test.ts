@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientIp, createKeyHasher } from "./client-ip.ts";
+import { clientIp, createKeyHasher, ipKey } from "./client-ip.ts";
 
 const headers = (o: Record<string, string>) => new Headers(o);
 
@@ -45,5 +45,34 @@ describe("createKeyHasher", () => {
     const a = createKeyHasher()("ip", "x");
     const b = createKeyHasher()("ip", "x");
     expect(a).not.toBe(b);
+  });
+});
+
+describe("ipKey", () => {
+  it("keeps an IPv4 address whole", () => {
+    expect(ipKey("203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("reduces an IPv6 address to its /64 network: one subscriber owns the whole of it", () => {
+    const a = ipKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd");
+    expect(a).toBe(ipKey("2001:0db8:0001:0002:1:2:3:4"));
+    expect(a).not.toBe(ipKey("2001:db8:1:3:aaaa:bbbb:cccc:dddd"));
+  });
+
+  it("reads the short forms of IPv6", () => {
+    expect(ipKey("2001:db8::1")).toBe(ipKey("2001:db8:0:0:ffff::9"));
+    expect(ipKey("::1")).toBe(ipKey("0:0:0:0:0:0:0:1"));
+    expect(ipKey("2001:db8:5:6::")).toBe(ipKey("2001:db8:5:6:7:8:9:a"));
+    expect(ipKey("::")).toBe(ipKey("0:0:0:0:1:2:3:4"));
+  });
+
+  it("treats an IPv4 address in IPv6 clothes as the IPv4 address", () => {
+    expect(ipKey("::ffff:203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("keeps text it cannot read, so that it is limited as it stands", () => {
+    expect(ipKey("1:2:3:4:5:6:7:8:9")).toBe("1:2:3:4:5:6:7:8:9");
+    expect(ipKey("zz::1")).toBe("zz::1");
+    expect(ipKey("1::2::3")).toBe("1::2::3");
   });
 });

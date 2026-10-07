@@ -568,7 +568,9 @@
       "consent_required": "Maʼlumotlarni qayta ishlashga rozilik boʻlmasa, arizani qabul qilib boʻlmaydi.",
       "rejected": "Bu maydonni tekshiring."
     },
-    "or": "Yoki darrov Telegramda"
+    "or": "Yoki darrov Telegramda",
+    "offTitle": "Ariza Telegram orqali qabul qilinadi",
+    "offText": "Saytdagi shakl hozircha ulanmagan. Vazifani Telegramdagi botga yozing — smetani oʻsha yerda yuboramiz."
   },
   "final": {
     "title": "Har bir qism — oʻz uyasida.",

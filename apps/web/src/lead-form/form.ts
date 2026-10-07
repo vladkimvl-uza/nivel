@@ -32,6 +32,16 @@ function read(raw: RawForm, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/** A control character other than the line break and the tab: Postgres refuses NUL in text, and no name or nickname has one. */
+function hasControl(text: string, allowLines: boolean): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c === 0x7f) return true;
+    if (c < 0x20 && !(allowLines && (c === 0x09 || c === 0x0a || c === 0x0d))) return true;
+  }
+  return false;
+}
+
 /** `@nick`, `nick` and `https://t.me/nick` all give `nick`; anything else that is not a nickname gives null. */
 function normalizeTelegram(raw: string): string | null {
   const text = raw.trim().replace(TELEGRAM_PREFIX, "").replace(/^@/, "");
@@ -67,14 +77,19 @@ export function parseLeadForm(raw: RawForm): ParsedLead {
   if (values.name.length > MAX_NAME) fields.name = "too_long";
   if (values.district.length > MAX_DISTRICT) fields.district = "too_long";
   if (values.comment.length > MAX_COMMENT) fields.comment = "too_long";
-  if (!CONSENT_ON.has(read(raw, "consent").trim().toLowerCase())) fields.consent = "consent_required";
+  if (hasControl(values.name, false)) fields.name = "rejected";
+  if (hasControl(values.district, false)) fields.district = "rejected";
+  if (hasControl(values.comment, true)) fields.comment = "rejected";
+  if (hasControl(values.telegram, false)) fields.telegram = "rejected";
+  if (CONSENT_ON.has(read(raw, "consent").trim().toLowerCase())) values.consent = "on";
+  else fields.consent = "consent_required";
 
   if (Object.keys(fields).length > 0 || scope === null || !budget.ok) return { kind: "invalid", fields, values };
 
   const utm: Record<string, string> = {};
   for (const key of UTM_KEYS) {
     const value = read(raw, key).trim();
-    if (value !== "" && value.length <= MAX_UTM_VALUE) utm[key] = value;
+    if (value !== "" && value.length <= MAX_UTM_VALUE && !hasControl(value, false)) utm[key] = value;
   }
 
   const customer: LeadCommand["customer"] = {};

@@ -189,7 +189,13 @@ export function LeadFormView({ labels, locale, utm, consentNote, botUrl, state, 
       </div>
       <div className={`lead-consent${err("consent") ? " is-invalid" : ""}`}>
         <label>
-          <input type="checkbox" name="consent" value="on" aria-invalid={err("consent") ? true : undefined} />
+          <input
+            type="checkbox"
+            name="consent"
+            value="on"
+            aria-invalid={err("consent") ? true : undefined}
+            {...(values.consent === "on" ? { defaultChecked: true } : {})}
+          />
           <span>{labels.consent}</span>
         </label>
         <p className="nv-field__hint">{consentNote}</p>
