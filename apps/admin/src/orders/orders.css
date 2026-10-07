@@ -1,0 +1,113 @@
+/*
+ * The few rules the orders screens add to the admin (night theme of @nivel/ui, ADR-006): the board by stages and the
+ * meter of the purchases. Colours are roles of themes.css, nothing of its own.
+ */
+
+.ord-board {
+  display: grid;
+  gap: 24px;
+}
+
+.ord-stage {
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  background: var(--surface);
+}
+
+.ord-stage > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.ord-stage > .adm-table-wrap {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.ord-count {
+  font-family: var(--mono);
+  color: var(--ink-2);
+}
+
+.ord-late {
+  color: var(--accent-ink);
+}
+
+meter {
+  width: min(320px, 60vw);
+  height: 14px;
+  vertical-align: middle;
+}
+
+.adm-card details > summary,
+details.adm-card > summary {
+  cursor: pointer;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.adm-card h3 {
+  margin: 0 0 8px;
+  font-family: var(--cond);
+  font-size: 18px;
+}
+
+.ord-lines input[type="number"],
+.ord-inline-field {
+  width: 88px;
+}
+
+@media (max-width: 640px) {
+  .adm-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The menu of the orders screens is longer than the base one: on a phone it takes its own line and the person wraps. */
+@media (max-width: 760px) {
+  .adm-head {
+    gap: 8px 12px;
+  }
+
+  .adm-nav {
+    flex: 1 1 100%;
+    order: 3;
+    min-width: 0;
+  }
+
+  .adm-who {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .adm-who > span {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* The page is never wider than the screen: the frame is one column of the width of the window, wide tables scroll inside. */
+.adm-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Terms of a card are long ("вознаграждение за закупку и ручательство"): on a phone the name is above its value. */
+@media (max-width: 640px) {
+  .adm-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+
+  .adm-kv dd {
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+  }
+}
