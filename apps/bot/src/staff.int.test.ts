@@ -59,6 +59,12 @@ describe("the answer of the owner in the topic goes to the customer", () => {
   it("a message of notes only is not sent at all", async () => {
     await inTopic(OWNER, { text: "// call him tomorrow\n// and ask about the case" });
     expect(h.tg.calls.filter((c) => c.payload.chat_id === ali.id)).toHaveLength(0);
+    // The customer was told nothing: the request is not answered yet, and the first answer is still to come.
+    const [row] = await q("select first_response_at from sales.leads where id = $1", [lead.leadId]);
+    expect(row.first_response_at).toBeNull();
+    await inTopic(OWNER, { text: "Salom" });
+    const [after] = await q("select first_response_at from sales.leads where id = $1", [lead.leadId]);
+    expect(after.first_response_at).not.toBeNull();
   });
 
   it("a photo keeps its picture and loses the note lines of its caption", async () => {
@@ -165,6 +171,37 @@ describe("the message of the customer goes to the topic", () => {
     } finally {
       w.clock.set(new Date("2026-10-12T10:00:00+05:00"));
     }
+  });
+
+  it("a topic that was deleted in Telegram is made again: the message arrives in the new one, the customer notices nothing", async () => {
+    h.tg.failNext("copyMessage", { error_code: 400, description: "Bad Request: message thread not found" });
+    await h.send(h.tg.text(ali, "Qachon tayyor boʻladi?"));
+    const [row] = await q("select tg_topic_id from sales.leads where id = $1", [lead.leadId]);
+    expect(row.tg_topic_id).not.toBeNull();
+    expect(Number(row.tg_topic_id)).not.toBe(lead.topicId);
+    // The card of the request is in the new topic, and the message was copied there after it.
+    expect(h.tg.of("createForumTopic")).toHaveLength(1);
+    expect(h.tg.textsTo(w.groupId, Number(row.tg_topic_id))).toHaveLength(1);
+    const copies = h.tg.of("copyMessage").filter((c) => c.payload.chat_id === w.groupId);
+    expect(copies.map((c) => c.payload.message_thread_id)).toEqual([lead.topicId, Number(row.tg_topic_id)]);
+    expect(h.tg.textsTo(ali.id)).toEqual([]);
+  });
+
+  it("a message the group cannot take is not lost in silence: the customer is told to send it again", async () => {
+    h.tg.failNext("copyMessage", { error_code: 400, description: "Bad Request: chat not found" });
+    const errors = await h.send(h.tg.text(ali, "Salom"), { allowErrors: true });
+    expect(errors).toEqual([]);
+    expect(h.tg.textsTo(ali.id)).toEqual(["Xabar ustaga yetkazilmadi. Birozdan soʻng qayta yuboring."]);
+    // The topic is still the topic of the request: a chat that cannot be reached is not a deleted topic.
+    const [row] = await q("select tg_topic_id from sales.leads where id = $1", [lead.leadId]);
+    expect(Number(row.tg_topic_id)).toBe(lead.topicId);
+  });
+
+  it("when the new topic fails as well the customer is told to send it again", async () => {
+    h.tg.failNext("copyMessage", { error_code: 400, description: "Bad Request: message thread not found" });
+    h.tg.failNext("copyMessage", { error_code: 400, description: "Bad Request: message thread not found" });
+    await h.send(h.tg.text(ali, "Salom"), { allowErrors: true });
+    expect(h.tg.textsTo(ali.id)).toEqual(["Xabar ustaga yetkazilmadi. Birozdan soʻng qayta yuboring."]);
   });
 
   it("a customer without any topic is told how to use the bot", async () => {

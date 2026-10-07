@@ -287,6 +287,18 @@ describe("the sweep of the topics", () => {
     expect(r.sweep).toHaveBeenCalledTimes(2);
   });
 
+  it("does not start a run while the previous one is still going (a slow Telegram makes no double topics)", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const r = await start({ BOT_TOKEN: TOKEN }, { sweepEveryMs: 1_000 });
+    let finish: () => void = () => {};
+    r.sweep.mockImplementationOnce(() => new Promise<number>((resolve) => (finish = () => resolve(0))));
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(r.sweep).toHaveBeenCalledTimes(1);
+    finish();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(r.sweep).toHaveBeenCalledTimes(2);
+  });
+
   it("does not run without a bot", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const r = await start({}, { sweepEveryMs: 1_000 });

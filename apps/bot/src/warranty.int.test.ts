@@ -110,6 +110,68 @@ describe("«Report a problem» (ARCHITECTURE 7.2 «Гарантия»)", () => {
     expect((await sessionOf(ali)).step).toBe("warranty_text");
   });
 
+  it("a voice message alone is no report the worker could open: the customer is asked for words or a photo", async () => {
+    const o = await handedOverOrder(w, lead);
+    await press(`o:${o.number}:warr`);
+    await h.send(h.tg.privateMessage(ali, { voice: { file_id: "v1", file_unique_id: "vu", duration: 3 } }));
+    h.tg.reset();
+    await press("w:done");
+    expect(h.tg.lastSend(ali.id)?.payload.text).toBe("Avval muammoni yozing.");
+    expect(await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [o.orderId])).toHaveLength(0);
+    // A voice message with the words is copied to the owner together with them.
+    await h.send(h.tg.text(ali, "Ovoz tepada"));
+    await press("w:done");
+    expect(h.tg.of("copyMessage").filter((c) => c.payload.chat_id === w.groupId)).toHaveLength(2);
+  });
+
+  it("the report is queued and written in the audit even when the topic is deleted: the topic is made again", async () => {
+    const o = await handedOverOrder(w, lead);
+    await press(`o:${o.number}:warr`);
+    await h.send(h.tg.text(ali, "Ekran oʻchib qoldi"));
+    h.tg.reset();
+    h.tg.failNext("sendMessage", { error_code: 400, description: "Bad Request: message thread not found" });
+    await press("w:done");
+    const [row] = await q("select tg_topic_id from sales.leads where id = $1", [lead.leadId]);
+    expect(Number(row.tg_topic_id)).not.toBe(lead.topicId);
+    expect(h.tg.textsTo(w.groupId, Number(row.tg_topic_id)).some((t) => t.includes(o.number))).toBe(true);
+    expect(
+      await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [o.orderId]),
+    ).toHaveLength(1);
+    expect(h.tg.textsTo(ali.id)[0]).toContain("Murojaat qabul qilindi");
+  });
+
+  it("a refusal of the group does not undo the report: it is queued first, the customer is told it was received", async () => {
+    const o = await handedOverOrder(w, lead);
+    await press(`o:${o.number}:warr`);
+    await h.send(h.tg.text(ali, "Shovqin bor"));
+    h.tg.reset();
+    h.tg.failNext("sendMessage", { error_code: 500, description: "Internal Server Error" });
+    await press("w:done");
+    expect(
+      await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [o.orderId]),
+    ).toHaveLength(1);
+    expect(
+      await q("select 1 from ops.audit_log where action = 'warranty.reported' and entity_id = $1", [o.orderId]),
+    ).toHaveLength(1);
+    expect(h.tg.textsTo(ali.id)[0]).toContain("Murojaat qabul qilindi");
+    expect((await sessionOf(ali)).step).toBe("idle");
+  });
+
+  it("a card number written in the description does not stop the report: the job carries it masked, the owner sees the words", async () => {
+    const o = await handedOverOrder(w, lead);
+    await press(`o:${o.number}:warr`);
+    await h.send(h.tg.text(ali, "Karta 8600 1234 5678 9012 bilan toʻladim, ishlamayapti"));
+    h.tg.reset();
+    await press("w:done");
+    const jobs = await q(
+      "select payload from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1",
+      [o.orderId],
+    );
+    expect(jobs).toHaveLength(1);
+    expect(parseWarrantyReport(jobs[0].payload)?.text).toBe("Karta [...] bilan toʻladim, ishlamayapti");
+    expect(h.tg.textsTo(ali.id)[0]).toContain("Murojaat qabul qilindi");
+  });
+
   it("«Done» out of its step does nothing but say the button is old", async () => {
     h.tg.reset();
     await press("w:done");

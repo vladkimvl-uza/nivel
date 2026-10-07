@@ -95,6 +95,15 @@ export async function setLeadTopic(db: Db, leadId: string, topicId: number): Pro
   return r.rowCount === 1;
 }
 
+/** The topic is gone (deleted in Telegram, or it could not get its card): the requests that point to it point to nothing. */
+export async function forgetTopic(db: Db, topicId: number): Promise<string[]> {
+  const { rows } = await db.$client.query<{ id: string }>(
+    "update sales.leads set tg_topic_id = null where tg_topic_id = $1 returning id",
+    [topicId],
+  );
+  return rows.map((r) => r.id);
+}
+
 /** Open requests of the last three days that have no topic in the owner's group yet. */
 export async function leadsWithoutTopic(db: Db, limit = 20): Promise<{ id: string }[]> {
   const { rows } = await db.$client.query<{ id: string }>(

@@ -173,6 +173,7 @@
     "received": "Murojaat qabul qilindi: {time}. Usta javob beradi.",
     "no_orders": "Kafolat murojaati uchun topshirilgan buyurtma kerak.",
     "empty": "Avval muammoni yozing.",
+    "failed": "Murojaat hozir qabul qilinmadi. Usta bilan bogʻlaning: /support.",
     "owner_card": "Garantiya murojaati {number}: {time}."
   },
   "support": {
@@ -196,6 +197,7 @@
     "cancelled": "Bekor qilindi.",
     "send_as_photo": "Rasmni fayl sifatida emas, foto sifatida yuboring: HEIC fayl ochilmaydi.",
     "relayed": "Xabaringiz ustaga yuborildi.",
+    "relay_failed": "Xabar ustaga yetkazilmadi. Birozdan soʻng qayta yuboring.",
     "no_topic": "Xabaringiz qabul qilindi; usta tez orada javob beradi."
   },
   "owner": {
@@ -298,6 +300,7 @@
       "wrong_status": "Chek «Xarid» holatida qabul qilinadi; hozir {number}: {status}.",
       "no_order": "Bu mavzu uchun buyurtma yoʻq.",
       "expired": "Qoralama eskirgan: chekni qayta yuboring.",
+      "not_queued": "Qoralamani navbatga qoʻyib boʻlmadi. Chekni adminkada qoʻlda kiriting.",
       "no_lines": "Smetada ochiq qatorlar yoʻq: «Smetadan tashqari»ni tanlang."
     },
     "act_photo": {

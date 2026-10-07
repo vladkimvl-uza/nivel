@@ -223,11 +223,18 @@ receipts.callbackQuery(/^r:/, async (ctx) => {
     payload.actId = draft.actId;
   }
   // One photo is one job whatever the number of presses (the key is the unique id of the file).
-  await outbox.enqueue(
-    { kind: "job", payload: { ...payload }, dedupeKey: `intake:${draft.kind}:${draft.telegramFileUniqueId}` },
-    {},
-    ctx.deps.rt,
-  );
+  try {
+    await outbox.enqueue(
+      { kind: "job", payload: { ...payload }, dedupeKey: `intake:${draft.kind}:${draft.telegramFileUniqueId}` },
+      {},
+      ctx.deps.rt,
+    );
+  } catch (err) {
+    // The queue refuses data that looks like a card number: the owner is told, the draft is kept for the admin panel.
+    if (!(err instanceof orders.ValidationError)) throw err;
+    ctx.deps.log.warn({ err, number: draft.orderNumber }, "the draft of a purchase was refused by the queue");
+    return rep(ctx, ctx.t("owner.receipt.not_queued"), thread);
+  }
   await botRepo.deleteSession(ctx.deps.db, draftKey(id));
   await clearButtons(ctx);
   return rep(

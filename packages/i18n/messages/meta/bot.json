@@ -664,6 +664,11 @@
     "maxLen": 40,
     "status": "draft"
   },
+  "warranty.failed": {
+    "context": "warranty report could not be taken",
+    "maxLen": 90,
+    "status": "draft"
+  },
   "warranty.owner_card": {
     "context": "header of the report in the topic of the owner",
     "maxLen": 70,
@@ -727,6 +732,11 @@
   "common.relayed": {
     "context": "the message of the customer was copied to the topic",
     "maxLen": 40,
+    "status": "draft"
+  },
+  "common.relay_failed": {
+    "context": "customer message could not be delivered to the owner topic",
+    "maxLen": 90,
     "status": "draft"
   },
   "common.no_topic": {
@@ -1132,6 +1142,11 @@
   "owner.receipt.expired": {
     "context": "the draft was not found",
     "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.receipt.not_queued": {
+    "context": "draft of the purchase was refused by the queue",
+    "maxLen": 100,
     "status": "draft"
   },
   "owner.receipt.no_lines": {

@@ -2,10 +2,12 @@
 // other way round): the message is copied into the topic of his order or request. Outside the hours of the answers the
 // bot says when the owner answers, once in six hours.
 import { formatDate, formatTime } from "@nivel/i18n";
+import { GrammyError } from "grammy";
 import { ownerGroupId, workCalendar } from "../config.ts";
 import type { BotContext } from "../context.ts";
 import { nextOpening } from "../hours.ts";
 import { topicForCustomer } from "../store.ts";
+import { sendToTopic } from "../topics.ts";
 import { say } from "../ui.ts";
 import { loadProfile } from "./profile.ts";
 
@@ -31,7 +33,21 @@ export async function relayToTopic(ctx: BotContext): Promise<boolean> {
   const groupId = await ownerGroupId(ctx.deps.db);
   const thread = await topicForCustomer(ctx.deps.db, customer.id);
   if (groupId === null || thread === null) return false;
-  await ctx.api.copyMessage(groupId, message.chat.id, message.message_id, { message_thread_id: thread });
+  try {
+    const delivered = await sendToTopic(ctx.api, ctx.deps, thread, (topic) =>
+      ctx.api.copyMessage(groupId, message.chat.id, message.message_id, { message_thread_id: topic }),
+    );
+    if (!delivered) {
+      await say(ctx, ctx.t("common.relay_failed"));
+      return true;
+    }
+  } catch (err) {
+    // The group refused (it is gone, the bot was removed): the customer is told, he is not left with a silent bot.
+    if (!(err instanceof GrammyError)) throw err;
+    ctx.deps.log.warn({ err: err.description, customerId: customer.id }, "the message could not be put into the topic");
+    await say(ctx, ctx.t("common.relay_failed"));
+    return true;
+  }
   await autoReply(ctx);
   return true;
 }

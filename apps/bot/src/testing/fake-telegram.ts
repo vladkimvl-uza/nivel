@@ -50,12 +50,14 @@ export class FakeTelegram {
   readonly calls: Call[] = [];
   private messageId = 1000;
   private readonly failures = new Map<string, Failure[]>();
+  private readonly hooks = new Map<string, (() => Promise<void>)[]>();
 
   /** Installs the fake on a bot: nothing leaves the process. */
   install<C extends Context>(bot: Bot<C>): void {
     bot.api.config.use(async (_prev, method, payload) => {
       const p = (payload ?? {}) as Record<string, unknown>;
       this.calls.push({ method, payload: p });
+      await this.hooks.get(method)?.shift()?.();
       const queue = this.failures.get(method);
       const failure = queue?.shift();
       if (failure) return { ok: false, ...failure } as never;
@@ -71,6 +73,13 @@ export class FakeTelegram {
     const queue = this.failures.get(method) ?? [];
     queue.push(failure);
     this.failures.set(method, queue);
+  }
+
+  /** Runs `hook` during the next call of `method`, before the answer (something else happens while the call is on its way). */
+  onNext(method: string, hook: () => Promise<void>) {
+    const queue = this.hooks.get(method) ?? [];
+    queue.push(hook);
+    this.hooks.set(method, queue);
   }
 
   private result(method: string, p: Record<string, unknown>): unknown {

@@ -122,8 +122,16 @@ export async function startApp(o: AppOptions): Promise<StartedApp> {
     }
     const api = bot.api;
     const sweep = o.sweep ?? sweepLeadTopics;
+    // One run at a time: a slow Telegram (429) must not let two runs make the same topic.
+    let sweeping = false;
     sweeper = setInterval(() => {
-      sweep(api, deps).catch((err) => log.error({ err }, "the sweep of the topics failed"));
+      if (sweeping) return;
+      sweeping = true;
+      sweep(api, deps)
+        .catch((err) => log.error({ err }, "the sweep of the topics failed"))
+        .finally(() => {
+          sweeping = false;
+        });
     }, o.sweepEveryMs ?? 30_000);
     sweeper.unref?.();
   }

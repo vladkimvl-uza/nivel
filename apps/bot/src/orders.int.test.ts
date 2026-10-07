@@ -197,6 +197,35 @@ describe("the acceptance of the offer and the estimate", () => {
     }
   });
 
+  it("an account of twenty digits written in groups is not mistaken for a card: the requisites are shown", async () => {
+    await ops.setSetting(
+      w.db,
+      "requisites.ip",
+      { holder: "YaTT Nivel Test", bank: "Test Bank", account: "2020 8000 9001 0000 0001", mfo: "00014", inn: "123456789" },
+      "test",
+    );
+    try {
+      const o = await sentOrder(w, lead);
+      await press(`o:${o.number}:acc:1`);
+      await press(`o:${o.number}:acc2:1`);
+      expect(h.tg.textsTo(ali.id).at(-1)).toContain("2020 8000 9001 0000 0001");
+    } finally {
+      await ops.setSetting(
+        w.db,
+        "requisites.ip",
+        {
+          holder: "YaTT Nivel Test",
+          bank: "Test Bank",
+          account: "20208000900100000001",
+          mfo: "00014",
+          inn: "123456789",
+          purpose: "Tovar xaridi uchun {number}",
+        },
+        "test",
+      );
+    }
+  });
+
   it("a second press of the confirmation changes nothing and records nothing twice", async () => {
     const o = await sentOrder(w, lead);
     await press(`o:${o.number}:acc:1`);

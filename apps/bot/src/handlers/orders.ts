@@ -8,6 +8,7 @@ import { consents, dispatch, orders, reports } from "@nivel/services";
 import type { InlineButton } from "@nivel/telegram";
 import { decodeCallback, orderCallback, sumText } from "@nivel/telegram";
 import { Composer } from "grammy";
+import { looksLikeCard } from "../card-number.ts";
 import { paymentRequisites } from "../config.ts";
 import type { BotContext } from "../context.ts";
 import { latestConsent, offersPublished } from "../store.ts";
@@ -15,8 +16,6 @@ import { ack, button, clearButtons, say } from "../ui.ts";
 import { loadProfile } from "./profile.ts";
 
 const MAX_QUESTION = 2000;
-/** Sixteen digits in a row: a card number. The requisites the owner typed are not shown if they look like one. */
-const CARD_NUMBER = /(?<![0-9])[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}(?![0-9])/;
 const SHOWN_REFUSALS = new Set(["estimate_expired", "offer_not_published", "consent_missing", "invalid_transition"]);
 
 type View = Awaited<ReturnType<typeof orders.getCustomerOrder>>;
@@ -61,7 +60,7 @@ async function paymentBlock(ctx: BotContext, view: View): Promise<string> {
   if (funds !== undefined) {
     lines.push(ctx.t("my.pay.funds", { sum: sumText(funds, ctx.lang) }));
     const requisites = await paymentRequisites(ctx.deps.db);
-    if (requisites !== null && !CARD_NUMBER.test(requisites.text) && !CARD_NUMBER.test(requisites.purpose ?? "")) {
+    if (requisites !== null && !looksLikeCard(requisites.text) && !looksLikeCard(requisites.purpose ?? "")) {
       lines.push(ctx.t("my.pay.requisites", { requisites: requisites.text }));
       if (requisites.purpose !== undefined) {
         lines.push(ctx.t("my.pay.purpose", { purpose: requisites.purpose.replaceAll("{number}", view.number) }));

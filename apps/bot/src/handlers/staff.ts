@@ -1,6 +1,9 @@
 // The owner's group (ARCHITECTURE 7.1, 7.2 «Группа владельца»): only the owner and the assistant are heard. A reply in a
-// topic is copied to the customer (lines that begin with `//` stay in the group); the buttons of a request and of an
-// order send events as the person who pressed (the database checks his Telegram id against ops.admin_users).
+// topic is copied to the customer (lines that begin with `//` stay in the group). The buttons of an order send events as
+// the person who pressed (the database checks his Telegram id against ops.admin_users). The buttons of a request
+// (in work, spam, address) and the copying of replies rest on the owner's id and the list of the assistants in the
+// settings only: the bot has no right to read ops.admin_users, so a helper switched off in the admin panel is also to
+// be taken out of `telegram.assistant_ids`.
 import { sales } from "@nivel/db/repos";
 import { dispatch, orders } from "@nivel/services";
 import { botTranslator, decodeCallback, hexToUuid, keyboardMarkup, stripOwnerNotes } from "@nivel/telegram";
@@ -168,9 +171,11 @@ staff.on("message", async (ctx) => {
 
   const text = message.text ?? message.caption;
   const { text: cleaned, hadNotes } = stripOwnerNotes(text);
+  let delivered = true;
   try {
     if (message.text !== undefined && hadNotes) {
-      if (cleaned !== "") await ctx.api.sendMessage(chatId, cleaned);
+      if (cleaned === "") delivered = false;
+      else await ctx.api.sendMessage(chatId, cleaned);
     } else if (hadNotes) {
       await ctx.api.copyMessage(chatId, ctx.chat.id, message.message_id, { caption: cleaned });
     } else {
@@ -181,5 +186,6 @@ staff.on("message", async (ctx) => {
     ctx.deps.log.warn({ err: err.description, customerId: target.customerId }, "the answer was not delivered");
     return inTopic(ctx, ctx.t("owner.copy.failed"), thread);
   }
-  if (target.leadId !== null) await markFirstResponse(ctx.deps.db, target.leadId);
+  // An internal note that reached nobody is not an answer to the customer.
+  if (delivered && target.leadId !== null) await markFirstResponse(ctx.deps.db, target.leadId);
 });

@@ -15,11 +15,13 @@ import {
   orderCallback,
   type WarrantyReportPayload,
 } from "@nivel/telegram";
-import { Composer } from "grammy";
+import { Composer, GrammyError } from "grammy";
+import { maskCardNumbers } from "../card-number.ts";
 import { ownerGroupId } from "../config.ts";
 import type { BotContext } from "../context.ts";
 import { advance } from "../steps.ts";
 import { orderTopic } from "../store.ts";
+import { sendToTopic } from "../topics.ts";
 import { ack, button, say } from "../ui.ts";
 import { loadProfile } from "./profile.ts";
 
@@ -93,24 +95,68 @@ warranty.callbackQuery("w:done", async (ctx) => {
     return ack(ctx, ctx.t("common.stale"));
   }
   await ack(ctx);
-  if (parts.text.trim() === "" && parts.messageIds.length === 0) return say(ctx, ctx.t("warranty.empty"));
+  // The worker opens a case only from words or a photo (parseWarrantyReport): a voice message or a file alone is not enough.
+  if (parts.text.trim() === "" && parts.photoFileIds.length === 0) return say(ctx, ctx.t("warranty.empty"));
   const own = (await handedOver(ctx)).find((o) => o.number === ctx.session.draft.orderNumber);
   const { customer } = await loadProfile(ctx);
   if (own === undefined || customer === null) return say(ctx, ctx.t("warranty.no_orders"));
   const at = ctx.deps.now();
   const { db } = ctx.deps;
 
-  // The owner sees the words and the photos in the topic of the order at once.
+  // First what must not be lost: the exact time (the warranty counts from it) and the job. Telegram comes after.
+  const payload: WarrantyReportPayload = {
+    job: BOT_JOB.WARRANTY_REPORT,
+    orderId: own.orderId,
+    orderNumber: own.number,
+    reportedAt: at.toISOString(),
+    // The queue refuses a card number; the owner reads the words as they were written, in the topic.
+    text: maskCardNumbers(parts.text),
+    photoFileIds: parts.photoFileIds,
+    byTelegramId: ctx.from.id,
+  };
+  await ops.appendAudit(db, {
+    actor: `customer:${customer.id}`,
+    action: "warranty.reported",
+    entity: "sales.orders",
+    entityId: own.orderId,
+    after: { reportedAt: payload.reportedAt, messages: parts.messageIds.length, photos: parts.photoFileIds.length },
+  });
+  let queued = true;
+  try {
+    await outbox.enqueue(
+      {
+        kind: "job",
+        payload: { ...payload },
+        dedupeKey: `warranty:${own.orderId}:${parts.messageIds[0] ?? at.getTime()}`,
+      },
+      {},
+      ctx.deps.rt,
+    );
+  } catch (err) {
+    if (!(err instanceof orders.ValidationError)) throw err;
+    queued = false;
+    ctx.deps.log.error({ err, number: own.number }, "the report of a problem was refused by the queue");
+  }
+
+  // The owner sees the words and the photos in the topic of the order at once; a failure here does not undo the report.
   const order = await db.query.orders.findFirst({
     columns: { tgTopicId: true, leadId: true },
     where: (t, { eq }) => eq(t.id, own.orderId),
   });
   const thread = order === undefined ? null : await orderTopic(db, order);
   const groupId = await ownerGroupId(db);
+  let shown = false;
   if (thread !== null && groupId !== null) {
-    await ctx.api.sendMessage(groupId, `${ownerHeader(at, own.number)}`, { message_thread_id: thread });
-    for (const id of parts.messageIds) {
-      await ctx.api.copyMessage(groupId, ctx.chat?.id ?? ctx.from.id, id, { message_thread_id: thread });
+    try {
+      shown = await sendToTopic(ctx.api, ctx.deps, thread, async (topic) => {
+        await ctx.api.sendMessage(groupId, ownerHeader(at, own.number), { message_thread_id: topic });
+        for (const id of parts.messageIds) {
+          await ctx.api.copyMessage(groupId, ctx.chat?.id ?? ctx.from.id, id, { message_thread_id: topic });
+        }
+      });
+    } catch (err) {
+      if (!(err instanceof GrammyError)) throw err;
+      ctx.deps.log.warn({ err: err.description, number: own.number }, "the report could not be shown in the topic");
     }
   } else {
     ctx.deps.log.warn(
@@ -119,31 +165,8 @@ warranty.callbackQuery("w:done", async (ctx) => {
     );
   }
 
-  const payload: WarrantyReportPayload = {
-    job: BOT_JOB.WARRANTY_REPORT,
-    orderId: own.orderId,
-    orderNumber: own.number,
-    reportedAt: at.toISOString(),
-    text: parts.text,
-    photoFileIds: parts.photoFileIds,
-    byTelegramId: ctx.from.id,
-  };
-  await outbox.enqueue(
-    {
-      kind: "job",
-      payload: { ...payload },
-      dedupeKey: `warranty:${own.orderId}:${parts.messageIds[0] ?? at.getTime()}`,
-    },
-    {},
-    ctx.deps.rt,
-  );
-  await ops.appendAudit(db, {
-    actor: `customer:${customer.id}`,
-    action: "warranty.reported",
-    entity: "sales.orders",
-    entityId: own.orderId,
-    after: { reportedAt: payload.reportedAt, messages: parts.messageIds.length, photos: parts.photoFileIds.length },
-  });
+  // Nobody can see the report (not queued and not in the topic): the customer is not told it was received.
+  if (!queued && !shown) return say(ctx, ctx.t("warranty.failed"));
   ctx.session.step = "idle";
   delete ctx.session.draft.orderNumber;
   delete ctx.session.draft.warrantyParts;

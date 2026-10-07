@@ -81,6 +81,19 @@ describe("the photo of a receipt in a topic: «1250000 Mycom»", () => {
     expect(await drafts()).toHaveLength(1);
   });
 
+  it("a job the queue refuses (a card number in the caption) is not lost in silence: the owner is told to enter it by hand", async () => {
+    const o = await buying();
+    await inTopic(OWNER, { photo: photo("AgAC-card"), caption: "1100000 8600123456789012" });
+    const card = h.tg.of("sendMessage").find((c) => c.payload.chat_id === w.groupId);
+    h.tg.reset();
+    const errors = await press(OWNER, inlineButtons(card)[0]?.callback_data as string);
+    expect(errors).toEqual([]);
+    expect(h.tg.textsTo(w.groupId, lead.topicId)).toEqual([
+      "Черновик не удалось поставить в очередь. Внесите чек в админке вручную.",
+    ]);
+    expect(await jobs(o.orderId)).toHaveLength(0);
+  });
+
   it("the choice of a line hands the photo and the sum to the worker as a job and says what comes next", async () => {
     const o = await buying();
     await inTopic(OWNER, { photo: photo("AgAC-r1"), caption: "1100000 Mycom" });
