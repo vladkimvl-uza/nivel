@@ -2,10 +2,11 @@
 // before the fix. The mock of Apps Script and of the Sheets service refuses what Google refuses (see gas-mock.mjs):
 // the types of arguments, methods and enum values that do not exist, options a method does not support.
 import { readFileSync } from "node:fs";
-import vm from "node:vm";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 import { beforeAll, describe, expect, it } from "vitest";
+import { createComputer } from "../crm-sheets/scripts/computed.mjs";
 import { createProject } from "../crm-sheets/scripts/env.mjs";
 import { calc } from "../crm-sheets/scripts/formula-eval.mjs";
 import { lintFormula } from "../crm-sheets/scripts/formula-lint.mjs";
@@ -95,7 +96,10 @@ describe("group 1: filter views of the Sheets service", () => {
               title: "x",
               range: { sheetId, startRowIndex: 4, startColumnIndex: 1, endColumnIndex: 4 },
               filterSpecs: [
-                { columnIndex: 2, filterCriteria: { condition: { type: "ONE_OF_LIST", values: [{ userEnteredValue: "a" }] } } },
+                {
+                  columnIndex: 2,
+                  filterCriteria: { condition: { type: "ONE_OF_LIST", values: [{ userEnteredValue: "a" }] } },
+                },
               ],
             },
           },
@@ -345,7 +349,9 @@ describe("group 6: dialogs", () => {
   it("a sidebar gets no setWidth (the reference gives it to dialogs only)", () => {
     const p = newProject();
     p.call("nvSetup");
-    for (const kind of Object.keys(JSON.parse(p.run("JSON.stringify(Object.fromEntries(Object.keys(NV_FORMS).map((k) => [k, 1])))")))) {
+    for (const kind of Object.keys(
+      JSON.parse(p.run("JSON.stringify(Object.fromEntries(Object.keys(NV_FORMS).map((k) => [k, 1])))")),
+    )) {
       p.env.sidebars.length = 0;
       p.call("nvShowForm", kind);
       expect(p.env.sidebars[0].width).toBe(0);
@@ -373,7 +379,16 @@ describe("group 6: google.script.run in the sidebars always has a failure handle
       );
     const els = new Map();
     const mkEl = (id) => {
-      const e = { id, value: id === "f_order" ? "NV-2026-0001" : "", className: "", textContent: "", children: [], listeners: {}, elements: [], reset: () => {} };
+      const e = {
+        id,
+        value: id === "f_order" ? "NV-2026-0001" : "",
+        className: "",
+        textContent: "",
+        children: [],
+        listeners: {},
+        elements: [],
+        reset: () => {},
+      };
       e.appendChild = (c) => e.children.push(c);
       e.setAttribute = () => {};
       e.addEventListener = (t, f) => {
@@ -441,12 +456,18 @@ describe("group 2: text from outside never turns into a formula when the code wr
       {
         received: p.date("2026-09-20T10:00:00+05:00"),
         eventId: "keep",
-        type: "=HYPERLINK(\"http://x\",\"y\")",
+        type: '=HYPERLINK("http://x","y")',
         error: "+998901234567",
         summary: "=1+1",
         result: "Принято",
       },
-      { received: p.date("2026-09-21T10:00:00+05:00"), eventId: "keep2", type: "-5", summary: "@name", result: "Принято" },
+      {
+        received: p.date("2026-09-21T10:00:00+05:00"),
+        eventId: "keep2",
+        type: "-5",
+        summary: "@name",
+        result: "Принято",
+      },
     ]);
     expect(p.call("nvCleanWebhookJournal", p.call("nvNow"))).toBe(1);
     const rows = p.call("nvReadTable", "webhook");
@@ -565,7 +586,10 @@ describe("group 2: the self-check compares formulas the way Sheets may spell the
 
   it("a really changed formula is still found", () => {
     const sh = built.env.ss.getSheetByName("Заказы");
-    const cell = sh.getRange(5, 2 + JSON.parse(built.run("JSON.stringify(NV_SCHEMA.orders.cols.map((c) => !!c.calc))")).indexOf(true));
+    const cell = sh.getRange(
+      5,
+      2 + JSON.parse(built.run("JSON.stringify(NV_SCHEMA.orders.cols.map((c) => !!c.calc))")).indexOf(true),
+    );
     const old = cell.getFormula();
     cell.setFormula("=1+1");
     try {
@@ -696,7 +720,8 @@ describe("group 3: only the cells that may be typed in are open in a protected s
     const layout = json(built, "nvSettingsLayout()");
     const sh = built.env.ss.getSheetByName("Настройки");
     const open = new Set();
-    for (const r of sh.sheetProtection.unprotected) for (let row = r.getRow(); row <= r.getLastRow(); row++) open.add(row);
+    for (const r of sh.sheetProtection.unprotected)
+      for (let row = r.getRow(); row <= r.getLastRow(); row++) open.add(row);
     const editable = layout.filter((x) => !x.isGroup && !x.def.readonly && x.def.type !== "formula").map((x) => x.row);
     expect([...open].sort((a, b) => a - b)).toEqual(editable);
   });
@@ -704,7 +729,8 @@ describe("group 3: only the cells that may be typed in are open in a protected s
   it("the calculator keeps the formula of the reserve closed", () => {
     const sh = built.env.ss.getSheetByName("Калькулятор");
     const open = new Set();
-    for (const r of sh.sheetProtection.unprotected) for (let row = r.getRow(); row <= r.getLastRow(); row++) open.add(row);
+    for (const r of sh.sheetProtection.unprotected)
+      for (let row = r.getRow(); row <= r.getLastRow(); row++) open.add(row);
     expect(open.has(23)).toBe(true);
     expect(open.has(24)).toBe(false);
   });
@@ -934,9 +960,14 @@ describe("group 4: gridlines only on the continuous axis", () => {
     expect(() => base().setOption("hAxis.gridlines.color", "#eee").build()).not.toThrow();
     expect(() => base().setOption("titel", "x").build()).toThrow(/Unknown chart option/);
     expect(() => sh.newChart().setChartType("BARS")).toThrow(/setChartType/);
-    expect(() => sh.newChart().setChartType("LINE").addRange(data.getRange("A1:C5")).setOption("hAxis.gridlines.color", "#eee").build()).toThrow(
-      /discrete/,
-    );
+    expect(() =>
+      sh
+        .newChart()
+        .setChartType("LINE")
+        .addRange(data.getRange("A1:C5"))
+        .setOption("hAxis.gridlines.color", "#eee")
+        .build(),
+    ).toThrow(/discrete/);
   });
 });
 
@@ -986,7 +1017,11 @@ describe("group 4: the script removes only its own charts", () => {
     const p = fresh();
     const ids = JSON.parse(p.env.docProps.get("NV_CHART_IDS"));
     expect(ids).toHaveLength(8);
-    expect(ids.sort()).toEqual(own(p).map((c) => c.getChartId()).sort());
+    expect(ids.sort()).toEqual(
+      own(p)
+        .map((c) => c.getChartId())
+        .sort(),
+    );
   });
 });
 
@@ -1005,5 +1040,157 @@ describe("group 4: setOption does not say whether a key was taken, the self-chec
     expect(r.result).toBe("Предупреждение");
     expect(r.details).toContain("funnel: isStacked");
     expect(r.details).toContain("deals_vs_threshold: series");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// group 5: sheet functions in formulas
+
+describe("group 5: HSTACK gets no bare scalar (it would pad the other rows with #N/A)", () => {
+  it("no formula of the book has a scalar literal as an argument of HSTACK", () => {
+    expect(lintBook(built, ["hstack-scalar"])).toEqual([]);
+  });
+
+  it("every block of «_Задачи» stretches its text, object, sum and code over the height of the key column", () => {
+    const block = built.call("nvTaskBlock", {
+      sheet: "orders",
+      keyCol: "num",
+      code: "order_x",
+      due: built.call("nvR", "orders", "dEstimate"),
+      text: '"Сделать"',
+      object: "Заказ",
+      num: built.call("nvR", "orders", "num"),
+      client: built.call("nvR", "orders", "clientName"),
+      amount: undefined,
+      conds: ["TRUE"],
+    });
+    const key = built.call("nvR", "orders", "num");
+    const stretched = block.split(`IF(ROW(${key});`).length - 1;
+    expect(stretched).toBeGreaterThanOrEqual(4);
+  });
+
+  it("the linter finds a scalar in HSTACK and accepts a stretched one", () => {
+    expect(lintFormula('=HSTACK(A1:A9,"x")').map((q) => q.rule)).toContain("hstack-scalar");
+    expect(lintFormula('=HSTACK(A1:A9,IF(ROW(A1:A9),"x"))')).toEqual([]);
+  });
+});
+
+describe("group 5: the tax of December is paid in January, and the flag can be set", () => {
+  const evalAt = (iso, paidDec, paidMonths = {}) => {
+    const p = newProject({ now: new Date(iso) });
+    p.call("nvSetup");
+    const th = p.env.ss.getSheetByName("Порог и налоги");
+    th.getRange("O19").setValue(paidDec);
+    for (const [row, v] of Object.entries(paidMonths)) th.getRange(`O${row}`).setValue(v);
+    const comp = createComputer(p);
+    const f = p.call("nvPrevTaxPaidFormula");
+    return calc(f, comp.ctxFor("Порог и налоги"));
+  };
+
+  it("the cell of December has a name and a checkbox", () => {
+    expect(built.env.ss.getRangeByName("TH_PAID_DEC")).toBeTruthy();
+    const sh = built.env.ss.getSheetByName("Порог и налоги");
+    expect(sh._cell(19, 15).dv.type).toBe("checkbox");
+  });
+
+  it("in January the flag of December counts (before: the month was not in the table, the reminder could not be cleared)", () => {
+    expect(evalAt("2027-01-12T10:00:00+05:00", false)).toBe(false);
+    expect(evalAt("2027-01-12T10:00:00+05:00", true)).toBe(true);
+  });
+
+  it("in the other months the flag of the previous month in the table counts", () => {
+    // October 2026: the previous month is September, row 14 of the table (E6 is January)
+    expect(evalAt("2026-10-07T10:00:00+05:00", false, { 14: false })).toBe(false);
+    expect(evalAt("2026-10-07T10:00:00+05:00", false, { 14: true })).toBe(true);
+  });
+
+  it("both the tile and the list of tasks use that one formula", () => {
+    const today = built.call("nvTaxTasksFormula");
+    expect(today).toContain("TH_PAID_DEC");
+    const kpi = JSON.stringify(built.call("nvKpiDefs"));
+    expect(kpi).toContain("TH_PAID_DEC");
+  });
+
+  it("the cells of December are open for the owner", () => {
+    const sh = built.env.ss.getSheetByName("Порог и налоги");
+    const open = sh.sheetProtection.unprotected.map((r) => r.getA1Notation());
+    expect(open.some((a) => a.includes("O19"))).toBe(true);
+  });
+});
+
+describe("group 5: links go through an address the reference allows", () => {
+  it("no link of the book starts with #gid=", () => {
+    expect(lintBook(built, ["hyperlink-anchor"])).toEqual([]);
+  });
+
+  it("the link of a task is the address of the book with #gid= and the row", () => {
+    const f = built.env.ss.getSheetByName("_Задачи")._cell(2, 1).f;
+    expect(f).toContain('"https://docs.google.com/spreadsheets/d/mock-spreadsheet-id/edit#gid=');
+    expect(f).toMatch(/#gid=\d+&range=B"&ROW\(/);
+  });
+
+  it("the linter finds an anchor link", () => {
+    expect(lintFormula('=HYPERLINK("#gid=5","x")').map((q) => q.rule)).toContain("hyperlink-anchor");
+    expect(lintFormula('=HYPERLINK("https://a.b/#gid=5","x")')).toEqual([]);
+  });
+});
+
+describe("group 5: names in LAMBDA and LET are not references", () => {
+  it("no LAMBDA or LET name of the book is r, c, rc, r1c1 or like A1", () => {
+    expect(lintBook(built, ["risky-name"])).toEqual([]);
+  });
+
+  it("the linter finds the names it must", () => {
+    for (const n of ["c", "r", "rc", "r1c2", "A1", "ab12"])
+      expect(
+        lintFormula(`=MAP(A1:A3,LAMBDA(${n},${n}*2))`).map((q) => q.rule),
+        n,
+      ).toContain("risky-name");
+    for (const n of ["code_", "num_", "d", "key_"])
+      expect(lintFormula(`=MAP(A1:A3,LAMBDA(${n},${n}*2))`), n).toEqual([]);
+    expect(lintFormula("=LET(c,1,c+1)").map((q) => q.rule)).toContain("risky-name");
+  });
+});
+
+describe("group 5: COUNTIFS and the like take ranges, not computed arrays", () => {
+  it("no *IFS function of the book gets an array from FILTER or from a LET variable", () => {
+    expect(lintBook(built, ["ifs-array"])).toEqual([]);
+  });
+
+  it("the list «Сегодня» counts rows of the sorted array by arithmetic", () => {
+    const f = built.env.ss.getSheetByName("Сегодня")._cell(6, 2).f;
+    expect(f).not.toMatch(/COUNTIFS\(/);
+    expect(f).toContain('SUMPRODUCT((INDEX(t,,4)=num_)*(INDEX(t,,7)<>"next_step"))=0');
+  });
+
+  it("the stages on «_Данные» match the codes by MATCH, not by COUNTIFS over an array of criteria", () => {
+    const data = built.env.ss.getSheetByName("_Данные");
+    const stages = json(built, "NV_ND.stages");
+    const d = data._cell(stages, 4).f;
+    const c = data._cell(stages, 3).f;
+    for (const f of [d, c]) {
+      expect(f).toContain("ISNUMBER(MATCH(");
+      expect(f).not.toContain("COUNTIFS(");
+    }
+    expect(c).toContain("TODAY()");
+  });
+
+  it("the linter finds the two shapes", () => {
+    const rules = (f) => lintFormula(f).map((q) => q.rule);
+    expect(rules("=LET(t,SORT(A1:B9),COUNTIFS(INDEX(t,,1),5))")).toContain("ifs-array");
+    expect(rules("=SUMPRODUCT(COUNTIFS(A1:A9,FILTER(B1:B9,B1:B9>1)))")).toContain("ifs-array");
+    expect(rules('=COUNTIFS(A1:A9,B1,C1:C9,"x")')).toEqual([]);
+  });
+});
+
+describe("group 5: XLOOKUP takes one key", () => {
+  it("no XLOOKUP of the book gets a range as the key", () => {
+    expect(lintBook(built, ["xlookup-array"])).toEqual([]);
+  });
+
+  it("the linter finds a range as a key and accepts a variable", () => {
+    expect(lintFormula("=XLOOKUP(A1:A9,B1:B9,C1:C9)").map((q) => q.rule)).toContain("xlookup-array");
+    expect(lintFormula("=XLOOKUP('Закупки'!$G$6:$G,B1:B9,C1:C9)").map((q) => q.rule)).toContain("xlookup-array");
+    expect(lintFormula("=MAP(A1:A9,LAMBDA(k_,XLOOKUP(k_,B1:B9,C1:C9)))")).toEqual([]);
   });
 });

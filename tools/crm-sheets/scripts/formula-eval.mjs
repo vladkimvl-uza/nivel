@@ -673,6 +673,22 @@ export function evaluate(tree, ctx) {
       if (i < 0) throw na();
       return ret[i] === undefined ? null : ret[i];
     },
+    // MATCH with the match type 0 only (the CRM uses no other): the position of the first equal value, #N/A when none
+    MATCH: (a) => {
+      const key = scalar(ev(a[0]));
+      const type = a[2] && a[2].k !== "empty" ? num(ev(a[2])) : 1;
+      if (type !== 0) throw new FormulaError("#NAME?", "MATCH with a match type other than 0 is not imitated");
+      const look = cellsOf(ev(a[1]));
+      const same = (v) =>
+        v !== null && v !== "" && key !== null && key !== ""
+          ? typeof v === "number" && typeof key === "number"
+            ? v === key
+            : String(v).toLowerCase() === String(key).toLowerCase()
+          : false;
+      const i = look.findIndex(same);
+      if (i < 0) throw na();
+      return i + 1;
+    },
     INDEX: (a) => {
       const r = ev(a[0]);
       const i = a[1] && a[1].k !== "empty" ? num(ev(a[1])) : 1;

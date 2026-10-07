@@ -185,7 +185,9 @@ function nvFilterViews() {
     });
     const all = [];
     items.forEach((it) => {
-      it.requests.forEach((r) => all.push(r));
+      it.requests.forEach((r) => {
+        all.push(r);
+      });
     });
     let batchOk = false;
     if (!failed.length) {
@@ -233,7 +235,9 @@ function nvWarnProtect(sh, text, open) {
   if (foreign) {
     nvSetupNote(
       note,
-      "лист уже защищён вручную («" + String(foreign.getDescription()).slice(0, 80) + "»): защита Nivel не поставлена, чужая не тронута",
+      "лист уже защищён вручную («" +
+        String(foreign.getDescription()).slice(0, 80) +
+        "»): защита Nivel не поставлена, чужая не тронута",
     );
     return null;
   }
@@ -273,6 +277,7 @@ function nvProtectSpecial() {
   lock("threshold", "формулы порога и налогов", [
     "M6:M17",
     "O6:P17",
+    "O" + NV_TH.months.dec + ":P" + NV_TH.months.dec,
     "R6:U" + (NV_TH.other.first + NV_TH.other.rows - 1),
   ]);
   lock("calc", "ввод только в светлые ячейки", ["C6:C13", "C23"]);
@@ -305,6 +310,7 @@ function nvDefineNames() {
   nvSetName(ss, "TH_CUM", th.getRange("K6:K17"));
   nvSetName(ss, "TH_TAX_EST", th.getRange("L6:L17"));
   nvSetName(ss, "TH_PAID", th.getRange("O6:O17"));
+  nvSetName(ss, "TH_PAID_DEC", th.getRange(NV_TH.months.dec, 15));
   const rs = nvSheet("reserves");
   ["NV_RES_BAL_W", "NV_RES_BAL_T", "NV_RES_CLOSED", "NV_RES_LOSS_BP", "NV_RES_RATE", "NV_RES_MATURE"].forEach(
     (name, i) => {

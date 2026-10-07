@@ -25,14 +25,48 @@ function nvSheetGid(sheetKey) {
   return nvSheet(sheetKey).getSheetId();
 }
 
+/**
+ * The address of a sheet of this book for HYPERLINK: the address of the book (getUrl) with #gid=. The reference of
+ * HYPERLINK lists the protocols it takes (http, https, mailto and others) and says that an address without one gets
+ * http:// in front, so a bare "#gid=…" is not promised to work.
+ */
+function nvGidUrl(sheetKey) {
+  return String(nvSpreadsheet().getUrl()).replace(/[?#].*$/, "") + "#gid=" + nvSheetGid(sheetKey);
+}
+
+/**
+ * Is the tax of the previous month paid. In January that month is December of the last year, which is not a row of the
+ * table of the selected year: its flag has a cell of its own (TH_PAID_DEC); in the other months the flag of the row of
+ * that month is read.
+ */
+function nvPrevTaxPaidFormula() {
+  const prevStart = "(EOMONTH(TODAY();-2)+1)";
+  return (
+    "IF(MONTH(TODAY())=1; TH_PAID_DEC=TRUE; IFERROR(INDEX(TH_PAID; MATCH(" + prevStart + "; TH_MONTHS; 0)); FALSE))"
+  );
+}
+
 /** One block: FILTER over HSTACK of eight columns (due, text, object, number, client, sum, rule code, link). */
 function nvTaskBlock(b) {
   const empty = "{" + new Array(8).fill('""').join("\\") + "}";
-  const url = '"#gid=' + nvSheetGid(b.sheet) + '&range=B"&ROW(' + nvR(b.sheet, b.keyCol) + ")";
+  const key = nvR(b.sheet, b.keyCol);
+  const url = '"' + nvGidUrl(b.sheet) + '&range=B"&ROW(' + key + ")";
   const conds = b.conds.concat([nvDemoOk(nvR(b.sheet, "demo"))]);
+  // HSTACK does not repeat one value down the height of the other columns, it pads them with #N/A: what is not a column
+  // of the sheet is stretched over the height of the key column
+  const stretch = (x) => "IF(ROW(" + key + "); " + x + ")";
   return (
     "ARRAYFORMULA(IFERROR(FILTER(HSTACK(" +
-    [b.due, b.text, nvQ(b.object), b.num, b.client, b.amount || '""', nvQ(b.code), url].join("; ") +
+    [
+      b.due,
+      stretch(b.text),
+      stretch(nvQ(b.object)),
+      b.num,
+      b.client,
+      stretch(b.amount || '""'),
+      stretch(nvQ(b.code)),
+      url,
+    ].join("; ") +
     "); " +
     conds.join("; ") +
     "); " +
@@ -59,7 +93,9 @@ function nvTaskRules() {
     amount: amount,
     conds: conds,
   });
-  const clientOfPurchase = "IFERROR(XLOOKUP(" + Pu("order") + "; " + O("num") + "; " + O("clientName") + '); "")';
+  // XLOOKUP is described for one key: the clients of the purchases are looked up one by one
+  const clientOfPurchase =
+    "MAP(" + Pu("order") + "; LAMBDA(k_; IFERROR(XLOOKUP(k_; " + O("num") + "; " + O("clientName") + '); "")))';
   const or = (...xs) => "(" + xs.join("+") + ")>0";
   return [
     {
@@ -378,8 +414,8 @@ function nvTaskRules() {
         {
           raw: true,
           formula:
-            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Порог года: пройден рубеж "&TEXT(MAX(FILTER(NV_ALERTS_BP;TH_SHARE*10000>=NV_ALERTS_BP))/100;"0")&" %"\\"Порог"\\""\\""\\TH_VOLUME\\"threshold_alert"\\"#gid=' +
-            nvSheetGid("threshold") +
+            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Порог года: пройден рубеж "&TEXT(MAX(FILTER(NV_ALERTS_BP;TH_SHARE*10000>=NV_ALERTS_BP))/100;"0")&" %"\\"Порог"\\""\\""\\TH_VOLUME\\"threshold_alert"\\"' +
+            nvGidUrl("threshold") +
             '"}; {AND(TH_SHARE*10000>=NV_ALERT_1; MAX(FILTER(NV_ALERTS_BP; TH_SHARE*10000>=NV_ALERTS_BP))/100>NV_ALERT_ACK_PCT)}); ' +
             "{" +
             new Array(8).fill('""').join("\\") +
@@ -393,8 +429,8 @@ function nvTaskRules() {
         {
           raw: true,
           formula:
-            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Вебхук молчит больше 48 ч: проверить платформу"\\"Интеграция"\\""\\""\\""\\"webhook_silent"\\"#gid=' +
-            nvSheetGid("webhook") +
+            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Вебхук молчит больше 48 ч: проверить платформу"\\"Интеграция"\\""\\""\\""\\"webhook_silent"\\"' +
+            nvGidUrl("webhook") +
             '"}; {AND(NV_WEBHOOK_ON; NOW()-MAX(' +
             nvR("webhook", "received") +
             ")>2)}); " +
@@ -410,9 +446,8 @@ function nvTaskRules() {
 /** The taxes block: turnover tax, social tax (by the 15th), reconciliation of the account (last working day). */
 function nvTaxTasksFormula() {
   const day15 = "DATE(YEAR(TODAY());MONTH(TODAY());15)";
-  const prevStart = "(EOMONTH(TODAY();-2)+1)";
   const lastWorking = 'WORKDAY.INTL(EOMONTH(TODAY();0)+1;-1;"0000001";NV_HOLIDAYS)';
-  const url = '"#gid=' + nvSheetGid("threshold") + '"';
+  const url = '"' + nvGidUrl("threshold") + '"';
   const taxPrev = nvKpiRowRef("taxdue");
   const rows = [
     [
@@ -438,14 +473,7 @@ function nvTaxTasksFormula() {
     ],
   ];
   const literal = "{" + rows.map((r) => r.join("\\")).join(";") + "}";
-  const cond =
-    "{AND(TODAY()<=" +
-    day15 +
-    "+3; NOT(IFERROR(INDEX(TH_PAID; MATCH(" +
-    prevStart +
-    "; TH_MONTHS; 0)); FALSE))); TODAY()<=" +
-    day15 +
-    "+3; TRUE}";
+  const cond = "{AND(TODAY()<=" + day15 + "+3; NOT(" + nvPrevTaxPaidFormula() + ")); TODAY()<=" + day15 + "+3; TRUE}";
   return "ARRAYFORMULA(IFERROR(FILTER(" + literal + "; " + cond + "); {" + new Array(8).fill('""').join("\\") + "}))";
 }
 
@@ -473,7 +501,7 @@ function nvTasksFormula() {
  */
 function nvTodayFormula() {
   const tasks = nvQuoteSheet(NV_SN.tasks);
-  const soft = "ISNUMBER(MATCH(c; {" + NV_SOFT_RULES.map((c) => '"' + c + '"').join(";") + "}; 0))";
+  const soft = "ISNUMBER(MATCH(code_; {" + NV_SOFT_RULES.map((c) => '"' + c + '"').join(";") + "}; 0))";
   return (
     "=IFERROR(LET(t; SORT(FILTER(" +
     tasks +
@@ -482,11 +510,11 @@ function nvTodayFormula() {
     '!$A$2:$A<>""; ' +
     tasks +
     "!$A$2:$A<=TODAY()+7); 1; TRUE); " +
-    'u; FILTER(t; MAP(INDEX(t;;4); INDEX(t;;7); LAMBDA(n; c; OR(c<>"next_step"; n=""; COUNTIFS(INDEX(t;;4); n; INDEX(t;;7); "<>next_step")=0)))); ' +
+    'u; FILTER(t; MAP(INDEX(t;;4); INDEX(t;;7); LAMBDA(num_; code_; OR(code_<>"next_step"; num_=""; SUMPRODUCT((INDEX(t;;4)=num_)*(INDEX(t;;7)<>"next_step"))=0)))); ' +
     "HSTACK(" +
     'MAP(INDEX(u;;1); LAMBDA(d; TEXT(d; IF(MOD(d;1)=0; "dd.mm.yyyy"; "dd.mm.yyyy hh:mm")))); ' +
     "CHOOSECOLS(u; 2; 4; 6); " +
-    "MAP(INDEX(u;;1); INDEX(u;;7); LAMBDA(d; c; IFS(IF(MOD(d;1)=0; d<TODAY(); d<NOW()); IF(" +
+    "MAP(INDEX(u;;1); INDEX(u;;7); LAMBDA(d; code_; IFS(IF(MOD(d;1)=0; d<TODAY(); d<NOW()); IF(" +
     soft +
     '; "Предупреждение"; "Просрочено"); INT(d)=TODAY(); "Сегодня"; INT(d)=TODAY()+1; "Завтра"; TRUE; "На неделе"))); ' +
     'CHOOSECOLS(u; 3; 5; 7; 8))); "")'

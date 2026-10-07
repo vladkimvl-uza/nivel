@@ -55,13 +55,20 @@ const key = (r, c) => `${r},${c}`;
  */
 function checkNumberFormat(f) {
   if (typeof f !== "string")
-    throw new Error("Exception: The parameters (" + typeof f + ") don't match the method signature for SpreadsheetApp.Range.setNumberFormat.");
+    throw new Error(
+      "Exception: The parameters (" +
+        typeof f +
+        ") don't match the method signature for SpreadsheetApp.Range.setNumberFormat.",
+    );
   const rest = f
     .replace(/"[^"]*"/g, "")
     .replace(/\[[^\]]*\]/g, "")
     .replace(/\\./g, "");
   const bad = /[^ymdhsEeaApPMDHSY0-9#?.,%/:;@_*()$+<>=!&~^ -]/.exec(rest);
-  if (bad) throw new Error("Exception: Invalid number format pattern " + JSON.stringify(f) + " (unexpected " + JSON.stringify(bad[0]) + ")");
+  if (bad)
+    throw new Error(
+      "Exception: Invalid number format pattern " + JSON.stringify(f) + " (unexpected " + JSON.stringify(bad[0]) + ")",
+    );
 }
 
 /**
@@ -402,7 +409,11 @@ class Range {
   }
   setFormula(f) {
     if (typeof f !== "string" || !f.startsWith("="))
-      throw new Error("Exception: The parameters (" + typeof f + ") don't match the method signature for SpreadsheetApp.Range.setFormula.");
+      throw new Error(
+        "Exception: The parameters (" +
+          typeof f +
+          ") don't match the method signature for SpreadsheetApp.Range.setFormula.",
+      );
     this._each((r, c) => {
       const cell = this._cell(r, c);
       cell.f = f;
@@ -417,7 +428,9 @@ class Range {
       throw new Error("setFormulas: expected " + this.numRows + " rows in " + this.getA1Notation());
     this._each((r, c, i, j) => {
       if (!Array.isArray(m[i]) || m[i].length !== this.numCols)
-        throw new Error("setFormulas: expected " + this.numCols + " columns in row " + i + " of " + this.getA1Notation());
+        throw new Error(
+          "setFormulas: expected " + this.numCols + " columns in row " + i + " of " + this.getA1Notation(),
+        );
       const f = m[i][j];
       if (typeof f !== "string" || !f.startsWith("="))
         throw new Error("setFormulas: " + JSON.stringify(f) + " is not a formula (cell " + colToLetter(c) + r + ")");
@@ -480,7 +493,7 @@ class Range {
     return this.sheet.cells.get(key(this.row, this.col))?.nf || "0.###############";
   }
   setNumberFormats(m) {
-    if (Array.isArray(m)) m.forEach((row) => Array.isArray(row) && row.forEach(checkNumberFormat));
+    if (Array.isArray(m)) for (const row of m) if (Array.isArray(row)) for (const f of row) checkNumberFormat(f);
     return this._setMatrix("nf", m);
   }
   setBackground(c) {
@@ -875,7 +888,9 @@ class Sheet {
   }
   setRowHeights(r, n, h) {
     if (!Number.isInteger(r) || !Number.isInteger(n) || typeof h !== "number")
-      throw new Error("Exception: The parameters do not match the method signature for SpreadsheetApp.Sheet.setRowHeights.");
+      throw new Error(
+        "Exception: The parameters do not match the method signature for SpreadsheetApp.Sheet.setRowHeights.",
+      );
     for (let i = 0; i < n; i++) {
       this.rowH.set(r + i, h);
       this.rowForced.delete(r + i);
@@ -884,7 +899,9 @@ class Sheet {
   }
   setRowHeightsForced(r, n, h) {
     if (!Number.isInteger(r) || !Number.isInteger(n) || typeof h !== "number")
-      throw new Error("Exception: The parameters do not match the method signature for SpreadsheetApp.Sheet.setRowHeightsForced.");
+      throw new Error(
+        "Exception: The parameters do not match the method signature for SpreadsheetApp.Sheet.setRowHeightsForced.",
+      );
     for (let i = 0; i < n; i++) {
       this.rowH.set(r + i, h);
       this.rowForced.add(r + i);
@@ -975,7 +992,9 @@ class Sheet {
       },
       setUnprotectedRanges(r) {
         if (!Array.isArray(r) || r.some((x) => !x || typeof x.getSheet !== "function" || x.getSheet() !== sheet))
-          throw new Error("Exception: The parameters do not match setUnprotectedRanges(Range): ranges of the same sheet");
+          throw new Error(
+            "Exception: The parameters do not match setUnprotectedRanges(Range): ranges of the same sheet",
+          );
         p.unprotected = r;
         return p;
       },
@@ -1129,31 +1148,43 @@ class ChartBuilder {
   }
   setChartType(t) {
     if (!CHART_TYPE_NAMES.includes(t))
-      throw new Error("Exception: The parameters (" + String(t) + ") don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setChartType.");
+      throw new Error(
+        "Exception: The parameters (" +
+          String(t) +
+          ") don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setChartType.",
+      );
     this.spec.type = t;
     return this;
   }
   addRange(r) {
     if (!r || typeof r.getA1Notation !== "function")
-      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.addRange.");
+      throw new Error(
+        "Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.addRange.",
+      );
     this.spec.ranges.push(r.getA1Notation());
     return this;
   }
   setPosition(row, col, offX, offY) {
     if (![row, col, offX, offY].every(Number.isInteger) || row < 1 || col < 1)
-      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setPosition.");
+      throw new Error(
+        "Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setPosition.",
+      );
     this.spec.position = { row, col, offX, offY };
     return this;
   }
   setOption(k, v) {
     if (typeof k !== "string")
-      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setOption.");
+      throw new Error(
+        "Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setOption.",
+      );
     this.spec.options[k] = v;
     return this;
   }
   setNumHeaders(n) {
     if (!Number.isInteger(n))
-      throw new Error("Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setNumHeaders.");
+      throw new Error(
+        "Exception: The parameters don't match the method signature for SpreadsheetApp.EmbeddedChartBuilder.setNumHeaders.",
+      );
     this.spec.numHeaders = n;
     return this;
   }
@@ -1177,9 +1208,22 @@ class ChartBuilder {
       const root = k.split(".")[0];
       if (!CHART_OPTION_ROOTS.has(root)) throw new Error("Exception: Unknown chart option " + JSON.stringify(k));
       // Gridlines exist only on a continuous axis: in a horizontal bar chart the axis of values is hAxis, vAxis lists the categories
-      const discrete = spec.type === "BAR" ? "vAxis" : spec.type === "LINE" || spec.type === "COMBO" || spec.type === "COLUMN" ? "hAxis" : "";
+      const discrete =
+        spec.type === "BAR"
+          ? "vAxis"
+          : spec.type === "LINE" || spec.type === "COMBO" || spec.type === "COLUMN"
+            ? "hAxis"
+            : "";
       if (discrete && (k.startsWith(discrete + ".gridlines") || k.startsWith(discrete + ".minorGridlines")))
-        throw new Error("Exception: " + k + " is only supported for a continuous axis; " + discrete + " of a " + spec.type + " chart is discrete");
+        throw new Error(
+          "Exception: " +
+            k +
+            " is only supported for a continuous axis; " +
+            discrete +
+            " of a " +
+            spec.type +
+            " chart is discrete",
+        );
     }
     const env = this.sheet.owner.env;
     env.chartSeq = (env.chartSeq || 100) + 1;
@@ -1492,7 +1536,8 @@ function checkFilterCondition(path, cond) {
     );
   values.forEach((v, i) => {
     const kinds = ["userEnteredValue", "relativeDate"].filter((k) => v && v[k] !== undefined);
-    if (kinds.length !== 1) throw sheetsError(`${path}.values[${i}]`, "exactly one of userEnteredValue or relativeDate");
+    if (kinds.length !== 1)
+      throw sheetsError(`${path}.values[${i}]`, "exactly one of userEnteredValue or relativeDate");
     if (kinds[0] === "userEnteredValue" && typeof v.userEnteredValue !== "string")
       throw sheetsError(`${path}.values[${i}].userEnteredValue`, "must be a string");
     if (kinds[0] === "relativeDate") {
@@ -1520,9 +1565,11 @@ function createSheetsService(env) {
   return {
     Spreadsheets: {
       get(id, optionalArgs) {
-        if (env.sheetsFail) throw new Error("GoogleJsonResponseException: sheets.spreadsheets.get failed: Service unavailable");
+        if (env.sheetsFail)
+          throw new Error("GoogleJsonResponseException: sheets.spreadsheets.get failed: Service unavailable");
         if (typeof id !== "string") throw noMatch("get");
-        if (optionalArgs !== undefined && (optionalArgs === null || typeof optionalArgs !== "object")) throw noMatch("get");
+        if (optionalArgs !== undefined && (optionalArgs === null || typeof optionalArgs !== "object"))
+          throw noMatch("get");
         if (id !== env.ss.id) throw new Error(`GoogleJsonResponseException: Requested entity was not found: ${id}`);
         return {
           spreadsheetId: id,
@@ -1558,7 +1605,8 @@ function createSheetsService(env) {
             const p = `${path}.addFilterView.filter`;
             if (!f || typeof f.title !== "string" || !f.title) throw sheetsError(`${p}.title`, "missing");
             const r = f.range;
-            if (!r || !env.ss.sheets.some((sh) => sh.id === r.sheetId)) throw sheetsError(`${p}.range.sheetId`, "no such sheet");
+            if (!r || !env.ss.sheets.some((sh) => sh.id === r.sheetId))
+              throw sheetsError(`${p}.range.sheetId`, "no such sheet");
             for (const k of ["startRowIndex", "startColumnIndex", "endColumnIndex", "endRowIndex"]) {
               if (r[k] !== undefined && (!Number.isInteger(r[k]) || r[k] < 0))
                 throw sheetsError(`${p}.range.${k}`, "must be a non-negative integer");
@@ -1602,7 +1650,10 @@ export function createGas(opts = {}) {
   // The answer of alert() and prompt() is a value of the enum Button. The reference compares it with ui.Button.YES and so
   // on and never says that String(button) is the name: here a value is an object that stringifies to nothing useful.
   const Button = Object.fromEntries(
-    ["OK", "CANCEL", "YES", "NO", "CLOSE"].map((n) => [n, Object.freeze({ toString: () => "[object Button]", _name: n })]),
+    ["OK", "CANCEL", "YES", "NO", "CLOSE"].map((n) => [
+      n,
+      Object.freeze({ toString: () => "[object Button]", _name: n }),
+    ]),
   );
   const buttonOf = (answer) => Button[answer] || Button.CLOSE;
   const SpreadsheetApp = {
@@ -1883,11 +1934,11 @@ export function createGas(opts = {}) {
       env.triggers
         .filter((t) => t.owner === env.effectiveEmail)
         .map((t) => ({
-        getHandlerFunction: () => t.handler,
-        getUniqueId: () => t.id,
-        getEventType: () => t.event,
-        _spec: t,
-      })),
+          getHandlerFunction: () => t.handler,
+          getUniqueId: () => t.id,
+          getEventType: () => t.event,
+          _spec: t,
+        })),
     deleteTrigger: (tr) => {
       env.triggers = env.triggers.filter((t) => t.id !== tr.getUniqueId());
     },

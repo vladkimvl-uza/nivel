@@ -5373,9 +5373,9 @@ function nvKpiDefs() {
     // owner switches it in the settings; the tax reserve is not mixed in (it is another 1 %, of the receipts)
     sub: 'IF(NV_XOLIS_WITHHOLDS; "оценка · удерживает Xolis"; "к уплате до "&TEXT(DATE(YEAR(TODAY());MONTH(TODAY());15);"dd.mm.yyyy"))',
     worse:
-      "AND(NOT(NV_XOLIS_WITHHOLDS); TODAY()>DATE(YEAR(TODAY());MONTH(TODAY());15); NOT(IFERROR(INDEX(TH_PAID; MATCH(" +
-      prevStart +
-      "; TH_MONTHS; 0)); FALSE)))",
+      "AND(NOT(NV_XOLIS_WITHHOLDS); TODAY()>DATE(YEAR(TODAY());MONTH(TODAY());15); NOT(" +
+      nvPrevTaxPaidFormula() +
+      "))",
   };
   defs.conv = {
     v: convOf("ND_FROM", "ND_TO_X"),
@@ -5833,21 +5833,14 @@ function nvDataCells() {
     // An expired estimate is not an open order: it is left out of the stages
     const codes = "FILTER(NVD_STATUS_CODE; NVD_STATUS_STAGE=A" + r + '; NVD_STATUS_CODE<>"estimate_expired")';
     put("A", r, st);
-    put("D", r, "=SUMPRODUCT(COUNTIFS(" + O("code") + "; " + codes + "; " + O("demo") + "; " + C + "))");
+    // COUNTIFS is described for a range of criteria, not for an array: the codes are matched one by one by MATCH
+    const inStage = "ISNUMBER(MATCH(" + O("code") + "; " + codes + "; 0))";
+    const shown = "((" + O("demo") + "<>TRUE)+ND_DEMO_ON>0)";
+    put("D", r, "=SUMPRODUCT(" + inStage + "*" + shown + ")");
     put(
       "C",
       r,
-      "=SUMPRODUCT(COUNTIFS(" +
-        O("code") +
-        "; " +
-        codes +
-        "; " +
-        O("nextDate") +
-        '; "<"&TODAY(); ' +
-        O("demo") +
-        "; " +
-        C +
-        "))",
+      "=SUMPRODUCT(" + inStage + "*" + shown + "*ISNUMBER(" + O("nextDate") + ")*(" + O("nextDate") + "<TODAY()))",
     );
     put("B", r, "=D" + r + "-C" + r);
   });
@@ -6000,7 +5993,7 @@ function nvBuildData() {
 
 const NV_TH = {
   year: { head: 5, first: 6 },
-  months: { col: 5, first: 6, last: 17, total: 18 },
+  months: { col: 5, first: 6, last: 17, total: 18, dec: 19 },
   other: { col: 18, first: 6, rows: 200 },
 };
 
@@ -6171,6 +6164,15 @@ function nvBuildThreshold() {
   nvSetName(ss, "TH_CUM", sh.getRange("K6:K17"));
   nvSetName(ss, "TH_TAX_EST", sh.getRange("L6:L17"));
   nvSetName(ss, "TH_PAID", sh.getRange("O6:O17"));
+  // December of the last year: it is not a row of the table of the selected year, but its tax is paid in January
+  const dec = NV_TH.months.dec;
+  sh.getRange(dec, 5).setValue("Декабрь прошлого года");
+  sh.getRange(dec, 14).setFormula(nvApiFormula("=DATE($C$6; 1; 15)"));
+  if (sh.getRange(dec, 15).getValue() === "") sh.getRange(dec, 15).setValue(false);
+  nvSetName(ss, "TH_PAID_DEC", sh.getRange(dec, 15));
+  sh.getRange(dec, 15).setNote(
+    "Налог за декабрь прошлого года уплачен: отметка нужна в январе, когда этого месяца нет в таблице года.",
+  );
 
   // Validations
   const intRule = (cell) =>
@@ -6183,6 +6185,10 @@ function nvBuildThreshold() {
       .build();
   sh.getRange("M6:M17").setDataValidation(intRule("M6"));
   sh.getRange("O6:O17").setDataValidation(nvCheckboxRule());
+  sh.getRange(dec, 15).setDataValidation(nvCheckboxRule());
+  sh.getRange(dec, 16).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build(),
+  );
   sh.getRange("P6:P17").setDataValidation(
     SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build(),
   );
@@ -6236,7 +6242,7 @@ function nvStyleThreshold() {
   sh.getRange(3, L.firstCol).setFontSize(9).setFontColor(T.text2).setWrap(false);
   const blocks = [
     { col: 2, n: 2, rows: 10, label: 2 },
-    { col: NV_TH.months.col, n: 12, rows: 13 },
+    { col: NV_TH.months.col, n: 12, rows: 14 },
     { col: NV_TH.other.col, n: 4, rows: NV_TH.other.rows },
   ];
   blocks.forEach((b) => {
@@ -6288,6 +6294,17 @@ function nvStyleThreshold() {
     .setHorizontalAlignment("right");
   nvBorder(total, "top", T.totalRule, "SOLID_MEDIUM");
   sh.getRange(NV_TH.months.total, 5).setFontFamily(NV_FONT_TEXT).setHorizontalAlignment("left").setNumberFormat("@");
+  // December of the last year (below the total): the label, the due date, the flag, the date of payment
+  const dec = NV_TH.months.dec;
+  sh.getRange(dec, 5, 1, 12).setFontFamily(NV_FONT_MONO).setHorizontalAlignment("right");
+  sh.getRange(dec, 5)
+    .setFontFamily(NV_FONT_TEXT)
+    .setHorizontalAlignment("left")
+    .setNumberFormat("@")
+    .setFontColor(T.text2);
+  sh.getRange(dec, 14).setNumberFormat(NV_FMT.date).setHorizontalAlignment("left");
+  sh.getRange(dec, 15).setHorizontalAlignment("center");
+  sh.getRange(dec, 16).setNumberFormat(NV_FMT.date).setHorizontalAlignment("left");
   // Other income block
   const oc = NV_TH.other.col;
   sh.getRange(NV_TH.other.first, oc, NV_TH.other.rows, 1).setNumberFormat(NV_FMT.date).setFontFamily(NV_FONT_MONO);
@@ -6563,7 +6580,9 @@ function nvBuildCalc() {
                 inp.row +
                 ">=0; C" +
                 inp.row +
-                "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
+                "<=" +
+                nvIndirectName("NV_MAX_BUDGET") +
+                ")",
             ),
           )
           .setAllowInvalid(false)
@@ -6604,7 +6623,9 @@ function nvBuildCalc() {
             rv.budget +
             ">=0; C" +
             rv.budget +
-            "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
+            "<=" +
+            nvIndirectName("NV_MAX_BUDGET") +
+            ")",
         ),
       )
       .setAllowInvalid(false)
@@ -6869,14 +6890,48 @@ function nvSheetGid(sheetKey) {
   return nvSheet(sheetKey).getSheetId();
 }
 
+/**
+ * The address of a sheet of this book for HYPERLINK: the address of the book (getUrl) with #gid=. The reference of
+ * HYPERLINK lists the protocols it takes (http, https, mailto and others) and says that an address without one gets
+ * http:// in front, so a bare "#gid=…" is not promised to work.
+ */
+function nvGidUrl(sheetKey) {
+  return String(nvSpreadsheet().getUrl()).replace(/[?#].*$/, "") + "#gid=" + nvSheetGid(sheetKey);
+}
+
+/**
+ * Is the tax of the previous month paid. In January that month is December of the last year, which is not a row of the
+ * table of the selected year: its flag has a cell of its own (TH_PAID_DEC); in the other months the flag of the row of
+ * that month is read.
+ */
+function nvPrevTaxPaidFormula() {
+  const prevStart = "(EOMONTH(TODAY();-2)+1)";
+  return (
+    "IF(MONTH(TODAY())=1; TH_PAID_DEC=TRUE; IFERROR(INDEX(TH_PAID; MATCH(" + prevStart + "; TH_MONTHS; 0)); FALSE))"
+  );
+}
+
 /** One block: FILTER over HSTACK of eight columns (due, text, object, number, client, sum, rule code, link). */
 function nvTaskBlock(b) {
   const empty = "{" + new Array(8).fill('""').join("\\") + "}";
-  const url = '"#gid=' + nvSheetGid(b.sheet) + '&range=B"&ROW(' + nvR(b.sheet, b.keyCol) + ")";
+  const key = nvR(b.sheet, b.keyCol);
+  const url = '"' + nvGidUrl(b.sheet) + '&range=B"&ROW(' + key + ")";
   const conds = b.conds.concat([nvDemoOk(nvR(b.sheet, "demo"))]);
+  // HSTACK does not repeat one value down the height of the other columns, it pads them with #N/A: what is not a column
+  // of the sheet is stretched over the height of the key column
+  const stretch = (x) => "IF(ROW(" + key + "); " + x + ")";
   return (
     "ARRAYFORMULA(IFERROR(FILTER(HSTACK(" +
-    [b.due, b.text, nvQ(b.object), b.num, b.client, b.amount || '""', nvQ(b.code), url].join("; ") +
+    [
+      b.due,
+      stretch(b.text),
+      stretch(nvQ(b.object)),
+      b.num,
+      b.client,
+      stretch(b.amount || '""'),
+      stretch(nvQ(b.code)),
+      url,
+    ].join("; ") +
     "); " +
     conds.join("; ") +
     "); " +
@@ -6903,7 +6958,9 @@ function nvTaskRules() {
     amount: amount,
     conds: conds,
   });
-  const clientOfPurchase = "IFERROR(XLOOKUP(" + Pu("order") + "; " + O("num") + "; " + O("clientName") + '); "")';
+  // XLOOKUP is described for one key: the clients of the purchases are looked up one by one
+  const clientOfPurchase =
+    "MAP(" + Pu("order") + "; LAMBDA(k_; IFERROR(XLOOKUP(k_; " + O("num") + "; " + O("clientName") + '); "")))';
   const or = (...xs) => "(" + xs.join("+") + ")>0";
   return [
     {
@@ -7222,8 +7279,8 @@ function nvTaskRules() {
         {
           raw: true,
           formula:
-            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Порог года: пройден рубеж "&TEXT(MAX(FILTER(NV_ALERTS_BP;TH_SHARE*10000>=NV_ALERTS_BP))/100;"0")&" %"\\"Порог"\\""\\""\\TH_VOLUME\\"threshold_alert"\\"#gid=' +
-            nvSheetGid("threshold") +
+            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Порог года: пройден рубеж "&TEXT(MAX(FILTER(NV_ALERTS_BP;TH_SHARE*10000>=NV_ALERTS_BP))/100;"0")&" %"\\"Порог"\\""\\""\\TH_VOLUME\\"threshold_alert"\\"' +
+            nvGidUrl("threshold") +
             '"}; {AND(TH_SHARE*10000>=NV_ALERT_1; MAX(FILTER(NV_ALERTS_BP; TH_SHARE*10000>=NV_ALERTS_BP))/100>NV_ALERT_ACK_PCT)}); ' +
             "{" +
             new Array(8).fill('""').join("\\") +
@@ -7237,8 +7294,8 @@ function nvTaskRules() {
         {
           raw: true,
           formula:
-            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Вебхук молчит больше 48 ч: проверить платформу"\\"Интеграция"\\""\\""\\""\\"webhook_silent"\\"#gid=' +
-            nvSheetGid("webhook") +
+            'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Вебхук молчит больше 48 ч: проверить платформу"\\"Интеграция"\\""\\""\\""\\"webhook_silent"\\"' +
+            nvGidUrl("webhook") +
             '"}; {AND(NV_WEBHOOK_ON; NOW()-MAX(' +
             nvR("webhook", "received") +
             ")>2)}); " +
@@ -7254,9 +7311,8 @@ function nvTaskRules() {
 /** The taxes block: turnover tax, social tax (by the 15th), reconciliation of the account (last working day). */
 function nvTaxTasksFormula() {
   const day15 = "DATE(YEAR(TODAY());MONTH(TODAY());15)";
-  const prevStart = "(EOMONTH(TODAY();-2)+1)";
   const lastWorking = 'WORKDAY.INTL(EOMONTH(TODAY();0)+1;-1;"0000001";NV_HOLIDAYS)';
-  const url = '"#gid=' + nvSheetGid("threshold") + '"';
+  const url = '"' + nvGidUrl("threshold") + '"';
   const taxPrev = nvKpiRowRef("taxdue");
   const rows = [
     [
@@ -7282,14 +7338,7 @@ function nvTaxTasksFormula() {
     ],
   ];
   const literal = "{" + rows.map((r) => r.join("\\")).join(";") + "}";
-  const cond =
-    "{AND(TODAY()<=" +
-    day15 +
-    "+3; NOT(IFERROR(INDEX(TH_PAID; MATCH(" +
-    prevStart +
-    "; TH_MONTHS; 0)); FALSE))); TODAY()<=" +
-    day15 +
-    "+3; TRUE}";
+  const cond = "{AND(TODAY()<=" + day15 + "+3; NOT(" + nvPrevTaxPaidFormula() + ")); TODAY()<=" + day15 + "+3; TRUE}";
   return "ARRAYFORMULA(IFERROR(FILTER(" + literal + "; " + cond + "); {" + new Array(8).fill('""').join("\\") + "}))";
 }
 
@@ -7317,7 +7366,7 @@ function nvTasksFormula() {
  */
 function nvTodayFormula() {
   const tasks = nvQuoteSheet(NV_SN.tasks);
-  const soft = "ISNUMBER(MATCH(c; {" + NV_SOFT_RULES.map((c) => '"' + c + '"').join(";") + "}; 0))";
+  const soft = "ISNUMBER(MATCH(code_; {" + NV_SOFT_RULES.map((c) => '"' + c + '"').join(";") + "}; 0))";
   return (
     "=IFERROR(LET(t; SORT(FILTER(" +
     tasks +
@@ -7326,11 +7375,11 @@ function nvTodayFormula() {
     '!$A$2:$A<>""; ' +
     tasks +
     "!$A$2:$A<=TODAY()+7); 1; TRUE); " +
-    'u; FILTER(t; MAP(INDEX(t;;4); INDEX(t;;7); LAMBDA(n; c; OR(c<>"next_step"; n=""; COUNTIFS(INDEX(t;;4); n; INDEX(t;;7); "<>next_step")=0)))); ' +
+    'u; FILTER(t; MAP(INDEX(t;;4); INDEX(t;;7); LAMBDA(num_; code_; OR(code_<>"next_step"; num_=""; SUMPRODUCT((INDEX(t;;4)=num_)*(INDEX(t;;7)<>"next_step"))=0)))); ' +
     "HSTACK(" +
     'MAP(INDEX(u;;1); LAMBDA(d; TEXT(d; IF(MOD(d;1)=0; "dd.mm.yyyy"; "dd.mm.yyyy hh:mm")))); ' +
     "CHOOSECOLS(u; 2; 4; 6); " +
-    "MAP(INDEX(u;;1); INDEX(u;;7); LAMBDA(d; c; IFS(IF(MOD(d;1)=0; d<TODAY(); d<NOW()); IF(" +
+    "MAP(INDEX(u;;1); INDEX(u;;7); LAMBDA(d; code_; IFS(IF(MOD(d;1)=0; d<TODAY(); d<NOW()); IF(" +
     soft +
     '; "Предупреждение"; "Просрочено"); INT(d)=TODAY(); "Сегодня"; INT(d)=TODAY()+1; "Завтра"; TRUE; "На неделе"))); ' +
     'CHOOSECOLS(u; 3; 5; 7; 8))); "")'
@@ -7873,7 +7922,11 @@ function nvStylePanel() {
 
 /** The whole sheet is read-only (a warning) except the three controls. */
 function nvProtectPanel() {
-  nvWarnProtect(nvSheet("panel"), "панель только для чтения, меняются период, год и флажок демо", ["C3:D3", "F3", "I3"]);
+  nvWarnProtect(nvSheet("panel"), "панель только для чтения, меняются период, год и флажок демо", [
+    "C3:D3",
+    "F3",
+    "I3",
+  ]);
 }
 
 // ===== 16_charts.js =====
@@ -12265,7 +12318,9 @@ function nvFilterViews() {
     });
     const all = [];
     items.forEach((it) => {
-      it.requests.forEach((r) => all.push(r));
+      it.requests.forEach((r) => {
+        all.push(r);
+      });
     });
     let batchOk = false;
     if (!failed.length) {
@@ -12313,7 +12368,9 @@ function nvWarnProtect(sh, text, open) {
   if (foreign) {
     nvSetupNote(
       note,
-      "лист уже защищён вручную («" + String(foreign.getDescription()).slice(0, 80) + "»): защита Nivel не поставлена, чужая не тронута",
+      "лист уже защищён вручную («" +
+        String(foreign.getDescription()).slice(0, 80) +
+        "»): защита Nivel не поставлена, чужая не тронута",
     );
     return null;
   }
@@ -12353,6 +12410,7 @@ function nvProtectSpecial() {
   lock("threshold", "формулы порога и налогов", [
     "M6:M17",
     "O6:P17",
+    "O" + NV_TH.months.dec + ":P" + NV_TH.months.dec,
     "R6:U" + (NV_TH.other.first + NV_TH.other.rows - 1),
   ]);
   lock("calc", "ввод только в светлые ячейки", ["C6:C13", "C23"]);
@@ -12385,6 +12443,7 @@ function nvDefineNames() {
   nvSetName(ss, "TH_CUM", th.getRange("K6:K17"));
   nvSetName(ss, "TH_TAX_EST", th.getRange("L6:L17"));
   nvSetName(ss, "TH_PAID", th.getRange("O6:O17"));
+  nvSetName(ss, "TH_PAID_DEC", th.getRange(NV_TH.months.dec, 15));
   const rs = nvSheet("reserves");
   ["NV_RES_BAL_W", "NV_RES_BAL_T", "NV_RES_CLOSED", "NV_RES_LOSS_BP", "NV_RES_RATE", "NV_RES_MATURE"].forEach(
     (name, i) => {
@@ -14607,7 +14666,9 @@ function nvSelfCheckRows() {
     if (chartBad.length)
       warn(
         "Графики",
-        "Таблицы не вернули параметры: " + chartBad.join("; ") + ". Сверьте вид графиков на листе «Панель» (раздел README «Что проверить»)",
+        "Таблицы не вернули параметры: " +
+          chartBad.join("; ") +
+          ". Сверьте вид графиков на листе «Панель» (раздел README «Что проверить»)",
       );
     else ok("Графики", NV_PANEL.charts.length + " графиков, параметры читаются обратно");
   } catch (e) {

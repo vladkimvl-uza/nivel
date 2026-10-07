@@ -368,5 +368,9 @@ function nvStylePanel() {
 
 /** The whole sheet is read-only (a warning) except the three controls. */
 function nvProtectPanel() {
-  nvWarnProtect(nvSheet("panel"), "панель только для чтения, меняются период, год и флажок демо", ["C3:D3", "F3", "I3"]);
+  nvWarnProtect(nvSheet("panel"), "панель только для чтения, меняются период, год и флажок демо", [
+    "C3:D3",
+    "F3",
+    "I3",
+  ]);
 }

@@ -125,7 +125,9 @@ function nvBuildCalc() {
                 inp.row +
                 ">=0; C" +
                 inp.row +
-                "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
+                "<=" +
+                nvIndirectName("NV_MAX_BUDGET") +
+                ")",
             ),
           )
           .setAllowInvalid(false)
@@ -166,7 +168,9 @@ function nvBuildCalc() {
             rv.budget +
             ">=0; C" +
             rv.budget +
-            "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
+            "<=" +
+            nvIndirectName("NV_MAX_BUDGET") +
+            ")",
         ),
       )
       .setAllowInvalid(false)

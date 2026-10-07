@@ -197,7 +197,11 @@ export function lintFormula(f, ctx = {}) {
       call.args.forEach((a, i) => {
         const isRange = RANGE_FIRST.has(name) ? i === 0 || i % 2 === 1 : i % 2 === 0;
         if (isRange) {
-          if (/^(?:INDEX\(\s*[a-z][a-z0-9_]*\s*,|FILTER\(|SORT\(|SORTN\(|CHOOSECOLS\(|ARRAYFORMULA\(|SEQUENCE\(|\{)/i.test(a))
+          if (
+            /^(?:INDEX\(\s*[a-z][a-z0-9_]*\s*,|FILTER\(|SORT\(|SORTN\(|CHOOSECOLS\(|ARRAYFORMULA\(|SEQUENCE\(|\{)/i.test(
+              a,
+            )
+          )
             add("ifs-array", `${name} range argument ${i + 1} is a computed array: ${a.slice(0, 50)}`);
         } else if (/FILTER\(|SEQUENCE\(|^\{/i.test(a)) {
           add("ifs-array", `${name} criterion ${i + 1} is an array: ${a.slice(0, 50)}`);
@@ -229,7 +233,8 @@ export function lintFormula(f, ctx = {}) {
   // Another sheet in data validation and conditional formatting: through INDIRECT only
   if (ctx.isOtherSheetName && (ctx.where === "validation" || ctx.where === "format")) {
     for (const m of blank.matchAll(/(?:^|[^A-Za-z0-9_.])((?:NV|NVD|TH|ND|P|CALC)_[A-Z0-9_]+)(?![A-Za-z0-9_(])/g)) {
-      if (ctx.isOtherSheetName(m[1])) add("other-sheet-name", `${m[1]} lies on another sheet and is not inside INDIRECT`);
+      if (ctx.isOtherSheetName(m[1]))
+        add("other-sheet-name", `${m[1]} lies on another sheet and is not inside INDIRECT`);
     }
     for (const m of blank.matchAll(/(?:'[^']+'|[A-Za-zА-Яа-я_][A-Za-zА-Яа-я0-9_]*)!/g)) {
       if (ctx.sheet && m[0].replace(/^'|'?!$/g, "") !== ctx.sheet)

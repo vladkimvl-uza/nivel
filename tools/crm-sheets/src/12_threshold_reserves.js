@@ -5,7 +5,7 @@
 
 const NV_TH = {
   year: { head: 5, first: 6 },
-  months: { col: 5, first: 6, last: 17, total: 18 },
+  months: { col: 5, first: 6, last: 17, total: 18, dec: 19 },
   other: { col: 18, first: 6, rows: 200 },
 };
 
@@ -176,6 +176,15 @@ function nvBuildThreshold() {
   nvSetName(ss, "TH_CUM", sh.getRange("K6:K17"));
   nvSetName(ss, "TH_TAX_EST", sh.getRange("L6:L17"));
   nvSetName(ss, "TH_PAID", sh.getRange("O6:O17"));
+  // December of the last year: it is not a row of the table of the selected year, but its tax is paid in January
+  const dec = NV_TH.months.dec;
+  sh.getRange(dec, 5).setValue("Декабрь прошлого года");
+  sh.getRange(dec, 14).setFormula(nvApiFormula("=DATE($C$6; 1; 15)"));
+  if (sh.getRange(dec, 15).getValue() === "") sh.getRange(dec, 15).setValue(false);
+  nvSetName(ss, "TH_PAID_DEC", sh.getRange(dec, 15));
+  sh.getRange(dec, 15).setNote(
+    "Налог за декабрь прошлого года уплачен: отметка нужна в январе, когда этого месяца нет в таблице года.",
+  );
 
   // Validations
   const intRule = (cell) =>
@@ -188,6 +197,10 @@ function nvBuildThreshold() {
       .build();
   sh.getRange("M6:M17").setDataValidation(intRule("M6"));
   sh.getRange("O6:O17").setDataValidation(nvCheckboxRule());
+  sh.getRange(dec, 15).setDataValidation(nvCheckboxRule());
+  sh.getRange(dec, 16).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build(),
+  );
   sh.getRange("P6:P17").setDataValidation(
     SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build(),
   );
@@ -241,7 +254,7 @@ function nvStyleThreshold() {
   sh.getRange(3, L.firstCol).setFontSize(9).setFontColor(T.text2).setWrap(false);
   const blocks = [
     { col: 2, n: 2, rows: 10, label: 2 },
-    { col: NV_TH.months.col, n: 12, rows: 13 },
+    { col: NV_TH.months.col, n: 12, rows: 14 },
     { col: NV_TH.other.col, n: 4, rows: NV_TH.other.rows },
   ];
   blocks.forEach((b) => {
@@ -293,6 +306,17 @@ function nvStyleThreshold() {
     .setHorizontalAlignment("right");
   nvBorder(total, "top", T.totalRule, "SOLID_MEDIUM");
   sh.getRange(NV_TH.months.total, 5).setFontFamily(NV_FONT_TEXT).setHorizontalAlignment("left").setNumberFormat("@");
+  // December of the last year (below the total): the label, the due date, the flag, the date of payment
+  const dec = NV_TH.months.dec;
+  sh.getRange(dec, 5, 1, 12).setFontFamily(NV_FONT_MONO).setHorizontalAlignment("right");
+  sh.getRange(dec, 5)
+    .setFontFamily(NV_FONT_TEXT)
+    .setHorizontalAlignment("left")
+    .setNumberFormat("@")
+    .setFontColor(T.text2);
+  sh.getRange(dec, 14).setNumberFormat(NV_FMT.date).setHorizontalAlignment("left");
+  sh.getRange(dec, 15).setHorizontalAlignment("center");
+  sh.getRange(dec, 16).setNumberFormat(NV_FMT.date).setHorizontalAlignment("left");
   // Other income block
   const oc = NV_TH.other.col;
   sh.getRange(NV_TH.other.first, oc, NV_TH.other.rows, 1).setNumberFormat(NV_FMT.date).setFontFamily(NV_FONT_MONO);

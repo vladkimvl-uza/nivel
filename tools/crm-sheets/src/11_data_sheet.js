@@ -253,9 +253,9 @@ function nvKpiDefs() {
     // owner switches it in the settings; the tax reserve is not mixed in (it is another 1 %, of the receipts)
     sub: 'IF(NV_XOLIS_WITHHOLDS; "оценка · удерживает Xolis"; "к уплате до "&TEXT(DATE(YEAR(TODAY());MONTH(TODAY());15);"dd.mm.yyyy"))',
     worse:
-      "AND(NOT(NV_XOLIS_WITHHOLDS); TODAY()>DATE(YEAR(TODAY());MONTH(TODAY());15); NOT(IFERROR(INDEX(TH_PAID; MATCH(" +
-      prevStart +
-      "; TH_MONTHS; 0)); FALSE)))",
+      "AND(NOT(NV_XOLIS_WITHHOLDS); TODAY()>DATE(YEAR(TODAY());MONTH(TODAY());15); NOT(" +
+      nvPrevTaxPaidFormula() +
+      "))",
   };
   defs.conv = {
     v: convOf("ND_FROM", "ND_TO_X"),
@@ -713,21 +713,14 @@ function nvDataCells() {
     // An expired estimate is not an open order: it is left out of the stages
     const codes = "FILTER(NVD_STATUS_CODE; NVD_STATUS_STAGE=A" + r + '; NVD_STATUS_CODE<>"estimate_expired")';
     put("A", r, st);
-    put("D", r, "=SUMPRODUCT(COUNTIFS(" + O("code") + "; " + codes + "; " + O("demo") + "; " + C + "))");
+    // COUNTIFS is described for a range of criteria, not for an array: the codes are matched one by one by MATCH
+    const inStage = "ISNUMBER(MATCH(" + O("code") + "; " + codes + "; 0))";
+    const shown = "((" + O("demo") + "<>TRUE)+ND_DEMO_ON>0)";
+    put("D", r, "=SUMPRODUCT(" + inStage + "*" + shown + ")");
     put(
       "C",
       r,
-      "=SUMPRODUCT(COUNTIFS(" +
-        O("code") +
-        "; " +
-        codes +
-        "; " +
-        O("nextDate") +
-        '; "<"&TODAY(); ' +
-        O("demo") +
-        "; " +
-        C +
-        "))",
+      "=SUMPRODUCT(" + inStage + "*" + shown + "*ISNUMBER(" + O("nextDate") + ")*(" + O("nextDate") + "<TODAY()))",
     );
     put("B", r, "=D" + r + "-C" + r);
   });
