@@ -27,7 +27,7 @@ import { loadProfile } from "./profile.ts";
 const MAX_MESSAGES = 20;
 const HANDED_OVER = new Set(["handed_over", "closed"]);
 
-const whenText = (ctx: BotContext, at: Date, lang: "uz" | "ru") => `${formatDate(at, lang)} ${formatTime(at, lang)}`;
+const whenText = (at: Date, lang: "uz" | "ru") => `${formatDate(at, lang)} ${formatTime(at, lang)}`;
 
 async function handedOver(ctx: BotContext) {
   const { customer } = await loadProfile(ctx);
@@ -108,7 +108,7 @@ warranty.callbackQuery("w:done", async (ctx) => {
   const thread = order === undefined ? null : await orderTopic(db, order);
   const groupId = await ownerGroupId(db);
   if (thread !== null && groupId !== null) {
-    await ctx.api.sendMessage(groupId, `${whenTextRu(at, own.number)}`, { message_thread_id: thread });
+    await ctx.api.sendMessage(groupId, `${ownerHeader(at, own.number)}`, { message_thread_id: thread });
     for (const id of parts.messageIds) {
       await ctx.api.copyMessage(groupId, ctx.chat?.id ?? ctx.from.id, id, { message_thread_id: thread });
     }
@@ -147,11 +147,11 @@ warranty.callbackQuery("w:done", async (ctx) => {
   ctx.session.step = "idle";
   delete ctx.session.draft.orderNumber;
   delete ctx.session.draft.warrantyParts;
-  return say(ctx, ctx.t("warranty.received", { time: whenText(ctx, at, ctx.lang) }));
+  return say(ctx, ctx.t("warranty.received", { time: whenText(at, ctx.lang) }));
 });
 
 /** The header in the owner's topic: Russian, the time of the press. */
-function whenTextRu(at: Date, number: string): string {
+function ownerHeader(at: Date, number: string): string {
   return botTranslator("ru")("warranty.owner_card", {
     number,
     time: `${formatDate(at, "ru")} ${formatTime(at, "ru")}`,

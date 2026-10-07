@@ -1,4 +1,6 @@
+import type { Db } from "@nivel/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { ensureCustomer } from "./store.ts";
 import type { Person } from "./testing/fake-telegram.ts";
 import { createHarness, type Harness, newPerson, STRANGER } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
@@ -153,5 +155,61 @@ describe("what the bot ignores", () => {
       inline_query: { id: "1", from: { ...ALI, is_bot: false }, query: "x", offset: "" },
     });
     expect(h.tg.calls).toHaveLength(0);
+  });
+});
+
+describe("buttons that arrive out of order", () => {
+  it("the consent button without a language asks the language first and records nothing", async () => {
+    await h.send(h.tg.press(ALI, ALI.id, 1002, "cn:ok"));
+    expect(h.tg.lastSend(ALI.id)?.payload.text).toBe("Tilni tanlang / Выберите язык");
+    expect(await q("select 1 from sales.customers where telegram_user_id = $1", [ALI.id])).toHaveLength(0);
+  });
+
+  it("a language button with a language the bot does not have changes nothing", async () => {
+    await h.send(h.tg.text(ALI, "/start"));
+    h.tg.reset();
+    await h.send(h.tg.press(ALI, ALI.id, 1001, "lg:en"));
+    await h.send(h.tg.press(ALI, ALI.id, 1001, "lg:"));
+    expect(h.tg.of("sendMessage")).toHaveLength(0);
+    expect(h.tg.of("answerCallbackQuery")).toHaveLength(2);
+  });
+
+  it("a button of the menu pressed before the consent gets the notice, not the feature", async () => {
+    await h.send(h.tg.text(ALI, "/start"));
+    await h.send(h.tg.press(ALI, ALI.id, 1001, "lg:uz"));
+    h.tg.reset();
+    await h.send(h.tg.press(ALI, ALI.id, 1002, "m:order"));
+    expect(h.tg.lastSend(ALI.id)?.payload.text).toBe("Davom etish uchun rozilik kerak.");
+  });
+});
+
+describe("the customer record", () => {
+  it("two first updates at once make one customer, and both get him", async () => {
+    const person = newPerson("Twin", "twin", "uz");
+    const make = () =>
+      ensureCustomer(w.bot.db, {
+        telegramUserId: person.id,
+        displayName: "Twin",
+        telegramUsername: "twin",
+        lang: "uz",
+      });
+    const [a, b] = await Promise.all([make(), make()]);
+    expect(a.id).toBe(b.id);
+    expect(await q("select 1 from sales.customers where telegram_user_id = $1", [person.id])).toHaveLength(1);
+  });
+});
+
+describe("a failure inside the bot", () => {
+  it("is logged, and the customer is told to try again instead of being left in silence", async () => {
+    const broken = createHarness(w, { db: {} as Db });
+    const errors = await broken.send(broken.tg.text(ALI, "/start"), { allowErrors: true });
+    expect(errors).toHaveLength(1);
+    expect(broken.tg.lastSend(ALI.id)?.payload.text).toBe("Xatolik yuz berdi. Qayta urinib koʻring.");
+  });
+
+  it("does not try to answer a chat it cannot (a group): nothing is sent", async () => {
+    const broken = createHarness(w, { db: {} as Db });
+    await broken.send(broken.tg.groupMessage(w.groupId, STRANGER, { text: "x" }, 5), { allowErrors: true });
+    expect(broken.tg.of("sendMessage")).toHaveLength(0);
   });
 });

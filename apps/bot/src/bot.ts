@@ -82,9 +82,19 @@ export function createBot(deps: BotDeps, opts: CreateBotOptions): Bot<BotContext
     ctx.answered = false;
     ctx.lang = "uz";
     ctx.t = botTranslator("uz");
-    await next();
-    // A button is always answered: Telegram shows a spinner on it until it is.
-    if (ctx.callbackQuery !== undefined && !ctx.answered) await ack(ctx);
+    // Whatever the mode (polling, webhook), a failure of a handler is logged here and the customer is not left in silence.
+    try {
+      await next();
+      // A button is always answered: Telegram shows a spinner on it until it is.
+      if (ctx.callbackQuery !== undefined && !ctx.answered) await ack(ctx);
+    } catch (err) {
+      deps.log.error({ err, update: ctx.update.update_id }, "bot error");
+      try {
+        if (ctx.chat?.type === "private") await ctx.reply(ctx.t("common.error"));
+      } catch {
+        // The chat may have blocked the bot: nothing more to do.
+      }
+    }
   });
 
   // Telegram repeats an update that was answered late: every update id is handled once.
@@ -101,13 +111,7 @@ export function createBot(deps: BotDeps, opts: CreateBotOptions): Bot<BotContext
     if (chat.type === "supergroup" && chat.id === (await ownerGroupId(deps.db))) return staff.middleware()(ctx, next);
   });
 
-  bot.catch(async (err) => {
-    deps.log.error({ err: err.error, update: err.ctx.update.update_id }, "bot error");
-    try {
-      if (err.ctx.chat?.type === "private") await err.ctx.reply(err.ctx.t("common.error"));
-    } catch {
-      // The chat may have blocked the bot: nothing more to do.
-    }
-  });
+  // Only what escapes the first middleware (it cannot, but a bot that is silent about it is worse).
+  bot.catch((err) => deps.log.error({ err: err.error }, "bot error outside the handlers"));
   return bot;
 }

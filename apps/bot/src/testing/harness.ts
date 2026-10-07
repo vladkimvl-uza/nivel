@@ -26,8 +26,11 @@ export interface Harness {
   bot: TestBot;
   tg: FakeTelegram;
   deps: BotDeps;
-  /** Sends an update to the bot and waits for the handlers. */
-  send(update: Parameters<TestBot["handleUpdate"]>[0]): Promise<void>;
+  /**
+   * Sends an update to the bot and waits for the handlers. An error the bot logged fails the test, unless the test says
+   * it expects one (`allowErrors`): then the logged errors are returned.
+   */
+  send(update: Parameters<TestBot["handleUpdate"]>[0], opts?: { allowErrors?: boolean }): Promise<unknown[][]>;
 }
 
 export function createHarness(w: BotWorld, o: Partial<BotDeps> = {}): Harness {
@@ -56,13 +59,14 @@ export function createHarness(w: BotWorld, o: Partial<BotDeps> = {}): Harness {
     tg,
     deps,
     // An error the bot caught and logged would hide behind its apology to the customer: the test must see it.
-    async send(update) {
+    async send(update, opts = {}) {
       await bot.handleUpdate(update);
-      if (errors.length > 0) {
-        const seen = errors.splice(0, errors.length);
+      const seen = errors.splice(0, errors.length);
+      if (seen.length > 0 && opts.allowErrors !== true) {
         const first = (seen[0]?.[0] as { err?: { stack?: string } } | undefined)?.err;
         throw new Error(`the bot logged an error: ${first?.stack ?? JSON.stringify(seen)}`);
       }
+      return seen;
     },
   };
 }

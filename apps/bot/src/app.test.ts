@@ -126,9 +126,8 @@ describe("BOT_MODE=polling", () => {
     expect(r.tg.of("setMyDescription").map((c) => c.payload.language_code)).toEqual([undefined, "uz", "ru"]);
     expect(r.tg.of("setMyShortDescription").map((c) => c.payload.language_code)).toEqual([undefined, "uz", "ru"]);
     // The default is Uzbek: it comes first.
-    expect((r.tg.of("setMyCommands")[0]?.payload.commands as { description: string }[])[0]?.description).toBe(
-      "Boshlash",
-    );
+    const first = r.tg.of("setMyCommands")[0]?.payload.commands as { description: string }[] | undefined;
+    expect(first?.[0]?.description).toBe("Boshlash");
     expect(await (await get(r.app)).json()).toMatchObject({ bot: "polling" });
   });
 
