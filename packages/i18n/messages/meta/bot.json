@@ -1084,6 +1084,11 @@
     "maxLen": 120,
     "status": "draft"
   },
+  "owner.receipt.line": {
+    "context": "button: a line of the quote the receipt may belong to",
+    "maxLen": 20,
+    "status": "draft"
+  },
   "owner.receipt.pick_line": {
     "context": "ask the line of the quote",
     "maxLen": 40,

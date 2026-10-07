@@ -3,7 +3,15 @@ import { acts } from "@nivel/services";
 import { keyboardMarkup, renderOutboxMessage } from "@nivel/telegram";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Person } from "./testing/fake-telegram.ts";
-import { customerWithLead, type LeadCase, ownerActor, type QuotedOrder, settledOrder } from "./testing/flow.ts";
+import {
+  confirmFinalPayment,
+  customerWithLead,
+  deliveringOrder,
+  type LeadCase,
+  ownerActor,
+  type QuotedOrder,
+  settledOrder,
+} from "./testing/flow.ts";
 import { ASSISTANT, createHarness, type Harness, newPerson, OWNER, STRANGER } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
 
@@ -129,5 +137,52 @@ describe("the button «I accept» under an act", () => {
     expect((await actRow(c)).signed_at).toBeNull();
     // Without the message there is no chat to answer in: the update is dropped before any handler.
     expect(h.tg.of("sendMessage")).toHaveLength(0);
+  });
+});
+
+describe("the act of handover", () => {
+  it("signs, and hands the order over when the final part of the fee is confirmed (the button of the customer in the table)", async () => {
+    const person = newPerson("Ali", "ali_uz", "uz");
+    const lead = await customerWithLead(w, h, person);
+    const o = await deliveringOrder(w, lead);
+    await confirmFinalPayment(w, o);
+    h.tg.reset();
+    const hex = o.handoverActId.replaceAll("-", "");
+    await h.send(h.tg.press(person, person.id, 7000, `a:${hex}:sg`));
+    expect((await q("select signed_via from sales.acts where id = $1", [o.handoverActId]))[0].signed_via).toBe(
+      "tg_button",
+    );
+    const [row] = await q("select status, warranty_until from sales.orders where id = $1", [o.orderId]);
+    expect(row.status).toBe("handed_over");
+    expect(row.warranty_until).not.toBeNull();
+    const events = await q(
+      "select actor_kind, event from sales.order_events where order_id = $1 order by seq desc limit 1",
+      [o.orderId],
+    );
+    expect(events[0]).toMatchObject({ actor_kind: "customer" });
+    expect(events[0].event).toMatchObject({
+      type: "HANDOVER",
+      actId: o.handoverActId,
+      finalPaymentId: o.finalPaymentId,
+    });
+    expect(
+      await q(
+        "select 1 from ops.outbox where payload ->> 'templateKey' = 'order.handed_over' and payload ->> 'orderId' = $1",
+        [o.orderId],
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("before the final payment is confirmed the press only signs: the order waits for the owner", async () => {
+    const person = newPerson("Dilya", "dilya", "ru");
+    const lead = await customerWithLead(w, h, person);
+    const o = await deliveringOrder(w, lead);
+    h.tg.reset();
+    await h.send(h.tg.press(person, person.id, 7000, `a:${o.handoverActId.replaceAll("-", "")}:sg`));
+    expect((await q("select signed_via from sales.acts where id = $1", [o.handoverActId]))[0].signed_via).toBe(
+      "tg_button",
+    );
+    expect((await q("select status from sales.orders where id = $1", [o.orderId]))[0].status).toBe("delivering");
+    expect(h.tg.textsTo(person.id)[0]).toMatch(/^Подписано: \d\d:\d\d\.$/);
   });
 });

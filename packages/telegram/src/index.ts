@@ -17,6 +17,7 @@ export {
   type InitDataUser,
   verifyInitData,
 } from "./init-data.ts";
+export { BOT_JOB, type FileIntakePayload, INTAKE_MIMES, parseFileIntake } from "./intake.ts";
 export { botTranslator, langOf } from "./messages.ts";
 export { isActPhotoCaption, parseReceiptCaption, stripOwnerNotes } from "./staff-text.ts";
 export {

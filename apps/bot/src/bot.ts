@@ -9,6 +9,7 @@ import { ownerGroupId } from "./config.ts";
 import type { BotContext } from "./context.ts";
 import type { BotDeps } from "./deps.ts";
 import { actButtons } from "./handlers/acts.ts";
+import { info } from "./handlers/info.ts";
 import { myOrders } from "./handlers/orders.ts";
 import { loadProfile } from "./handlers/profile.ts";
 import { relayToTopic } from "./handlers/relay.ts";
@@ -60,6 +61,7 @@ function customerComposer(deps: BotDeps): Composer<BotContext> {
   c.use(select);
   c.use(request);
   c.use(actButtons);
+  c.use(info);
   c.use(myOrders);
   c.on("message", async (ctx) => {
     const isCommand = ctx.message.entities?.some((e) => e.type === "bot_command" && e.offset === 0) === true;

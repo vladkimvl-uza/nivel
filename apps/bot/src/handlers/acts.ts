@@ -4,7 +4,7 @@
 // order of the act, once, with its own clock. The strength of the button as a signature is a question for the lawyer;
 // the fallback is the photo of the paper act (the owner records it in the admin panel).
 import { formatTime } from "@nivel/i18n";
-import { acts, orders } from "@nivel/services";
+import { acts, dispatch, orders } from "@nivel/services";
 import { decodeCallback, hexToUuid } from "@nivel/telegram";
 import { Composer } from "grammy";
 import type { BotContext } from "../context.ts";
@@ -43,6 +43,7 @@ actButtons.callbackQuery(/^a:/, async (ctx) => {
     return say(ctx, ctx.t("act.error"));
   }
   await clearButtons(ctx);
+  await handOverIfDue(ctx, actId, customer.id);
   // The time is the one the database wrote, not the clock of this process.
   const row = await ctx.deps.db.query.acts.findFirst({
     columns: { signedAt: true },
@@ -50,3 +51,30 @@ actButtons.callbackQuery(/^a:/, async (ctx) => {
   });
   return say(ctx, ctx.t("act.signed", { time: formatTime(row?.signedAt ?? ctx.deps.now(), ctx.lang) }));
 });
+
+/**
+ * The press under the act of handover is also the button of the customer in the table of the automaton («HANDOVER: owner
+ * (+ the button of the customer)»): the order is handed over when the final part of the fee is confirmed. Before that the
+ * act is only signed, and the owner hands the order over in the admin panel once the money is confirmed.
+ */
+async function handOverIfDue(ctx: BotContext, actId: string, customerId: string): Promise<void> {
+  const { db, rt } = ctx.deps;
+  const act = await db.query.acts.findFirst({
+    columns: { kind: true, orderId: true },
+    where: (t, { eq }) => eq(t.id, actId),
+  });
+  if (act?.kind !== "handover") return;
+  const final = await db.query.payments.findFirst({
+    columns: { id: true },
+    where: (t, { and, eq, isNull }) =>
+      and(eq(t.orderId, act.orderId), eq(t.kind, "fee_final"), eq(t.status, "confirmed"), isNull(t.reversalOf)),
+  });
+  if (final === undefined) return;
+  const result = await dispatch(
+    act.orderId,
+    { type: "HANDOVER", actId, finalPaymentId: final.id },
+    { kind: "customer", id: customerId },
+    rt,
+  );
+  if (!result.ok) ctx.deps.log.warn({ actId, error: result.error }, "the handover was not taken after the signature");
+}

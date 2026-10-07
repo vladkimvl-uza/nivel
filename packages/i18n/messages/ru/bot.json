@@ -288,6 +288,7 @@
     },
     "receipt": {
       "card": "Чек: {sum} · {vendor}\nЗаказ {number}. Лимит закупки: {limit}, потрачено: {spent}.",
+      "line": "{title} · {sum}",
       "pick_line": "К какой строке сметы?",
       "outside": "Вне сметы",
       "cancel": "Отмена",

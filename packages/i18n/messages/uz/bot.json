@@ -288,6 +288,7 @@
     },
     "receipt": {
       "card": "Chek: {sum} · {vendor}\nBuyurtma {number}. Xarid limiti: {limit}, sarflangan: {spent}.",
+      "line": "{title} · {sum}",
       "pick_line": "Smetaning qaysi qatoriga?",
       "outside": "Smetadan tashqari",
       "cancel": "Bekor qilish",

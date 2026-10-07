@@ -1,7 +1,8 @@
 // Steps of the life of an order for the integration tests of the bot, built from the scenarios themselves. What the
 // admin panel does in production (convert a lead, build and send the quote, confirm the money, record a purchase) is
 // done here with the admin runtime; what the bot does is done by the bot under test.
-import { consents, dispatch, leads, payments, purchases, quotes, reports } from "@nivel/services";
+import { buildPassports } from "@nivel/db";
+import { acts, consents, dispatch, leads, payments, purchases, quotes, reports } from "@nivel/services";
 import { openLeadTopic } from "../topics.ts";
 import type { Person } from "./fake-telegram.ts";
 import { type Harness, onboard } from "./harness.ts";
@@ -114,12 +115,18 @@ export async function paidOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> 
 
 let receiptNo = 7000;
 
-/** The next working day has come, the purchase starts and every position is bought with a receipt and a photo. */
-export async function purchasedOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
+/** The next working day has come and the owner starts the purchases. */
+export async function purchasingOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
   const o = await paidOrder(w, c);
   w.clock.set(new Date("2026-10-13T10:00:00+05:00"));
   const start = await dispatch(o.orderId, { type: "START_PURCHASE" }, ownerActor(w), w.admin);
   if (!start.ok) throw new Error(`the purchase did not start: ${start.error}`);
+  return o;
+}
+
+/** Every position is bought with a receipt and a photo, and the purchases are closed. */
+export async function purchasedOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
+  const o = await purchasingOrder(w, c);
   for (const p of PC_CATALOG) {
     const { rows } = await w.db.$client.query(
       "select id from sales.quote_lines where quote_id = $1 and product_id = $2",
@@ -182,5 +189,73 @@ export async function settledOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrde
     w.admin,
   );
   if (!settled.ok) throw new Error(`the remainder was not settled: ${settled.error}`);
+  return o;
+}
+
+export interface DeliveringOrder extends QuotedOrder {
+  finalPaymentId: string;
+  handoverActId: string;
+}
+
+/**
+ * From the settled order to the road: the materials act is signed by the customer and accepted, the PC is assembled and
+ * tested, the owner sends it; the final part of the fee is expected and confirmed (the QR with a receipt); the act of
+ * handover is drawn. The customer's press of «I accept» under it is what the tests of the bot do next.
+ */
+export async function deliveringOrder(w: BotWorld, c: LeadCase): Promise<DeliveringOrder> {
+  const o = await settledOrder(w, c);
+  const customer = { kind: "customer" as const, id: o.customerId };
+  const materials = await acts.generate(
+    { orderId: o.orderId, kind: "material_acceptance", lines: [{ title: "Keyboard of the customer", qty: 1 }] },
+    ownerActor(w),
+    w.admin,
+  );
+  await acts.sign(
+    { actId: materials.actId, via: "tg_button", evidence: { messageId: 100, telegramUserId: c.person.id } },
+    customer,
+    w.bot,
+  );
+  for (const event of [{ type: "MATERIALS_ACCEPTED", actId: materials.actId }, { type: "ASSEMBLED" }] as const) {
+    const r = await dispatch(o.orderId, event, ownerActor(w), w.admin);
+    if (!r.ok) throw new Error(`${event.type} was refused: ${r.error}`);
+  }
+  await w.db.insert(buildPassports).values({ orderId: o.orderId, tests: { tool: "OCCT", minutes: 420, errors: 0 } });
+  for (const event of [{ type: "TESTS_PASSED", passportId: o.orderId }, { type: "DISPATCH" }] as const) {
+    const r = await dispatch(o.orderId, event, ownerActor(w), w.admin);
+    if (!r.ok) throw new Error(`${event.type} was refused: ${r.error}`);
+  }
+  const handover = await acts.generate({ orderId: o.orderId, kind: "handover" }, ownerActor(w), w.admin);
+  const { rows } = await w.db.$client.query(
+    "select id from sales.payments where order_id = $1 and kind = 'fee_final'",
+    [o.orderId],
+  );
+  return { ...o, finalPaymentId: rows[0].id as string, handoverActId: handover.actId };
+}
+
+/** The final part of the fee is confirmed; the customer has pressed «I accept» (the event of the customer through the bot). */
+export async function confirmFinalPayment(w: BotWorld, o: DeliveringOrder): Promise<void> {
+  await payments.confirm(
+    { paymentId: o.finalPaymentId, fiscalReceiptNo: `FR-${o.finalPaymentId.slice(-8)}` },
+    ownerActor(w),
+    w.admin,
+  );
+}
+
+/** Handed over: the final payment is confirmed, the act is signed and the HANDOVER of the customer is dispatched. */
+export async function handedOverOrder(w: BotWorld, c: LeadCase): Promise<DeliveringOrder> {
+  const o = await deliveringOrder(w, c);
+  await confirmFinalPayment(w, o);
+  await acts.sign(
+    { actId: o.handoverActId, via: "tg_button", evidence: { messageId: 101, telegramUserId: c.person.id } },
+    { kind: "customer", id: o.customerId },
+    w.bot,
+  );
+  const r = await dispatch(
+    o.orderId,
+    { type: "HANDOVER", actId: o.handoverActId, finalPaymentId: o.finalPaymentId },
+    { kind: "customer", id: o.customerId },
+    w.bot,
+  );
+  if (!r.ok) throw new Error(`the handover was refused: ${r.error}`);
   return o;
 }
