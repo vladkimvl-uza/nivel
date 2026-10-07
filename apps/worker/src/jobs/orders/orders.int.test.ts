@@ -10,7 +10,7 @@ import {
   sentOrder,
 } from "../../queues/test-support/flow.ts";
 import { testRuntime } from "../../queues/test-support/runtime.ts";
-import { createWorld, type World } from "../../queues/test-support/world.ts";
+import { createWorld, theRow, type World } from "../../queues/test-support/world.ts";
 import { QUEUE } from "../outbox/routes.ts";
 import { scheduledDepsOf } from "./register.ts";
 import { sweepLeadReminders } from "./reminders.ts";
@@ -109,7 +109,7 @@ describe("REPORT_DEEMED_ACCEPTED on the real automaton, as the system", () => {
     ]);
     const accepted = await reports.accept({ orderId: o.orderId }, customerActor(o), w.bot);
     expect(accepted.ok).toBe(true);
-    w.clock.set(new Date((row?.objection_until as Date).getTime() + 3_600_000));
+    w.clock.set(new Date(theRow([row]).objection_until.getTime() + 3_600_000));
     const deps = scheduledDepsOf(testRuntime(w).rt);
     expect(await sweepDeemed(deps)).toEqual({
       accepted: 0,
@@ -209,7 +209,7 @@ describe("the requests nobody has answered", () => {
     // The hours of answers: Monday to Saturday 10:00-19:00. Take the first such half hour after the request was made.
     const [made] = await q<{ created_at: Date }>("select created_at from sales.leads where id = $1", [waiting.leadId]);
     const cal = createWorkCalendar([], { from: "10:00", to: "19:00" });
-    let now = new Date((made?.created_at as Date).getTime() + 20 * 60_000);
+    let now = new Date(theRow([made]).created_at.getTime() + 20 * 60_000);
     while (!cal.isResponseHours(now)) now = new Date(now.getTime() + 30 * 60_000);
     w.clock.set(now);
 
@@ -249,7 +249,7 @@ describe("the requests nobody has answered", () => {
     );
     const [made] = await q<{ created_at: Date }>("select created_at from sales.leads where id = $1", [lead.leadId]);
     const plain = createWorkCalendar([], { from: "10:00", to: "19:00" });
-    let first = new Date((made?.created_at as Date).getTime() + 20 * 60_000);
+    let first = new Date(theRow([made]).created_at.getTime() + 20 * 60_000);
     while (!plain.isResponseHours(first)) first = new Date(first.getTime() + 30 * 60_000);
     const holiday = isoDateInTashkent(first);
     await ops.setSetting(

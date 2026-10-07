@@ -206,3 +206,10 @@ export async function newFile(
   });
   return { id, key };
 }
+
+/** The only row of a result: a test that expects a row fails with a clear message when there is none. */
+export function theRow<T>(rows: readonly T[]): T {
+  const row = rows[0];
+  if (row === undefined) throw new Error("the query returned no row");
+  return row;
+}
