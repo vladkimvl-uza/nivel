@@ -342,18 +342,27 @@ describe("sanitizeImage: what is not accepted", () => {
 });
 
 /** A stand-in for sharp that records what it was given and says what the pipeline was asked to do. */
-function fakeSharp(opts: { calls?: Buffer[]; fail?: boolean; format?: string; steps?: string[] }): SharpFactory {
+function fakeSharp(opts: {
+  calls?: Buffer[];
+  fail?: boolean;
+  format?: string;
+  inputFormat?: string;
+  steps?: string[];
+}): SharpFactory {
   return (input) => {
-    opts.calls?.push(input);
     const step = (name: string) => {
       opts.steps?.push(name);
       return pipeline;
     };
     const pipeline: SharpPipeline = {
+      // What libvips finds in the bytes: a JPEG or the HEIF family (what the guard of the sanitizer lets through).
+      metadata: async () => ({ format: opts.inputFormat ?? (input[0] === 0xff ? "jpeg" : "heif") }),
+      timeout: () => pipeline,
       rotate: () => step("rotate"),
       flatten: () => step("flatten"),
       jpeg: () => step("jpeg"),
       toBuffer: async () => {
+        opts.calls?.push(input);
         if (opts.fail) throw new Error("Input buffer contains unsupported image format");
         return { data: Buffer.from("clean-jpeg"), info: { format: opts.format ?? "jpeg" } };
       },
@@ -385,6 +394,21 @@ describe("createSharpSanitizer", () => {
     const hevc = await createSharpSanitizer(fakeSharp({ fail: true }))(heic);
     expect(hevc.ok ? "" : hevc.error).toContain("JPEG");
     expect(await createSharpSanitizer(fakeSharp({ format: "heif" }))(heic)).toMatchObject({ ok: false });
+    // A file that has the name of a brand where a HEIF file has it, but that libvips reads as something else (an SVG
+    // behind a comment), or whose first box is not as long as a box of this kind: never given to the pipeline.
+    const steps: string[] = [];
+    const polyglot = Buffer.from('<!--ftypavif--><svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>');
+    expect(await createSharpSanitizer(fakeSharp({ steps, inputFormat: "svg" }))(polyglot)).toEqual({
+      ok: false,
+      error: "Нужен снимок в формате JPEG, PNG или WebP.",
+    });
+    expect(await createSharpSanitizer(fakeSharp({ steps, inputFormat: "svg" }))(avif)).toMatchObject({ ok: false });
+    for (const size of [0, 1, 8, 15, 0x100]) {
+      const short = Buffer.from(avif);
+      short.writeUInt32BE(size, 0);
+      expect(await createSharpSanitizer(fakeSharp({ steps }))(short)).toMatchObject({ ok: false });
+    }
+    expect(steps).toEqual([]);
     for (const other of ["GIF89a....", "<svg/>", "II*\0....", "%PDF-1.7"]) {
       expect(await createSharpSanitizer(fakeSharp({}))(Buffer.from(other, "latin1"))).toEqual({
         ok: false,

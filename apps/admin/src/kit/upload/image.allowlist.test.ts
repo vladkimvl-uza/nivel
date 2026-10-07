@@ -262,6 +262,8 @@ function recordingSharp(state: { limits: number[]; running: number; peak: number
   return (_input, options) => {
     state.limits.push(options.limitInputPixels);
     const pipeline: SharpPipeline = {
+      metadata: async () => ({ format: _input[0] === 0xff ? "jpeg" : "heif" }),
+      timeout: () => pipeline,
       rotate: () => pipeline,
       flatten: () => pipeline,
       jpeg: () => pipeline,
@@ -292,7 +294,8 @@ describe("sharp: pixel limits that fit the memory of the container, one picture 
     const sharp = createSharpSanitizer(recordingSharp(state));
     await sharp(avif);
     await sharp(turnedJpeg());
-    expect(state.limits).toEqual([MAX_HEIF_PIXELS, MAX_JPEG_PIXELS]);
+    // Each picture is asked its format (the header only) and then decoded, both under the limit of its kind.
+    expect(state.limits).toEqual([MAX_HEIF_PIXELS, MAX_HEIF_PIXELS, MAX_JPEG_PIXELS, MAX_JPEG_PIXELS]);
   });
 
   it("answers a HEIF over the limit with a message that says what to do", async () => {

@@ -688,6 +688,8 @@ function cleanWebp(input: Buffer): SanitizeResult {
 
 /** The part of sharp this file uses; `import sharp from "sharp"` fits it. */
 export interface SharpPipeline {
+  metadata(): Promise<{ format?: string }>;
+  timeout(options: { seconds: number }): SharpPipeline;
   rotate(): SharpPipeline;
   flatten(options: { background: { r: number; g: number; b: number } }): SharpPipeline;
   jpeg(options: { quality: number }): SharpPipeline;
@@ -706,6 +708,8 @@ export type SharpFactory = (input: Buffer, options: { limitInputPixels: number }
 export const MAX_JPEG_PIXELS = 12_000_000;
 export const MAX_HEIF_PIXELS = 6_000_000;
 const JPEG_QUALITY = 90;
+/** A job of sharp that runs longer than this (a picture is decoded in a second or two) is stopped. */
+const SHARP_SECONDS = 20;
 const TOO_MANY_PIXELS =
   "Снимок слишком большой для обработки на сервере (не более 6 мегапикселей). Отправьте его как JPEG или уменьшите размер.";
 
@@ -738,8 +742,11 @@ const HEIF_BRANDS = new Set([
 const HEIC_HELP =
   "Снимок HEIC этот сервер прочитать не может. Отправьте его как JPEG: на iPhone — Настройки, Камера, Форматы, «Наиболее совместимый».";
 
+/** The name of the brand of a file that opens with an `ftyp` box of a real size (not the text of a comment), or null. */
 function heifBrand(input: Buffer): string | null {
-  if (input.length < 12 || input.subarray(4, 8).toString("latin1") !== "ftyp") return null;
+  if (input.length < 16 || input.subarray(4, 8).toString("latin1") !== "ftyp") return null;
+  const size = input.readUInt32BE(0);
+  if (size < 16 || size > input.length) return null;
   const brand = input.subarray(8, 12).toString("latin1");
   return HEIF_BRANDS.has(brand) ? brand : null;
 }
@@ -756,14 +763,22 @@ export function createSharpSanitizer(sharp: SharpFactory): FallbackSanitizer {
     const isJpeg = input[0] === 0xff && input[1] === 0xd8;
     const brand = heifBrand(input);
     if (!isJpeg && !brand) return fail(UNSUPPORTED);
+    const options = { limitInputPixels: isJpeg ? MAX_JPEG_PIXELS : MAX_HEIF_PIXELS };
     try {
-      const { data, info } = await exclusively(() =>
-        sharp(input, { limitInputPixels: isJpeg ? MAX_JPEG_PIXELS : MAX_HEIF_PIXELS })
+      const decoded = await exclusively(async () => {
+        // libvips tells the format from the content, whatever the first bytes say: an SVG behind a comment that spells
+        // `ftypavif` is an SVG, and the picture inside it is not counted by the pixel limit. Only the header is read here.
+        const found = (await sharp(input, options).metadata()).format;
+        if (found !== (isJpeg ? "jpeg" : "heif")) return null;
+        return sharp(input, options)
+          .timeout({ seconds: SHARP_SECONDS })
           .rotate()
           .flatten({ background: { r: 255, g: 255, b: 255 } })
           .jpeg({ quality: JPEG_QUALITY })
-          .toBuffer({ resolveWithObject: true }),
-      );
+          .toBuffer({ resolveWithObject: true });
+      });
+      if (!decoded) return fail(UNSUPPORTED);
+      const { data, info } = decoded;
       if (info.format !== "jpeg") return fail(UNSUPPORTED);
       return { ok: true, data, mime: "image/jpeg", ext: "jpg", removed: ["reencoded"] };
     } catch (error) {

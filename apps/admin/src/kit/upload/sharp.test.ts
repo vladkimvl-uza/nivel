@@ -162,6 +162,28 @@ describe("photos from a phone through the real sharp", () => {
     expect(await sanitizeImage(tiff, { fallback })).toMatchObject({ ok: false });
   });
 
+  it("refuses an SVG that hides behind the name of a HEIF brand, and an SVG that holds a huge picture inside, before decoding anything", async (ctx) => {
+    const sharp = needSharp(ctx);
+    const fallback = createSharpSanitizer(sharp);
+    const big = await sharp({ create: { width: 3000, height: 3000, channels: 4, background: "#808080" } })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    // The outer size is 100 x 100, so the pixel limit of libvips sees nothing; the picture inside is 36 MB when decoded.
+    const bomb = Buffer.from(
+      `<!--ftypavif--><svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><image width="100" height="100" href="data:image/png;base64,${big.toString("base64")}"/></svg>`,
+    );
+    expect(bomb.subarray(4, 12).toString("latin1")).toBe("ftypavif");
+    const before = process.memoryUsage().rss;
+    expect(await sanitizeImage(bomb, { fallback })).toEqual({
+      ok: false,
+      error: "Нужен снимок в формате JPEG, PNG или WebP.",
+    });
+    expect(process.memoryUsage().rss - before).toBeLessThan(20 * 1024 * 1024);
+    // The same with a box size that is a real one: the format is read from the content, not from the name.
+    const named = Buffer.concat([Buffer.from([0, 0, 0, 0x1c]), Buffer.from("ftypavif"), bomb.subarray(12)]);
+    expect(await sanitizeImage(named, { fallback })).toMatchObject({ ok: false });
+  });
+
   it("refuses a picture with more pixels than a phone makes: a few KB of AVIF that held 49 megapixels (900 MB) is refused at the header", async (ctx) => {
     const sharp = needSharp(ctx);
     const big = await sharp({ create: { width: 7000, height: 7000, channels: 3, background: "#808080" } })
