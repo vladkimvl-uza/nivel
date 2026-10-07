@@ -155,10 +155,10 @@ describe("the directory of addresses", () => {
     await ops.setSetting(w.db, "telegram.owner_group", { chatId: -1001234567890 }, "test");
     expect(await dir.ownerGroup()).toBe(-1001234567890);
     const o = await draftOrder(w);
-    expect(await dir.orderTopic(o.orderId)).toBeNull();
+    expect(await dir.topic({ orderId: o.orderId })).toBeNull();
     await q("update sales.orders set tg_topic_id = 4242 where id = $1", [o.orderId]);
-    expect(await dir.orderTopic(o.orderId)).toBe(4242);
-    expect(await dir.orderTopic("not-a-uuid")).toBeNull();
+    expect(await dir.topic({ orderId: o.orderId })).toBe(4242);
+    expect(await dir.topic({ orderId: "not-a-uuid" })).toBeNull();
   });
 });
 

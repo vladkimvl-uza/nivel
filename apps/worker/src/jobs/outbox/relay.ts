@@ -33,8 +33,8 @@ export interface ChatDirectory {
   customer(customerId: string): Promise<{ chatId: number; lang: Lang } | { skip: string }>;
   /** The chat id of the group of the owner (ops.settings `telegram.owner_group`), `null` when it is not set. */
   ownerGroup(): Promise<number | null>;
-  /** The topic of the order in the group of the owner, `null` when the order has none. */
-  orderTopic(orderId: string): Promise<number | null>;
+  /** The topic of the order or of the request in the group of the owner, `null` when it has none. */
+  topic(ref: { orderId?: string; leadId?: string }): Promise<number | null>;
 }
 
 export interface FlagReader {
@@ -175,8 +175,12 @@ async function processMessage(deps: RelayDeps, row: OutboxRow): Promise<Outcome>
     if (group === null) return { kind: "skip", reason: "the owner group is not set (telegram.owner_group)" };
     chatId = group;
     const orderId = str(p.orderId);
-    if ((target as Target) === "owner_topic" && orderId !== undefined) {
-      const topic = await deps.directory.orderTopic(orderId);
+    const leadId = str(p.leadId);
+    if ((target as Target) === "owner_topic" && (orderId !== undefined || leadId !== undefined)) {
+      const topic = await deps.directory.topic({
+        ...(orderId === undefined ? {} : { orderId }),
+        ...(leadId === undefined ? {} : { leadId }),
+      });
       if (topic !== null) threadId = topic;
     }
   }

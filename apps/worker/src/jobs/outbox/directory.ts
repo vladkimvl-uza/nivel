@@ -25,14 +25,25 @@ export function createPgDirectory(db: Db): ChatDirectory {
 
     ownerGroup: () => loadOwnerGroup(db),
 
-    async orderTopic(orderId) {
-      if (!UUID.test(orderId)) return null;
-      const { rows } = await q.query<{ topic: string | null }>(
-        "select tg_topic_id::text as topic from sales.orders where id = $1",
-        [orderId],
-      );
-      const topic = rows[0]?.topic;
-      return topic === null || topic === undefined ? null : Number(topic);
+    async topic(ref) {
+      // An order has the topic of its own; a request that is not an order yet has the one of the request.
+      if (ref.orderId !== undefined && UUID.test(ref.orderId)) {
+        const { rows } = await q.query<{ topic: string | null }>(
+          "select tg_topic_id::text as topic from sales.orders where id = $1",
+          [ref.orderId],
+        );
+        const topic = rows[0]?.topic;
+        if (topic !== null && topic !== undefined) return Number(topic);
+      }
+      if (ref.leadId !== undefined && UUID.test(ref.leadId)) {
+        const { rows } = await q.query<{ topic: string | null }>(
+          "select tg_topic_id::text as topic from sales.leads where id = $1",
+          [ref.leadId],
+        );
+        const topic = rows[0]?.topic;
+        if (topic !== null && topic !== undefined) return Number(topic);
+      }
+      return null;
     },
   };
 }

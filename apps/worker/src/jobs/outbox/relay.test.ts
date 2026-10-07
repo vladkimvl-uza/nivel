@@ -34,8 +34,8 @@ function setup(over: { flags?: Record<string, boolean>; group?: number | null } 
     async ownerGroup() {
       return over.group === undefined ? GROUP : over.group;
     },
-    async orderTopic(orderId) {
-      return topics.get(orderId) ?? null;
+    async topic(ref) {
+      return topics.get(ref.orderId ?? ref.leadId ?? "") ?? null;
     },
   };
   const flags: FlagReader = { isOn: async (key) => over.flags?.[key] === true };
@@ -118,6 +118,19 @@ describe("relayOnce: messages to Telegram", () => {
       [GROUP, undefined],
       [GROUP, undefined],
     ]);
+  });
+
+  it("sends the message about a request into the topic of the request", async () => {
+    const t = setup();
+    t.topics.set("lead-1", 99);
+    t.store.add("telegram_message", {
+      target: "owner_topic",
+      templateKey: "reminder.lead_no_answer",
+      leadId: "lead-1",
+      params: { number: "L-2026-0007", minutes: 15 },
+    });
+    await relayOnce(t.deps);
+    expect(t.telegram.sent[0]).toMatchObject({ chatId: GROUP, threadId: 99 });
   });
 
   it("takes the number of the order from the row when the params do not carry it", async () => {
