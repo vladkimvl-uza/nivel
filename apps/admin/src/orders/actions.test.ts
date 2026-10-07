@@ -63,7 +63,10 @@ vi.mock("./commands.ts", () => {
   ];
   return Object.fromEntries(names.map((n) => [n, record(n)]));
 });
-vi.mock("./quote-editor.ts", () => ({ rebuildQuote: record("rebuildQuote") }));
+vi.mock("./quote-editor.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./quote-editor.ts")>()),
+  rebuildQuote: record("rebuildQuote"),
+}));
 vi.mock("./writes.ts", () => ({
   savePassport: record("savePassport"),
   openWarrantyCase: record("openWarrantyCase"),

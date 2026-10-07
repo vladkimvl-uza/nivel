@@ -35,6 +35,7 @@ export async function listRegistry(db: Db, year: number): Promise<RegistryRow[]>
     spent: string;
     refunded: string;
     losses: string;
+    difference: string;
     fee_in: string;
     fee_refund: string;
   }>(
@@ -49,6 +50,8 @@ export async function listRegistry(db: Db, year: number): Promise<RegistryRow[]>
      select o.id, o.number, o.status,
             coalesce(pay.funds, 0)::text as funds, coalesce(buy.spent, 0)::text as spent,
             coalesce(pay.refunded, 0)::text as refunded, o.documented_losses_sum::text as losses,
+            (coalesce(pay.funds, 0) - coalesce(buy.spent, 0) - coalesce(pay.refunded, 0)
+               - o.documented_losses_sum)::text as difference,
             coalesce(pay.fee_in, 0)::text as fee_in, coalesce(pay.fee_refund, 0)::text as fee_refund
        from sales.orders o
        left join pay on pay.order_id = o.id
@@ -62,24 +65,18 @@ export async function listRegistry(db: Db, year: number): Promise<RegistryRow[]>
       order by o.number`,
     [year],
   );
-  return rows.map((r) => {
-    const received = num(r.funds);
-    const purchased = num(r.spent);
-    const returned = num(r.refunded);
-    const losses = num(r.losses);
-    return {
-      orderId: r.id,
-      number: r.number,
-      status: r.status,
-      received,
-      purchased,
-      returned,
-      losses,
-      difference: received - purchased - returned - losses,
-      feeIn: num(r.fee_in),
-      feeRefunded: num(r.fee_refund),
-    };
-  });
+  return rows.map((r) => ({
+    orderId: r.id,
+    number: r.number,
+    status: r.status,
+    received: num(r.funds),
+    purchased: num(r.spent),
+    returned: num(r.refunded),
+    losses: num(r.losses),
+    difference: num(r.difference),
+    feeIn: num(r.fee_in),
+    feeRefunded: num(r.fee_refund),
+  }));
 }
 
 export interface OtherIncomeRow {
