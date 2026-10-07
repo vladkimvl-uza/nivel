@@ -6,6 +6,7 @@ import {
   customerAcceptsEstimate,
   customerAcceptsReport,
   expect,
+  getInBrowser,
   onlyPhone,
   signIn,
   tashkentToday,
@@ -22,14 +23,25 @@ import { PC_CATALOG } from "../apps/admin/src/orders/test-support/world.ts";
 // the passport, hands over; the worker closes it. Every status is read on the screen, every sum is compared with the
 // database.
 
+/** A sum as a person types it: groups of three with spaces, no unit. */
+const typed = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 const sumText = (n: number) => plainSum(formatSum(n));
 
 async function ok(form: Locator, text: string | RegExp): Promise<void> {
-  await expect(form.locator(".adm-flash--ok")).toContainText(text);
+  await expect(form.locator(".adm-flash--ok").first()).toContainText(text);
+}
+
+/** The page is not wider than the screen of the phone: a wider page makes the browser lay it out larger and misses the buttons. */
+async function fits(page: Page): Promise<void> {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow, `${page.url()} is wider than the screen`).toBeLessThanOrEqual(1);
 }
 
 async function statusIs(page: Page, status: string): Promise<void> {
   await expect(page.getByTestId("order-status")).toHaveAttribute("data-status", status);
+  await fits(page);
 }
 
 /** Opens a `<details>` whose summary has this text, inside `scope`. */
@@ -38,11 +50,20 @@ async function open(scope: Locator, summary: string): Promise<void> {
   if ((await details.getAttribute("open")) === null) await details.locator("summary").first().click();
 }
 
+// Without limits a click on something the page does not let through waits for ever (the config of the project sets none).
+test.use({ actionTimeout: 30_000, navigationTimeout: 45_000 });
+
 test.describe("заказ от сметы до закрытия, с телефона", () => {
   onlyPhone();
 
-  test("владелец проводит заказ с фото чеков, акты подписываются фото, закрывает система", async ({ page, admin, world }) => {
+  test("владелец проводит заказ с фото чеков, акты подписываются фото, закрывает система", async ({
+    page,
+    admin,
+    world,
+  }) => {
     test.setTimeout(540_000);
+    page.on("pageerror", (e) => console.log("[pageerror]", e.message));
+    page.on("console", (m) => (m.type() === "error" ? console.log("[console]", m.text()) : undefined));
     const owner = await admin.createUser("owner");
     await signIn(page, admin, owner);
     const lead = await botLead(world, "Азиз Каримов");
@@ -56,7 +77,7 @@ test.describe("заказ от сметы до закрытия, с телефо
       const row = page.locator(`[data-lead="${lead.number}"]`);
       await expect(row).toContainText("Азиз Каримов");
       await row.getByRole("button", { name: "Взять в работу" }).click();
-      await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/);
+      await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/, { timeout: 30_000 });
       orderId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
       await statusIs(page, "estimate_draft");
       const heading = page.getByRole("heading", { level: 1 });
@@ -73,7 +94,10 @@ test.describe("заказ от сметы до закрытия, с телефо
       const results = page.getByTestId("catalog-results");
       let lines = 0;
       for (const p of PC_CATALOG) {
-        await results.locator("tr", { hasText: `${p.brand} ${p.model}` }).getByRole("button", { name: "Добавить" }).click();
+        await results
+          .locator("tr", { hasText: `${p.brand} ${p.model}` })
+          .getByRole("button", { name: "Добавить" })
+          .click();
         lines += 1;
         await expect(page.getByTestId("quote-lines").locator("tbody tr")).toHaveCount(lines);
       }
@@ -85,6 +109,7 @@ test.describe("заказ от сметы до закрытия, с телефо
       await manual.getByRole("button", { name: "Добавить строку" }).click();
       await expect(page.getByTestId("quote-lines").locator("tbody tr")).toHaveCount(lines + 1);
       await expect(page.getByTestId("quote-verdict")).toBeVisible();
+      await fits(page);
 
       const stored = (
         await admin.query<{ purchase_limit: string; fee_total: string; fee_advance: string; fee_final: string }>(
@@ -109,10 +134,12 @@ test.describe("заказ от сметы до закрытия, с телефо
       await expect(send.locator(".adm-flash--error")).toContainText("Проверено вручную");
       await send.getByLabel("Проверено вручную").check();
       await send.getByRole("button", { name: "Отправить смету клиенту" }).click();
-      await expect(send.locator(".adm-flash--ok")).toContainText("Смета отправлена");
+      // The estimate is no longer a draft: the editor becomes read only and the form of sending goes away with its message.
+      await expect(page.getByTestId("quote-order-status")).toHaveText("Смета отправлена");
+      await expect(page.getByTestId("quote-readonly")).toBeVisible();
       await card();
       await statusIs(page, "estimate_sent");
-      await expect(page.getByTestId("no-steps")).toContainText("Ждём клиента");
+      await expect(page.getByTestId("waiting")).toContainText("Ждём клиента");
     });
 
     await test.step("клиент принимает смету в боте: деньги ожидаются двумя разными путями", async () => {
@@ -132,14 +159,14 @@ test.describe("заказ от сметы до закрытия, с телефо
       await expect(confirmAdvance.locator(".adm-flash--error")).toContainText("номер");
       await confirmAdvance.getByLabel("Номер фискального чека").fill("FR-2026-0001");
       await confirmAdvance.getByRole("button", { name: "Подтвердить платёж" }).click();
-      await ok(confirmAdvance, "Платёж подтверждён");
+      await expect(advance).toHaveAttribute("data-status", "confirmed");
 
       const funds = page.getByTestId("payment-purchase_funds");
       await open(funds, "Подтвердить или аннулировать");
       const confirmFunds = funds.locator('[data-testid^="confirm-"]');
       await confirmFunds.getByLabel("Номер платёжного документа банка").fill("PP-2026-0001");
       await confirmFunds.getByRole("button", { name: "Подтвердить платёж" }).click();
-      await ok(confirmFunds, "Платёж подтверждён");
+      await expect(funds).toHaveAttribute("data-status", "confirmed");
       await expect(page.getByTestId("payment-fee_advance")).toHaveAttribute("data-status", "confirmed");
       await expect(page.getByTestId("payment-purchase_funds")).toHaveAttribute("data-status", "confirmed");
     });
@@ -161,7 +188,9 @@ test.describe("заказ от сметы до закрытия, с телефо
       const form = page.getByTestId("record-purchase");
       const picker = form.getByTestId("receipt-picker");
       await expect(picker).toContainText("HEIC");
-      await picker.locator('input[type="file"]').setInputFiles({ name: "IMG_0001.heic", mimeType: "image/heic", buffer: heicPhoto() });
+      await picker
+        .locator('input[type="file"]')
+        .setInputFiles({ name: "IMG_0001.heic", mimeType: "image/heic", buffer: heicPhoto() });
       await expect(picker.getByTestId("receipt-picker-message")).toContainText("HEIC");
       await expect(picker.getByTestId("receipt-picker-message")).toHaveClass(/adm-flash--error/);
     });
@@ -170,15 +199,17 @@ test.describe("заказ от сметы до закрытия, с телефо
       let n = 0;
       for (const [i, p] of PC_CATALOG.entries()) {
         const form = page.getByTestId("record-purchase");
-        await form.getByLabel("Магазин").selectOption({ label: "Test shop-e2e" });
+        await form.getByLabel("Магазин", { exact: true }).selectOption({ label: "Test shop-e2e" });
         await form.getByLabel("Строка сметы").selectOption({ label: `${p.brand} ${p.model}` });
-        await form.getByLabel("Сумма по чеку, сумов").fill(formatSum(p.price).replace(/ сум$/, "").replace(/ /g, " "));
-        await form.getByLabel("Номер чека").fill(`CH-${2026_100 + i}`);
+        await form.getByLabel("Сумма по чеку, сумов").fill(typed(p.price));
+        await form.getByLabel("Номер чека", { exact: true }).fill(`CH-${2026_100 + i}`);
         if (i === 0) await form.getByLabel("Серийные номера").fill("SN-CPU-0001");
         const picker = form.getByTestId("receipt-picker");
-        await picker
-          .locator('input[type="file"]')
-          .setInputFiles({ name: `IMG_${100 + i}.jpg`, mimeType: "image/jpeg", buffer: phonePhoto(`GPS-41.2995N-69.2401E-${i}`) });
+        await picker.locator('input[type="file"]').setInputFiles({
+          name: `IMG_${100 + i}.jpg`,
+          mimeType: "image/jpeg",
+          buffer: phonePhoto(`GPS-41.2995N-69.2401E-${i}`, `receipt-${i}`),
+        });
         await expect(picker.getByTestId("receipt-picker-message")).toContainText("Файл загружен");
         await form.getByRole("button", { name: "Записать покупку" }).click();
         await ok(form, "Покупка записана");
@@ -190,13 +221,18 @@ test.describe("заказ от сметы до закрытия, с телефо
       // The photo of the receipt is on the screen and in the folder of files without the place of the shooting.
       const first = page.getByTestId("receipt-photo").first();
       const href = (await first.getAttribute("href")) ?? "";
-      const answer = await page.request.get(`${admin.baseURL}${href}`);
-      expect(answer.status()).toBe(200);
-      expect(answer.headers()["content-type"]).toBe("image/jpeg");
+      const answer = await getInBrowser(page, `${admin.baseURL}${href}`);
+      expect(answer.status).toBe(200);
+      expect(answer.type).toBe("image/jpeg");
       const files = await admin.query<{ storage_key: string }>(
         "select storage_key from ops.files where kind = 'receipt' order by created_at",
       );
       expect(files).toHaveLength(PC_CATALOG.length);
+      const linked = await admin.query(
+        "select 1 from sales.purchase_files pf join sales.purchases p on p.id = pf.purchase_id where p.order_id = $1",
+        [orderId],
+      );
+      expect(linked).toHaveLength(PC_CATALOG.length);
       for (const f of files) {
         const saved = readFileSync(join(admin.filesDir, f.storage_key)).toString("latin1");
         expect(saved).not.toContain("GPS-41.2995N");
@@ -222,7 +258,7 @@ test.describe("заказ от сметы до закрытия, с телефо
       const confirm = refund.locator('[data-testid^="confirm-"]');
       await confirm.getByLabel("Номер платёжного документа банка").fill("PP-2026-0002");
       await confirm.getByRole("button", { name: "Подтвердить платёж" }).click();
-      await ok(confirm, "Платёж подтверждён");
+      await expect(refund).toHaveAttribute("data-status", "confirmed");
       const settle = page.getByTestId("event-REMAINDER_SETTLED");
       await settle.getByLabel("Платёж возврата остатка").selectOption({ index: 1 });
       await settle.getByRole("button", { name: "Свести остаток" }).click();
@@ -238,10 +274,11 @@ test.describe("заказ от сметы до закрытия, с телефо
       await ok(generate, "Акт составлен");
       const sign = page.getByTestId("sign-act");
       const picker = sign.getByTestId("act-picker");
-      await picker.locator('input[type="file"]').setInputFiles({ name: "act.jpg", mimeType: "image/jpeg", buffer: phonePhoto("GPS-ACT") });
+      await picker
+        .locator('input[type="file"]')
+        .setInputFiles({ name: "act.jpg", mimeType: "image/jpeg", buffer: phonePhoto("GPS-ACT", "act-material") });
       await expect(picker.getByTestId("act-picker-message")).toContainText("Файл загружен");
       await sign.getByRole("button", { name: "Записать подпись" }).click();
-      await ok(sign, "Акт подписан");
       await expect(page.getByTestId("act-material_acceptance")).toHaveAttribute("data-signed", "yes");
       const accepted = page.getByTestId("event-MATERIALS_ACCEPTED");
       await accepted.getByRole("button", { name: "Материал клиента принят" }).click();
@@ -271,7 +308,7 @@ test.describe("заказ от сметы до закрытия, с телефо
       const confirm = final.locator('[data-testid^="confirm-"]');
       await confirm.getByLabel("Номер фискального чека").fill("FR-2026-0002");
       await confirm.getByRole("button", { name: "Подтвердить платёж" }).click();
-      await ok(confirm, "Платёж подтверждён");
+      await expect(final).toHaveAttribute("data-status", "confirmed");
 
       await open(page.getByTestId("acts"), "Составить акт");
       const generate = page.getByTestId("generate-act");
@@ -280,10 +317,16 @@ test.describe("заказ от сметы до закрытия, с телефо
       await ok(generate, "Акт составлен");
       const sign = page.getByTestId("sign-act");
       const picker = sign.getByTestId("act-picker");
-      await picker.locator('input[type="file"]').setInputFiles({ name: "handover.jpg", mimeType: "image/jpeg", buffer: phonePhoto("GPS-HANDOVER") });
+      await picker
+        .locator('input[type="file"]')
+        .setInputFiles({
+          name: "handover.jpg",
+          mimeType: "image/jpeg",
+          buffer: phonePhoto("GPS-HANDOVER", "act-handover"),
+        });
       await expect(picker.getByTestId("act-picker-message")).toContainText("Файл загружен");
       await sign.getByRole("button", { name: "Записать подпись" }).click();
-      await ok(sign, "Акт подписан");
+      await expect(page.getByTestId("act-handover")).toHaveAttribute("data-signed", "yes");
 
       await page.getByTestId("event-HANDOVER").getByRole("button", { name: "Передать клиенту" }).click();
       await statusIs(page, "handed_over");
@@ -303,14 +346,17 @@ test.describe("заказ от сметы до закрытия, с телефо
       await expect(row.getByTestId("registry-diff")).toHaveText(sumText(0));
       const year = Number(tashkentToday().slice(0, 4));
       const deals = (
-        await admin.query<{ deals_sum: string }>("select deals_sum::text from sales.v_deal_volume_by_year where year = $1", [year])
+        await admin.query<{ deals_sum: string }>(
+          "select deals_sum::text from sales.v_deal_volume_by_year where year = $1",
+          [year],
+        )
       )[0];
       await expect(page.getByTestId("deals-total")).toHaveText(sumText(Number(deals?.deals_sum)));
-      const csv = await page.request.get(`${admin.baseURL}/registry/export`);
-      expect(csv.status()).toBe(200);
-      expect(csv.headers()["content-type"]).toContain("text/csv");
-      expect(csv.headers()["content-disposition"]).toContain(`registry-${year}.csv`);
-      const body = await csv.text();
+      const csv = await getInBrowser(page, `${admin.baseURL}/registry/export`);
+      expect(csv.status).toBe(200);
+      expect(csv.type).toContain("text/csv");
+      expect(csv.disposition).toContain(`registry-${year}.csv`);
+      const body = csv.text;
       const line = body.split(/\r?\n/).find((l) => l.includes(number)) ?? "";
       expect(line.split(";")[0]).toBe("Заказ");
       expect(line.split(";")[7]).toBe("0");
@@ -318,7 +364,9 @@ test.describe("заказ от сметы до закрытия, с телефо
 
     await test.step("на узком экране телефона страница заказа не уходит за край", async () => {
       await card();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
       expect(overflow).toBeLessThanOrEqual(1);
     });
   });

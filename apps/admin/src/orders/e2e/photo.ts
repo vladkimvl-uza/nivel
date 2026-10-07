@@ -7,8 +7,11 @@ const TINY_JPEG = Buffer.from(
 
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
 
-/** `marker` goes into the EXIF block so that a test can look for it in the saved file (and must not find it). */
-export function phonePhoto(marker = "GPS-41.2995N-69.2401E"): Buffer {
+/**
+ * `marker` goes into the EXIF block so that a test can look for it in the saved file (and must not find it); `unique`
+ * goes into the picture itself, so that two photos are two files (the admin keeps one file for one picture).
+ */
+export function phonePhoto(marker = "GPS-41.2995N-69.2401E", unique = ""): Buffer {
   const tiff = [
     ...ascii("MM"),
     0,
@@ -39,7 +42,7 @@ export function phonePhoto(marker = "GPS-41.2995N-69.2401E"): Buffer {
   ];
   const exif = [...ascii("Exif"), 0, 0, ...tiff];
   const head = [0xff, 0xe1, (exif.length + 2) >> 8, (exif.length + 2) & 255];
-  return Buffer.from([0xff, 0xd8, ...head, ...exif, ...TINY_JPEG.subarray(2), 0xff, 0xd9]);
+  return Buffer.from([0xff, 0xd8, ...head, ...exif, ...TINY_JPEG.subarray(2), ...ascii(unique), 0xff, 0xd9]);
 }
 
 /** An iPhone photo in HEIC: the admin cannot read it and says how to send it as JPEG. */

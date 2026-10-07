@@ -261,8 +261,17 @@ describe("the upload of an act photo or a statement", () => {
     });
     expect(state.stored[0]).toMatch(/^uploads\/[0-9a-f]{2}\/[0-9a-f]{64}\.jpg$/);
     expect(state.audit[0]).toMatchObject({ action: "files.upload", entity: "ops.files", entityId: FILE_ID });
-    const second = await post(photo("third_party_statement"));
+    state.rows = [{ kind: "act_photo" }];
+    const second = await post(photo("act_photo"));
     expect(((await second.json()) as { message: string }).message).toContain("Такой файл уже загружен");
+  });
+
+  it("does not hand out a file that was uploaded as another kind of document: the act would be refused later", async () => {
+    await post(photo("act_photo"));
+    state.rows = [{ kind: "receipt" }];
+    const again = await post(photo("act_photo"));
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { message: string }).message).toContain("для другого документа");
   });
 
   it("refuses a kind of the base upload, an unknown kind and an iPhone picture in HEIC with the way out", async () => {

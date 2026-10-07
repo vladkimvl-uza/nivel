@@ -70,3 +70,44 @@ details.adm-card > summary {
     grid-template-columns: 1fr;
   }
 }
+
+/* The menu of the orders screens is longer than the base one: on a phone it takes its own line and the person wraps. */
+@media (max-width: 760px) {
+  .adm-head {
+    gap: 8px 12px;
+  }
+
+  .adm-nav {
+    flex: 1 1 100%;
+    order: 3;
+    min-width: 0;
+  }
+
+  .adm-who {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .adm-who > span {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* The page is never wider than the screen: the frame is one column of the width of the window, wide tables scroll inside. */
+.adm-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Terms of a card are long ("вознаграждение за закупку и ручательство"): on a phone the name is above its value. */
+@media (max-width: 640px) {
+  .adm-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+
+  .adm-kv dd {
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+  }
+}

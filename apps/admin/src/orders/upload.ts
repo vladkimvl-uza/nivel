@@ -97,6 +97,19 @@ export async function handleOrderUpload(request: Request): Promise<Response> {
       retentionClass: spec.retentionClass,
       createdBy: `admin:${user.id}`,
     });
+    if (row.duplicate) {
+      // One picture is one file (its key is the hash). The same picture under another kind is not what the person means to
+      // attach: the signature of an act needs a file registered as the photo of an act.
+      const { rows } = await runtime.db.$client.query<{ kind: string }>("select kind from ops.files where id = $1", [
+        row.id,
+      ]);
+      if (rows[0] && rows[0].kind !== kind) {
+        return reply(409, {
+          ok: false,
+          message: "Этот снимок уже загружен для другого документа. Сделайте новый снимок нужного документа.",
+        });
+      }
+    }
     await runtime.audit.append({
       actor: `admin:${user.id}`,
       action: "files.upload",

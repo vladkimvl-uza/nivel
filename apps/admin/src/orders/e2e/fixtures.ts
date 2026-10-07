@@ -132,3 +132,20 @@ export async function customerAcceptsReport(world: OrdersWorld, orderId: string)
 export async function workerCloses(world: OrdersWorld, orderId: string) {
   return orders.dispatch(orderId, { type: "CLOSE" }, { kind: "system", id: "system" }, world.worker);
 }
+
+/**
+ * A GET made by the page itself, with its cookies: the session cookie is `Secure` and the request context of Playwright
+ * does not send it over plain http (the browser does for 127.0.0.1).
+ */
+export async function getInBrowser(page: import("@playwright/test").Page, url: string) {
+  return page.evaluate(async (target) => {
+    const r = await fetch(target, { credentials: "same-origin" });
+    const type = r.headers.get("content-type");
+    return {
+      status: r.status,
+      type,
+      disposition: r.headers.get("content-disposition"),
+      text: type?.startsWith("text/") ? await r.text() : "",
+    };
+  }, url);
+}

@@ -1,7 +1,9 @@
+import type { AdminHarness, OrdersWorld, TestUser } from "../apps/admin/src/orders/e2e/fixtures.ts";
 import {
   botLead,
   customerAcceptsReport,
   expect,
+  getInBrowser,
   onlyDesktop,
   signIn,
   siteLeadWithoutCustomer,
@@ -9,7 +11,6 @@ import {
   test,
   workerCloses,
 } from "../apps/admin/src/orders/e2e/fixtures.ts";
-import type { AdminHarness, OrdersWorld, TestUser } from "../apps/admin/src/orders/e2e/fixtures.ts";
 import { phonePhoto, plainSum } from "../apps/admin/src/orders/e2e/photo.ts";
 import { formatSum } from "../apps/admin/src/orders/format.ts";
 import { GUARD_TEXT } from "../apps/admin/src/orders/messages.ts";
@@ -47,19 +48,28 @@ async function fillPurchase(
   o: { line: string; amount: string; receipt: string },
 ): Promise<void> {
   const form = page.getByTestId("record-purchase");
-  await form.getByLabel("Магазин").selectOption({ label: "Test shop-e2e" });
+  await form.getByLabel("Магазин", { exact: true }).selectOption({ label: "Test shop-e2e" });
   await form.getByLabel("Строка сметы").selectOption({ label: o.line });
   await form.getByLabel("Сумма по чеку, сумов").fill(o.amount);
-  await form.getByLabel("Номер чека").fill(o.receipt);
+  await form.getByLabel("Номер чека", { exact: true }).fill(o.receipt);
   const picker = form.getByTestId("receipt-picker");
-  await picker.locator('input[type="file"]').setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: phonePhoto() });
+  await picker
+    .locator('input[type="file"]')
+    .setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: phonePhoto() });
   await expect(picker.getByTestId("receipt-picker-message")).toContainText("Файл загружен");
 }
+
+// Without limits a click on something the page does not let through waits for ever (the config of the project sets none).
+test.use({ actionTimeout: 30_000, navigationTimeout: 45_000 });
 
 test.describe("отказы автомата в карточке заказа", () => {
   onlyDesktop();
 
-  test("закупка сверх лимита: без согласия клиента отказ, с согласием — всё равно не своими деньгами", async ({ page, admin, world }) => {
+  test("закупка сверх лимита: без согласия клиента отказ, с согласием — всё равно не своими деньгами", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const owner = await admin.createUser("owner");
     await signIn(page, admin, owner);
     const o = await purchasingOrder(flowOf(world, owner), "Лимит Лимитов");
@@ -81,7 +91,9 @@ test.describe("отказы автомата в карточке заказа", 
 
     const rows = await admin.query("select 1 from sales.purchases where order_id = $1", [o.orderId]);
     expect(rows).toHaveLength(0);
-    const given = await admin.query("select 1 from ops.consents where order_id = $1 and kind = 'limit_overrun'", [o.orderId]);
+    const given = await admin.query("select 1 from ops.consents where order_id = $1 and kind = 'limit_overrun'", [
+      o.orderId,
+    ]);
     expect(given).toHaveLength(1);
   });
 
@@ -109,11 +121,17 @@ test.describe("отказы автомата в карточке заказа", 
     const confirm = advance.locator('[data-testid^="confirm-"]');
     await confirm.getByRole("button", { name: "Подтвердить платёж" }).click();
     await expect(confirm.locator(".adm-flash--error")).toContainText("Номер фискального чека");
-    const still = await admin.query("select status from sales.payments where order_id = $1 and kind = 'fee_advance'", [o.orderId]);
+    const still = await admin.query("select status from sales.payments where order_id = $1 and kind = 'fee_advance'", [
+      o.orderId,
+    ]);
     expect(still.map((r) => r.status)).toEqual(["expected"]);
   });
 
-  test("закупка раньше следующего рабочего дня после поступления денег не начинается", async ({ page, admin, world }) => {
+  test("закупка раньше следующего рабочего дня после поступления денег не начинается", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const owner = await admin.createUser("owner");
     await signIn(page, admin, owner);
     const o = await paidOrder(flowOf(world, owner), { name: "Спешка Спешкин" });
@@ -125,7 +143,11 @@ test.describe("отказы автомата в карточке заказа", 
     expect(row[0]?.status).toBe("accepted");
   });
 
-  test("закрытие без сверки: остаток не возвращён — «Свести остаток» отказывает, закрывает только система", async ({ page, admin, world }) => {
+  test("закрытие без сверки: остаток не возвращён — «Свести остаток» отказывает, закрывает только система", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const owner = await admin.createUser("owner");
     await signIn(page, admin, owner);
     const flow = flowOf(world, owner);
@@ -136,14 +158,21 @@ test.describe("отказы автомата в карточке заказа", 
     // The refund of the remainder is not confirmed: received != purchased + returned.
     await settle.getByRole("button", { name: "Свести остаток" }).click();
     await expect(settle.locator(".adm-flash--error")).toContainText(GUARD_TEXT.not_reconciled);
-    expect((await admin.query("select status from sales.orders where id = $1", [o.orderId]))[0]?.status).toBe("report_sent");
-    const registry = await admin.query("select 1 from sales.payments where order_id = $1 and kind = 'remainder_refund' and status = 'confirmed'", [
-      o.orderId,
-    ]);
+    expect((await admin.query("select status from sales.orders where id = $1", [o.orderId]))[0]?.status).toBe(
+      "report_sent",
+    );
+    const registry = await admin.query(
+      "select 1 from sales.payments where order_id = $1 and kind = 'remainder_refund' and status = 'confirmed'",
+      [o.orderId],
+    );
     expect(registry).toHaveLength(0);
   });
 
-  test("у переданного заказа нет кнопки «Закрыть»: закрытие — дело системы после сверки", async ({ page, admin, world }) => {
+  test("у переданного заказа нет кнопки «Закрыть»: закрытие — дело системы после сверки", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const owner = await admin.createUser("owner");
     await signIn(page, admin, owner);
     const o = await handedOverOrder(flowOf(world, owner), "Закрытие Закрытов");
@@ -179,7 +208,11 @@ test.describe("отказы автомата в карточке заказа", 
 test.describe("помощник и бухгалтер", () => {
   onlyDesktop();
 
-  test("кнопок денег у помощника нет ни на одном шаге заказа, а закупки он записывает", async ({ page, admin, world }) => {
+  test("кнопок денег у помощника нет ни на одном шаге заказа, а закупки он записывает", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const owner = await admin.createUser("owner");
     const helper = await admin.createUser("assistant");
     const flow = flowOf(world, owner);
@@ -210,21 +243,30 @@ test.describe("помощник и бухгалтер", () => {
     await expect(page.getByRole("button", { name: "Отправить отчёт клиенту" })).toHaveCount(0);
     await expect(page.getByTestId("consent-details")).toHaveCount(0);
     const form = page.getByTestId("record-purchase");
-    await fillPurchase(page, { line: "Ryzen 5 7600", amount: formatSum(2_800_000).replace(/ сум$/, ""), receipt: "CH-HELPER-1" });
+    await fillPurchase(page, {
+      line: "Ryzen 5 7600",
+      amount: formatSum(2_800_000).replace(/ сум$/, ""),
+      receipt: "CH-HELPER-1",
+    });
     await form.getByRole("button", { name: "Записать покупку" }).click();
     await expect(form.locator(".adm-flash--ok")).toContainText("Покупка записана");
-    const by = await admin.query<{ bought_by: string }>("select bought_by from sales.purchases where order_id = $1", [buying.orderId]);
+    const by = await admin.query<{ bought_by: string }>("select bought_by from sales.purchases where order_id = $1", [
+      buying.orderId,
+    ]);
     expect(by[0]?.bought_by).toBe(helper.id);
   });
 
-  test("помощник не открывает порог и выгрузку; бухгалтер читает порог и выгружает, но не вносит и не видит заказы", async ({ page, admin }) => {
+  test("помощник не открывает порог и выгрузку; бухгалтер читает порог и выгружает, но не вносит и не видит заказы", async ({
+    page,
+    admin,
+  }) => {
     const helper = await admin.createUser("assistant");
     const accountant = await admin.createUser("accountant");
     await signIn(page, admin, helper);
     await page.goto(`${admin.baseURL}/registry`);
     await expect(page).toHaveURL(/\/forbidden/);
-    const blocked = await page.request.get(`${admin.baseURL}/registry/export`);
-    expect(blocked.status()).toBe(403);
+    const blocked = await getInBrowser(page, `${admin.baseURL}/registry/export`);
+    expect(blocked.status).toBe(403);
     await page.goto(`${admin.baseURL}/dashboard`);
     await expect(page.getByTestId("threshold")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Порог и учёт" })).toHaveCount(0);
@@ -235,8 +277,8 @@ test.describe("помощник и бухгалтер", () => {
     await expect(page.getByTestId("threshold")).toBeVisible();
     await expect(page.getByTestId("registry-export")).toBeVisible();
     await expect(page.getByTestId("income-form")).toHaveCount(0);
-    const csv = await page.request.get(`${admin.baseURL}/registry/export`);
-    expect(csv.status()).toBe(200);
+    const csv = await getInBrowser(page, `${admin.baseURL}/registry/export`);
+    expect(csv.status).toBe(200);
     await page.goto(`${admin.baseURL}/orders`);
     await expect(page).toHaveURL(/\/forbidden/);
   });
@@ -245,7 +287,11 @@ test.describe("помощник и бухгалтер", () => {
 test.describe("заявки, порог, доска", () => {
   onlyDesktop();
 
-  test("заявка сайта без клиента: помощник привязывает клиента, телефон видит только владелец", async ({ page, admin, world }) => {
+  test("заявка сайта без клиента: помощник привязывает клиента, телефон видит только владелец", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const helper = await admin.createUser("assistant");
     const owner = await admin.createUser("owner");
     const phone = `+99893${Math.floor(1_000_000 + Math.random() * 8_999_999)}`;
@@ -269,16 +315,24 @@ test.describe("заявки, порог, доска", () => {
 
     await page.goto(`${admin.baseURL}/leads`);
     await page.locator(`[data-lead="${lead.number}"]`).getByRole("button", { name: "Взять в работу" }).click();
-    await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/);
+    await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
     await page.context().clearCookies();
     await signIn(page, admin, owner);
-    const second = await siteLeadWithoutCustomer(world, "Сайтов Второй", `+99890${Math.floor(1_000_000 + Math.random() * 8_999_999)}`);
+    const second = await siteLeadWithoutCustomer(
+      world,
+      "Сайтов Второй",
+      `+99890${Math.floor(1_000_000 + Math.random() * 8_999_999)}`,
+    );
     await page.goto(`${admin.baseURL}/leads`);
     await expect(page.locator(`[data-lead="${second.number}"]`)).toContainText("+99890");
   });
 
-  test("порог: доход другой деятельности входит в сделки года, выгрузка и доска показывают заказы", async ({ page, admin, world }) => {
+  test("порог: доход другой деятельности входит в сделки года, выгрузка и доска показывают заказы", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const owner = await admin.createUser("owner");
     const flow = flowOf(world, owner);
     const reported = await reportSentOrder(flow, "Реестр Реестров");
@@ -327,7 +381,11 @@ test.describe("заявки, порог, доска", () => {
 test.describe("гарантия, паспорт и кнопки PDF", () => {
   onlyDesktop();
 
-  test("гарантийный случай по переданному заказу открывает помощник; PDF-кнопки появляются только с флагом", async ({ page, admin, world }) => {
+  test("гарантийный случай по переданному заказу открывает помощник; PDF-кнопки появляются только с флагом", async ({
+    page,
+    admin,
+    world,
+  }) => {
     const owner = await admin.createUser("owner");
     const helper = await admin.createUser("assistant");
     const o = await handedOverOrder(flowOf(world, owner), "Гарантия Гарантова");

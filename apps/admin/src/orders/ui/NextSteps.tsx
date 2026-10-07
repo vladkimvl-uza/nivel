@@ -217,7 +217,11 @@ export function NextSteps({ card, role }: { card: OrderCard; role: Role }) {
             : "У вашей роли нет действий по заказу."}
         </p>
       ) : null}
-      {actions.length > 0 && waiting ? <p className="adm-note">{waiting}</p> : null}
+      {actions.length > 0 && waiting ? (
+        <p className="adm-note" data-testid="waiting">
+          {waiting}
+        </p>
+      ) : null}
       {links.length > 0 ? (
         <div className="adm-actions">
           {links.map((a) => {
