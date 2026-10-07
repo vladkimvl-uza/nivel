@@ -221,7 +221,13 @@ describe("BOT_MODE=webhook", () => {
       headers: { "x-telegram-bot-api-secret-token": SECRET },
       body: JSON.stringify({
         update_id: 91,
-        message: { message_id: 1, date: 1, chat: { id: 5, type: "private" }, from: { id: 5, is_bot: false, first_name: "A" }, text: "x" },
+        message: {
+          message_id: 1,
+          date: 1,
+          chat: { id: 5, type: "private" },
+          from: { id: 5, is_bot: false, first_name: "A" },
+          text: "x",
+        },
       }),
     });
     expect(res.status).toBe(200);
@@ -248,6 +254,32 @@ describe("BOT_MODE=webhook", () => {
       }),
     ).rejects.toThrow();
     expect(tg.of("setWebhook")).toHaveLength(0);
+  });
+
+  it("a refusal of setWebhook ends the start with the words of Telegram only: the secret does not leave with the error", async () => {
+    const tg = new FakeTelegram();
+    const bare = new Bot<BotContext>(TOKEN, { botInfo: BOT_INFO });
+    tg.install(bare);
+    tg.failNext("setWebhook", {
+      error_code: 400,
+      description: "Bad Request: secret token contains unallowed characters",
+    });
+    const failed = await startApp({
+      env: envOf(env),
+      db: {} as Db,
+      rt: {} as never,
+      log: logger() as never,
+      port: 0,
+      ping: async () => ({ ok: true, ms: 1, queueSchema: true }),
+      botFactory: () => bare,
+      sweep: async () => 0,
+    }).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(failed).toBeInstanceOf(Error);
+    expect(String((failed as Error).message)).toContain("setWebhook was refused by Telegram: 400");
+    expect(JSON.stringify(failed, Object.getOwnPropertyNames(failed))).not.toContain(SECRET);
   });
 
   it("an update that fails in the bot is logged, not answered with an error", async () => {

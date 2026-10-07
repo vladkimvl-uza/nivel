@@ -117,7 +117,11 @@ describe("«Report a problem» (ARCHITECTURE 7.2 «Гарантия»)", () => {
     h.tg.reset();
     await press("w:done");
     expect(h.tg.lastSend(ali.id)?.payload.text).toBe("Avval muammoni yozing.");
-    expect(await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [o.orderId])).toHaveLength(0);
+    expect(
+      await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [
+        o.orderId,
+      ]),
+    ).toHaveLength(0);
     // A voice message with the words is copied to the owner together with them.
     await h.send(h.tg.text(ali, "Ovoz tepada"));
     await press("w:done");
@@ -135,7 +139,9 @@ describe("«Report a problem» (ARCHITECTURE 7.2 «Гарантия»)", () => {
     expect(Number(row.tg_topic_id)).not.toBe(lead.topicId);
     expect(h.tg.textsTo(w.groupId, Number(row.tg_topic_id)).some((t) => t.includes(o.number))).toBe(true);
     expect(
-      await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [o.orderId]),
+      await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [
+        o.orderId,
+      ]),
     ).toHaveLength(1);
     expect(h.tg.textsTo(ali.id)[0]).toContain("Murojaat qabul qilindi");
   });
@@ -148,7 +154,9 @@ describe("«Report a problem» (ARCHITECTURE 7.2 «Гарантия»)", () => {
     h.tg.failNext("sendMessage", { error_code: 500, description: "Internal Server Error" });
     await press("w:done");
     expect(
-      await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [o.orderId]),
+      await q("select 1 from ops.outbox where payload ->> 'job' = 'warranty.report' and payload ->> 'orderId' = $1", [
+        o.orderId,
+      ]),
     ).toHaveLength(1);
     expect(
       await q("select 1 from ops.audit_log where action = 'warranty.reported' and entity_id = $1", [o.orderId]),

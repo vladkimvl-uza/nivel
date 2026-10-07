@@ -198,6 +198,7 @@
     "send_as_photo": "Rasmni fayl sifatida emas, foto sifatida yuboring: HEIC fayl ochilmaydi.",
     "relayed": "Xabaringiz ustaga yuborildi.",
     "relay_failed": "Xabar ustaga yetkazilmadi. Birozdan soʻng qayta yuboring.",
+    "slow_down": "Juda tez. Biroz kuting. / Слишком часто. Подождите немного.",
     "no_topic": "Xabaringiz qabul qilindi; usta tez orada javob beradi."
   },
   "owner": {

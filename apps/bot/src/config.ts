@@ -72,3 +72,17 @@ export async function staffRole(
   if (deps.ownerIds.includes(id)) return "owner";
   return (await assistantIds(deps.db)).includes(id) ? "assistant" : null;
 }
+
+/** At the start: what the bot needs from the owner and does not find. The bot works without it, but says so in the log. */
+export async function warnAboutSettings(db: Db, log: { warn: (o: object, msg: string) => void }): Promise<void> {
+  try {
+    if ((await ownerGroupId(db)) === null) {
+      log.warn({}, `${OWNER_GROUP_KEY} is not set: the topics of the requests are not made, nothing reaches the owner`);
+    }
+    if ((await paymentRequisites(db)) === null) {
+      log.warn({}, `${REQUISITES_KEY} is not set: the instruction to pay for purchases goes without the account`);
+    }
+  } catch (err) {
+    log.warn({ err }, "the settings of the bot could not be read at the start");
+  }
+}

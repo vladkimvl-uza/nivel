@@ -1,8 +1,9 @@
 import type { Db } from "@nivel/db";
+import { consents } from "@nivel/services";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ensureCustomer } from "./store.ts";
 import type { Person } from "./testing/fake-telegram.ts";
-import { createHarness, type Harness, newPerson, STRANGER } from "./testing/harness.ts";
+import { createHarness, type Harness, newPerson, onboard, STRANGER } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
 
 let w: BotWorld;
@@ -226,5 +227,28 @@ describe("two updates of one person at once", () => {
     expect(
       await q("select 1 from ops.consents where evidence ->> 'telegramUserId' = $1", [String(ALI.id)]),
     ).toHaveLength(1);
+  });
+});
+
+describe("the consent is asked of the database every time", () => {
+  it("a consent that was withdrawn brings the customer back to the consent screen; agreeing again records a new consent", async () => {
+    await onboard(h, ALI, "uz");
+    const [{ id: customerId }] = await q("select id from sales.customers where telegram_user_id = $1", [ALI.id]);
+    await consents.record({ kind: "pd_processing", customerId, granted: false, channel: "bot" }, w.bot);
+    h.tg.reset();
+    await h.send(h.tg.text(ALI, "Salom"));
+    expect(h.tg.of("copyMessage")).toHaveLength(0);
+    const sent = h.tg.lastSend(ALI.id);
+    expect(String(sent?.payload.text)).toBe("Davom etish uchun rozilik kerak.");
+    expect(buttons(sent).map((b) => b.callback_data)).toEqual(["cn:ok"]);
+    await h.send(h.tg.press(ALI, ALI.id, 1003, "cn:ok"));
+    expect(
+      await q("select granted from ops.consents where customer_id = $1 and kind = 'pd_processing' order by at, id", [
+        customerId,
+      ]),
+    ).toEqual([{ granted: true }, { granted: false }, { granted: true }]);
+    h.tg.reset();
+    await h.send(h.tg.text(ALI, "/start"));
+    expect(h.tg.lastSend(ALI.id)?.payload.text).toBe("Nima qilamiz?");
   });
 });

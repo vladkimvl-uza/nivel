@@ -144,8 +144,8 @@ describe("the catalog of the bot", () => {
     }
   });
 
-  it("the Uzbek is in Latin (but for the two lines that are bilingual by design), the Russian in Cyrillic", () => {
-    const bilingual = new Set(["start.choose_language", "start.language_ru", "menu.language"]);
+  it("the Uzbek is in Latin (but for the lines that are bilingual by design), the Russian in Cyrillic", () => {
+    const bilingual = new Set(["start.choose_language", "start.language_ru", "menu.language", "common.slow_down"]);
     for (const [key, value] of uz) {
       if (bilingual.has(key)) continue;
       // Words in Latin; the guillemets and signs are not letters.

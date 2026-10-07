@@ -121,6 +121,8 @@ export const request = new Composer<BotContext>();
 
 request.on("message", async (ctx, next) => {
   const step = ctx.session.step;
+  // A command is a command at every step (/start and /language were taken before): the step stays where it was.
+  if (ctx.message.entities?.some((e) => e.type === "bot_command" && e.offset === 0) === true) return next();
   if (step === "req_contact") {
     const contact = ctx.message.contact;
     if (contact !== undefined) {

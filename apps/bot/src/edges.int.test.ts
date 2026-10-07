@@ -93,6 +93,31 @@ describe("the request out of step", () => {
     expect((await sessionOf(ali)).step).toBe("idle");
   });
 
+  it("/support and /stop in the middle of a request are commands, not a contact or a district; the request goes on after", async () => {
+    for (const d of [
+      "m:select",
+      "sel:task:gaming",
+      "sel:band:12m_20m",
+      "sel:scope:pc",
+      "sel:done",
+      "sel:pick:gaming.T2.A",
+    ]) {
+      await press(d);
+    }
+    expect((await sessionOf(ali)).step).toBe("req_contact");
+    h.tg.reset();
+    await say("/support");
+    expect((await sessionOf(ali)).step).toBe("req_contact");
+    expect(String(h.tg.lastSend(ali.id)?.payload.text)).toContain("Ish vaqti");
+    await h.send(h.tg.contact(ali, "+998901112233"));
+    expect((await sessionOf(ali)).step).toBe("req_district");
+    h.tg.reset();
+    await say("/stop");
+    expect((await sessionOf(ali)).step).toBe("req_district");
+    expect(h.tg.textsTo(ali.id)).toHaveLength(1);
+    expect(h.tg.textsTo(ali.id)[0]).not.toContain("Tuman");
+  });
+
   it("the wishes buttons do nothing outside the step of the wishes", async () => {
     await press("sel:w:quiet");
     await press("sel:done");

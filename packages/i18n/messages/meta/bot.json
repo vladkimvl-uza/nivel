@@ -739,6 +739,11 @@
     "maxLen": 90,
     "status": "draft"
   },
+  "common.slow_down": {
+    "context": "too many updates from one person; both languages, the language may be unknown yet",
+    "maxLen": 70,
+    "status": "draft"
+  },
   "common.no_topic": {
     "context": "no topic yet, the message waits for the owner",
     "maxLen": 80,

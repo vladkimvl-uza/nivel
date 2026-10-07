@@ -8,10 +8,11 @@ import type { Env } from "@nivel/config";
 import type { Db } from "@nivel/db";
 import type { DbHealth } from "@nivel/db/health";
 import type { orders } from "@nivel/services";
-import type { Bot } from "grammy";
+import { type Bot, GrammyError } from "grammy";
 import type { Update } from "grammy/types";
 import type { Logger } from "pino";
 import { createBot } from "./bot.ts";
+import { warnAboutSettings } from "./config.ts";
 import { configureBot } from "./configure.ts";
 import type { BotContext } from "./context.ts";
 import type { BotDeps } from "./deps.ts";
@@ -44,6 +45,19 @@ export interface StartedApp {
   port: number;
   server: Server;
   stop(): Promise<void>;
+}
+
+/**
+ * A refusal of Telegram to a call that carries the secret of the webhook ends the start with a plain error: the
+ * error of grammY holds the whole request, and the process would print it (the secret, the texts) on its way out.
+ */
+async function refused(method: string, call: () => Promise<unknown>): Promise<void> {
+  try {
+    await call();
+  } catch (err) {
+    if (!(err instanceof GrammyError)) throw err;
+    throw new Error(`${method} was refused by Telegram: ${err.error_code} ${err.description}`);
+  }
 }
 
 export async function startApp(o: AppOptions): Promise<StartedApp> {
@@ -101,39 +115,50 @@ export async function startApp(o: AppOptions): Promise<StartedApp> {
     onError: (err) => log.error({ err }, "webhook update failed"),
   });
 
-  if (bot !== undefined) {
-    try {
-      await configureBot(bot.api);
-    } catch (err) {
-      // The commands are for convenience; a bot that cannot set them still answers people.
-      log.error({ err }, "the commands and the descriptions of the bot were not set");
+  try {
+    if (bot !== undefined) {
+      const api = bot.api;
+      try {
+        await configureBot(api);
+      } catch (err) {
+        // The commands are for convenience; a bot that cannot set them still answers people.
+        log.error({ err }, "the commands and the descriptions of the bot were not set");
+      }
+      await warnAboutSettings(deps.db, log);
+      if (webhook !== undefined && env.BOT_WEBHOOK_SECRET !== undefined) {
+        await refused("setWebhook", () =>
+          api.setWebhook(`${env.PUBLIC_BASE_URL.replace(/\/+$/, "")}${webhook.path}`, {
+            secret_token: env.BOT_WEBHOOK_SECRET as string,
+            allowed_updates: [...ALLOWED_UPDATES],
+          }),
+        );
+        log.info({ port }, "webhook set");
+      } else {
+        // Telegram refuses getUpdates while a webhook is set.
+        await refused("deleteWebhook", () => api.deleteWebhook());
+        poller = (o.poll ?? ((b) => run(b, { runner: { fetch: { allowed_updates: [...ALLOWED_UPDATES] } } })))(bot);
+        log.info({ port }, "polling started");
+      }
+      const sweep = o.sweep ?? sweepLeadTopics;
+      // One run at a time: a slow Telegram (429) must not let two runs make the same topic.
+      let sweeping = false;
+      sweeper = setInterval(() => {
+        if (sweeping) return;
+        sweeping = true;
+        sweep(api, deps)
+          .catch((err) => log.error({ err }, "the sweep of the topics failed"))
+          .finally(() => {
+            sweeping = false;
+          });
+      }, o.sweepEveryMs ?? 30_000);
+      sweeper.unref?.();
     }
-    if (webhook !== undefined && env.BOT_WEBHOOK_SECRET !== undefined) {
-      await bot.api.setWebhook(`${env.PUBLIC_BASE_URL.replace(/\/+$/, "")}${webhook.path}`, {
-        secret_token: env.BOT_WEBHOOK_SECRET,
-        allowed_updates: [...ALLOWED_UPDATES],
-      });
-      log.info({ port }, "webhook set");
-    } else {
-      // Telegram refuses getUpdates while a webhook is set.
-      await bot.api.deleteWebhook();
-      poller = (o.poll ?? ((b) => run(b, { runner: { fetch: { allowed_updates: [...ALLOWED_UPDATES] } } })))(bot);
-      log.info({ port }, "polling started");
-    }
-    const api = bot.api;
-    const sweep = o.sweep ?? sweepLeadTopics;
-    // One run at a time: a slow Telegram (429) must not let two runs make the same topic.
-    let sweeping = false;
-    sweeper = setInterval(() => {
-      if (sweeping) return;
-      sweeping = true;
-      sweep(api, deps)
-        .catch((err) => log.error({ err }, "the sweep of the topics failed"))
-        .finally(() => {
-          sweeping = false;
-        });
-    }, o.sweepEveryMs ?? 30_000);
-    sweeper.unref?.();
+  } catch (err) {
+    // A start that fails leaves nothing listening behind it.
+    if (sweeper !== undefined) clearInterval(sweeper);
+    await poller?.stop();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw err;
   }
   log.info({ port, bot: state }, `bot /healthz on http://127.0.0.1:${port}/healthz`);
 

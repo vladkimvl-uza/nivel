@@ -187,7 +187,9 @@ async function acceptance(ctx: BotContext, number: string, confirm: boolean, see
     ]
       .filter((l) => l !== "")
       .join("\n");
-    return say(ctx, text, [[button(ctx.t("my.accept.confirm"), orderCallback(view.number, "acc2", String(quote.version)))]]);
+    return say(ctx, text, [
+      [button(ctx.t("my.accept.confirm"), orderCallback(view.number, "acc2", String(quote.version)))],
+    ]);
   }
   const pd = await latestConsent(ctx.deps.db, customerId, "pd_processing", null);
   if (pd === null || !pd.granted) return say(ctx, ctx.t("my.error.consent_missing"));

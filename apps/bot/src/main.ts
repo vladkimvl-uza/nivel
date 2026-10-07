@@ -5,11 +5,13 @@ import { pingDatabase } from "@nivel/db/health";
 import { orders } from "@nivel/services";
 import pino from "pino";
 import { startApp } from "./app.ts";
+import { safeErr } from "./safe-err.ts";
 
 const env = loadEnv("bot");
 const log = pino({
   name: "bot",
   redact: [...LOG_REDACT_PATHS],
+  serializers: { err: safeErr },
 });
 const port = Number(process.env.PORT) || appPort("bot", env.NIVEL_SLOT);
 

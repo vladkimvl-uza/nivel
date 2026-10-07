@@ -52,8 +52,10 @@ export async function orderCard(ctx: BotContext, orderId: string, role: "owner" 
       fee = sumText(view.quote.feeTotal, ctx.lang);
       limit = sumText(view.quote.purchaseLimit, ctx.lang);
     }
-  } catch {
-    // An order that has no quote the customer was shown yet has no numbers to show: the dashes stay.
+  } catch (err) {
+    // An order that has no quote the customer was shown yet has no numbers to show: the dashes stay. A failure of the
+    // database is not that: it goes up, so that the owner is not shown dashes as if there were no estimate.
+    if (!(err instanceof orders.NotFoundError || err instanceof orders.ValidationError)) throw err;
   }
   const text = t("owner.card.order", {
     number: order.number,

@@ -15,10 +15,9 @@ export async function loadProfile(ctx: BotContext): Promise<Profile> {
   const from = ctx.from;
   const customer = from === undefined ? null : await findCustomer(ctx.deps.db, from.id);
   if (ctx.session.lang === undefined && customer !== null) ctx.session.lang = langOf(customer.lang);
-  let consented = ctx.session.consented;
-  if (!consented && customer !== null) {
-    consented = await hasProcessingConsent(ctx.deps.db, customer.id);
-    ctx.session.consented = consented;
-  }
+  // Every time: a consent that was withdrawn (a new record, ARCHITECTURE 10.2) or a customer who was erased must stop
+  // the dialog at once; the flag of the session is only what was seen last.
+  const consented = customer !== null && (await hasProcessingConsent(ctx.deps.db, customer.id));
+  ctx.session.consented = consented;
   return { customer, consented };
 }

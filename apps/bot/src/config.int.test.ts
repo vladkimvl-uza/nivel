@@ -1,5 +1,5 @@
 import { ops } from "@nivel/db/repos";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   ASSISTANT_IDS_KEY,
   assistantIds,
@@ -9,6 +9,7 @@ import {
   paymentRequisites,
   REQUISITES_KEY,
   staffRole,
+  warnAboutSettings,
   workCalendar,
 } from "./config.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
@@ -114,5 +115,33 @@ describe("the requisites of the account of the sole proprietor", () => {
     expect(await paymentRequisites(db())).toEqual({ text: "YaTT Nivel, Bank, 2020 8000, 123", purpose: "Xarid" });
     await set(REQUISITES_KEY, { holder: "YaTT Nivel" });
     expect(await paymentRequisites(db())).toEqual({ text: "YaTT Nivel" });
+  });
+});
+
+describe("what the owner has not set yet is said in the log at the start", () => {
+  const logger = () => ({ warn: vi.fn() });
+
+  it("names the group and the requisites that are missing", async () => {
+    await set(OWNER_GROUP_KEY, 0);
+    await set(REQUISITES_KEY, {});
+    const log = logger();
+    await warnAboutSettings(db(), log);
+    const said = log.warn.mock.calls.map((c) => c[1]);
+    expect(said.some((m) => String(m).includes(OWNER_GROUP_KEY))).toBe(true);
+    expect(said.some((m) => String(m).includes(REQUISITES_KEY))).toBe(true);
+  });
+
+  it("is silent when both are set", async () => {
+    await set(OWNER_GROUP_KEY, -1_001_234_567_890);
+    await set(REQUISITES_KEY, { holder: "YaTT Nivel", account: "20208000900100000001" });
+    const log = logger();
+    await warnAboutSettings(db(), log);
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it("does not fail the start when the settings cannot be read", async () => {
+    const log = logger();
+    await expect(warnAboutSettings({} as never, log)).resolves.toBeUndefined();
+    expect(log.warn).toHaveBeenCalledTimes(1);
   });
 });

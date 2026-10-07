@@ -21,13 +21,19 @@ import { staff } from "./handlers/staff.ts";
 import { askLanguage, start } from "./handlers/start.ts";
 import { warranty } from "./handlers/warranty.ts";
 import { dbStorage, initialSession, sessionKey } from "./session.ts";
+import { createThrottle, type ThrottleOptions } from "./throttle.ts";
 import { ack, button, say } from "./ui.ts";
 
 export interface CreateBotOptions {
   token: string;
   /** With the data of the bot Telegram is not asked `getMe` before the first update (tests and webhooks). */
   botInfo?: UserFromGetMe;
+  /** How often one person may write (ARCHITECTURE 10.1); `false` for the tests that send many updates in a moment. */
+  throttle?: ThrottleOptions | false;
 }
+
+/** A burst of eight (a person taps through the menu) and one update a second after that. */
+export const DEFAULT_THROTTLE: ThrottleOptions = { burst: 8, perSecond: 1 };
 
 function customerComposer(deps: BotDeps): Composer<BotContext> {
   const c = new Composer<BotContext>();
@@ -101,6 +107,17 @@ export function createBot(deps: BotDeps, opts: CreateBotOptions): Bot<BotContext
         // The chat may have blocked the bot: nothing more to do.
       }
     }
+  });
+
+  // Before the database is touched: more than the limit from one person is dropped (the owner is not limited).
+  const throttle = opts.throttle === false ? undefined : createThrottle(opts.throttle ?? DEFAULT_THROTTLE);
+  bot.use(async (ctx, next) => {
+    const id = ctx.from?.id;
+    if (throttle === undefined || id === undefined || deps.ownerIds.includes(String(id))) return next();
+    const verdict = throttle.take(String(id));
+    if (verdict === "ok") return next();
+    if (ctx.callbackQuery !== undefined) await ack(ctx);
+    if (verdict === "notice" && ctx.chat?.type === "private") await ctx.reply(ctx.t("common.slow_down"));
   });
 
   // Telegram repeats an update that was answered late: every update id is handled once.

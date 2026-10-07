@@ -201,7 +201,13 @@ describe("the acceptance of the offer and the estimate", () => {
     await ops.setSetting(
       w.db,
       "requisites.ip",
-      { holder: "YaTT Nivel Test", bank: "Test Bank", account: "2020 8000 9001 0000 0001", mfo: "00014", inn: "123456789" },
+      {
+        holder: "YaTT Nivel Test",
+        bank: "Test Bank",
+        account: "2020 8000 9001 0000 0001",
+        mfo: "00014",
+        inn: "123456789",
+      },
       "test",
     );
     try {

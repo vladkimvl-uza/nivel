@@ -338,6 +338,40 @@ describe("the card of the order and the buttons of the events", () => {
     });
   });
 
+  it("an id that the lists of the bot name but the database does not know as an active member of the staff is refused", async () => {
+    const o = await acceptedOrder(w, lead);
+    const ghost = newPerson("Ghost", "ghost"); // no account in the admin panel at all
+    const former = newPerson("Former", "former"); // an account that was switched off
+    const wrongRole = newPerson("Helper", "helper2"); // an assistant that the list of the bot calls an owner
+    await ops.createAdminUser(w.db, {
+      email: `former-${former.id}@nivel.test`,
+      passwordHash: "x",
+      role: "owner",
+      telegramUserId: former.id,
+    });
+    await w.db.$client.query("update ops.admin_users set active = false where telegram_user_id = $1", [former.id]);
+    await ops.createAdminUser(w.db, {
+      email: `helper-${wrongRole.id}@nivel.test`,
+      passwordHash: "x",
+      role: "assistant",
+      telegramUserId: wrongRole.id,
+    });
+    const hh = createHarness(w, { ownerIds: [String(ghost.id), String(former.id), String(wrongRole.id)] });
+    const eventsBefore = (await q("select 1 from sales.order_events where order_id = $1", [o.orderId])).length;
+    for (const who of [ghost, former, wrongRole]) {
+      hh.tg.reset();
+      await hh.send(hh.tg.press(who, w.groupId, 6100, `o:${o.number}:ev:MEETING_DONE`, lead.topicId));
+      expect(hh.tg.of("answerCallbackQuery").at(-1)?.payload).toMatchObject({
+        text: "Отказ: Это действие вам недоступно.",
+        show_alert: true,
+      });
+    }
+    expect((await q("select 1 from sales.order_events where order_id = $1", [o.orderId])).length).toBe(eventsBefore);
+    expect((await q("select first_order_meeting_done from sales.orders where id = $1", [o.orderId]))[0]).toEqual({
+      first_order_meeting_done: false,
+    });
+  });
+
   it("an event outside the list of the buttons is never dispatched", async () => {
     const o = await acceptedOrder(w, lead);
     const count = async () =>

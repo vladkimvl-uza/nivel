@@ -1,5 +1,5 @@
 // The bot of the tests: the real handlers on the real (throwaway) database, the fake Bot API in place of Telegram.
-import { createBot } from "../bot.ts";
+import { type CreateBotOptions, createBot } from "../bot.ts";
 import type { BotDeps } from "../deps.ts";
 import { BOT_INFO, FakeTelegram, type Person } from "./fake-telegram.ts";
 import type { BotWorld } from "./world.ts";
@@ -33,7 +33,11 @@ export interface Harness {
   send(update: Parameters<TestBot["handleUpdate"]>[0], opts?: { allowErrors?: boolean }): Promise<unknown[][]>;
 }
 
-export function createHarness(w: BotWorld, o: Partial<BotDeps> = {}): Harness {
+export function createHarness(
+  w: BotWorld,
+  o: Partial<BotDeps> = {},
+  botOptions: Partial<CreateBotOptions> = {},
+): Harness {
   const tg = new FakeTelegram();
   const errors: unknown[][] = [];
   const deps: BotDeps = {
@@ -52,7 +56,8 @@ export function createHarness(w: BotWorld, o: Partial<BotDeps> = {}): Harness {
     },
     ...o,
   };
-  const bot = createBot(deps, { token: TEST_TOKEN, botInfo: BOT_INFO });
+  // The tests send many updates of one person in a moment: the limit is off unless a test asks for it.
+  const bot = createBot(deps, { token: TEST_TOKEN, botInfo: BOT_INFO, throttle: false, ...botOptions });
   tg.install(bot);
   return {
     bot,
