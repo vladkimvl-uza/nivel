@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCsp } from "./csp.ts";
+import { buildCsp } from "../csp.ts";
 
 describe("buildCsp", () => {
   const directives = (csp: string) => Object.fromEntries(csp.split("; ").map((d) => [d.split(" ")[0], d]));
