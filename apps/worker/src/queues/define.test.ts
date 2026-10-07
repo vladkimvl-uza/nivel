@@ -9,6 +9,7 @@ type Handler = (jobs: Record<string, unknown>[]) => Promise<void>;
 function fakeContext() {
   const calls = {
     createQueue: [] as [string, Record<string, unknown> | undefined][],
+    updateQueue: [] as [string, Record<string, unknown> | undefined][],
     schedule: [] as [string, string, unknown, Record<string, unknown> | undefined][],
     work: [] as [string, Record<string, unknown>][],
   };
@@ -26,6 +27,9 @@ function fakeContext() {
   const boss = {
     async createQueue(name: string, options?: Record<string, unknown>) {
       calls.createQueue.push([name, options]);
+    },
+    async updateQueue(name: string, options?: Record<string, unknown>) {
+      calls.updateQueue.push([name, options]);
     },
     async schedule(name: string, cron: string, data: unknown, options?: Record<string, unknown>) {
       calls.schedule.push([name, cron, data, options]);
@@ -61,6 +65,16 @@ describe("registerQueue", () => {
     ]);
     expect(calls.work[0]?.[0]).toBe("payment.expect");
     expect(calls.work[0]?.[1]).toMatchObject({ includeMetadata: true });
+  });
+
+  it("applies the options again to a queue that exists already, so that a change in a new release reaches it", async () => {
+    const { ctx, calls } = fakeContext();
+    await registerQueue(ctx, { name: "payment.expect", retry: { limit: 6, maxDelaySec: 600 }, handler: async () => {} });
+    expect(calls.updateQueue).toEqual([
+      ["payment.expect", expect.objectContaining({ retryLimit: 6, retryDelay: 30, retryBackoff: true, retryDelayMax: 600 })],
+    ]);
+    await registerQueue(ctx, { name: "flat", retry: { backoff: false }, handler: async () => {} });
+    expect(calls.updateQueue[1]?.[1]).toMatchObject({ retryBackoff: false, retryDelayMax: null });
   });
 
   it("schedules a cron queue in the calendar of Tashkent and a queue without a cron is not scheduled", async () => {

@@ -64,6 +64,8 @@ export async function registerQueue<D extends object = Record<string, unknown>>(
     ...(spec.expireInSeconds === undefined ? {} : { expireInSeconds: spec.expireInSeconds }),
   };
   await ctx.boss.createQueue(spec.name, options);
+  // createQueue leaves a queue that exists as it is: a change of the options in a new release must reach it too.
+  await ctx.boss.updateQueue(spec.name, { ...options, retryDelayMax: retry.backoff ? retry.maxDelaySec : null });
   if (spec.cron !== undefined) await ctx.boss.schedule(spec.name, spec.cron, null, { tz: TASHKENT_TZ });
   await ctx.boss.work<D>(
     spec.name,
