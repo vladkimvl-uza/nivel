@@ -59,6 +59,7 @@ vi.mock("./read-registry.ts", async (importActual) => ({
 const { serveFile } = await import("./files.ts");
 const { exportRegistryCsv, parseYear } = await import("./export.ts");
 const { handleOrderUpload, ORDER_UPLOAD_KINDS } = await import("./upload.ts");
+const { MAX_BODY_CHUNKS } = await import("../kit/upload/handler.ts");
 
 const FILE_ID = "0199aaaa-bbbb-7ccc-8ddd-0000000000f1";
 const user = (role: SessionUser["role"]): SessionUser => ({
@@ -320,5 +321,99 @@ describe("the upload of an act photo or a statement", () => {
     const r = await post(m, { "content-length": String(m.body.length - 40) });
     expect(r.status).toBe(400);
     expect(state.registered).toHaveLength(0);
+  });
+
+  // The guards of the body that /files/upload has (kit/upload/handler.test.ts): the same attacks, the same answers.
+  const streamed = (source: UnderlyingDefaultSource<Uint8Array>, declared: number, signal?: AbortSignal) =>
+    new Request("http://admin.test/orders/upload", {
+      method: "POST",
+      body: new ReadableStream(source),
+      headers: {
+        "content-type": "multipart/form-data; boundary=B",
+        "content-length": String(declared),
+        origin: "http://admin.test",
+        host: "admin.test",
+      },
+      ...(signal ? { signal } : {}),
+      duplex: "half",
+    } as RequestInit);
+  const answered = async (request: Request, options: { totalMs?: number; idleMs?: number } = {}) => {
+    const r = await handleOrderUpload(request, options);
+    return { status: r.status, body: (await r.json()) as { ok: boolean; message: string } };
+  };
+
+  it("stops a body that comes in pieces of one byte after a bound on the pieces, with 408", async () => {
+    let pulled = 0;
+    const r = await answered(
+      streamed(
+        {
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(new Uint8Array(1));
+          },
+        },
+        10 * 1024 * 1024,
+      ),
+      { totalMs: 20_000 },
+    );
+    expect(r.status).toBe(408);
+    expect(r.body.message).toContain("медленно");
+    expect(pulled).toBeLessThanOrEqual(MAX_BODY_CHUNKS + 2);
+    expect(state.registered).toHaveLength(0);
+  });
+
+  it("gives up on a client that stops in the middle, and on one that is too slow, with 408 and not 400", async () => {
+    let sent = false;
+    const stopped = await answered(
+      streamed(
+        {
+          pull(controller) {
+            if (sent) return new Promise(() => {});
+            sent = true;
+            controller.enqueue(new Uint8Array(100));
+          },
+        },
+        1000,
+      ),
+      { totalMs: 20_000, idleMs: 80 },
+    );
+    expect(stopped.status).toBe(408);
+    const slow = await answered(streamed({ pull: () => new Promise(() => {}) }, 1000), { totalMs: 50 });
+    expect(slow.status).toBe(408);
+  });
+
+  it("lets go of the place when the client leaves, and then serves the next one", async () => {
+    const leave = new AbortController();
+    const pending = handleOrderUpload(streamed({ pull: () => new Promise(() => {}) }, 1000, leave.signal), {
+      totalMs: 20_000,
+      idleMs: 20_000,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    leave.abort();
+    const outcome = await Promise.race([
+      pending.then((r) => r.status),
+      new Promise((r) => setTimeout(() => r("hung"), 3_000)),
+    ]);
+    expect(outcome).toBe(408);
+    expect((await post(photo("act_photo"))).status).toBe(200);
+  });
+
+  it("reads a good form that comes in small pieces, without a buffer for each piece", async () => {
+    const m = photo("act_photo");
+    let at = 0;
+    const request = new Request("http://admin.test/orders/upload", {
+      method: "POST",
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (at >= m.body.length) return controller.close();
+          controller.enqueue(new Uint8Array(m.body.subarray(at, at + 7)));
+          at += 7;
+        },
+      }),
+      headers: m.headers,
+      duplex: "half",
+    } as RequestInit);
+    expect((await handleOrderUpload(request)).status).toBe(200);
+    expect(state.registered).toHaveLength(1);
   });
 });

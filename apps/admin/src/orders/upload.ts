@@ -10,6 +10,7 @@ import { getRuntime } from "../auth/runtime.ts";
 import { sanitizeImage } from "../kit/upload/image.ts";
 import { boundaryOf, parseMultipart } from "../kit/upload/multipart.ts";
 import { BUSY, MAX_UPLOAD_BYTES, takeUploadSlot } from "../kit/upload/save.ts";
+import { readBody, timingFor } from "./upload-body.ts";
 
 export const ORDER_UPLOAD_KINDS: Record<
   string,
@@ -20,7 +21,6 @@ export const ORDER_UPLOAD_KINDS: Record<
 };
 
 const OVERHEAD = 64 * 1024;
-const BODY_TIMEOUT_MS = 60_000;
 
 const reply = (status: number, body: Record<string, unknown>): Response =>
   new Response(JSON.stringify(body), {
@@ -28,33 +28,10 @@ const reply = (status: number, body: Record<string, unknown>): Response =>
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
 
-/** The body as one buffer, never longer than `max` bytes and never slower than the time allows; null otherwise. */
-async function readCapped(request: Request, max: number): Promise<Buffer | null> {
-  if (!request.body) return null;
-  const reader = request.body.getReader();
-  const chunks: Buffer[] = [];
-  let total = 0;
-  const timer = setTimeout(() => void reader.cancel().catch(() => {}), BODY_TIMEOUT_MS);
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.length;
-      if (total > max) {
-        void reader.cancel().catch(() => {});
-        return null;
-      }
-      chunks.push(Buffer.from(value));
-    }
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-  return Buffer.concat(chunks, total);
-}
-
-export async function handleOrderUpload(request: Request): Promise<Response> {
+export async function handleOrderUpload(
+  request: Request,
+  options: { totalMs?: number; idleMs?: number } = {},
+): Promise<Response> {
   if (!isSameOriginRequest(request.headers))
     return reply(403, { ok: false, message: "Запрос не из этой админки отклонён." });
   const user = await guardAction("upload.write", "orders.upload_attempt", "ops.files");
@@ -69,7 +46,8 @@ export async function handleOrderUpload(request: Request): Promise<Response> {
   const slot = await takeUploadSlot({ signal: request.signal });
   if (!slot) return reply(503, { ok: false, message: BUSY });
   try {
-    const body = await readCapped(request, Number(declared));
+    const body = await readBody(request, Number(declared), timingFor(Number(declared), options));
+    if (body === "slow") return reply(408, { ok: false, message: "Файл передаётся слишком медленно. Повторите." });
     const parts = body ? parseMultipart(body, boundary) : null;
     if (!parts) return reply(400, { ok: false, message: "Не удалось прочитать форму." });
     const file = parts.find((p) => p.name === "photo" && p.filename !== null);
