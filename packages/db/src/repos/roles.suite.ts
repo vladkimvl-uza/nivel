@@ -5,6 +5,7 @@ import {
   connectAs,
   createOrder,
   createVendor,
+  driveTo,
   insertPayment,
   insertPurchase,
   one,
@@ -236,9 +237,20 @@ describe("nivel_worker", () => {
     ).toBe(DENIED);
   });
 
-  it("writes the reserve ledger and purges expired AI conversations", async () => {
+  it("writes the reserve ledger for an order that owes the reserve and purges expired AI conversations", async () => {
+    // The guard of the ledger (insert-guards.suite.ts) reads the journal of the order: the warranty reserve is booked once
+    // the order has been handed over, and no more than its receipts allow (150 000 at least, 2 % of the receipts).
+    const handed = await createOrder(migrator);
+    await receiveFunds(migrator, handed.orderId, 2_000_000);
+    await insertPurchase(migrator, {
+      orderId: handed.orderId,
+      vendorId: await createVendor(migrator),
+      amount: 500_000,
+    });
+    await driveTo(migrator, handed.orderId, "handed_over");
     await worker.query(
-      "insert into sales.reserve_ledger (fund, amount_sum, reason) values ('warranty', 150000, 'contribution')",
+      "insert into sales.reserve_ledger (fund, order_id, amount_sum, reason) values ('warranty', $1, 150000, 'contribution')",
+      [handed.orderId],
     );
     await worker.query("select ai.purge_expired()");
   });

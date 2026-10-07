@@ -16,6 +16,8 @@
 --   search_path              every function of the application schemas pins it (the guards no longer use the operators of the
 --                            caller); the application roles lose TEMP on the database
 --   sales.guard_quote, sales.guard_payment  let the file purge empty a link to a file that has expired, nothing else
+--   ai.guard_conversation    the term of a dialogue of the AI (purge_after) is 90 days from the database clock at INSERT, whatever is sent
+--   sales.guard_reserve_entry  the worker books the reserve of an order that owes it, at the database clock, up to what the receipts allow
 
 -- ---- the functions do not take the search_path of the caller ------------------------------------------------------
 -- A guard is a plain function: the operators it uses (=, <, IS DISTINCT FROM) were looked up in the search_path of
@@ -818,6 +820,103 @@ BEGIN
   EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM PUBLIC', current_database());
 END
 $$;
+--> statement-breakpoint
+-- ---- the term of a dialogue of the AI is the database's, at INSERT too ------------------------------------------------
+-- The site writes ai.conversations and may UPDATE only the counters, the outcome and two links: the column grant keeps
+-- purge_after out of its UPDATE. An INSERT writes every column it names, so a dialogue made with purge_after = '2999-01-01'
+-- (or 'infinity') was kept for ever, against DATA-MAP 9 (90 days), and one made with a past date went at the next purge.
+-- Every role but the migrator (an import, a repair by hand) gets 90 days from the clock of the database, whatever it
+-- sends, an explicit NULL included. The owner's panel keeps its UPDATE: a dispute may need a longer term.
+CREATE FUNCTION ai.guard_conversation() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
+BEGIN
+  IF session_user <> 'nivel_migrator' THEN
+    NEW.purge_after := clock_timestamp() + interval '90 days';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER conversations_purge_after BEFORE INSERT ON ai.conversations
+  FOR EACH ROW EXECUTE FUNCTION ai.guard_conversation();
+--> statement-breakpoint
+-- ---- the reserve ledger: the worker books what an order owes, at the time of the database ---------------------------------
+-- The worker books the contributions the site and the bot cannot write (they queue the job ledger.append). Nothing else
+-- bound it: any sum, any time (five years back), any order or none, a spending instead of a contribution. For the public
+-- roles now (the owner's panel and the migrator keep their rights: a spending, a reversal, an entry by hand):
+--  - the time of the entry is the clock of the database (the rule of ops.stamp_time for the journals);
+--  - the entry is a positive sum for an order, in the fund the domain books for that order: the tax-risk reserve once the
+--    order has been settled (REMAINDER_SETTLED), the warranty reserve once it has been handed over (HANDOVER). The journal of
+--    the order says whether it got there (the worker writes no journal and sends neither event), whatever the status is
+--    now: the worker books after the commit, and the order may have gone on, or been cancelled;
+--  - the sum together with what the order already has in that fund (a reversal of the owner counts) is not above what
+--    packages/domain computes from the receipts of the order: 1 % rounded up for the tax-risk reserve (nothing once the owner
+--    has switched it off in ops.settings money.tax_risk_active), 2 % rounded up and not less than 150 000 for the warranty
+--    reserve (the rate of a young fund, the highest the domain gives: a fund of 10 million and 30 closed orders pays 1 %).
+--    A retried job cannot book twice. A test runs the functions of the domain against this cap.
+-- What stays outside (DATA-MAP 2 and 10): the mature rate is not told from the young one, and a sum below the due one passes.
+-- The worker may not lock the order row, so one writer at a time per order and fund is the advisory lock of the pair.
+CREATE FUNCTION sales.guard_reserve_entry() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
+DECLARE
+  v_milestone text;
+  v_receipts numeric;
+  v_cap numeric;
+  v_booked numeric;
+BEGIN
+  IF session_user NOT IN ('nivel_web', 'nivel_bot', 'nivel_worker') THEN
+    RETURN NEW;
+  END IF;
+  NEW.at := clock_timestamp();
+  IF NEW.fund IS NULL OR NEW.fund NOT IN ('warranty', 'tax_risk') THEN
+    RAISE EXCEPTION 'invalid_reserve: % is not a fund of reserves', coalesce(NEW.fund, 'no fund')
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.order_id IS NULL THEN
+    RAISE EXCEPTION 'invalid_reserve: % books the reserve of an order, the entry names none', session_user
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.amount_sum IS NULL OR NEW.amount_sum <= 0 THEN
+    RAISE EXCEPTION 'invalid_reserve: % books contributions, positive sums (a spending or a reversal is the owner''s), got %',
+      session_user, coalesce(NEW.amount_sum::text, 'no sum') USING ERRCODE = 'check_violation';
+  END IF;
+  PERFORM 1 FROM sales.orders o WHERE o.id = NEW.order_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'order_not_found: %', NEW.order_id USING ERRCODE = 'no_data_found';
+  END IF;
+  v_milestone := CASE NEW.fund WHEN 'tax_risk' THEN 'settled' ELSE 'handed_over' END;
+  IF NOT EXISTS (SELECT 1 FROM sales.order_events e WHERE e.order_id = NEW.order_id AND e.to_status = v_milestone) THEN
+    RAISE EXCEPTION 'reserve_not_due: the % reserve of order % is booked when the order becomes %, it has not', NEW.fund,
+      NEW.order_id, v_milestone USING ERRCODE = 'check_violation';
+  END IF;
+  SELECT coalesce(sum(p.amount_sum), 0) INTO v_receipts FROM sales.purchases p WHERE p.order_id = NEW.order_id;
+  IF v_receipts <= 0 THEN
+    v_cap := 0;
+  ELSIF NEW.fund = 'tax_risk' THEN
+    -- No row of the setting is "on" (the default of the domain); only a JSON false switches the reserve off.
+    IF coalesce((SELECT s.value IS DISTINCT FROM 'false'::jsonb FROM ops.settings s WHERE s.key = 'money.tax_risk_active'), true) THEN
+      v_cap := ceil(v_receipts / 100);
+    ELSE
+      v_cap := 0;
+    END IF;
+  ELSE
+    v_cap := greatest(ceil(v_receipts / 50), 150000);
+  END IF;
+  -- After the lock the sum is read again, so the second writer sees the entry of the first (a statement of a volatile
+  -- function takes its own snapshot).
+  PERFORM pg_advisory_xact_lock(hashtextextended('sales.reserve_ledger:' || NEW.order_id::text || ':' || NEW.fund, 0));
+  SELECT coalesce(sum(l.amount_sum), 0) INTO v_booked
+    FROM sales.reserve_ledger l WHERE l.order_id = NEW.order_id AND l.fund = NEW.fund;
+  IF v_booked + NEW.amount_sum > v_cap THEN
+    RAISE EXCEPTION 'reserve_exceeded: the entry of % to the % reserve of order % with % already booked is above %, the most its receipts allow',
+      NEW.amount_sum, NEW.fund, NEW.order_id, v_booked, v_cap USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER reserve_ledger_guard BEFORE INSERT ON sales.reserve_ledger
+  FOR EACH ROW EXECUTE FUNCTION sales.guard_reserve_entry();
 --> statement-breakpoint
 -- ---- rights ---------------------------------------------------------------------------------------------------------
 -- The bot and the worker expect payments; the site queues a job and cannot call it. The admin panel writes the table.

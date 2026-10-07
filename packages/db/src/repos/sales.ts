@@ -567,6 +567,13 @@ export async function loadOrderContext(db: Executor, orderId: string): Promise<O
 }
 
 // ---- reserves, other income, deals ------------------------------------------------------------------------------
+/**
+ * Appends an entry to the reserve ledger. The admin panel writes what the owner decides; the worker books contributions,
+ * and the database checks them (trigger reserve_ledger_guard): the time is its own clock whatever `at` says, the order has
+ * reached the milestone of the fund (settled for tax_risk, handed_over for warranty) and the sum, with what the order already
+ * has in that fund, is within what the domain computes from the receipts. A refusal is a check_violation named
+ * invalid_reserve, reserve_not_due or reserve_exceeded (a retried job meets the last one: the entry is already there).
+ */
 export async function appendReserve(
   db: Executor,
   r: { fund: "warranty" | "tax_risk"; amountSum: number; reason: string; orderId?: string; at?: Date },
