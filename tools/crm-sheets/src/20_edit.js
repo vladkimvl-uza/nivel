@@ -169,8 +169,13 @@ function nvAssignNumbers(sheetKey, rowFrom, rowTo) {
 function nvAskEx(title, text, buttons) {
   try {
     const ui = SpreadsheetApp.getUi();
-    // The answer is an enum of the UI; its name ("YES", "NO", "OK") is what the code compares
-    return String(ui.alert(title, text, buttons || ui.ButtonSet.YES_NO));
+    // The answer is a value of the enum Button: it is compared with the enum, never turned into text
+    const b = ui.alert(title, text, buttons || ui.ButtonSet.YES_NO);
+    if (b === ui.Button.YES) return "YES";
+    if (b === ui.Button.NO) return "NO";
+    if (b === ui.Button.OK) return "OK";
+    if (b === ui.Button.CANCEL) return "CANCEL";
+    return "CLOSE";
   } catch (e) {
     return "NO_UI";
   }

@@ -11,10 +11,31 @@ const NV_TRIGGERS = [
   { handler: "nvMonthlyJob", kind: "monthly" },
 ];
 
+/**
+ * A trigger runs as the account that created it, and getProjectTriggers shows an account only its own triggers. If an
+ * assistant installed them, the owner's set would stay invisible and a second one would appear next to it: every edit
+ * handled twice. So with OWNER_EMAIL set, only that account installs.
+ */
+function nvAssertTriggerOwner() {
+  const owner = nvScriptProps().getProperty(NV_PROP.ownerEmail);
+  if (!owner) return;
+  let me = "";
+  try {
+    me = Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    me = "";
+  }
+  if (me && me.toLowerCase() !== owner.toLowerCase())
+    throw new Error(
+      "Триггеры ставит только владелец книги: войдите под его учётной записью (адрес в свойстве OWNER_EMAIL) и повторите. Триггеры помощника дублировали бы работу владельца.",
+    );
+}
+
 /** Installs exactly one trigger of each kind (the old ones of the project are removed first). */
 function nvInstallTriggers() {
   const ss = nvSpreadsheet();
   nvScriptProps().setProperty(NV_PROP.spreadsheetId, ss.getId());
+  nvAssertTriggerOwner();
   const mine = NV_TRIGGERS.map((t) => t.handler);
   ScriptApp.getProjectTriggers().forEach((t) => {
     if (mine.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
@@ -25,16 +46,17 @@ function nvInstallTriggers() {
   ScriptApp.newTrigger("nvHourlyJob").timeBased().everyHours(1).create();
   installed.push("ежечасно");
   ScriptApp.newTrigger("nvDailyDigest").timeBased().atHour(9).everyDays(1).inTimezone(NV_TZ).create();
-  installed.push("сводка 09:00");
+  // The time of a daily trigger is chosen by Google within the hour: not 09:00 sharp
+  installed.push("сводка с 9 до 10");
   ScriptApp.newTrigger("nvWeeklyBackup")
     .timeBased()
     .onWeekDay(ScriptApp.WeekDay.SUNDAY)
     .atHour(3)
     .inTimezone(NV_TZ)
     .create();
-  installed.push("копия раз в неделю");
+  installed.push("копия раз в неделю (воскресенье, с 3 до 4)");
   ScriptApp.newTrigger("nvMonthlyJob").timeBased().onMonthDay(1).atHour(3).inTimezone(NV_TZ).create();
-  installed.push("раз в месяц");
+  installed.push("раз в месяц (1-го числа, с 3 до 4)");
   return { installed: installed };
 }
 
@@ -206,14 +228,34 @@ function nvUrgentReminders(now, s, holidays) {
       mark("warranty:" + w.num, "Гарантийный случай " + w.num + ": ответить клиенту сегодня");
   });
   if (!lines.length) return 0;
-  // Keep the memory of the reminders short: the last 300 keys.
-  const keys = Object.keys(sent).sort((a, b) => sent[a] - sent[b]);
-  keys.slice(0, Math.max(0, keys.length - 300)).forEach((k) => {
-    delete sent[k];
-  });
-  props.setProperty("NV_REMINDERS_SENT", JSON.stringify(sent));
+  nvRememberReminders(props, sent, now);
   nvNotifyOwner("Срочно:\n" + lines.join("\n"));
   return lines.length;
+}
+
+/** The memory of the reminders is one property: a value is at most 9 KB, so it is kept far below that. */
+const NV_REMINDERS_MAX_BYTES = 8000;
+const NV_REMINDERS_MAX_AGE_MS = 30 * 86400000;
+
+/**
+ * Forgets what is older than 30 days, then the oldest ones until the text is short enough, and stores it. A failure to
+ * store is only logged: the message to the owner goes out anyway (a reminder repeated is better than one lost).
+ */
+function nvRememberReminders(props, sent, now) {
+  Object.keys(sent).forEach((k) => {
+    if (now.getTime() - sent[k] > NV_REMINDERS_MAX_AGE_MS) delete sent[k];
+  });
+  const keys = Object.keys(sent).sort((a, b) => sent[a] - sent[b]);
+  let text = JSON.stringify(sent);
+  while (keys.length && nvUtf8Length(text) > NV_REMINDERS_MAX_BYTES) {
+    delete sent[keys.shift()];
+    text = JSON.stringify(sent);
+  }
+  try {
+    props.setProperty("NV_REMINDERS_SENT", text);
+  } catch (e) {
+    Logger.log("Память напоминаний не записана: " + (e?.message ? e.message : e));
+  }
 }
 
 /* ---------------------------------------------------------------- daily digest */

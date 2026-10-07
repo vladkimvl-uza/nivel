@@ -692,6 +692,8 @@ class Sheet {
         `Range outside the grid of ${this.name}: row ${r}, column ${c} (grid ${this.maxRows}x${this.maxCols})`,
       );
     }
+    // Every write goes through here: the changes are pending until SpreadsheetApp.flush()
+    this.owner.env.dirty = true;
     const k = key(r, c);
     let cell = this.cells.get(k);
     if (!cell) {
@@ -1201,6 +1203,7 @@ class Env {
     this.userProps = new Map();
     this.cache = new Map();
     this.triggers = [];
+    this.triggerSeq = 0;
     this.fetches = [];
     this.fetchHandler = opts.fetchHandler || null;
     this.mails = [];
@@ -1228,6 +1231,11 @@ class Env {
     this.sheetsFail = false;
     this.noTheme = false;
     this.deprecatedFields = [];
+    // Writes not yet flushed at the moment a lock is released: the reference of Lock advises flush() before releaseLock()
+    this.dirty = false;
+    this.unflushedReleases = 0;
+    // The account the code runs as (installable triggers run as the one who created them)
+    this.effectiveEmail = opts.effectiveEmail === undefined ? "owner@example.com" : opts.effectiveEmail;
     this.webAppUrl = "https://script.google.com/macros/s/MOCK/exec";
   }
 }
@@ -1422,6 +1430,12 @@ export function createGas(opts = {}) {
   const env = new Env(opts);
   const enumOf = (names) => Object.fromEntries(names.map((n) => [n, n]));
 
+  // The answer of alert() and prompt() is a value of the enum Button. The reference compares it with ui.Button.YES and so
+  // on and never says that String(button) is the name: here a value is an object that stringifies to nothing useful.
+  const Button = Object.fromEntries(
+    ["OK", "CANCEL", "YES", "NO", "CLOSE"].map((n) => [n, Object.freeze({ toString: () => "[object Button]", _name: n })]),
+  );
+  const buttonOf = (answer) => Button[answer] || Button.CLOSE;
   const SpreadsheetApp = {
     getActive: () => env.ss,
     getActiveSpreadsheet: () => env.ss,
@@ -1456,7 +1470,7 @@ export function createGas(opts = {}) {
         if (!env.uiAvailable) throw new Error("Exception: Cannot call SpreadsheetApp.getUi() from this context.");
         if (env.locked) env.dialogsUnderLock.push(title);
         env.alerts.push({ title, text, buttons });
-        return env.alertAnswers.length ? env.alertAnswers.shift() : "YES";
+        return buttonOf(env.alertAnswers.length ? env.alertAnswers.shift() : "YES");
       },
       prompt: (title, text) => {
         if (!env.uiAvailable) throw new Error("Exception: Cannot call SpreadsheetApp.getUi() from this context.");
@@ -1464,15 +1478,18 @@ export function createGas(opts = {}) {
         env.prompts.push({ title, text });
         const a = env.promptAnswers.length ? env.promptAnswers.shift() : "";
         return {
-          getSelectedButton: () => (a === null ? "CANCEL" : "OK"),
+          getSelectedButton: () => (a === null ? Button.CANCEL : Button.OK),
           getResponseText: () => (a === null ? "" : a),
         };
       },
       showSidebar: (html) => env.sidebars.push(html),
       showModalDialog: (html, title) => env.dialogs.push({ html, title }),
       ButtonSet: enumOf(["OK", "OK_CANCEL", "YES_NO", "YES_NO_CANCEL"]),
-      Button: enumOf(["OK", "CANCEL", "YES", "NO", "CLOSE"]),
+      Button: Button,
     }),
+    flush: () => {
+      env.dirty = false;
+    },
     newDataValidation: () => new DataValidationBuilder(),
     newColor: () => {
       const st = { hex: null };
@@ -1540,13 +1557,20 @@ export function createGas(opts = {}) {
     Position: enumOf(["TOP", "BOTTOM", "LEFT", "RIGHT", "NONE"]),
   };
 
+  // Quotas of the reference: a value of a property is at most 9 KB (9216 bytes), all properties 500 KB
+  const checkProp = (k, v) => {
+    if (Buffer.byteLength(String(v), "utf8") > 9 * 1024)
+      throw new Error(`Exception: The value of property ${k} is too large (the limit is 9 KB per value)`);
+  };
   const propsApi = (map) => ({
     getProperty: (k) => (map.has(k) ? map.get(k) : null),
     setProperty(k, v) {
+      checkProp(k, v);
       map.set(k, String(v));
       return this;
     },
     setProperties(o, del) {
+      for (const [k, v] of Object.entries(o)) checkProp(k, v);
       if (del) map.clear();
       for (const [k, v] of Object.entries(o)) map.set(k, String(v));
       return this;
@@ -1579,6 +1603,7 @@ export function createGas(opts = {}) {
         return true;
       },
       releaseLock() {
+        if (env.dirty) env.unflushedReleases += 1;
         env.locked = false;
       },
       hasLock: () => env.locked,
@@ -1608,7 +1633,8 @@ export function createGas(opts = {}) {
   };
 
   const triggerBuilder = (kind) => {
-    const t = { kind, handler: "", id: `trg-${env.triggers.length + 1}`, params: {} };
+    // An installable trigger runs as the account that created it, and only that account sees it in getProjectTriggers
+    const t = { kind, handler: "", id: `trg-${++env.triggerSeq}`, params: {}, owner: env.effectiveEmail };
     const api = {
       forSpreadsheet() {
         t.source = "spreadsheet";
@@ -1685,7 +1711,9 @@ export function createGas(opts = {}) {
       return b;
     },
     getProjectTriggers: () =>
-      env.triggers.map((t) => ({
+      env.triggers
+        .filter((t) => t.owner === env.effectiveEmail)
+        .map((t) => ({
         getHandlerFunction: () => t.handler,
         getUniqueId: () => t.id,
         getEventType: () => t.event,
@@ -1843,7 +1871,7 @@ export function createGas(opts = {}) {
         return env.userEmail;
       },
     }),
-    getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }),
+    getEffectiveUser: () => ({ getEmail: () => env.effectiveEmail }),
     getScriptTimeZone: () => "Asia/Tashkent",
   };
 

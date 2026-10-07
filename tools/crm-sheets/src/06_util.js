@@ -100,6 +100,12 @@ function nvWithLock(fn, waitMs) {
     return fn();
   } finally {
     nvLockDepth--;
+    // The reference of Lock: flush before releaseLock, so that the writes reach the sheet before the next execution reads it
+    try {
+      SpreadsheetApp.flush();
+    } catch (e) {
+      Logger.log("flush перед снятием блокировки: " + (e?.message ? e.message : e));
+    }
     lock.releaseLock();
   }
 }

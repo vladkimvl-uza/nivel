@@ -2,6 +2,7 @@
 // before the fix. The mock of Apps Script and of the Sheets service refuses what Google refuses (see gas-mock.mjs):
 // the types of arguments, methods and enum values that do not exist, options a method does not support.
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -160,5 +161,269 @@ describe("group 1: sources", () => {
     const s = code("24_setup.js");
     expect(s).not.toMatch(/ONE_OF_LIST/);
     expect(s).not.toMatch(/view\.criteria/);
+  });
+});
+
+describe("group 6: memory of the urgent reminders (a property holds 9 KB)", () => {
+  const MB = (n) => `report:NV-2026-${String(n).padStart(4, "0")}`;
+  const bytes = (t) => Buffer.byteLength(t, "utf8");
+
+  function seeded(count, ageMs = 60_000) {
+    const p = newProject({ now: T0 });
+    p.call("nvSetup");
+    const sent = {};
+    for (let i = 0; i < count; i++) sent[MB(i)] = T0.getTime() - ageMs - i;
+    p.env.scriptProps.set("NV_REMINDERS_SENT", JSON.stringify(sent));
+    return p;
+  }
+
+  function newReminder(p) {
+    const num = p.call("nvCreateLead", { channel: "Сайт", scope: "ПК", name: "Срочный" });
+    const row = p.call("nvReadTable", "leads").find((l) => l.num === num)._row;
+    p.call("nvWriteCells", "leads", row, { created: p.date("2026-10-07T09:00:00+05:00") });
+    p.env.now = new Date("2026-10-07T17:30:00+05:00");
+    return { num, count: p.call("nvUrgentReminders", p.call("nvNow"), p.call("nvSettings"), []) };
+  }
+
+  it("with 290 remembered reminders the new one is stored and sent (before: setProperty threw above 9 KB)", () => {
+    const p = seeded(290);
+    const { num, count } = newReminder(p);
+    expect(count).toBe(1);
+    const text = p.env.scriptProps.get("NV_REMINDERS_SENT");
+    expect(bytes(text)).toBeLessThanOrEqual(8000);
+    expect(JSON.parse(text)[`lead:${num}`]).toBeTruthy();
+    expect(p.env.fetches.concat(p.env.mails).length).toBeGreaterThan(0);
+  });
+
+  it("the oldest memories go first, the newest stay", () => {
+    const p = seeded(290);
+    newReminder(p);
+    const kept = JSON.parse(p.env.scriptProps.get("NV_REMINDERS_SENT"));
+    expect(kept[MB(0)]).toBeTruthy();
+    expect(kept[MB(289)]).toBeUndefined();
+  });
+
+  it("memories older than 30 days are forgotten", () => {
+    const p = seeded(5, 40 * 86_400_000);
+    const { num } = newReminder(p);
+    const kept = JSON.parse(p.env.scriptProps.get("NV_REMINDERS_SENT"));
+    expect(Object.keys(kept)).toEqual([`lead:${num}`]);
+  });
+
+  it("the mock refuses a property value above 9 KB, like Google", () => {
+    const p = newProject();
+    expect(() => p.ctx.PropertiesService.getScriptProperties().setProperty("K", "x".repeat(9 * 1024 + 1))).toThrow(
+      /too large/,
+    );
+    p.ctx.PropertiesService.getScriptProperties().setProperty("K", "x".repeat(9 * 1024));
+  });
+});
+
+describe("group 6: flush before the lock is released", () => {
+  it("a write under the lock is flushed before releaseLock", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.env.unflushedReleases = 0;
+    p.run('nvWithLock(() => { nvSheet("tasks").getRange("J1").setValue("x"); })');
+    expect(p.env.unflushedReleases).toBe(0);
+  });
+
+  it("nested locks flush once, when the outer one is released", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.env.unflushedReleases = 0;
+    p.run('nvWithLock(() => { nvWithLock(() => { nvSheet("tasks").getRange("J2").setValue("y"); }); })');
+    expect(p.env.unflushedReleases).toBe(0);
+  });
+
+  it("an error of flush does not keep the lock", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.ctx.SpreadsheetApp.flush = () => {
+      throw new Error("flush failed");
+    };
+    p.run('nvWithLock(() => { nvSheet("tasks").getRange("J3").setValue("z"); })');
+    expect(p.env.locked).toBe(false);
+  });
+
+  it("the mock notices a release without flush (the check itself works)", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.env.unflushedReleases = 0;
+    const lock = p.ctx.LockService.getScriptLock();
+    lock.tryLock(1000);
+    p.env.ss.getSheetByName("Задачи")?.getRange("J4").setValue("w");
+    p.env.ss.getSheets()[0].getRange("A1").setValue("w");
+    lock.releaseLock();
+    expect(p.env.unflushedReleases).toBe(1);
+  });
+});
+
+describe("group 6: triggers belong to the account that creates them", () => {
+  it("an assistant cannot install triggers: no second set next to the owner's", () => {
+    const owner = newProject();
+    owner.call("nvInstallTriggers");
+    expect(owner.env.triggers).toHaveLength(5);
+    const helper = createProject({
+      now: T0,
+      scriptProps: { OWNER_EMAIL: "owner@example.com" },
+      effectiveEmail: "helper@example.com",
+    });
+    helper.env.triggers = owner.env.triggers; // the same project: the triggers of the owner exist already
+    expect(() => helper.call("nvInstallTriggers")).toThrow(/владельц/);
+    expect(owner.env.triggers).toHaveLength(5);
+  });
+
+  it("from the menu the refusal is a message, not an exception", () => {
+    const helper = createProject({
+      now: T0,
+      scriptProps: { OWNER_EMAIL: "owner@example.com" },
+      effectiveEmail: "helper@example.com",
+    });
+    helper.call("nvMenuInstallTriggers");
+    expect(helper.env.triggers).toHaveLength(0);
+    expect(helper.env.alerts.at(-1).text).toMatch(/владельц/);
+  });
+
+  it("without OWNER_EMAIL there is one user: any account may install", () => {
+    const p = createProject({ now: T0, effectiveEmail: "someone@example.com" });
+    p.call("nvInstallTriggers");
+    expect(p.env.triggers).toHaveLength(5);
+  });
+
+  it("the owner installs; the second installation replaces the set, never doubles it", () => {
+    const p = newProject();
+    p.call("nvInstallTriggers");
+    p.call("nvInstallTriggers");
+    expect(p.env.triggers).toHaveLength(5);
+  });
+
+  it("the mock shows a user only his own triggers, as getProjectTriggers does", () => {
+    const owner = newProject();
+    owner.call("nvInstallTriggers");
+    const helper = createProject({ now: T0, effectiveEmail: "helper@example.com" });
+    helper.env.triggers = owner.env.triggers;
+    expect(helper.call("nvTriggerCounts")).toEqual(expect.objectContaining({ nvOnEdit: 0 }));
+  });
+
+  it("the self-check says that only the triggers of the current user are counted", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.call("nvInstallTriggers");
+    const row = p.call("nvSelfCheckRows").find((r) => r.check === "Триггеры");
+    expect(row.result).toBe("ОК");
+    expect(row.details).toMatch(/текущего пользователя/);
+  });
+
+  it("the time of the digest is not promised to the minute", () => {
+    const p = newProject();
+    const labels = p.call("nvInstallTriggers").installed.join(" | ");
+    expect(labels).not.toMatch(/09:00/);
+    expect(labels).toMatch(/с 9 до 10/);
+  });
+});
+
+describe("group 6: dialogs", () => {
+  it("the answer of alert is an enum value; String() of it is not the name, so the code compares with ui.Button", () => {
+    const p = newProject();
+    p.env.alertAnswers.push("YES", "NO", "CANCEL", "CLOSE", "OK");
+    const got = [1, 2, 3, 4, 5].map(() => p.call("nvAskEx", "t", "x"));
+    expect(got).toEqual(["YES", "NO", "CANCEL", "CLOSE", "OK"]);
+    const ui = p.ctx.SpreadsheetApp.getUi();
+    expect(String(ui.Button.YES)).not.toBe("YES");
+  });
+
+  it("prompt: OK and cancel are told apart by the enum", () => {
+    const p = newProject();
+    p.env.promptAnswers.push("text", null);
+    expect(p.call("nvPromptEx", "t", "x")).toEqual({ state: "ok", text: "text" });
+    expect(p.call("nvPromptEx", "t", "x").state).toBe("cancel");
+  });
+
+  it("a sidebar gets no setWidth (the reference gives it to dialogs only)", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    for (const kind of Object.keys(JSON.parse(p.run("JSON.stringify(Object.fromEntries(Object.keys(NV_FORMS).map((k) => [k, 1])))")))) {
+      p.env.sidebars.length = 0;
+      p.call("nvShowForm", kind);
+      expect(p.env.sidebars[0].width).toBe(0);
+    }
+  });
+});
+
+describe("group 6: google.script.run in the sidebars always has a failure handler", () => {
+  /** Runs the script of a sidebar page against a fake page and a strict fake of google.script.run. */
+  function drive(html) {
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    const calls = [];
+    const chain = (o) =>
+      new Proxy(
+        {},
+        {
+          get: (_t, name) => {
+            if (name === "withSuccessHandler") return (f) => chain({ ...o, ok: f });
+            if (name === "withFailureHandler") return (f) => chain({ ...o, fail: f });
+            return (...args) => {
+              calls.push({ name, args, ...o });
+            };
+          },
+        },
+      );
+    const els = new Map();
+    const mkEl = (id) => {
+      const e = { id, value: id === "f_order" ? "NV-2026-0001" : "", className: "", textContent: "", children: [], listeners: {}, elements: [], reset: () => {} };
+      e.appendChild = (c) => e.children.push(c);
+      e.setAttribute = () => {};
+      e.addEventListener = (t, f) => {
+        e.listeners[t] = f;
+      };
+      return e;
+    };
+    const document = {
+      getElementById: (id) => {
+        if (!els.has(id)) els.set(id, mkEl(id));
+        return els.get(id);
+      },
+      createElement: () => mkEl(""),
+      addEventListener: () => {},
+    };
+    const sandbox = {
+      document,
+      google: { script: { run: chain({}) } },
+      confirm: () => true,
+      prompt: () => "причина",
+    };
+    vm.createContext(sandbox);
+    for (const s of scripts) vm.runInContext(s, sandbox);
+    return { sandbox, calls, els };
+  }
+
+  it("the panel of the order action: the three server calls have a failure handler that writes the message", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const html = p.call("nvFormHtml", "action");
+    const { sandbox, calls, els } = drive(html);
+    sandbox.load();
+    expect(calls.map((c) => c.name)).toEqual(["nvOrderPanelInfo"]);
+    calls[0].ok({ status: "s", events: [{ code: "ev", label: "L", violations: [], input: "" }] });
+    sandbox.run("ev");
+    expect(calls.at(-1).name).toBe("nvOrderPanelRun");
+    calls.at(-1).ok({ needConfirm: true, text: "нельзя" });
+    expect(calls.at(-1).args[3]).toBe(true);
+    for (const c of calls) {
+      expect(typeof c.fail, `${c.name} has no failure handler`).toBe("function");
+      c.fail({ message: "занято" });
+      const msg = els.get("msg");
+      expect(msg.className).toBe("err");
+      expect(msg.textContent).toBe("занято");
+    }
+  });
+
+  it("the plain forms keep theirs", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const { sandbox, calls } = drive(p.call("nvFormHtml", "lead"));
+    sandbox.send();
+    expect(calls.map((c) => typeof c.fail)).toEqual(["function"]);
   });
 });

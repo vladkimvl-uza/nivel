@@ -83,7 +83,13 @@ function nvMenuDemoClear() {
   return null;
 }
 function nvMenuInstallTriggers() {
-  const r = nvInstallTriggers();
+  let r;
+  try {
+    r = nvInstallTriggers();
+  } catch (e) {
+    nvAsk("Триггеры", e?.message ? e.message : String(e), SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
   nvToast("Триггеры установлены: " + r.installed.join(", "));
 }
 function nvMenuSecretTelegram() {
@@ -414,7 +420,7 @@ function nvFormHtml(kind) {
       "var order='';" +
       "function el(tag,cls,text){var e=document.createElement(tag);if(cls){e.className=cls;}if(text!==undefined){e.textContent=text;}return e;}" +
       "function load(){var n=document.getElementById('f_order').value;order=n;if(!n){return;}" +
-      "google.script.run.withSuccessHandler(show).nvOrderPanelInfo(n);}" +
+      "google.script.run.withSuccessHandler(show).withFailureHandler(fail).nvOrderPanelInfo(n);}" +
       "function show(info){var box=document.getElementById('panel');box.textContent='';" +
       "var head=el('p');head.appendChild(el('b',null,info.status));box.appendChild(head);" +
       "if(!info.events.length){box.appendChild(el('p',null,'Действий нет.'));}" +
@@ -424,7 +430,8 @@ function nvFormHtml(kind) {
       "var btn=el('button',null,'Выполнить');btn.addEventListener('click',function(){run(e.code);});p.appendChild(btn);" +
       "box.appendChild(p);});}" +
       "function run(code){var i=document.getElementById('in_'+code);var v=i?i.value:'';var r='';" +
-      "google.script.run.withSuccessHandler(function(res){if(res.needConfirm){if(confirm('Не выполнено: '+res.text+'\\nПринудительно с причиной?')){r=prompt('Причина');if(r){google.script.run.withSuccessHandler(done).nvOrderPanelRun(order,code,v,true,r);}}}else{done(res);}}).nvOrderPanelRun(order,code,v,false,'');}" +
+      "google.script.run.withSuccessHandler(function(res){if(res.needConfirm){if(confirm('Не выполнено: '+res.text+'\\nПринудительно с причиной?')){r=prompt('Причина');if(r){google.script.run.withSuccessHandler(done).withFailureHandler(fail).nvOrderPanelRun(order,code,v,true,r);}}}else{done(res);}}).withFailureHandler(fail).nvOrderPanelRun(order,code,v,false,'');}" +
+      "function fail(e){var m=document.getElementById('msg');m.className='err';m.textContent=e&&e.message?e.message:String(e);}" +
       "function done(res){var m=document.getElementById('msg');m.className=res.ok?'ok':'err';m.textContent=res.ok?'Готово: '+res.label:res.text;if(res.ok){load();}}";
   } else {
     script =
@@ -456,7 +463,8 @@ function nvFormHtml(kind) {
 }
 
 function nvShowForm(kind) {
-  const html = HtmlService.createHtmlOutput(nvFormHtml(kind)).setTitle(NV_FORMS[kind].title).setWidth(360);
+  // No setWidth: the reference gives it to dialogs; the width of a sidebar is set by Google Sheets itself
+  const html = HtmlService.createHtmlOutput(nvFormHtml(kind)).setTitle(NV_FORMS[kind].title);
   SpreadsheetApp.getUi().showSidebar(html);
 }
 

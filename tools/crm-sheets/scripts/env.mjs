@@ -12,6 +12,7 @@ export function createProject(opts = {}) {
     scopes: opts.scopes,
     fetchHandler: opts.fetchHandler,
     sheetsService: opts.sheetsService,
+    effectiveEmail: opts.effectiveEmail,
   });
   const ctx = loadSources(gas.globals);
   pinClock(ctx, gas.env);
