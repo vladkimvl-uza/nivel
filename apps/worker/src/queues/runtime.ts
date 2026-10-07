@@ -85,14 +85,43 @@ export interface WorkerRuntime {
 /** What a domain receives at registration: the context of WP-00 and the runtime of the worker. */
 export interface WorkerContext extends JobContext {
   readonly runtime: WorkerRuntime;
-  /** Registers something to close at shutdown (the polling loop of the relay). */
+  /** Registers something to run once every domain has registered its queues (the polling loop of the relay). */
+  onStart(fn: () => Promise<void> | void): void;
+  /** Registers something to close at shutdown. */
   onStop(fn: () => Promise<void> | void): void;
+}
+
+/** The start and stop hooks of the domains: `start()` runs them in the order they were added, `stop()` in the reverse order. */
+export class Lifecycle {
+  readonly #starts: (() => Promise<void> | void)[] = [];
+  readonly #stops: (() => Promise<void> | void)[] = [];
+  onStart = (fn: () => Promise<void> | void): void => {
+    this.#starts.push(fn);
+  };
+  onStop = (fn: () => Promise<void> | void): void => {
+    this.#stops.push(fn);
+  };
+  async start(): Promise<void> {
+    for (const fn of this.#starts) await fn();
+  }
+  /** Runs every hook even if one throws; the first error is thrown at the end. */
+  async stop(): Promise<void> {
+    let first: unknown;
+    for (const fn of [...this.#stops].reverse()) {
+      try {
+        await fn();
+      } catch (error) {
+        first ??= error;
+      }
+    }
+    if (first !== undefined) throw first;
+  }
 }
 
 /** A domain registers with the context of WP-00 (`JobContext`); the worker hands it a `WorkerContext`, and this checks it. */
 export function workerContext(ctx: JobContext): WorkerContext {
   const c = ctx as Partial<WorkerContext>;
-  if (c.runtime === undefined || c.onStop === undefined) {
+  if (c.runtime === undefined || c.onStart === undefined || c.onStop === undefined) {
     throw new Error("the job domain was registered without the runtime of the worker (see main.ts)");
   }
   return ctx as WorkerContext;
