@@ -101,7 +101,7 @@ async function card(
   showDemo: boolean,
 ): Promise<BuildCard | null> {
   const build = await catalog.getBaseBuild(db, { ...cell, variant: "base" });
-  if (!build || build.status !== "offered" || !build.isShowcase || (build.isDemo && !showDemo)) return null;
+  if (build?.status !== "offered" || !build.isShowcase || (build.isDemo && !showDemo)) return null;
   const explain = build.explain?.[lang] ?? "";
   return { ...cell, priceSum: await priceOf(db, build.items), explain, demo: build.isDemo };
 }

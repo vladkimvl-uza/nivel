@@ -1,6 +1,6 @@
 import { formatSum } from "@nivel/i18n";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Person } from "./testing/fake-telegram.ts";
+import { inlineButtons, type Person } from "./testing/fake-telegram.ts";
 import { createHarness, type Harness, lastButtons, newPerson, onboard } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
 
@@ -92,9 +92,7 @@ describe("the selection by buttons (ARCHITECTURE 7.2: task, budget, composition,
     await press("sel:w:rgb");
     expect((await sessionOf(ali)).draft.wishes).toEqual(["quiet", "rgb"]);
     const edited = h.tg.of("editMessageReplyMarkup").at(-1);
-    const marked = (edited?.payload.reply_markup as { inline_keyboard: { text: string }[][] }).inline_keyboard
-      .flat()
-      .map((b) => b.text);
+    const marked = inlineButtons(edited).map((b) => b.text);
     expect(marked).toContain("✓ Sokin");
     expect(marked).toContain("✓ Yoritishli");
     expect(marked).toContain("Ixcham");

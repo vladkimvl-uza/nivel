@@ -9,8 +9,10 @@ import { ownerGroupId } from "./config.ts";
 import type { BotContext } from "./context.ts";
 import type { BotDeps } from "./deps.ts";
 import { loadProfile } from "./handlers/profile.ts";
+import { relayToTopic } from "./handlers/relay.ts";
 import { request } from "./handlers/request.ts";
 import { select } from "./handlers/select.ts";
+import { staff } from "./handlers/staff.ts";
 import { askLanguage, start } from "./handlers/start.ts";
 import { dbStorage, initialSession, sessionKey } from "./session.ts";
 import { ack, button, say } from "./ui.ts";
@@ -55,14 +57,17 @@ function customerComposer(deps: BotDeps): Composer<BotContext> {
   });
   c.use(select);
   c.use(request);
-  c.on("message", (ctx) => say(ctx, ctx.t("common.unknown")));
+  c.on("message", async (ctx) => {
+    const isCommand = ctx.message.entities?.some((e) => e.type === "bot_command" && e.offset === 0) === true;
+    if (!isCommand && (await relayToTopic(ctx))) return;
+    return say(ctx, ctx.t("common.unknown"));
+  });
   return c;
 }
 
 export function createBot(deps: BotDeps, opts: CreateBotOptions): Bot<BotContext> {
   const bot = new Bot<BotContext>(opts.token, opts.botInfo === undefined ? {} : { botInfo: opts.botInfo });
   const customer = customerComposer(deps);
-  const staff = new Composer<BotContext>();
 
   bot.use(async (ctx, next) => {
     ctx.deps = deps;

@@ -33,13 +33,22 @@ export const BOT_INFO: UserFromGetMe = {
 
 // Update ids are global to the run: the bot remembers them in the database, and every test brings its own bot.
 let updateId = 5000;
+// Topic ids are global to the run too: the bot keeps them in the requests of the database, shared by the tests of a file.
+let topicId = 300;
+
+/** The inline buttons of a call (sendMessage, editMessageReplyMarkup): text and callback_data, flat. */
+export function inlineButtons(call: Call | undefined): { text: string; callback_data: string }[] {
+  const markup = call?.payload.reply_markup as
+    | { inline_keyboard?: { text: string; callback_data: string }[][] }
+    | undefined;
+  return (markup?.inline_keyboard ?? []).flat();
+}
 
 type Failure = { error_code: number; description: string };
 
 export class FakeTelegram {
   readonly calls: Call[] = [];
   private messageId = 1000;
-  private topicId = 300;
   private readonly failures = new Map<string, Failure[]>();
 
   /** Installs the fake on a bot: nothing leaves the process. */
@@ -81,8 +90,8 @@ export class FakeTelegram {
         this.messageId += 1;
         return { message_id: this.messageId };
       case "createForumTopic":
-        this.topicId += 1;
-        return { message_thread_id: this.topicId, name: p.name, icon_color: 7322096 };
+        topicId += 1;
+        return { message_thread_id: topicId, name: p.name, icon_color: 7322096 };
       case "getFile":
         return {
           file_id: p.file_id,

@@ -109,3 +109,78 @@ export async function leadsWithoutTopic(db: Db, limit = 20): Promise<{ id: strin
 export async function getLead(db: Db, leadId: string) {
   return (await db.query.leads.findFirst({ where: (t, { eq }) => eq(t.id, leadId) })) ?? null;
 }
+
+// ---- topics of the owner's group ------------------------------------------------------------------------------
+export interface TopicTarget {
+  leadId: string | null;
+  orderId: string | null;
+  customerId: string | null;
+}
+
+/** What a topic of the group is about: the request of the topic and the order made from it (or the topic of the order). */
+export async function topicTarget(db: Db, threadId: number): Promise<TopicTarget> {
+  const lead = await db.query.leads.findFirst({
+    columns: { id: true, customerId: true },
+    where: (t, { eq }) => eq(t.tgTopicId, threadId),
+  });
+  const order = await db.query.orders.findFirst({
+    columns: { id: true, customerId: true },
+    where: (t, { eq, or }) => (lead ? or(eq(t.tgTopicId, threadId), eq(t.leadId, lead.id)) : eq(t.tgTopicId, threadId)),
+    orderBy: (t, { desc }) => [desc(t.createdAt)],
+  });
+  return {
+    leadId: lead?.id ?? null,
+    orderId: order?.id ?? null,
+    customerId: order?.customerId ?? lead?.customerId ?? null,
+  };
+}
+
+/** The topic of an order: its own, else the topic of the request it was made from. */
+export async function orderTopic(
+  db: Db,
+  order: { tgTopicId: number | null; leadId: string | null },
+): Promise<number | null> {
+  if (order.tgTopicId !== null) return order.tgTopicId;
+  if (order.leadId === null) return null;
+  return (await getLead(db, order.leadId))?.tgTopicId ?? null;
+}
+
+export async function customerTelegram(
+  db: Db,
+  customerId: string,
+): Promise<{ telegramUserId: number | null; lang: AppLocale } | null> {
+  const row = await db.query.customers.findFirst({
+    columns: { telegramUserId: true, lang: true },
+    where: (t, { eq }) => eq(t.id, customerId),
+  });
+  return row ?? null;
+}
+
+/** The topic a message of the customer goes to: his newest open order, else his newest request that has a topic. */
+export async function topicForCustomer(db: Db, customerId: string): Promise<number | null> {
+  const open = await db.query.orders.findMany({
+    columns: { tgTopicId: true, leadId: true },
+    where: (t, { and, eq, notInArray }) =>
+      and(eq(t.customerId, customerId), notInArray(t.status, ["closed", "cancelled"])),
+    orderBy: (t, { desc }) => [desc(t.createdAt)],
+    limit: 5,
+  });
+  for (const order of open) {
+    const topic = await orderTopic(db, order);
+    if (topic !== null) return topic;
+  }
+  const lead = await db.query.leads.findFirst({
+    columns: { tgTopicId: true },
+    where: (t, { and, eq, isNotNull }) => and(eq(t.customerId, customerId), isNotNull(t.tgTopicId)),
+    orderBy: (t, { desc }) => [desc(t.createdAt)],
+  });
+  return lead?.tgTopicId ?? null;
+}
+
+/** The first answer of the owner to a request, by the clock of the database; written once. */
+export async function markFirstResponse(db: Db, leadId: string): Promise<void> {
+  await db.$client.query(
+    "update sales.leads set first_response_at = now() where id = $1 and first_response_at is null",
+    [leadId],
+  );
+}

@@ -1,7 +1,7 @@
 import { ops } from "@nivel/db/repos";
 import { leads } from "@nivel/services";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Person } from "./testing/fake-telegram.ts";
+import { inlineButtons, type Person } from "./testing/fake-telegram.ts";
 import { createHarness, type Harness, lastButtons, newPerson, onboard } from "./testing/harness.ts";
 import { type BotWorld, createBotWorld } from "./testing/world.ts";
 import { sweepLeadTopics } from "./topics.ts";
@@ -54,9 +54,10 @@ describe("the request: contact, district, term, then a lead", () => {
     await pickBuild();
     const sent = h.tg.lastSend(ali.id);
     expect(sent?.payload.text).toBe("Aloqa uchun kontaktingizni ulashing (ixtiyoriy).");
-    const keyboard = (sent?.payload.reply_markup as { keyboard: { text: string; request_contact?: boolean }[][] })
-      .keyboard;
-    expect(keyboard.flat()).toEqual([
+    const keyboard = (
+      sent?.payload.reply_markup as { keyboard: { text: string; request_contact?: boolean }[][] } | undefined
+    )?.keyboard;
+    expect(keyboard?.flat()).toEqual([
       { text: "Kontaktni ulashish", request_contact: true },
       { text: "Oʻtkazib yuborish" },
     ]);
@@ -124,7 +125,7 @@ describe("the request: contact, district, term, then a lead", () => {
     expect(answer?.payload.text).toBe(
       `Ariza ${lead.number} qabul qilindi. Usta ish vaqtida 2 soat ichida javob beradi (du–sha 10:00–19:00).`,
     );
-    expect((answer?.payload.reply_markup as { remove_keyboard?: boolean }).remove_keyboard).toBe(true);
+    expect((answer?.payload.reply_markup as { remove_keyboard?: boolean } | undefined)?.remove_keyboard).toBe(true);
     const session = await sessionOf(ali);
     expect(session.step).toBe("idle");
     expect(session.draft).toEqual({ wishes: [] });
@@ -173,9 +174,7 @@ describe("the request: contact, district, term, then a lead", () => {
     const card = h.tg.of("sendMessage").find((c) => c.payload.chat_id === w.groupId);
     expect(card?.payload.message_thread_id).toBe(Number(lead.tg_topic_id));
     expect(card?.payload.text).toContain(`Новая заявка ${lead.number}`);
-    const data = (card?.payload.reply_markup as { inline_keyboard: { callback_data: string }[][] }).inline_keyboard
-      .flat()
-      .map((b) => b.callback_data);
+    const data = inlineButtons(card).map((b) => b.callback_data);
     expect(data).toHaveLength(3);
     expect(data.every((d) => d.startsWith("l:") && Buffer.byteLength(d) <= 64)).toBe(true);
   });
