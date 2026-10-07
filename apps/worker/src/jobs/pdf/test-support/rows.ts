@@ -190,11 +190,14 @@ export const purchase = (over: Partial<PurchaseRow> = {}): PurchaseRow => ({
   discountSum: 50_000,
   boughtAt: new Date("2026-10-08T07:30:00.000Z"),
   demo: false,
+  // what is left of the purchase after the returns to the shop: the whole sum unless a test says otherwise
+  netSum: over.amountSum ?? 4_150_000,
   ...over,
 });
 
 export const PURCHASES: PurchaseRow[] = [
-  purchase(),
+  // 4 150 000 less the part returned to the shop (P3)
+  purchase({ netSum: 4_010_000 }),
   purchase({
     id: P2,
     title: "GeForce RTX 5070 12 GB",
@@ -221,6 +224,7 @@ export const PURCHASES: PurchaseRow[] = [
     vendorWarrantyUntil: null,
     files: 1,
     amountSum: -140_000,
+    netSum: -140_000,
     refundOf: P1,
     receiptNo: "0004460001",
     discountSum: 0,
@@ -361,8 +365,14 @@ export function fakeRows(data: FakeData): PdfRows & { calls: string[] } {
     purchasesOfOrder: async () =>
       note(
         "purchasesOfOrder",
-        data.purchases.filter((p) => p.refundOf === null),
+        data.purchases.filter((p) => p.refundOf === null && p.netSum > 0),
       ),
+    receiptsTotal: async () =>
+      note(
+        "receiptsTotal",
+        data.purchases.reduce((n, p) => n + p.amountSum, 0),
+      ),
+    sentQuoteId: async () => note("sentQuoteId", data.quote?.row.sentAt ? data.quote.row.id : null),
     feePayments: async () => note("payments", data.payments),
     act: async (_o, actId, kind) =>
       note("act", data.acts.find((a) => (actId ? a.id === actId : a.kind === kind)) ?? null),

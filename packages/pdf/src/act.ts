@@ -4,7 +4,7 @@
 import { Text, View } from "@react-pdf/renderer";
 import { createElement as h, type ReactElement } from "react";
 import { amount, day, money, stampOf } from "./format.ts";
-import { DocumentDataError, whole, wholeNonNegative } from "./guards.ts";
+import { DocumentDataError, same, whole, wholeNonNegative } from "./guards.ts";
 import { amountRow, type Cell, paperDocument, paragraph, section, style, table } from "./kit.ts";
 import { pdfText, type T } from "./messages.ts";
 import { toPdfBuffer } from "./render.ts";
@@ -26,6 +26,16 @@ function assertAct(kind: ActKind, doc: ActDoc): void {
   for (const [i, r] of (doc.receipts ?? []).entries()) {
     whole(`receipts.${i}.qty`, r.qty);
     wholeNonNegative(`receipts.${i}.amountSum`, r.amountSum);
+  }
+  if (doc.receiptsTotal !== undefined && doc.receiptsTotal !== null) whole("receiptsTotal", doc.receiptsTotal);
+  if ((doc.receipts ?? []).length > 0) {
+    if (doc.receiptsTotal === undefined || doc.receiptsTotal === null)
+      throw new DocumentDataError("the total of the receipts is not given");
+    same(
+      "the receipts do not add up to the total of the purchases",
+      (doc.receipts ?? []).reduce((n, r) => n + r.amountSum, 0),
+      doc.receiptsTotal,
+    );
   }
 }
 
@@ -49,7 +59,7 @@ function linesBlock(doc: ActDoc, t: T): ReactElement {
 function receiptsBlock(doc: ActDoc, t: T, lang: PdfLang): ReactElement {
   const receipts = doc.receipts ?? [];
   if (receipts.length === 0) return section(t("act.receipts.title"), paragraph(t("act.receipts.none")));
-  const total = receipts.reduce((n, r) => n + r.amountSum, 0);
+  const total = doc.receiptsTotal ?? 0;
   return section(
     t("act.receipts.title"),
     table(

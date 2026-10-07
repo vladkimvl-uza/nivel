@@ -294,6 +294,7 @@ export function actFixture(over: Partial<ActDoc> = {}): ActDoc {
         boughtAt: "2026-10-08T09:10:00.000Z",
       },
     ],
+    receiptsTotal: 4_150_000 + 9_500_000,
     signed: { at: "2026-10-12T09:15:00.000Z", via: "tg_button" },
     warrantyUntil: "2027-10-12",
     ip: IP_REQUISITES,

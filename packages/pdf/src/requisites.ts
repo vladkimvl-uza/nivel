@@ -8,10 +8,14 @@ import { band, keyValue, section, style } from "./kit.ts";
 import type { T } from "./messages.ts";
 import type { IpRequisites } from "./types.ts";
 
-/** Sixteen digits, alone or in groups of four, not a part of a longer run of digits. */
-const CARD_NUMBER = /(?<![0-9])[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}(?![0-9])/;
-/** The account of a company is twenty digits, often written in five groups of four: it is not a card. */
-const ACCOUNT_OF_TWENTY = /(?<![0-9])[0-9]{4}(?:[ -]?[0-9]{4}){4}(?![0-9])/g;
+/** The marks that split a number into groups: any space (no-break, narrow, thin), a hyphen or a dash; one to three of them. */
+const GAP = String.raw`[\s\u00A0\u2007\u2009\u202F\-\u2010-\u2015]{1,3}`;
+/** Sixteen to twenty digits in a row. */
+const RUN = /(?<![0-9])[0-9]{16,20}(?![0-9])/g;
+/** Four groups or more of up to four digits split by the marks above (four groups of four, or groups of two and three digits among them). */
+const GROUPS = new RegExp(`(?<![0-9])[0-9]{1,4}(?:${GAP}[0-9]{1,4}){3,}(?![0-9])`, "g");
+/** The same with one dot or slash all the way (a date, "12.10.2026", has three groups and never reaches four). */
+const DOTTED = /(?<![0-9])[0-9]{1,4}([./])(?:[0-9]{1,4}\1){2,}[0-9]{1,4}(?![0-9])/g;
 
 export class CardNumberError extends Error {
   readonly field: string;
@@ -22,10 +26,30 @@ export class CardNumberError extends Error {
   }
 }
 
-export const looksLikeCard = (text: string): boolean => CARD_NUMBER.test(text.replace(ACCOUNT_OF_TWENTY, ""));
+const digitsIn = (text: string): number => text.replace(/[^0-9]/g, "").length;
+
+/**
+ * A number that can be a bank card: sixteen digits or more in a row or in groups, however the spaces are written, with the term of
+ * the card after it too. Twenty digits are the account of a company only where the account is expected (`account: true`): anywhere
+ * else they are taken for a card and its date.
+ */
+export function looksLikeCard(text: string, o: { account?: boolean } = {}): boolean {
+  for (const re of [RUN, GROUPS, DOTTED]) {
+    for (const m of text.matchAll(re)) {
+      const n = digitsIn(m[0]);
+      if (n >= 16 && !(o.account === true && n === 20)) return true;
+    }
+  }
+  return false;
+}
 
 export function assertNoCardNumber(field: string, ...values: readonly (string | null | undefined)[]): void {
   for (const v of values) if (typeof v === "string" && looksLikeCard(v)) throw new CardNumberError(field);
+}
+
+/** The field of the account of the sole proprietor: twenty digits are what it holds, anything that looks like a card is not. */
+export function assertAccountIsNotCard(field: string, value: string | null | undefined): void {
+  if (typeof value === "string" && looksLikeCard(value, { account: true })) throw new CardNumberError(field);
 }
 
 /** Fields that carry long numbers by their nature: the numbers of receipts, invoices and serials, codes of the passport. */
@@ -73,7 +97,10 @@ const clean = (v: string | null | undefined): string | null =>
 export function requisiteRows(req: IpRequisites | null | undefined, t: T): RequisiteRow[] {
   return FIELDS.map(([field, label]) => {
     const value = clean(req?.[field]);
-    if (value !== null) assertNoCardNumber(`requisites.${field}`, value);
+    if (value !== null) {
+      if (field === "account") assertAccountIsNotCard(`requisites.${field}`, value);
+      else assertNoCardNumber(`requisites.${field}`, value);
+    }
     return { label: t(label), value: value ?? t("common.pending"), pending: value === null };
   });
 }

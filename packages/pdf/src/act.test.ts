@@ -1,6 +1,7 @@
 import { formatAmount } from "@nivel/ui";
 import { describe, expect, it } from "vitest";
 import { ACT_KINDS, renderAct } from "./act.ts";
+import { DocumentDataError } from "./guards.ts";
 import { pdfText } from "./messages.ts";
 import { PDF_MAX_BYTES } from "./render.ts";
 import { CardNumberError } from "./requisites.ts";
@@ -78,8 +79,26 @@ describe("the acts (renderAct)", () => {
       expect(text).toContain(flat(pdfText("ru")("act.receipts.none")));
     });
 
+    it("prints the total it was given and not one of its own", async () => {
+      const doc = actFixture();
+      const { text } = await read("material_acceptance", doc, opts("ru"));
+      expect(text).toContain(amount(doc.receiptsTotal as number));
+    });
+
+    it("refuses a total that is not the sum of the receipts, or no total at all, instead of printing a paper that does not add up", async () => {
+      await expect(
+        renderAct("material_acceptance", actFixture({ receiptsTotal: 13_650_001 }), opts("uz")),
+      ).rejects.toThrow(DocumentDataError);
+      await expect(
+        renderAct("material_acceptance", actFixture({ receiptsTotal: undefined }), opts("uz")),
+      ).rejects.toThrow(/total of the receipts/);
+      await expect(
+        renderAct("material_acceptance", actFixture({ receiptsTotal: 1.5, receipts: [] }), opts("uz")),
+      ).rejects.toThrow(RangeError);
+    });
+
     it("refuses a sum that is a fraction", async () => {
-      const doc = actFixture({ receipts: [{ title: "x", qty: 1, amountSum: 10.5 }] });
+      const doc = actFixture({ receipts: [{ title: "x", qty: 1, amountSum: 10.5 }], receiptsTotal: 10.5 });
       await expect(renderAct("material_acceptance", doc, opts("uz"))).rejects.toThrow(RangeError);
     });
   });

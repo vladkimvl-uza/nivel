@@ -1,6 +1,9 @@
 // Data of the documents. Plain JSON-friendly objects: the worker (apps/worker/src/jobs/pdf) reads the order from the
-// database through @nivel/services and @nivel/db and hands them over; the package never computes money again, it writes
-// down what the domain and the database fixed (ARCHITECTURE 6.4). Sums are whole sums, rates are basis points.
+// database through @nivel/services and @nivel/db and hands them over; the package decides no money, it writes down what the
+// domain and the database fixed (ARCHITECTURE 6.4): every total is printed as it is given and only checked against its rows.
+// The few sums that are restated on the paper (the sum of a line of the estimate: quantity times the price; the sum of the
+// returns of a report, from its own rows) are derived from the given rows by the same rule as the database, never by another.
+// Sums are whole sums, rates are basis points.
 
 export type PdfLang = "uz" | "ru";
 
@@ -162,6 +165,11 @@ export interface ActDoc {
   lines: readonly ActLineDoc[];
   /** The prices by the receipts of the purchases (the act of acceptance of materials). */
   receipts?: readonly ReceiptRowDoc[];
+  /**
+   * The sum of all purchases of the order as the database holds it (returns to the shops taken off), given by the worker and printed
+   * as it is; the renderer only checks that the rows above add up to it. Needed whenever there are receipts.
+   */
+  receiptsTotal?: number | null;
   signed?: { at: IsoStamp; via: "tg_button" | "paper_photo" | "site_button" } | null;
   /** The act of handover: the end of the warranty. */
   warrantyUntil?: IsoDay | null;

@@ -30,17 +30,47 @@ describe("a card number never reaches a document (CLAUDE.md, red lines of the mo
     }
   });
 
-  it("does not take the account of a company (twenty digits, in five groups too), the INN, the MFO or a number of an order for a card", () => {
+  it("knows a card written with the spaces the project itself prints (no-break, narrow, thin), dots, slashes, double spaces and line breaks", () => {
+    const groups = ["8600", "1234", "1234", "1234"];
+    for (const sep of ["\u00A0", "\u202F", "\u2009", "\u2007", "  ", "\n", ".", "/", "\u2011", "\u2013", " - "]) {
+      expect(looksLikeCard(groups.join(sep)), JSON.stringify(sep)).toBe(true);
+    }
+    expect(looksLikeCard("8600 12 34 1234 1234")).toBe(true);
+    expect(looksLikeCard("номер: 8600\n1234\n1234\n1234.")).toBe(true);
+  });
+
+  it("knows a card that is followed by its term (five groups of four are a card and its date, not an account)", () => {
+    expect(looksLikeCard("8600123412341234 0927")).toBe(true);
+    expect(looksLikeCard("8600 1234 1234 1234 09/27")).toBe(true);
+    expect(looksLikeCard("20208000123456789012")).toBe(true);
+    expect(looksLikeCard("2020 8000 1234 5678 9012")).toBe(true);
+  });
+
+  it("knows a card of nineteen digits and does not take a long run of other digits for one", () => {
+    expect(looksLikeCard("6200 1234 1234 1234 123")).toBe(true);
+    expect(looksLikeCard("1234567890 12.10.2026 4150000")).toBe(false);
+    expect(looksLikeCard("Чек 0004457812 от 12.10.2026, 14:30")).toBe(false);
+    expect(looksLikeCard("гарантия 12.10.2026 - 12.10.2027")).toBe(false);
+    expect(looksLikeCard("12.10.2026 \u2013 14.10.2026")).toBe(false);
+  });
+
+  it("does not take the INN, the MFO, a number of an order or a date for a card", () => {
+    for (const ok of ["123456789", "00014", "NV-2026-0001", "1250000", "12.10.2026 4 150 000", "+998 90 123 45 67"]) {
+      expect(looksLikeCard(ok), ok).toBe(false);
+    }
+  });
+
+  it("takes the twenty digits of the account of a company for an account only in the field of the account", () => {
     for (const ok of [
       "20208000123456789012",
       "2020 8000 1234 5678 9012",
-      "123456789",
-      "00014",
-      "NV-2026-0001",
-      "1250000",
+      "2020\u00A08000\u00A01234\u00A05678\u00A09012",
     ]) {
-      expect(looksLikeCard(ok), ok).toBe(false);
+      expect(looksLikeCard(ok, { account: true }), ok).toBe(false);
     }
+    expect(looksLikeCard("8600 1234 1234 1234", { account: true })).toBe(true);
+    expect(looksLikeCard("8600123412341234 0927", { account: true })).toBe(true);
+    expect(looksLikeCard("карта 8600 1234 1234 1234 и счёт 20208000123456789012", { account: true })).toBe(true);
   });
 
   it("refuses a card in any of the requisites, naming the field", () => {
@@ -94,6 +124,17 @@ describe("the requisites of the sole proprietor", () => {
   it("fills only the fields that are there and keeps a placeholder for the rest", () => {
     const rows = requisiteRows({ holder: "YaTT Karimov", account: "20208000123456789012" }, uz);
     expect(rows.map((r) => r.pending)).toEqual([false, true, true, false, true]);
+  });
+
+  it("refuses a card with odd spaces or with its term in any of the requisites and in the text of a document", () => {
+    expect(() => requisiteRows({ ...IP, holder: "8600\u00A01234\u00A01234\u00A01234" }, uz)).toThrow(CardNumberError);
+    expect(() => requisiteRows({ ...IP, account: "8600123412341234 0927" }, uz)).toThrow(CardNumberError);
+    expect(() => paymentPurpose({ purpose: "на 8600\u202F1234\u202F1234\u202F1234" }, "NV-1", ru)).toThrow(
+      CardNumberError,
+    );
+    expect(() => assertNoCardNumberDeep({ notes: "8600.1234.1234.1234" })).toThrow(CardNumberError);
+    expect(() => assertNoCardNumberDeep({ notes: "карта\n8600 1234 1234 1234 0927" })).toThrow(CardNumberError);
+    expect(() => assertNoCardNumberDeep({ ip: { account: "20208000123456789012" } })).not.toThrow();
   });
 
   it("refuses requisites that hold a card number", () => {
