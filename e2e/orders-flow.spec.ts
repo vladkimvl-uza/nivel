@@ -62,8 +62,9 @@ test.describe("заказ от сметы до закрытия, с телефо
     world,
   }) => {
     test.setTimeout(540_000);
-    page.on("pageerror", (e) => console.log("[pageerror]", e.message));
-    page.on("console", (m) => (m.type() === "error" ? console.log("[console]", m.text()) : undefined));
+    // An uncaught error of the page in any step is a failure of the test, not a line in a log.
+    const pageErrors: string[] = [];
+    page.on("pageerror", (e) => pageErrors.push(e.message));
     const owner = await admin.createUser("owner");
     await signIn(page, admin, owner);
     const lead = await botLead(world, "Азиз Каримов");
@@ -367,5 +368,6 @@ test.describe("заказ от сметы до закрытия, с телефо
       );
       expect(overflow).toBeLessThanOrEqual(1);
     });
+    expect(pageErrors).toEqual([]);
   });
 });

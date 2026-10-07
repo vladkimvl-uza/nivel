@@ -4,21 +4,14 @@
 // upload route (which strips the shooting data and registers the file), and the form then carries the id of the file.
 // The picture is sent at once, before the form: the form itself stays small.
 import { type ChangeEvent, useEffect, useId, useRef, useState } from "react";
+import { refuseBeforeSending, sendPhoto } from "./upload-client.ts";
 
 export const HEIC_HINT =
   "Снимок в JPEG, PNG или WebP до 12 МБ. Фото с iPhone в формате HEIC не принимается: отправьте его себе через Telegram или включите «Камера → Форматы → Наиболее совместимый».";
 
-const MAX_BYTES = 12 * 1024 * 1024;
-
 interface Uploaded {
   id: string;
   name: string;
-}
-
-interface UploadAnswer {
-  ok?: boolean;
-  message?: string;
-  file?: { id: string };
 }
 
 export interface PhotoPickerProps {
@@ -31,20 +24,6 @@ export interface PhotoPickerProps {
   multiple?: boolean;
   testId?: string;
   hint?: string;
-}
-
-async function send(endpoint: string, file: File, kind: string): Promise<UploadAnswer> {
-  const data = new FormData();
-  data.set("kind", kind);
-  data.set("photo", file);
-  try {
-    const response = await fetch(endpoint, { method: "POST", body: data, credentials: "same-origin" });
-    const body = (await response.json().catch(() => null)) as UploadAnswer | null;
-    if (body && typeof body.message === "string") return body;
-    return { ok: false, message: `Не удалось загрузить файл (ответ ${response.status}). Попробуйте ещё раз.` };
-  } catch {
-    return { ok: false, message: "Нет связи с сервером. Проверьте сеть и повторите." };
-  }
 }
 
 export function PhotoPicker({
@@ -82,11 +61,12 @@ export function PhotoPicker({
     setMessage(null);
     const added: Uploaded[] = [];
     for (const file of files) {
-      if (file.size === 0 || file.size > MAX_BYTES) {
-        setMessage({ ok: false, text: file.size === 0 ? "Файл пустой." : "Файл больше 12 МБ." });
+      const refused = refuseBeforeSending(file);
+      if (refused) {
+        setMessage({ ok: false, text: refused });
         continue;
       }
-      const answer = await send(endpoint, file, kind);
+      const answer = await sendPhoto(endpoint, file, kind);
       if (answer.ok && answer.file) added.push({ id: answer.file.id, name: file.name });
       else setMessage({ ok: false, text: answer.message ?? "Файл не загружен." });
     }

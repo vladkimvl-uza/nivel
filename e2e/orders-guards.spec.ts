@@ -245,7 +245,7 @@ test.describe("помощник и бухгалтер", () => {
     const form = page.getByTestId("record-purchase");
     await fillPurchase(page, {
       line: "Ryzen 5 7600",
-      amount: formatSum(2_800_000).replace(/ сум$/, ""),
+      amount: "2 800 000",
       receipt: "CH-HELPER-1",
     });
     await form.getByRole("button", { name: "Записать покупку" }).click();

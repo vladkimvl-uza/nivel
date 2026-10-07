@@ -393,6 +393,22 @@ function passportView(row: Record<string, unknown> | undefined): PassportView | 
   };
 }
 
+/**
+ * The objection of the customer to the latest report: open while an OBJECTION of the journal is newer than the answer of
+ * the owner (`resolvedAfterSeq`, written by `reports.resolveObjection`), answered after it, null when there was none.
+ */
+export function objectionOf(
+  events: readonly { seq: number; event: Record<string, unknown> }[],
+  stored: Record<string, unknown> | null,
+): ReportView["objection"] {
+  const answeredThrough = typeof stored?.resolvedAfterSeq === "number" ? stored.resolvedAfterSeq : 0;
+  const said = events.filter((e) => e.event.type === "OBJECTION");
+  const open = said.filter((e) => e.seq > answeredThrough).at(-1);
+  if (open) return { text: String(open.event.text ?? ""), resolved: false };
+  if (stored && typeof stored.note === "string") return { note: stored.note, resolved: true };
+  return null;
+}
+
 export async function getOrderCard(db: Db, orderId: string, opts: { seePhone: boolean }): Promise<OrderCard | null> {
   const context = await sales.loadOrderContext(db, orderId);
   if (!context) return null;
@@ -494,31 +510,23 @@ export async function getOrderCard(db: Db, orderId: string, opts: { seePhone: bo
       documentedLosses: context.money.documentedLosses,
       hasLimitOverrunConsent: context.money.hasLimitOverrunConsent,
     },
-    reports: reports.map((r) => {
-      const obj = r.objection as { resolvedAt?: string; note?: string; text?: string } | null;
-      return {
-        id: r.id,
-        version: r.version,
-        receivedSum: r.receivedSum,
-        spentSum: r.spentSum,
-        discountsSum: r.discountsSum,
-        remainderSum: r.remainderSum,
-        generatedAt: r.generatedAt,
-        sentAt: r.sentAt,
-        dueAt: r.dueAt,
-        objectionUntil: r.objectionUntil,
-        objection: obj
-          ? {
-              ...(obj.text ? { text: obj.text } : {}),
-              ...(obj.note ? { note: obj.note } : {}),
-              resolved: obj.resolvedAt !== undefined,
-            }
-          : null,
-        acceptedAt: r.acceptedAt,
-        deemedAcceptedAt: r.deemedAcceptedAt,
-        pdf: { uz: r.pdfUzFileId, ru: r.pdfRuFileId },
-      };
-    }),
+    reports: reports.map((r, index) => ({
+      id: r.id,
+      version: r.version,
+      receivedSum: r.receivedSum,
+      spentSum: r.spentSum,
+      discountsSum: r.discountsSum,
+      remainderSum: r.remainderSum,
+      generatedAt: r.generatedAt,
+      sentAt: r.sentAt,
+      dueAt: r.dueAt,
+      objectionUntil: r.objectionUntil,
+      // The words of the customer are in the journal of events; the report keeps only the owner's answer.
+      objection: index === 0 ? objectionOf(events, r.objection) : null,
+      acceptedAt: r.acceptedAt,
+      deemedAcceptedAt: r.deemedAcceptedAt,
+      pdf: { uz: r.pdfUzFileId, ru: r.pdfRuFileId },
+    })),
     acts: acts.map((a) => ({
       id: a.id,
       kind: a.kind,
