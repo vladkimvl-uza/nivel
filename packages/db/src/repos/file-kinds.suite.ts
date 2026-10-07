@@ -48,3 +48,35 @@ describe("the kinds of ops.files", () => {
     },
   );
 });
+
+describe("the storage key of a file", () => {
+  // The purge returns the keys to the worker, which removes them from the disk: a key that climbs out of the directory of
+  // the files would make that removal reach any file the worker can write.
+  it.each([
+    "../etc/passwd",
+    "a/../../b",
+    "/abs/path",
+    "a/./b",
+    "a//b",
+    "a/b/",
+    "..",
+    "a\\b",
+    "C:\\windows",
+    "a\tb",
+    "a\nb",
+    "",
+    "x".repeat(301),
+  ])("refuses the key %j", async (storageKey) => {
+    const e = await pgError(worker, INSERT, [storageKey, "quote_pdf"]);
+    expect(e.code).toBe("23514");
+    expect(e.constraint).toBe("files_storage_key_chk");
+  });
+
+  it.each(["receipts/2026/10/0190a1b2-c3d4.pdf", "quote_pdf/a-b_c.d/file.1", "a", "x".repeat(250)])(
+    "accepts the key %j",
+    async (storageKey) => {
+      // The keys of the registry are unique: the fixture adds its own tail.
+      await worker.query(INSERT, [`${storageKey}-${++n}-${Math.random().toString(36).slice(2, 8)}`, "quote_pdf"]);
+    },
+  );
+});

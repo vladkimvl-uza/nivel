@@ -63,6 +63,21 @@ const customerView = {
   createdAt: customers.createdAt,
 };
 
+/**
+ * Holds the row of a customer (FOR SHARE) and answers whether he has been made anonymous by the 12-month erasure; null when
+ * there is no such customer. The erasure takes the same row FOR UPDATE: whoever holds it first makes the other wait, and the
+ * one that waits judges again with what the first has committed, so an order is never opened for a customer who is
+ * being erased and a customer is never erased in the middle of the opening of his order.
+ */
+export async function holdCustomer(db: Executor, customerId: string): Promise<{ erased: boolean } | null> {
+  const [row] = await db
+    .select({ erasedAt: customers.erasedAt })
+    .from(customers)
+    .where(eq(customers.id, customerId))
+    .for("share");
+  return row ? { erased: row.erasedAt !== null } : null;
+}
+
 export async function findCustomerByTelegramId(db: Executor, telegramUserId: number): Promise<CustomerView | null> {
   const [row] = await db.select(customerView).from(customers).where(eq(customers.telegramUserId, telegramUserId));
   return row ?? null;
@@ -511,6 +526,15 @@ export async function orderMoney(db: Executor, orderId: string): Promise<OrderMo
     documentedLosses: sum(Number(r?.losses ?? 0)),
     hasLimitOverrunConsent: await consentGranted(db, orderId, "limit_overrun"),
   };
+}
+
+/** What was really paid: the confirmed payments of the order of these kinds, the reversals (negative rows) included. */
+export async function confirmedSum(db: Executor, orderId: string, kinds: readonly PaymentRow["kind"][]): Promise<Sum> {
+  const [row] = await db
+    .select({ total: sql<string>`coalesce(sum(${payments.amountSum}), 0)::text` })
+    .from(payments)
+    .where(and(eq(payments.orderId, orderId), eq(payments.status, "confirmed"), inArray(payments.kind, [...kinds])));
+  return sum(Number(row?.total ?? 0));
 }
 
 export interface OrderContext {

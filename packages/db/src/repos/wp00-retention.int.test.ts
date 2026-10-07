@@ -5,4 +5,5 @@ import "./retention-files.suite.ts";
 import "./json-limits.suite.ts";
 import "./lead-contact.suite.ts";
 import "./file-kinds.suite.ts";
+import "./retention-inputs.suite.ts";
 import "./rights-repos.suite.ts";

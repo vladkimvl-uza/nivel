@@ -77,6 +77,13 @@ export const files = ops.table(
     check("files_bytes_chk", sql`${t.bytes} >= 0`),
     check("files_retention_chk", oneOf(t.retentionClass, RETENTION_CLASSES)),
     check("files_kind_chk", sql`${t.kind} ~ '^[a-z][a-z0-9_]{1,39}$'`),
+    // The key is a relative path under the directory of the files, one segment at a time: it never starts with a slash or
+    // a dot, has no empty or dotted segment, no backslash and no control character. The purge hands the keys to the worker
+    // to remove from the disk, so a key that could climb out of the directory would reach any file the worker can write.
+    check(
+      "files_storage_key_chk",
+      sql`${t.storageKey} ~ '^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$' and char_length(${t.storageKey}) <= 300`,
+    ),
     // Personal data never sits in a public file.
     check("files_public_no_pd_chk", sql`not (${t.isPublic} and ${t.containsPd})`),
   ],

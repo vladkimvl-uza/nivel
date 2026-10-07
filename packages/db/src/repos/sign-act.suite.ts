@@ -241,6 +241,22 @@ describe("acts_evidence_chk: a signature always has evidence", () => {
     expect(u.constraint).toBe("acts_evidence_chk");
   });
 
+  it.each(["null", "[]", '"pressed"', "42", "true"])(
+    "a signature rests on an object: the evidence %s is no evidence (the JSON null is not an SQL NULL)",
+    async (evidence) => {
+      const o = await createOrder(migrator);
+      for (const client of [migrator, admin]) {
+        const actId = await insertAct(migrator, o.orderId, "handover");
+        const e = await pgError(
+          client,
+          "update sales.acts set signed_at = now(), signed_via = 'paper_photo', evidence = $2::jsonb where id = $1",
+          [actId, evidence],
+        );
+        expect(e.constraint, evidence).toBe("acts_evidence_chk");
+      }
+    },
+  );
+
   it("accepts an unsigned act without evidence and a signed one with it", async () => {
     const o = await createOrder(migrator);
     const actId = await insertAct(migrator, o.orderId, "customer_parts");

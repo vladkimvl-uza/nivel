@@ -133,6 +133,32 @@ describe.each(["worker", "bot"] as const)("sales.expect_payment as the %s role",
     expect(e.code).toBe("22P02");
   });
 
+  it("refuses a sum above the largest whole number the services read without loss (2^53 - 1)", async () => {
+    const o = await createOrder(migrator);
+    for (const amount of ["9007199254740992", "9223372036854775807"]) {
+      const e = await pgError(client(), CALL, [o.orderId, "fee_advance", amount, null]);
+      expect(e.message, amount).toMatch(/^invalid_payment:/);
+    }
+    expect(await payments(o.orderId)).toEqual([]);
+  });
+
+  it.each(["fee_advance", "fee_final", "purchase_funds", "podbor_fee"] as const)(
+    "%s is one sum of the quote: a second open expectation with another sum is refused, not written beside the first",
+    async (kind) => {
+      const o = await createOrder(migrator);
+      const first = await expectAs(client(), o.orderId, kind, 450_000);
+      const e = await pgError(client(), CALL, [o.orderId, kind, 1, null]);
+      expect(e.message).toMatch(/^invalid_payment:/);
+      expect(e.message).toMatch(/another sum/);
+      expect(await payments(o.orderId)).toHaveLength(1);
+      // The first one made void by the owner (the quote changed): the new sum is expected.
+      await migrator.query("update sales.payments set status = 'void' where id = $1", [first?.out_payment_id]);
+      const second = await expectAs(client(), o.orderId, kind, 500_000);
+      expect(second?.out_duplicate).toBe(false);
+      expect(await payments(o.orderId)).toHaveLength(2);
+    },
+  );
+
   it("refuses an order that does not exist, or none", async () => {
     const e = await pgError(client(), CALL, ["0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "fee_advance", 1000, null]);
     expect(e.message).toMatch(/^order_not_found:/);
@@ -234,11 +260,12 @@ describe.each(["worker", "bot"] as const)("sales.expect_payment as the %s role",
 
 describe("the pairs of sales.expect_payment are the pairs of the domain", () => {
   it("accepts a kind with a way exactly when validatePayment accepts the pair, and writes the direction the domain names", async () => {
-    const o = await createOrder(migrator);
     let amount = 1000;
     for (const kind of PAYMENT_KINDS) {
       for (const method of PAYMENT_METHODS) {
         amount += 1;
+        // An order of its own for every pair: the payments of one sum of the quote are expected one at a time.
+        const o = await createOrder(migrator);
         const domain = (["in", "out"] as const).find((direction) => validatePayment({ kind, direction, method }).ok);
         const call = worker.query(CALL, [o.orderId, kind, amount, method]);
         if (domain === undefined) {

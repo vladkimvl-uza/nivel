@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../client.ts";
 import { DbRuleError } from "./errors.ts";
 import type { Executor } from "./executor.ts";
-import { purgeExpiredFiles } from "./ops.ts";
+import { purgeExpiredFiles, purgeExpiredFilesAndRemoveBytes } from "./ops.ts";
 import {
   bindLeadCustomer,
   createLead,
@@ -161,12 +161,14 @@ describe.each(["WEB", "BOT", "WORKER", "ADMIN"] as const)("warrantyFundState as 
     for (const v of Object.values(s)) expect(Number.isSafeInteger(v)).toBe(true);
   });
 
-  it("is the same for every role and honours the moment it is given", async () => {
+  it("is the same for every role; the admin panel and the worker honour the moment, the site and the bot read the present", async () => {
     const now = await asRole(role, (tx) => warrantyFundState(tx));
     const m = await asRole("ADMIN", (tx) => warrantyFundState(tx));
     expect(now).toEqual(m);
     const old = await asRole(role, (tx) => warrantyFundState(tx, new Date("2001-01-01T00:00:00Z")));
-    expect(old).toEqual({ balance: 0, closedOrders: 0, lossesLast12m: 0, purchasedLast12m: 0 });
+    expect(old).toEqual(
+      role === "WEB" || role === "BOT" ? now : { balance: 0, closedOrders: 0, lossesLast12m: 0, purchasedLast12m: 0 },
+    );
   });
 });
 
@@ -205,6 +207,68 @@ describe.each(["WORKER", "ADMIN"] as const)("the retention functions as %s", (ro
     expect(await asRole(role, (tx) => purgeExpiredFiles(tx, new Date("2001-01-01T00:00:00Z")))).toEqual([]);
     expect(await asRole(role, (tx) => purgeExpiredFiles(tx))).toEqual([old.storageKey]);
     expect(await asRole(role, (tx) => purgeExpiredFiles(tx))).toEqual([]);
+  });
+});
+
+describe.each(["WORKER", "ADMIN"] as const)("purgeExpiredFilesAndRemoveBytes as %s", (role) => {
+  const seed = async (n: number) => {
+    const m = await connectAs("MIGRATOR");
+    try {
+      const out: { id: string; storageKey: string }[] = [];
+      for (let i = 0; i < n; i += 1) out.push(await insertFile(m, { retention: "ai_90d", age: "100 days" }));
+      return out;
+    } finally {
+      await m.end();
+    }
+  };
+  const left = async (ids: string[]) => {
+    const m = await connectAs("MIGRATOR");
+    try {
+      return Number(
+        (await one<{ n: string }>(m, "select count(*)::text as n from ops.files where id = any ($1::uuid[])", [ids])).n,
+      );
+    } finally {
+      await m.end();
+    }
+  };
+
+  it("removes the bytes of every key before the rows are committed, and answers the keys", async () => {
+    await purgeExpiredFiles(dbs[role]);
+    const files = await seed(3);
+    const removed: string[] = [];
+    const keys = await purgeExpiredFilesAndRemoveBytes(dbs[role], async (k) => {
+      // At this moment the rows are gone only inside the transaction of the caller.
+      expect(await left(files.map((f) => f.id))).toBe(3);
+      removed.push(k);
+    });
+    expect(keys).toEqual(files.map((f) => f.storageKey).sort());
+    expect(removed.sort()).toEqual(keys);
+    expect(await left(files.map((f) => f.id))).toBe(0);
+  });
+
+  it("keeps every row when the bytes of one key cannot be removed: no key is lost, the next run does it again", async () => {
+    await purgeExpiredFiles(dbs[role]);
+    const files = await seed(3);
+    const failing = files[1]?.storageKey;
+    await expect(
+      purgeExpiredFilesAndRemoveBytes(dbs[role], async (k) => {
+        if (k === failing) throw new Error("disk busy");
+      }),
+    ).rejects.toThrow("disk busy");
+    expect(await left(files.map((f) => f.id))).toBe(3);
+    const again = await purgeExpiredFilesAndRemoveBytes(dbs[role], async () => undefined);
+    expect(again).toEqual(files.map((f) => f.storageKey).sort());
+    expect(await left(files.map((f) => f.id))).toBe(0);
+  });
+
+  it("does nothing, and calls nothing, when no file is due", async () => {
+    await purgeExpiredFiles(dbs[role]);
+    let calls = 0;
+    const removeBytes = async () => {
+      calls += 1;
+    };
+    expect(await purgeExpiredFilesAndRemoveBytes(dbs[role], removeBytes)).toEqual([]);
+    expect(calls).toBe(0);
   });
 });
 

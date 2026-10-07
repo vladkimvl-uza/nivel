@@ -557,8 +557,12 @@ export const acts = sales.table(
     check("acts_kind_chk", oneOf(t.kind, ["material_acceptance", "customer_parts", "handover"])),
     check("acts_signed_via_chk", oneOf(t.signedVia, ["tg_button", "paper_photo", "site_button"])),
     check("acts_signed_chk", sql`(${t.signedAt} is null) = (${t.signedVia} is null)`),
-    // A signature always rests on evidence (the id of the press, the file of the paper act).
-    check("acts_evidence_chk", sql`${t.signedAt} is null or ${t.evidence} is not null`),
+    // A signature always rests on evidence (the id of the press, the file of the paper act): a JSON object. The JSON null,
+    // a list or a text is not an SQL NULL and would pass `is not null`.
+    check(
+      "acts_evidence_chk",
+      sql`${t.signedAt} is null or (${t.evidence} is not null and jsonb_typeof(${t.evidence}) = 'object')`,
+    ),
   ],
 );
 

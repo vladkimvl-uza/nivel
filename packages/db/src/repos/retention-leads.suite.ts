@@ -328,3 +328,36 @@ describe("who may call sales.purge_expired_leads", () => {
     expect((await pgError(worker, "update sales.customers set erased_at = now()")).code).toBe(DENIED);
   });
 });
+
+describe("an order that appears while the erasure runs", () => {
+  // The candidates are chosen by one statement and erased by another. An order opened for a candidate in between (the
+  // owner converted an old request) must stop the erasure: the function locks the candidates and judges them again.
+  it("waits for the order being written, then leaves the customer alone", async () => {
+    const p = await person();
+    const old = await lead(p.id, "20 months", { comment: "call me" });
+    const writer = await connectAs("MIGRATOR");
+    try {
+      await writer.query("begin");
+      await writer.query("insert into sales.orders (number, customer_id, kind, lead_id) values ($1, $2, 'pc', $3)", [
+        `NV-2997-${pad(uniq())}`,
+        p.id,
+        old,
+      ]);
+      let done = false;
+      const running = purge(worker).then((n) => {
+        done = true;
+        return n;
+      });
+      await new Promise((r) => setTimeout(r, 400));
+      // The erasure holds on the customer row that the order being written also holds.
+      expect(done).toBe(false);
+      await writer.query("commit");
+      await running;
+      expect((await customerRow(p.id)).erased_at).toBeNull();
+      expect((await customerRow(p.id)).telegram_user_id).toBe(String(p.telegramId));
+    } finally {
+      await writer.query("rollback").catch(() => undefined);
+      await writer.end();
+    }
+  });
+});

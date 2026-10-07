@@ -14,7 +14,7 @@ import {
   thresholdSnapshots,
 } from "../schema/ops.ts";
 import { DbRuleError, expectUpdated, guarded } from "./errors.ts";
-import type { Executor, Tx } from "./executor.ts";
+import type { Database, Executor, Tx } from "./executor.ts";
 import { MS_PER_MINUTE } from "./time.ts";
 
 export type SettingRow = typeof settings.$inferSelect;
@@ -251,8 +251,10 @@ export async function getFile(db: Executor, id: string) {
 
 /**
  * Deletes the rows of the files whose retention class has run out (ops.purge_expired_files) and answers their storage
- * keys: the caller removes the bytes from the disk. For the admin panel and the worker. A file whose bytes could not be
- * removed stays on the disk without a row: the keys are the only record, so the caller logs a failure by key.
+ * keys: the caller removes the bytes from the disk. For the admin panel and the worker. The rows go with the commit of
+ * the transaction `db` belongs to: a caller that removes the bytes after that commit and fails in between keeps bytes
+ * that nothing names any more, and the keys are the only record of them. Use purgeExpiredFilesAndRemoveBytes, which
+ * removes the bytes inside the transaction, before the commit.
  */
 export async function purgeExpiredFiles(db: Executor, now?: Date): Promise<string[]> {
   const at = now === undefined ? null : now.toISOString();
@@ -260,6 +262,26 @@ export async function purgeExpiredFiles(db: Executor, now?: Date): Promise<strin
     db.execute<{ storage_key: string }>(sql`select storage_key from ops.purge_expired_files(${at}::timestamptz)`),
   );
   return rows.map((r) => r.storage_key).sort();
+}
+
+/**
+ * The retention of files with the removal of the bytes in one step that cannot lose a key. The rows are deleted inside
+ * a transaction, `removeBytes` is called for every storage key (it must treat a file that is already gone as removed),
+ * and only then the transaction commits. If the disk fails, `removeBytes` throws, the transaction rolls back, the rows
+ * are still there and the next run offers the same keys again; the bytes of the keys removed before the failure are gone,
+ * which the next run tolerates by the rule above. A crash of the process before the commit is the same. The transaction
+ * lasts as long as the removals: they are few (the daily run) and local.
+ */
+export async function purgeExpiredFilesAndRemoveBytes(
+  db: Database,
+  removeBytes: (storageKey: string) => Promise<void>,
+  now?: Date,
+): Promise<string[]> {
+  return db.transaction(async (tx) => {
+    const keys = await purgeExpiredFiles(tx, now);
+    for (const key of keys) await removeBytes(key);
+    return keys;
+  });
 }
 
 // ---- public numbers ---------------------------------------------------------------------------------------------

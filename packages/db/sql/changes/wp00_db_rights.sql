@@ -9,7 +9,9 @@
 --   sales.warranty_fund_state  four aggregates of the warranty fund for the contribution at HANDOVER, for every role
 --   sales.purge_expired_leads  the 12-month erasure of requests that did not become an order
 --   ops.purge_expired_files  the retention classes of files; returns the storage keys to delete from the disk
---   sales.guard_lead         a request is bound to a customer once, by the admin panel only
+--   sales.guard_lead         a request is bound to a customer once, by the admin panel only; its day is never rewritten
+--   sales.guard_customer     the bot gives a Telegram id to a customer that has none and never changes it afterwards
+--   ops.guard_file           the class (never shorter), the day, the kind, the key and the hash of a file are not rewritten
 --   sales.guard_quote, sales.guard_payment  let the file purge empty a link to a file that has expired, nothing else
 
 -- ---- the file purge may empty the link of a document to an expired file -----------------------------------------
@@ -333,8 +335,9 @@ BEGIN
     RAISE EXCEPTION 'invalid_payment: % is not paid by "%" (allowed: %)', p_kind, v_method, v_methods
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
-  IF p_amount_sum IS NULL OR p_amount_sum <= 0 THEN
-    RAISE EXCEPTION 'invalid_payment: the sum of % must be a positive whole number of sums, got %', p_kind, coalesce(p_amount_sum::text, 'none')
+  -- The sums of the system are whole numbers a JavaScript number reads without loss (ARCHITECTURE 3.1).
+  IF p_amount_sum IS NULL OR p_amount_sum <= 0 OR p_amount_sum > 9007199254740991 THEN
+    RAISE EXCEPTION 'invalid_payment: the sum of % must be a positive whole number of sums up to 9007199254740991, got %', p_kind, coalesce(p_amount_sum::text, 'none')
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
   IF p_payer_is_customer IS NULL THEN
@@ -362,6 +365,14 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
+  -- The sum of such a payment is one sum of the quote: an open expectation of another sum is a conflict (the quote changed
+  -- or the caller is wrong) that the owner voids first, not a second row for the customer to see beside the first.
+  IF v_once AND EXISTS (SELECT 1 FROM sales.payments p
+                         WHERE p.order_id = p_order_id AND p.kind = p_kind AND p.status = 'expected'
+                           AND p.reversal_of IS NULL AND p.amount_sum <> p_amount_sum) THEN
+    RAISE EXCEPTION 'invalid_payment: % is already expected for another sum of the order', p_kind
+      USING ERRCODE = 'invalid_parameter_value', HINT = 'Void the open expectation first.';
+  END IF;
   INSERT INTO sales.payments (order_id, kind, direction, method, amount_sum, status, payer_is_customer)
   VALUES (p_order_id, p_kind, v_direction, v_method, p_amount_sum, 'expected', p_payer_is_customer)
   RETURNING id INTO v_id;
@@ -378,9 +389,12 @@ $$;
 -- ---- the signature of an act by the button of the bot ---------------------------------------------------------------
 -- The bot cannot write acts; the press of the button of the customer is the one signature that arrives through it. The
 -- press proves itself with the Telegram id of the person and the id of the message with the button, and it counts only
--- when that Telegram id is the one of the customer of the order of the act (the credentials of the bot alone must not
--- sign for anybody). The act is signed once; the time is the clock of the database. Only the two facts of the press are
--- kept, never the other words of the caller.
+-- when that Telegram id is the one of the customer of the order of the act. The check catches the mistakes of the code
+-- of the bot (a press of another person, of another order) and leaves a trace (the role of the database in the audit
+-- row); it is NOT a defence against whoever holds the credentials of the bot: the bot reads the Telegram id of every
+-- customer and names it itself. Two things limit that: the bot cannot change a Telegram id once a customer has one
+-- (sales.guard_customer), and the act is signed once. The act is signed once; the time is the clock of the database.
+-- Only the two facts of the press are kept, never the other words of the caller.
 CREATE FUNCTION sales.sign_act(p_act_id uuid, p_via text, p_evidence jsonb) RETURNS timestamptz
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
@@ -433,14 +447,19 @@ $$;
 -- not see always used the rate of a young fund. The function answers the four aggregates the domain needs, never a
 -- row of a register: the balance of the warranty fund, the orders closed, the losses paid from the fund and the
 -- purchases of the last 12 months (their ratio is the losses in basis points, counted by packages/domain). A moment
--- later than the clock of the database is not taken.
+-- later than the clock of the database is not taken. The site and the bot read the present only: the contribution is
+-- computed at HANDOVER, now, and a moment they could choose would let them find the single entries of the registers by
+-- asking the same question for two close moments. The admin panel and the worker, which read the registers anyway, may
+-- ask about the past (tests, the closing check).
 CREATE FUNCTION sales.warranty_fund_state(p_now timestamptz DEFAULT now())
 RETURNS TABLE (out_balance bigint, out_closed_orders integer, out_losses_12m bigint, out_purchased_12m bigint)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
-  v_now timestamptz := least(coalesce(p_now, now()), now());
-  v_since timestamptz := least(coalesce(p_now, now()), now()) - interval '12 months';
+  v_now timestamptz := CASE WHEN session_user IN ('nivel_web', 'nivel_bot') THEN now()
+                            ELSE least(coalesce(p_now, now()), now()) END;
+  v_since timestamptz;
 BEGIN
+  v_since := v_now - interval '12 months';
   out_balance := coalesce((SELECT sum(l.amount_sum) FROM sales.reserve_ledger l WHERE l.fund = 'warranty' AND l.at <= v_now), 0)::bigint;
   out_closed_orders := (SELECT count(DISTINCT e.order_id) FROM sales.order_events e WHERE e.to_status = 'closed' AND e.at <= v_now)::integer;
   out_losses_12m := coalesce((SELECT sum(w.cost_from_reserve_sum) FROM sales.warranty_cases w
@@ -454,10 +473,15 @@ $$;
 -- ---- a request is bound to a customer once, by the admin panel ---------------------------------------------------------
 -- The site cannot link a request to a customer it cannot read (it keeps the contact in the request). The owner merges
 -- them by hand in the admin panel: customer_id goes from NULL to a customer, once. The bot may update a request (its
--- status, the first answer) but never its customer; the worker cannot update requests at all.
+-- status, the first answer) but never its customer; the worker cannot update requests at all. The day of a request
+-- (created_at) is the start of its 12 months (sales.purge_expired_leads) and is never rewritten by a role of the
+-- application: the bot can update its requests, and a day it could move would make any request due, or never due.
 CREATE FUNCTION sales.guard_lead() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
+  IF NEW.created_at IS DISTINCT FROM OLD.created_at AND session_user <> 'nivel_migrator' THEN
+    RAISE EXCEPTION 'immutable: the day of request % is written once', OLD.number USING ERRCODE = 'check_violation';
+  END IF;
   IF NEW.customer_id IS DISTINCT FROM OLD.customer_id THEN
     IF OLD.customer_id IS NOT NULL THEN
       RAISE EXCEPTION 'immutable: the customer of request % is bound once and never changes', OLD.number
@@ -474,6 +498,56 @@ $$;
 --> statement-breakpoint
 CREATE TRIGGER leads_guard BEFORE UPDATE ON sales.leads
   FOR EACH ROW EXECUTE FUNCTION sales.guard_lead();
+--> statement-breakpoint
+-- ---- the Telegram id of a customer is given once ---------------------------------------------------------------------
+-- sales.sign_act() trusts the press of a button when its Telegram id is the one of the customer, and the bot may update
+-- customers (the name, the language, the first contact). So the bot gives a Telegram id to a customer that has none and
+-- never changes or clears it: whoever holds the credentials of the bot cannot make a customer "be" another person to
+-- sign an act in his name. The erasure of a customer clears the id as the worker or the admin panel (not as the bot).
+CREATE FUNCTION sales.guard_customer() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF session_user = 'nivel_bot' AND OLD.telegram_user_id IS NOT NULL
+     AND NEW.telegram_user_id IS DISTINCT FROM OLD.telegram_user_id THEN
+    RAISE EXCEPTION 'immutable: the Telegram id of customer % is given once and the bot does not change it', OLD.id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER customers_guard BEFORE UPDATE ON sales.customers
+  FOR EACH ROW EXECUTE FUNCTION sales.guard_customer();
+--> statement-breakpoint
+-- ---- what decides the retention of a file is not rewritten ----------------------------------------------------------
+-- ops.purge_expired_files() judges a file by its class and its day and then removes links of journals that nobody else
+-- may touch. The worker and the admin panel write ops.files (they register the files), so the inputs of the decision
+-- must not be theirs to change: the class may be lengthened (a lead file that becomes a document of an order, a file
+-- that is published) and never shortened; the day, the kind, the key and the hash are written once. The migrator
+-- (fixtures, repairs by hand) is not bound.
+CREATE FUNCTION ops.guard_file() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_rank jsonb := '{"ai_90d": 1, "lead_12m": 2, "order_warranty_plus_3y": 3, "tax_5y": 3, "media": 4}';
+BEGIN
+  IF session_user = 'nivel_migrator' THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.created_at IS DISTINCT FROM OLD.created_at OR NEW.kind IS DISTINCT FROM OLD.kind
+     OR NEW.storage_key IS DISTINCT FROM OLD.storage_key OR NEW.sha256 IS DISTINCT FROM OLD.sha256 THEN
+    RAISE EXCEPTION 'immutable: the day, the kind, the storage key and the hash of a file are written once'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF (v_rank ->> NEW.retention_class)::integer < (v_rank ->> OLD.retention_class)::integer THEN
+    RAISE EXCEPTION 'immutable: the retention class of a file may be lengthened, never shortened (% -> %)',
+      OLD.retention_class, NEW.retention_class USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER files_guard BEFORE UPDATE ON ops.files
+  FOR EACH ROW EXECUTE FUNCTION ops.guard_file();
 --> statement-breakpoint
 -- ---- the 12-month erasure of requests ---------------------------------------------------------------------------------
 -- A request that did not become an order is kept 12 months (DATA-MAP 9). After that the personal data of the request
@@ -496,21 +570,31 @@ DECLARE
   v_telegram bigint[];
   v_leads integer;
   v_erased integer := 0;
+  v_pass integer;
 BEGIN
-  SELECT coalesce(array_agg(c.id), ARRAY[]::uuid[]),
-         coalesce(array_agg(c.telegram_user_id) FILTER (WHERE c.telegram_user_id IS NOT NULL), ARRAY[]::bigint[])
-    INTO v_customers, v_telegram
-    FROM sales.customers c
-   WHERE c.erased_at IS NULL
-     AND EXISTS (SELECT 1 FROM sales.leads l
-                  WHERE l.customer_id = c.id AND l.created_at <= v_cut
-                    AND NOT EXISTS (SELECT 1 FROM sales.orders o WHERE o.lead_id = l.id))
-     AND NOT EXISTS (SELECT 1 FROM sales.orders o WHERE o.customer_id = c.id)
-     AND NOT EXISTS (SELECT 1 FROM sales.leads l
-                      WHERE l.customer_id = c.id
-                        AND (l.created_at > v_cut OR EXISTS (SELECT 1 FROM sales.orders o WHERE o.lead_id = l.id)))
-     AND NOT EXISTS (SELECT 1 FROM sales.configurations cf WHERE cf.customer_id = c.id AND cf.created_at > v_cut)
-     AND NOT EXISTS (SELECT 1 FROM ops.consents k WHERE k.customer_id = c.id AND k.at > v_cut);
+  -- Two passes. The first one picks the candidates; they are locked (an order, a request or a consent being written for a
+  -- customer holds a share of his row, so the lock waits for it); the second judges the same customers again, with what
+  -- has been committed meanwhile. A customer who got an order between the two is not erased.
+  FOR v_pass IN 1..2 LOOP
+    SELECT coalesce(array_agg(c.id ORDER BY c.id), ARRAY[]::uuid[]),
+           coalesce(array_agg(c.telegram_user_id) FILTER (WHERE c.telegram_user_id IS NOT NULL), ARRAY[]::bigint[])
+      INTO v_customers, v_telegram
+      FROM sales.customers c
+     WHERE (v_pass = 1 OR c.id = ANY (v_customers))
+       AND c.erased_at IS NULL
+       AND EXISTS (SELECT 1 FROM sales.leads l
+                    WHERE l.customer_id = c.id AND l.created_at <= v_cut
+                      AND NOT EXISTS (SELECT 1 FROM sales.orders o WHERE o.lead_id = l.id))
+       AND NOT EXISTS (SELECT 1 FROM sales.orders o WHERE o.customer_id = c.id)
+       AND NOT EXISTS (SELECT 1 FROM sales.leads l
+                        WHERE l.customer_id = c.id
+                          AND (l.created_at > v_cut OR EXISTS (SELECT 1 FROM sales.orders o WHERE o.lead_id = l.id)))
+       AND NOT EXISTS (SELECT 1 FROM sales.configurations cf WHERE cf.customer_id = c.id AND cf.created_at > v_cut)
+       AND NOT EXISTS (SELECT 1 FROM ops.consents k WHERE k.customer_id = c.id AND k.at > v_cut);
+    IF v_pass = 1 THEN
+      PERFORM 1 FROM sales.customers c WHERE c.id = ANY (v_customers) ORDER BY c.id FOR UPDATE;
+    END IF;
+  END LOOP;
 
   WITH due AS (
     SELECT l.id, l.customer_id FROM sales.leads l
@@ -549,15 +633,19 @@ $$;
 -- ---- the retention classes of files -----------------------------------------------------------------------------------
 -- ops.files.retention_class decides how long the row and the bytes stay (DATA-MAP 9):
 --  - lead_12m: 12 months from the day of the file; ai_90d: 90 days; media: for good;
---  - order_warranty_plus_3y and tax_5y: the end of the longest warranty of the orders the file belongs to (ours and the
---    shops') plus 3 years, and never less than 5 years from the day of the file. A file that no order names lives 5 years;
---    a file of an order that has no warranty yet (it is going on) waits; one of an order that ended without a warranty
---    (cancelled, a Podbor) does not.
+--  - order_warranty_plus_3y and tax_5y: 5 years from the day of the file;
+--  - whatever the class says, a file that a document of an order names (by a column, or by an id inside the JSON of the
+--    order: the passport photos, the evidence of a paper act, a claim to a shop) lives until the end of the longest
+--    warranty of that order (ours and the shops') plus 3 years, and never less than 5 years from its day. An order that
+--    has no warranty yet (it is going on) waits; one that ended without a warranty (cancelled, a Podbor) does not. A
+--    wrong class, written by whoever, never shortens the life of a receipt.
 -- The rows go and the function returns their storage keys, so that the worker removes the bytes from the disk. The links
 -- of the documents to a file that goes are emptied first (the quotes, the payments, the reports, the acts, the passports,
 -- the DSR results; the rows of purchase_files are removed): the documents stay, only the file is gone. A file that the
--- catalog, the content or the price lists still use is skipped, so the purge never fails on a link it does not know.
--- The moment is never later than the clock of the database.
+-- catalog, the content (a picture, a frame of the hero scene, a photo of the portfolio) or the price lists still use is
+-- skipped, so the purge never fails on a link it does not know. The caller removes the bytes inside the same transaction,
+-- before the commit (repos/ops.ts purgeExpiredFilesAndRemoveBytes): if the disk fails, the rows come back and the keys
+-- are not lost. The moment is never later than the clock of the database.
 CREATE FUNCTION ops.purge_expired_files(p_now timestamptz DEFAULT now()) RETURNS TABLE (storage_key text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
@@ -565,6 +653,7 @@ DECLARE
   v_ids uuid[];
 BEGIN
   WITH links AS MATERIALIZED (
+    -- The documents of an order name their files by a column ...
     SELECT q.order_id, x.file_id FROM sales.quotes q,
            LATERAL (VALUES (q.pdf_uz_file_id), (q.pdf_ru_file_id)) AS x (file_id) WHERE x.file_id IS NOT NULL
     UNION ALL
@@ -577,12 +666,22 @@ BEGIN
            LATERAL (VALUES (r.pdf_uz_file_id), (r.pdf_ru_file_id)) AS x (file_id) WHERE x.file_id IS NOT NULL
     UNION ALL
     SELECT a.order_id, x.file_id FROM sales.acts a,
-           LATERAL (VALUES (a.pdf_uz_file_id), (a.pdf_ru_file_id),
-                    (CASE WHEN a.evidence ->> 'fileId' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-                          THEN (a.evidence ->> 'fileId')::uuid END)) AS x (file_id) WHERE x.file_id IS NOT NULL
+           LATERAL (VALUES (a.pdf_uz_file_id), (a.pdf_ru_file_id)) AS x (file_id) WHERE x.file_id IS NOT NULL
     UNION ALL
     SELECT b.order_id, x.file_id FROM sales.build_passports b,
            LATERAL (VALUES (b.pdf_uz_file_id), (b.pdf_ru_file_id)) AS x (file_id) WHERE x.file_id IS NOT NULL
+    -- ... and by an id inside the free JSON of the order (the photos of the passport and of the seals, the evidence of a
+    -- paper act, the pictures of a purchase, a claim to a shop). Every text of the shape of an id counts, in any case:
+    -- a text that only looks like one keeps a file longer, never shorter.
+    UNION ALL
+    SELECT j.order_id, lower(m[1])::uuid FROM (
+      SELECT pu.order_id, concat_ws(' ', pu.authenticity::text) AS doc FROM sales.purchases pu
+      UNION ALL SELECT r.order_id, concat_ws(' ', r.lines::text, r.objection::text) FROM sales.commission_reports r
+      UNION ALL SELECT a.order_id, concat_ws(' ', a.lines::text, a.evidence::text) FROM sales.acts a
+      UNION ALL SELECT b.order_id, concat_ws(' ', b.serials::text, b.tests::text, b.photos::text, b.seal_photos::text)
+                  FROM sales.build_passports b
+      UNION ALL SELECT w.order_id, concat_ws(' ', w.vendor_claim::text) FROM sales.warranty_cases w
+    ) j, LATERAL regexp_matches(j.doc, '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', 'g') AS m
   ), ends AS MATERIALIZED (
     SELECT o.id, o.status,
            greatest(o.warranty_until,
@@ -592,21 +691,29 @@ BEGIN
   )
   SELECT coalesce(array_agg(f.id), ARRAY[]::uuid[]) INTO v_ids
     FROM ops.files f
-   WHERE (
-           (f.retention_class = 'lead_12m' AND f.created_at <= v_now - interval '12 months')
-        OR (f.retention_class = 'ai_90d' AND f.created_at <= v_now - interval '90 days')
-        OR (f.retention_class IN ('order_warranty_plus_3y', 'tax_5y')
-            AND f.created_at <= v_now - interval '5 years'
-            AND NOT EXISTS (
-              SELECT 1 FROM links l JOIN ends e ON e.id = l.order_id
-               WHERE l.file_id = f.id
-                 AND ((e.warranty_end IS NULL AND e.status NOT IN ('cancelled', 'closed', 'podbor_delivered'))
-                      OR e.warranty_end + interval '3 years' > v_now)))
-         )
+   WHERE f.retention_class IN ('lead_12m', 'ai_90d', 'order_warranty_plus_3y', 'tax_5y')
+     AND CASE
+           -- A file that a document of an order names lives as long as the order says, whatever its class: not less than
+           -- 5 years from its day, and until the end of the warranty plus 3 years. A wrong class never shortens it.
+           WHEN EXISTS (SELECT 1 FROM links l WHERE l.file_id = f.id) THEN
+             f.created_at <= v_now - interval '5 years'
+             AND NOT EXISTS (
+               SELECT 1 FROM links l JOIN ends e ON e.id = l.order_id
+                WHERE l.file_id = f.id
+                  AND ((e.warranty_end IS NULL AND e.status NOT IN ('cancelled', 'closed', 'podbor_delivered'))
+                       OR e.warranty_end + interval '3 years' > v_now))
+           -- A file no order names goes by its own class.
+           ELSE f.created_at <= v_now - CASE f.retention_class
+                                          WHEN 'lead_12m' THEN interval '12 months'
+                                          WHEN 'ai_90d' THEN interval '90 days'
+                                          ELSE interval '5 years' END
+         END
      AND NOT EXISTS (SELECT 1 FROM catalog.products x WHERE x.image_file_id = f.id)
      AND NOT EXISTS (SELECT 1 FROM content.idea_posts x WHERE x.permission_file_id = f.id)
      AND NOT EXISTS (SELECT 1 FROM content.hero_scene x
-                      WHERE f.id IN (x.poster_file_id, x.video_720_file_id, x.video_1080_file_id, x.video_vertical_file_id))
+                      WHERE f.id IN (x.poster_file_id, x.video_720_file_id, x.video_1080_file_id, x.video_vertical_file_id)
+                         OR position(f.id::text IN lower(x.frames::text)) > 0)
+     AND NOT EXISTS (SELECT 1 FROM content.portfolio_items x WHERE position(f.id::text IN lower(x.photos::text)) > 0)
      AND NOT EXISTS (SELECT 1 FROM pricing.vendors x WHERE x.agreement_file_id = f.id)
      AND NOT EXISTS (SELECT 1 FROM pricing.price_imports x WHERE x.file_id = f.id);
 

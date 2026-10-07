@@ -148,12 +148,31 @@ describe("what the aggregates count", () => {
     expect(numbers((await stateAs(clients.WEB))[0]).purchased - before.purchased).toBe(-300_000);
   });
 
-  it("looks at the moment the caller names, never later than the clock of the database", async () => {
+  it("looks at the moment the admin panel and the worker name, never later than the clock of the database", async () => {
     const now = numbers((await stateAs(clients.ADMIN))[0]);
     const future = numbers((await stateAs(clients.ADMIN, "2999-01-01T00:00:00Z"))[0]);
     expect(future).toEqual(now);
     const past = numbers((await stateAs(clients.ADMIN, "2000-01-01T00:00:00Z"))[0]);
     expect(past).toEqual({ balance: 0, closed: 0, losses: 0, purchased: 0 });
+  });
+
+  it("lets the site and the bot read the present only: the moment they send is ignored, so no bisection by time opens a register", async () => {
+    const yesterday = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const presentBefore = numbers((await stateAs(clients.ADMIN))[0]);
+    const pastBefore = numbers((await stateAs(clients.ADMIN, yesterday))[0]);
+    await migrator.query(
+      "insert into sales.reserve_ledger (fund, amount_sum, reason, at) values ('warranty', 777000, 'contribution', now() - interval '12 hours')",
+    );
+    const present = numbers((await stateAs(clients.ADMIN))[0]);
+    const past = numbers((await stateAs(clients.ADMIN, yesterday))[0]);
+    // The admin panel and the worker see the past: the row of 12 hours ago is not in yesterday.
+    expect(present.balance - presentBefore.balance).toBe(777_000);
+    expect(past.balance).toBe(pastBefore.balance);
+    expect(numbers((await stateAs(clients.WORKER, yesterday))[0])).toEqual(past);
+    for (const role of ["WEB", "BOT"] as const) {
+      expect(numbers((await stateAs(clients[role], yesterday))[0]), role).toEqual(present);
+      expect(numbers((await stateAs(clients[role], "2000-01-01T00:00:00Z"))[0]), role).toEqual(present);
+    }
   });
 
   it("reads a missing moment as now", async () => {
