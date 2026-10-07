@@ -28,6 +28,15 @@ const text = (v: unknown, fallback = ""): string =>
   typeof v === "string" ? v.trim() : typeof v === "number" && Number.isFinite(v) ? String(v) : fallback;
 const whole = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0);
 
+/** The bands of the budget of a request (services/leads: budgetBandOf). */
+const BAND: Record<string, string> = {
+  lt_6_7m: "до 6,7 млн",
+  "6_7m_12m": "6,7–12 млн",
+  "12m_20m": "12–20 млн",
+  "20m_35m": "20–35 млн",
+  gte_35m: "от 35 млн",
+};
+
 const SCOPE: Record<string, string> = { pc: "ПК", pc_periph: "ПК и периферия", setup: "сетап", podbor: "подбор" };
 
 const MISSING = {
@@ -56,7 +65,7 @@ const TEMPLATES: Record<string, Template> = {
   "lead.created": (p) => {
     const parts = [SCOPE[text(p.scope)] ?? "заявка"];
     if (text(p.district) !== "") parts.push(text(p.district));
-    if (text(p.budgetBand) !== "") parts.push(`бюджет ${text(p.budgetBand)}`);
+    if (text(p.budgetBand) !== "") parts.push(`бюджет ${BAND[text(p.budgetBand)] ?? text(p.budgetBand)}`);
     return `Новая заявка ${text(p.number)}: ${parts.join(", ")}`;
   },
 

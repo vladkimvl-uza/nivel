@@ -72,9 +72,9 @@ describe("the texts of the owner (Russian: the owner reads the admin panel in Ru
         number: "L-2026-0007",
         scope: "pc",
         district: "Chilonzor",
-        budgetBand: "10-15",
+        budgetBand: "12m_20m",
       }),
-    ).toBe("Новая заявка L-2026-0007: ПК, Chilonzor, бюджет 10-15");
+    ).toBe("Новая заявка L-2026-0007: ПК, Chilonzor, бюджет 12–20 млн");
     expect(r.render("lead.created", "ru", { number: "L-2026-0008", scope: "setup" })).toBe(
       "Новая заявка L-2026-0008: сетап",
     );
