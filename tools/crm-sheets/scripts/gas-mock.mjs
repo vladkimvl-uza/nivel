@@ -67,7 +67,7 @@ function checkNumberFormat(f) {
   const bad = /[^ymdhsEeaApPMDHSY0-9#?.,%/:;@_*()$+<>=!&~^ -]/.exec(rest);
   if (bad)
     throw new Error(
-      "Exception: Invalid number format pattern " + JSON.stringify(f) + " (unexpected " + JSON.stringify(bad[0]) + ")",
+      `Exception: Invalid number format pattern ${JSON.stringify(f)} (unexpected ${JSON.stringify(bad[0])})`,
     );
 }
 
@@ -425,15 +425,13 @@ class Range {
   }
   setFormulas(m) {
     if (!Array.isArray(m) || m.length !== this.numRows)
-      throw new Error("setFormulas: expected " + this.numRows + " rows in " + this.getA1Notation());
+      throw new Error(`setFormulas: expected ${this.numRows} rows in ${this.getA1Notation()}`);
     this._each((r, c, i, j) => {
       if (!Array.isArray(m[i]) || m[i].length !== this.numCols)
-        throw new Error(
-          "setFormulas: expected " + this.numCols + " columns in row " + i + " of " + this.getA1Notation(),
-        );
+        throw new Error(`setFormulas: expected ${this.numCols} columns in row ${i} of ${this.getA1Notation()}`);
       const f = m[i][j];
       if (typeof f !== "string" || !f.startsWith("="))
-        throw new Error("setFormulas: " + JSON.stringify(f) + " is not a formula (cell " + colToLetter(c) + r + ")");
+        throw new Error(`setFormulas: ${JSON.stringify(f)} is not a formula (cell ${colToLetter(c)}${r})`);
       const cell = this._cell(r, c);
       cell.f = f;
       cell.v = "";
@@ -1206,7 +1204,7 @@ class ChartBuilder {
     if (!spec.ranges.length) throw new Error("Exception: The chart has no data range");
     for (const k of Object.keys(spec.options)) {
       const root = k.split(".")[0];
-      if (!CHART_OPTION_ROOTS.has(root)) throw new Error("Exception: Unknown chart option " + JSON.stringify(k));
+      if (!CHART_OPTION_ROOTS.has(root)) throw new Error(`Exception: Unknown chart option ${JSON.stringify(k)}`);
       // Gridlines exist only on a continuous axis: in a horizontal bar chart the axis of values is hAxis, vAxis lists the categories
       const discrete =
         spec.type === "BAR"
@@ -1214,7 +1212,7 @@ class ChartBuilder {
           : spec.type === "LINE" || spec.type === "COMBO" || spec.type === "COLUMN"
             ? "hAxis"
             : "";
-      if (discrete && (k.startsWith(discrete + ".gridlines") || k.startsWith(discrete + ".minorGridlines")))
+      if (discrete && (k.startsWith(`${discrete}.gridlines`) || k.startsWith(`${discrete}.minorGridlines`)))
         throw new Error(
           "Exception: " +
             k +
@@ -1525,13 +1523,13 @@ function checkFilterCondition(path, cond) {
   if (!cond || typeof cond !== "object") throw sheetsError(path, "condition is missing");
   if (!(cond.type in FILTER_CONDITIONS))
     throw sheetsError(
-      path + ".type",
+      `${path}.type`,
       `condition type ${JSON.stringify(cond.type)} is not supported by filters (data validation only, or unknown)`,
     );
   const values = cond.values || [];
   if (!Array.isArray(values) || values.length !== FILTER_CONDITIONS[cond.type])
     throw sheetsError(
-      path + ".values",
+      `${path}.values`,
       `${cond.type} needs ${FILTER_CONDITIONS[cond.type]} value(s), got ${values.length}`,
     );
   values.forEach((v, i) => {

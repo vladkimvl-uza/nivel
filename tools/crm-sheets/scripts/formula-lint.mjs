@@ -125,7 +125,7 @@ export function sparklineOptions(f) {
   const out = [];
   for (const call of findCalls(f, "SPARKLINE")) {
     const lit = call.args[1];
-    if (!lit || lit[0] !== "{") continue;
+    if (lit?.[0] !== "{") continue;
     const inner = lit.slice(1, -1);
     // rows are separated by ";" outside strings, brackets and braces
     const blank = blankStrings(inner);
