@@ -4,7 +4,7 @@
 import { Text, View } from "@react-pdf/renderer";
 import { createElement as h, type ReactElement } from "react";
 import { amount, day, money, stampOf } from "./format.ts";
-import { DocumentDataError, same, whole, wholeNonNegative } from "./guards.ts";
+import { DocumentDataError, DocumentNumberError, same, whole, wholeNonNegative } from "./guards.ts";
 import { amountRow, type Cell, paperDocument, paragraph, section, style, table } from "./kit.ts";
 import { pdfText, type T } from "./messages.ts";
 import { toPdfBuffer } from "./render.ts";
@@ -21,7 +21,7 @@ function assertAct(kind: ActKind, doc: ActDoc): void {
   assertNoCardNumberDeep(doc);
   for (const [i, l] of doc.lines.entries()) {
     whole(`lines.${i}.qty`, l.qty);
-    if (l.qty < 1) throw new RangeError(`lines.${i}.qty must be at least 1`);
+    if (l.qty < 1) throw new DocumentNumberError(`lines.${i}.qty must be at least 1`);
   }
   for (const [i, r] of (doc.receipts ?? []).entries()) {
     whole(`receipts.${i}.qty`, r.qty);

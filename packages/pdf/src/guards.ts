@@ -10,10 +10,18 @@ export class DocumentDataError extends Error {
   }
 }
 
+/** A number of the data that is not a whole one or not allowed (a fraction of a sum, a negative quantity): a RangeError that no second try mends. */
+export class DocumentNumberError extends RangeError {
+  constructor(message: string) {
+    super(message);
+    this.name = "DocumentNumberError";
+  }
+}
+
 /** A whole number of sums (or of anything counted): no fraction, no NaN, no unsafe integer. */
 export function whole(label: string, value: unknown): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value)) {
-    throw new RangeError(`${label} must be a whole number, got ${String(value)}`);
+    throw new DocumentNumberError(`${label} must be a whole number, got ${String(value)}`);
   }
   return value;
 }
@@ -21,7 +29,7 @@ export function whole(label: string, value: unknown): number {
 /** A whole number from 0 up. */
 export function wholeNonNegative(label: string, value: unknown): number {
   const n = whole(label, value);
-  if (n < 0) throw new RangeError(`${label} must not be negative, got ${n}`);
+  if (n < 0) throw new DocumentNumberError(`${label} must not be negative, got ${n}`);
   return n;
 }
 

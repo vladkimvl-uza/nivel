@@ -4,7 +4,7 @@
 import { Text, View } from "@react-pdf/renderer";
 import { createElement as h, type ReactElement } from "react";
 import { amount, day, money, rate, stampOf } from "./format.ts";
-import { same, whole, wholeNonNegative } from "./guards.ts";
+import { DocumentNumberError, same, whole, wholeNonNegative } from "./guards.ts";
 import { amountRow, band, type Cell, paperDocument, paragraph, section, stamp, style, table, tag } from "./kit.ts";
 import { pdfText, type T } from "./messages.ts";
 import { toPdfBuffer } from "./render.ts";
@@ -18,7 +18,7 @@ function assertQuote(doc: QuoteDoc): void {
   for (const [i, l] of doc.lines.entries()) {
     whole(`lines.${i}.qty`, l.qty);
     wholeNonNegative(`lines.${i}.unitSum`, l.unitSum);
-    if (l.qty < 1) throw new RangeError(`lines.${i}.qty must be at least 1`);
+    if (l.qty < 1) throw new DocumentNumberError(`lines.${i}.qty must be at least 1`);
   }
   const t = doc.totals;
   for (const [k, v] of Object.entries(t)) if (typeof v === "number") wholeNonNegative(`totals.${k}`, v);

@@ -7,7 +7,7 @@
 import { Text, View } from "@react-pdf/renderer";
 import { createElement as h, type ReactElement } from "react";
 import { amount, day, money, stampOf } from "./format.ts";
-import { same, whole, wholeNonNegative } from "./guards.ts";
+import { DocumentNumberError, same, whole, wholeNonNegative } from "./guards.ts";
 import {
   amountRow,
   type Cell,
@@ -39,9 +39,9 @@ function assertReport(doc: CommissionReportDoc): void {
     whole(`lines.${i}.amountSum`, l.amountSum);
     wholeNonNegative(`lines.${i}.discountSum`, l.discountSum);
     wholeNonNegative(`lines.${i}.files`, l.files);
-    if (l.qty < 1) throw new RangeError(`lines.${i}.qty must be at least 1`);
+    if (l.qty < 1) throw new DocumentNumberError(`lines.${i}.qty must be at least 1`);
     if (l.isReturn !== l.amountSum < 0)
-      throw new RangeError(`lines.${i}: a return has a negative sum, a purchase a positive one`);
+      throw new DocumentNumberError(`lines.${i}: a return has a negative sum, a purchase a positive one`);
   }
   // The same rules the database holds (commission_reports_sums_chk) and the report is made from one snapshot of the purchases.
   same("remainder is not received - spent", doc.receivedSum - doc.spentSum, doc.remainderSum);
