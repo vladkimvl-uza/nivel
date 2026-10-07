@@ -242,6 +242,11 @@ export function section(title: string, ...children: ReactNode[]): ReactElement {
   );
 }
 
+/** Content that stays on one page: a short block is moved whole to the next page instead of being cut in two. */
+export function keep(...children: ReactNode[]): ReactElement {
+  return h(View, { wrap: false }, ...children);
+}
+
 export interface Column {
   label: string;
   /** Share of the width. */

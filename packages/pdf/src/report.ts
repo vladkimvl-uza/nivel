@@ -11,6 +11,7 @@ import { same, whole, wholeNonNegative } from "./guards.ts";
 import {
   amountRow,
   type Cell,
+  keep,
   keyValue,
   num,
   paperDocument,
@@ -199,12 +200,14 @@ function body(doc: CommissionReportDoc, t: T, lang: PdfLang): ReactElement[] {
   out.push(
     section(
       t("report.fee.title"),
-      doc.fee ? amountRow(t("quote.fee.commission"), money(doc.fee.commissionLine, lang)) : null,
-      doc.fee ? amountRow(t("quote.fee.works"), money(doc.fee.worksLine, lang)) : null,
-      doc.fee ? amountRow(t("quote.fee.total"), money(doc.fee.total, lang), { strong: true }) : null,
-      paymentRow("fee_advance", doc.feePayments, t, lang),
-      paymentRow("fee_final", doc.feePayments, t, lang),
-      h(Text, { style: { ...style.small, marginTop: 3 } }, t("report.fee.no_vat")),
+      keep(
+        doc.fee ? amountRow(t("quote.fee.commission"), money(doc.fee.commissionLine, lang)) : null,
+        doc.fee ? amountRow(t("quote.fee.works"), money(doc.fee.worksLine, lang)) : null,
+        doc.fee ? amountRow(t("quote.fee.total"), money(doc.fee.total, lang), { strong: true }) : null,
+        paymentRow("fee_advance", doc.feePayments, t, lang),
+        paymentRow("fee_final", doc.feePayments, t, lang),
+        h(Text, { style: { ...style.small, marginTop: 3 } }, t("report.fee.no_vat")),
+      ),
     ),
   );
 
