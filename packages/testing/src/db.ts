@@ -58,12 +58,12 @@ const ident = (name: string) => {
 export const APP_ROLES_WITH_CONNECT = ["nivel_web", "nivel_admin", "nivel_bot", "nivel_worker"] as const;
 
 /**
- * The rights on the database itself, as infra/postgres/init/01-roles.sh gives them to `nivel`: PUBLIC holds nothing, the
- * four application roles may connect, the owner (nivel_migrator) holds the rest. CREATE DATABASE ... TEMPLATE copies
- * the data and not these rights: a clone would keep the defaults of PostgreSQL (CONNECT and TEMP for PUBLIC) and,
- * as it used to, whatever the harness granted by hand, so a test would never see what production refuses
- * (a role that makes a schema or a temporary table). The migrations take care of the rest (REVOKE CREATE of the worker,
- * REVOKE TEMPORARY of PUBLIC) in the template, where they are not copied either.
+ * The rights on the database itself, as `nivel` has them after infra/postgres/init/01-roles.sh and the migrations: PUBLIC
+ * holds nothing, the four application roles may connect and hold nothing else (no CREATE, no TEMP), the owner
+ * (nivel_migrator) holds the rest. CREATE DATABASE ... TEMPLATE copies the data and not these rights, so the REVOKEs of
+ * the migrations stay in the template: a clone would keep the defaults of PostgreSQL (CONNECT and TEMP for PUBLIC) and,
+ * as it used to, whatever the harness granted by hand, and a test would never see what production refuses (a role that
+ * makes a schema or a temporary table).
  */
 export function productionRightsSql(database: string): string[] {
   const db = ident(database);
