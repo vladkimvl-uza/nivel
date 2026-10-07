@@ -440,6 +440,31 @@ function nvEnsureCapacity(sheetKey, neededRow) {
   const add = 500;
   sh.insertRowsAfter(have, add);
   if (typeof nvStyleBody === "function") nvStyleBody(sheetKey, have + 1, have + add);
+  // The lists of order numbers in other sheets point at a fixed range of the orders: put them over the longer one
+  if (sheetKey === "orders") {
+    try {
+      nvRefreshOrderLists();
+    } catch (e) {
+      // The new rows are there; a failure of the list must not stop the write of a row
+      Logger.log("Списки номеров заказов не обновлены: " + (e?.message ? e.message : e));
+    }
+  }
+}
+
+/** A checkbox rule that refuses typed text: the default of setAllowInvalid is true, and the code reads flags as === true. */
+function nvCheckboxRule() {
+  return SpreadsheetApp.newDataValidation().requireCheckbox().setAllowInvalid(false).build();
+}
+
+/**
+ * INDIRECT of the address of a named cell: the reference writes the argument of INDIRECT as "a cell reference, written as
+ * a string", so the address ('Sheet'!C12) is used, never the name. Data validation and conditional formatting reach
+ * another sheet only through INDIRECT.
+ */
+function nvIndirectName(name) {
+  const r = nvSpreadsheet().getRangeByName(name);
+  if (!r) throw new Error("Нет именованного диапазона " + name + ": запустите «Применить оформление»");
+  return 'INDIRECT("' + nvQuoteSheet(r.getSheet().getName()) + "!" + r.getA1Notation() + '")';
 }
 
 /**

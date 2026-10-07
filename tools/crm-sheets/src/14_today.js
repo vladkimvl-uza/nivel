@@ -601,6 +601,9 @@ function nvStyleToday() {
     b.remove();
   });
   const rows = maxRows - L.firstRow + 1;
+  // A fill of a cell is drawn over a banding: the banded blocks lose the fill of the whole sheet first
+  sh.getRange(L.firstRow, 2, rows, 10).setBackground(null);
+  sh.getRange(L.firstRow, NV_TODAY.manualCol, rows, 5).setBackground(null);
   sh.getRange(L.firstRow, 2, rows, 10)
     .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false)
     .setFirstRowColor(T.surface)
@@ -651,6 +654,6 @@ function nvOnTodayEdit(range) {
   const c1 = Math.min(range.getLastColumn(), NV_TODAY.manualCol + 4);
   if (c0 > c1 || range.getLastRow() < NV_TODAY.first) return;
   const first = Math.max(range.getRow(), NV_TODAY.first);
-  const rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+  const rule = nvCheckboxRule();
   sh.getRange(first, NV_TODAY.manualCol + 3, range.getLastRow() - first + 1, 1).setDataValidation(rule);
 }

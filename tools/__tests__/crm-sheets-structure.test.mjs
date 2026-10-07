@@ -281,8 +281,11 @@ describe("validations", () => {
     const sh = sheet("Настройки");
     const layout = JSON.parse(p.run("JSON.stringify(nvSettingsLayout())"));
     const row = (name) => layout.find((x) => x.def.name === name).row;
-    expect(sh._cell(row("NV_PC_LOW_BP"), 3).dv.type).toBe("numberBetween");
-    expect(sh._cell(row("NV_PC_THRESHOLD"), 3).dv.type).toBe("number>=");
+    // Whole numbers are a formula about the cell: the number rules of Sheets do not ask for a whole number
+    const lowBp = sh._cell(row("NV_PC_LOW_BP"), 3).dv;
+    expect(lowBp.type).toBe("formula");
+    expect(lowBp.formula).toContain("<=10000");
+    expect(sh._cell(row("NV_PC_THRESHOLD"), 3).dv.type).toBe("formula");
     expect(sh._cell(row("NV_TAX_RISK_ACTIVE"), 3).dv.type).toBe("checkbox");
   });
 

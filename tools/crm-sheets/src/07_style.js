@@ -387,7 +387,9 @@ function nvConditionalRules(sheetKey, T) {
             ref("created") +
             '<>""; NOW()-' +
             ref("created") +
-            '>INDIRECT("NV_FIRST_RESPONSE_HOURS")/24)',
+            ">" +
+            nvIndirectName("NV_FIRST_RESPONSE_HOURS") +
+            "/24)",
           { bg: T.overdueFill, color: T.overdueText, bold: true },
         ),
       );
@@ -507,7 +509,7 @@ function nvConditionalRules(sheetKey, T) {
       rules.push(
         nvRule(
           R("clientCost"),
-          "=AND(ISNUMBER(" + ref("clientCost") + "); " + ref("clientCost") + '>INDIRECT("NV_CAC_LIMIT"))',
+          "=AND(ISNUMBER(" + ref("clientCost") + "); " + ref("clientCost") + ">" + nvIndirectName("NV_CAC_LIMIT") + ")",
           hot,
         ),
       );

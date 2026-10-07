@@ -148,7 +148,7 @@ function nvBuildPanel() {
       .setAllowInvalid(false)
       .build(),
   );
-  demo.setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
+  demo.setDataValidation(nvCheckboxRule());
   nvSetName(ss, "P_PERIOD", period);
   nvSetName(ss, "P_YEAR", year);
   nvSetName(ss, "P_DEMO", demo);
@@ -361,12 +361,5 @@ function nvStylePanel() {
 
 /** The whole sheet is read-only (a warning) except the three controls. */
 function nvProtectPanel() {
-  const sh = nvSheet("panel");
-  const old = sh.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-  old.forEach((p) => {
-    p.remove();
-  });
-  const p = sh.protect();
-  p.setDescription("Nivel: панель только для чтения, меняются период, год и флажок демо").setWarningOnly(true);
-  p.setUnprotectedRanges([sh.getRange("C3:D3"), sh.getRange("F3"), sh.getRange("I3")]);
+  nvWarnProtect(nvSheet("panel"), "панель только для чтения, меняются период, год и флажок демо", ["C3:D3", "F3", "I3"]);
 }

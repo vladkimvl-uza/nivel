@@ -109,7 +109,7 @@ function nvBuildCalc() {
           .build(),
       );
     } else if (inp.type === "flag") {
-      cell.setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
+      cell.setDataValidation(nvCheckboxRule());
     } else {
       cell.setDataValidation(
         SpreadsheetApp.newDataValidation()
@@ -125,7 +125,7 @@ function nvBuildCalc() {
                 inp.row +
                 ">=0; C" +
                 inp.row +
-                "<=NV_MAX_BUDGET)",
+                "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
             ),
           )
           .setAllowInvalid(false)
@@ -166,7 +166,7 @@ function nvBuildCalc() {
             rv.budget +
             ">=0; C" +
             rv.budget +
-            "<=NV_MAX_BUDGET)",
+            "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
         ),
       )
       .setAllowInvalid(false)

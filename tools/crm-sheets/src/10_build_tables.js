@@ -124,6 +124,19 @@ function nvColumnValidation(sheetKey, col) {
   return null;
 }
 
+/** The checks "number of an existing order" of the sheets that refer to orders, over the whole current range of the orders. */
+function nvRefreshOrderLists() {
+  NV_TABLE_SHEETS.forEach((key) => {
+    const def = NV_SCHEMA[key];
+    const sh = nvSheet(key);
+    def.cols.forEach((c, i) => {
+      if (!c.orderList) return;
+      const rows = sh.getMaxRows() - NV_LAYOUT.firstRow + 1;
+      sh.getRange(NV_LAYOUT.firstRow, NV_LAYOUT.firstCol + i, rows, 1).setDataValidation(nvColumnValidation(key, c));
+    });
+  });
+}
+
 /** Writes headers, formulas, captions, totals, validations and notes of one table sheet. */
 function nvBuildTable(sheetKey) {
   const def = NV_SCHEMA[sheetKey];
@@ -234,7 +247,7 @@ function nvFlagValidations(sheetKey, firstRow, count) {
   if (count <= 0) return;
   const def = NV_SCHEMA[sheetKey];
   const sh = nvSheet(sheetKey);
-  const rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+  const rule = nvCheckboxRule();
   def.cols.forEach((c, i) => {
     if (c.type === "flag") sh.getRange(firstRow, NV_LAYOUT.firstCol + i, count, 1).setDataValidation(rule);
   });

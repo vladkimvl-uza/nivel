@@ -954,6 +954,9 @@ class Sheet {
     return [...this.protections];
   }
   protect() {
+    // The reference: on a sheet that is protected already, protect() returns the protection that exists
+    if (this.sheetProtection) return this.sheetProtection;
+    const sheet = this;
     const p = {
       type: "SHEET",
       warningOnly: false,
@@ -963,11 +966,16 @@ class Sheet {
         p.description = d;
         return p;
       },
+      getDescription() {
+        return p.description;
+      },
       setWarningOnly(b) {
         p.warningOnly = b;
         return p;
       },
       setUnprotectedRanges(r) {
+        if (!Array.isArray(r) || r.some((x) => !x || typeof x.getSheet !== "function" || x.getSheet() !== sheet))
+          throw new Error("Exception: The parameters do not match setUnprotectedRanges(Range): ranges of the same sheet");
         p.unprotected = r;
         return p;
       },

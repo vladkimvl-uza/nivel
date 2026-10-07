@@ -319,7 +319,8 @@ NV_SCHEMA.orders = {
       grp: "report",
       prot: "script",
     }),
-    nvCol("refundDue", "Вернуть остаток до (+5 р. д.)", "dt", 128, { prot: "script", grp: "report" }),
+    // The last column of a group stays outside it: neighbouring groups of one depth would be one group
+    nvCol("refundDue", "Вернуть остаток до (+5 р. д.)", "dt", 128, { prot: "script" }),
     // Stage dates (group, set by the script)
     nvCol("dEstimate", "Смета отправлена", "dt", 128, { prot: "script", grp: "dates" }),
     nvCol("dAccepted", "Принят", "dt", 128, { prot: "script", grp: "dates" }),
@@ -341,7 +342,6 @@ NV_SCHEMA.orders = {
     nvCol("aftercare2", "Сопровождение 30 дн.", "dt", 128, { prot: "script", grp: "dates" }),
     nvCol("shopWarrantyNext", "Ближайший конец гарантии магазинов", "date", 130, {
       prot: "formula",
-      grp: "dates",
       calc: 'IFERROR(IF(MINIFS({purchases.warrantyUntil}; {purchases.order}; [num]; {purchases.warrantyUntil}; ">="&TODAY())=0; ""; MINIFS({purchases.warrantyUntil}; {purchases.order}; [num]; {purchases.warrantyUntil}; ">="&TODAY())); "")',
     }),
     // Cancellation (group)
@@ -355,7 +355,7 @@ NV_SCHEMA.orders = {
     nvCol("losses", "Подтверждённые потери", "sum", 132, { int: true, grp: "cancel" }),
     nvCol("fundsToRefund", "Вернуть денег на закупку", "sum", 140, { prot: "script", grp: "cancel" }),
     nvCol("partsTo", "Детали — кому", "list", 170, { list: "NVD_CANCEL_PARTS", grp: "cancel", prot: "script" }),
-    nvCol("cancelDue", "Вернуть до", "dt", 128, { prot: "script", grp: "cancel" }),
+    nvCol("cancelDue", "Вернуть до", "dt", 128, { prot: "script" }),
     // Taxes and reserves (group)
     nvCol("taxEst", "Налог 1 % (оценка)", "sum", 132, {
       prot: "formula",

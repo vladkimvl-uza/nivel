@@ -7,6 +7,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createProject } from "../crm-sheets/scripts/env.mjs";
+import { calc } from "../crm-sheets/scripts/formula-eval.mjs";
+import { lintFormula } from "../crm-sheets/scripts/formula-lint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, "..", "crm-sheets", "src");
@@ -597,5 +599,277 @@ describe("group 2: number formats and row heights as the reference documents the
       expect(loose, `${name}: rows with growing height`).toEqual([]);
       expect(sh.rowH.size).toBeGreaterThan(20);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// group 3: data validation, protection, banding, column groups
+
+const json = (p, code) => JSON.parse(p.run(`JSON.stringify(${code})`));
+const dvList = (p) => {
+  const seen = new Set();
+  const out = [];
+  for (const sh of p.env.ss.sheets)
+    for (const [k, c] of sh.cells)
+      if (c.dv && !seen.has(c.dv)) {
+        seen.add(c.dv);
+        out.push({ sheet: sh.name, at: k, dv: c.dv });
+      }
+  return out;
+};
+
+function colLetterOf(n) {
+  let s = "";
+  let x = n;
+  while (x > 0) {
+    s = String.fromCharCode(65 + ((x - 1) % 26)) + s;
+    x = Math.floor((x - 1) / 26);
+  }
+  return s;
+}
+
+describe("group 3: whole numbers in the settings are checked as whole numbers", () => {
+  const rowsOf = (p, type) =>
+    json(p, "nvSettingsLayout()").filter((x) => !x.isGroup && x.def.type === type && !x.def.readonly);
+  const accepts = (p, row, value) => {
+    const dv = p.env.ss.getSheetByName("Настройки")._cell(row, 3).dv;
+    expect(dv.type, `row ${row}`).toBe("formula");
+    const ctx = {
+      sheetName: "Настройки",
+      getCell: (_s, r, c) => (r === row && c === 3 ? value : null),
+      maxRows: () => 1000,
+      maxCols: () => 26,
+      named: () => null,
+      now: T0,
+      rowRef: () => null,
+    };
+    try {
+      return calc(dv.formula, ctx) === true;
+    } catch {
+      return false;
+    }
+  };
+
+  it("basis points: 0 to 10 000, whole", () => {
+    const row = rowsOf(built, "bp")[0].row;
+    expect(accepts(built, row, 1500)).toBe(true);
+    expect(accepts(built, row, 0)).toBe(true);
+    expect(accepts(built, row, 10000)).toBe(true);
+    expect(accepts(built, row, 1500.5)).toBe(false);
+    expect(accepts(built, row, -1)).toBe(false);
+    expect(accepts(built, row, 10001)).toBe(false);
+    expect(accepts(built, row, "abc")).toBe(false);
+  });
+
+  it("sums and whole numbers: not below 0, whole (a sum of 12,7 was accepted)", () => {
+    for (const type of ["sum", "int"]) {
+      const row = rowsOf(built, type)[0].row;
+      expect(accepts(built, row, 12), type).toBe(true);
+      expect(accepts(built, row, 0), type).toBe(true);
+      expect(accepts(built, row, 12.7), type).toBe(false);
+      expect(accepts(built, row, -3), type).toBe(false);
+      expect(accepts(built, row, "x"), type).toBe(false);
+    }
+  });
+
+  it("every editable numeric setting has its own rule that names its own row", () => {
+    for (const type of ["bp", "sum", "int"])
+      for (const x of rowsOf(built, type)) {
+        const dv = built.env.ss.getSheetByName("Настройки")._cell(x.row, 3).dv;
+        expect(dv.formula, `${x.def.name}`).toContain(`C${x.row}`);
+      }
+  });
+});
+
+describe("group 3: only the cells that may be typed in are open in a protected sheet", () => {
+  it("no open cell holds a formula; on the settings sheet exactly the editable rows are open", () => {
+    for (const sh of built.env.ss.sheets) {
+      const prot = sh.sheetProtection;
+      if (!prot) continue;
+      for (const r of prot.unprotected)
+        for (let row = r.getRow(); row <= r.getLastRow(); row++)
+          for (let col = r.getColumn(); col <= r.getLastColumn(); col++) {
+            const cell = sh.cells.get(`${row},${col}`);
+            expect(Boolean(cell?.f), `${sh.name}!${colLetterOf(col)}${row} is open and holds a formula`).toBe(false);
+          }
+    }
+    const layout = json(built, "nvSettingsLayout()");
+    const sh = built.env.ss.getSheetByName("Настройки");
+    const open = new Set();
+    for (const r of sh.sheetProtection.unprotected) for (let row = r.getRow(); row <= r.getLastRow(); row++) open.add(row);
+    const editable = layout.filter((x) => !x.isGroup && !x.def.readonly && x.def.type !== "formula").map((x) => x.row);
+    expect([...open].sort((a, b) => a - b)).toEqual(editable);
+  });
+
+  it("the calculator keeps the formula of the reserve closed", () => {
+    const sh = built.env.ss.getSheetByName("Калькулятор");
+    const open = new Set();
+    for (const r of sh.sheetProtection.unprotected) for (let row = r.getRow(); row <= r.getLastRow(); row++) open.add(row);
+    expect(open.has(23)).toBe(true);
+    expect(open.has(24)).toBe(false);
+  });
+});
+
+describe("group 3: protection that the owner set by hand is not removed", () => {
+  it("a sheet protected by hand keeps its protection; the self-check says so and the setup goes on", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const sh = p.env.ss.getSheetByName("Панель");
+    sh.sheetProtection.remove();
+    const own = sh.protect();
+    own.setDescription("Только я правлю панель");
+    p.call("nvProtectPanel");
+    expect(sh.sheetProtection).toBe(own);
+    expect(own.getDescription()).toBe("Только я правлю панель");
+    expect(own.isWarningOnly()).toBe(false);
+    const row = p.call("nvSelfCheckRows").find((r) => r.check === "Защита: Панель");
+    expect(row.result).toBe("Предупреждение");
+  });
+
+  it("our own warning is replaced as before, and no note is left", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    p.call("nvProtectPanel");
+    p.call("nvProtectSpecial");
+    const sh = p.env.ss.getSheetByName("Панель");
+    expect(sh.sheetProtection.getDescription()).toMatch(/^Nivel:/);
+    expect(sh.sheetProtection.isWarningOnly()).toBe(true);
+    expect(p.call("nvSelfCheckRows").some((r) => r.check.startsWith("Защита:"))).toBe(false);
+  });
+
+  it("protect() on a protected sheet returns the existing protection (the mock shows the rule)", () => {
+    const sh = built.env.ss.getSheetByName("Телефон");
+    expect(sh.protect()).toBe(sh.protect());
+  });
+});
+
+describe("group 3: checkboxes refuse typed text", () => {
+  it("every checkbox rule of the book has setAllowInvalid(false)", () => {
+    built.call("nvFlagValidations", "orders", 6, 3);
+    built.call("nvFlagValidations", "payments", 6, 3);
+    const boxes = dvList(built).filter((x) => x.dv.type === "checkbox");
+    expect(boxes.length).toBeGreaterThan(5);
+    expect(boxes.filter((x) => x.dv.allowInvalid !== false).map((x) => `${x.sheet}!${x.at}`)).toEqual([]);
+  });
+});
+
+describe("group 3: the list of order numbers follows the growth of the orders sheet", () => {
+  it("after rows are added to the orders the checks of purchases, payments and warranty reach the new last row", () => {
+    const p = newProject();
+    p.call("nvSetup");
+    const orders = p.env.ss.getSheetByName("Заказы");
+    const before = orders.getMaxRows();
+    p.call("nvEnsureCapacity", "orders", before);
+    const last = orders.getMaxRows();
+    expect(last).toBeGreaterThan(before);
+    for (const key of ["purchases", "payments", "warranty"]) {
+      const sh = p.env.ss.getSheetByName(json(p, `NV_SCHEMA.${key}.title`));
+      const idx = json(p, `NV_SCHEMA.${key}.cols.map((c) => !!c.orderList)`).indexOf(true);
+      const dv = sh._cell(6, 2 + idx).dv;
+      expect(dv.range, key).toMatch(new RegExp(`:[A-Z]+${last}$`));
+      expect(sh._cell(10, 2 + idx).dv).toBe(dv);
+    }
+  });
+});
+
+describe("group 3: column groups of the orders sheet stay separate groups", () => {
+  it("adjacent columns of the same depth form one group: every group has an ungrouped column next to it", () => {
+    const sh = built.env.ss.getSheetByName("Заказы");
+    const groups = json(built, "Object.keys(NV_SCHEMA.orders.groups)");
+    const n = sh.getMaxColumns();
+    const runs = [];
+    let from = null;
+    for (let c = 1; c <= n + 1; c++) {
+      const d = c <= n ? sh.getColumnGroupDepth(c) : 0;
+      if (d > 0 && from === null) from = c;
+      if (d === 0 && from !== null) {
+        runs.push([from, c - 1]);
+        from = null;
+      }
+    }
+    expect(runs).toHaveLength(groups.length);
+  });
+
+  it("each grouped column is collapsed, the others are not grouped", () => {
+    const sh = built.env.ss.getSheetByName("Заказы");
+    const cols = json(built, "NV_SCHEMA.orders.cols.map((c) => c.grp || '')");
+    cols.forEach((g, i) => {
+      expect(sh.getColumnGroupDepth(2 + i) > 0, `${i}`).toBe(Boolean(g));
+      if (g) expect(sh.collapsedCols.has(2 + i)).toBe(true);
+    });
+  });
+});
+
+describe("group 3: banding is not hidden behind a fill of the cells", () => {
+  it("no cell inside a banded range has a fill of its own", () => {
+    const bad = [];
+    for (const sh of built.env.ss.sheets)
+      for (const b of sh.bandings) {
+        const r = b.range;
+        for (let row = r.getRow(); row <= r.getLastRow(); row++)
+          for (let col = r.getColumn(); col <= r.getLastColumn(); col++) {
+            const cell = sh.cells.get(`${row},${col}`);
+            if (cell?.bg) bad.push(`${sh.name}!${colLetterOf(col)}${row}`);
+          }
+      }
+    expect(bad.slice(0, 8), `${bad.length} cells`).toEqual([]);
+    expect(built.env.ss.sheets.flatMap((s) => s.bandings).length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// the formulas of the whole book against the documentation
+
+function allFormulas(p) {
+  const ss = p.env.ss;
+  const out = [];
+  const sheetOfName = (name) => ss.getRangeByName(name)?.getSheet().getName();
+  const seen = new Set();
+  for (const sh of ss.sheets) {
+    const add = (where, at, f) => out.push({ where, sheet: sh.name, at: `${sh.name}!${at}`, f, sheetOfName });
+    for (const [k, c] of sh.cells) {
+      if (c.f) add("cell", k, c.f);
+      if (c.dv && c.dv.type === "formula" && !seen.has(c.dv)) {
+        seen.add(c.dv);
+        add("validation", k, c.dv.formula);
+      }
+    }
+    for (const r of sh.cf) add("format", r.ranges?.[0]?.getA1Notation?.() ?? "", r.formula);
+  }
+  return out;
+}
+
+function lintBook(p, rules) {
+  const bad = [];
+  for (const x of allFormulas(p)) {
+    const found = lintFormula(x.f, {
+      sheet: x.sheet,
+      where: x.where,
+      isOtherSheetName: (n) => {
+        const s = x.sheetOfName(n);
+        return s !== undefined && s !== x.sheet;
+      },
+    }).filter((q) => rules.includes(q.rule));
+    for (const q of found) bad.push(`${x.at} [${x.where}] ${q.rule}: ${q.text}`);
+  }
+  return [...new Set(bad)];
+}
+
+describe("formulas of the book: the documentation of Google, rule by rule", () => {
+  it("another sheet in data validation and conditional formatting only through INDIRECT", () => {
+    expect(lintBook(built, ["other-sheet-name", "other-sheet-ref"])).toEqual([]);
+  });
+
+  it("INDIRECT takes an address, not the name of a range", () => {
+    expect(lintBook(built, ["indirect-name"])).toEqual([]);
+  });
+
+  it("the linter itself finds what it is meant to find", () => {
+    const rules = (f, ctx) => lintFormula(f, ctx).map((q) => q.rule);
+    expect(rules('=INDIRECT("NV_CAC_LIMIT")')).toContain("indirect-name");
+    expect(rules("=INDIRECT(\"'Настройки'!C12\")")).not.toContain("indirect-name");
+    const ctx = { sheet: "Калькулятор", where: "validation", isOtherSheetName: () => true };
+    expect(rules("=C1<=NV_MAX_BUDGET", ctx)).toContain("other-sheet-name");
+    expect(rules("=C1<=INDIRECT(\"'Настройки'!C5\")", ctx)).toEqual([]);
   });
 });

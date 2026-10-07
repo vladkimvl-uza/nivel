@@ -68,19 +68,28 @@ function nvBuildSettings() {
   nvResetSettingsCache();
 }
 
-function nvSettingValidation(r) {
+/**
+ * The rule of one setting cell. requireNumberBetween and requireNumberGreaterThanOrEqualTo do not ask for a whole
+ * number (1500,5 would pass), so whole numbers are a formula about the cell of this row.
+ */
+function nvSettingValidation(r, row) {
   const b = SpreadsheetApp.newDataValidation().setAllowInvalid(false);
+  const cell = "C" + row;
+  const whole = "ISNUMBER(" + cell + "); " + cell + "=INT(" + cell + "); " + cell + ">=0";
   switch (r.type) {
     case "bp":
       return b
-        .requireNumberBetween(0, 10000)
+        .requireFormulaSatisfied(nvApiFormula("=AND(" + whole + "; " + cell + "<=10000)"))
         .setHelpText("Целое число от 0 до 10 000 (базисные пункты, 1500 = 15 %)")
         .build();
     case "sum":
     case "int":
-      return b.requireNumberGreaterThanOrEqualTo(0).setHelpText("Целое число не меньше 0").build();
+      return b
+        .requireFormulaSatisfied(nvApiFormula("=AND(" + whole + ")"))
+        .setHelpText("Целое число не меньше 0")
+        .build();
     case "bool":
-      return SpreadsheetApp.newDataValidation().requireCheckbox().build();
+      return nvCheckboxRule();
     case "date":
       return b.requireDate().setHelpText("Дата").build();
     case "text":
@@ -172,7 +181,9 @@ function nvStyleSettings() {
     }),
   );
   values.setDataValidations(
-    layout.map((x) => [x.isGroup || x.def.readonly || x.def.type === "formula" ? null : nvSettingValidation(x.def)]),
+    layout.map((x) => [
+      x.isGroup || x.def.readonly || x.def.type === "formula" ? null : nvSettingValidation(x.def, x.row),
+    ]),
   );
   sh.getRange(first, NV_SET_COLS.unit, n, 1).setFontColor(T.text2).setHorizontalAlignment("left");
   sh.getRange(first, NV_SET_COLS.name, n, 1).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2);

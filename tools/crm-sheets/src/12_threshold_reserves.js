@@ -187,7 +187,7 @@ function nvBuildThreshold() {
       .setHelpText("Целое число не меньше 0")
       .build();
   sh.getRange("M6:M17").setDataValidation(intRule("M6"));
-  sh.getRange("O6:O17").setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
+  sh.getRange("O6:O17").setDataValidation(nvCheckboxRule());
   sh.getRange("P6:P17").setDataValidation(
     SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build(),
   );
@@ -303,6 +303,8 @@ function nvStyleThreshold() {
   sh.getBandings().forEach((b) => {
     b.remove();
   });
+  // The block was filled above; a fill of a cell is drawn over a banding, so the banded cells lose it
+  sh.getRange(NV_TH.other.first, oc, NV_TH.other.rows, 4).setBackground(null);
   sh.getRange(NV_TH.other.first, oc, NV_TH.other.rows, 4)
     .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false)
     .setFirstRowColor(T.surface)
@@ -310,8 +312,8 @@ function nvStyleThreshold() {
   const solid = { bg: T.overdueFill, color: T.overdueText, bold: true };
   sh.setConditionalFormatRules([
     nvRule(sh.getRange("N6:O17"), "=AND($N6<TODAY(); $O6<>TRUE; $L6>0)", solid),
-    nvRule(sh.getRange("C10:C11"), '=C10*10000>=INDIRECT("NV_ALERT_5")', solid),
-    nvRule(sh.getRange("C10:C11"), '=C10*10000>=INDIRECT("NV_ALERT_2")', { color: T.accentText, bold: true }),
+    nvRule(sh.getRange("C10:C11"), "=C10*10000>=" + nvIndirectName("NV_ALERT_5"), solid),
+    nvRule(sh.getRange("C10:C11"), "=C10*10000>=" + nvIndirectName("NV_ALERT_2"), { color: T.accentText, bold: true }),
     nvRule(sh.getRange("C13"), '=C13="Да"', solid),
   ]);
   sh.setFrozenRows(L.headerRow);

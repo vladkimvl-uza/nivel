@@ -2356,7 +2356,8 @@ NV_SCHEMA.orders = {
       grp: "report",
       prot: "script",
     }),
-    nvCol("refundDue", "Вернуть остаток до (+5 р. д.)", "dt", 128, { prot: "script", grp: "report" }),
+    // The last column of a group stays outside it: neighbouring groups of one depth would be one group
+    nvCol("refundDue", "Вернуть остаток до (+5 р. д.)", "dt", 128, { prot: "script" }),
     // Stage dates (group, set by the script)
     nvCol("dEstimate", "Смета отправлена", "dt", 128, { prot: "script", grp: "dates" }),
     nvCol("dAccepted", "Принят", "dt", 128, { prot: "script", grp: "dates" }),
@@ -2378,7 +2379,6 @@ NV_SCHEMA.orders = {
     nvCol("aftercare2", "Сопровождение 30 дн.", "dt", 128, { prot: "script", grp: "dates" }),
     nvCol("shopWarrantyNext", "Ближайший конец гарантии магазинов", "date", 130, {
       prot: "formula",
-      grp: "dates",
       calc: 'IFERROR(IF(MINIFS({purchases.warrantyUntil}; {purchases.order}; [num]; {purchases.warrantyUntil}; ">="&TODAY())=0; ""; MINIFS({purchases.warrantyUntil}; {purchases.order}; [num]; {purchases.warrantyUntil}; ">="&TODAY())); "")',
     }),
     // Cancellation (group)
@@ -2392,7 +2392,7 @@ NV_SCHEMA.orders = {
     nvCol("losses", "Подтверждённые потери", "sum", 132, { int: true, grp: "cancel" }),
     nvCol("fundsToRefund", "Вернуть денег на закупку", "sum", 140, { prot: "script", grp: "cancel" }),
     nvCol("partsTo", "Детали — кому", "list", 170, { list: "NVD_CANCEL_PARTS", grp: "cancel", prot: "script" }),
-    nvCol("cancelDue", "Вернуть до", "dt", 128, { prot: "script", grp: "cancel" }),
+    nvCol("cancelDue", "Вернуть до", "dt", 128, { prot: "script" }),
     // Taxes and reserves (group)
     nvCol("taxEst", "Налог 1 % (оценка)", "sum", 132, {
       prot: "formula",
@@ -3407,6 +3407,31 @@ function nvEnsureCapacity(sheetKey, neededRow) {
   const add = 500;
   sh.insertRowsAfter(have, add);
   if (typeof nvStyleBody === "function") nvStyleBody(sheetKey, have + 1, have + add);
+  // The lists of order numbers in other sheets point at a fixed range of the orders: put them over the longer one
+  if (sheetKey === "orders") {
+    try {
+      nvRefreshOrderLists();
+    } catch (e) {
+      // The new rows are there; a failure of the list must not stop the write of a row
+      Logger.log("Списки номеров заказов не обновлены: " + (e?.message ? e.message : e));
+    }
+  }
+}
+
+/** A checkbox rule that refuses typed text: the default of setAllowInvalid is true, and the code reads flags as === true. */
+function nvCheckboxRule() {
+  return SpreadsheetApp.newDataValidation().requireCheckbox().setAllowInvalid(false).build();
+}
+
+/**
+ * INDIRECT of the address of a named cell: the reference writes the argument of INDIRECT as "a cell reference, written as
+ * a string", so the address ('Sheet'!C12) is used, never the name. Data validation and conditional formatting reach
+ * another sheet only through INDIRECT.
+ */
+function nvIndirectName(name) {
+  const r = nvSpreadsheet().getRangeByName(name);
+  if (!r) throw new Error("Нет именованного диапазона " + name + ": запустите «Применить оформление»");
+  return 'INDIRECT("' + nvQuoteSheet(r.getSheet().getName()) + "!" + r.getA1Notation() + '")';
 }
 
 /**
@@ -3860,7 +3885,9 @@ function nvConditionalRules(sheetKey, T) {
             ref("created") +
             '<>""; NOW()-' +
             ref("created") +
-            '>INDIRECT("NV_FIRST_RESPONSE_HOURS")/24)',
+            ">" +
+            nvIndirectName("NV_FIRST_RESPONSE_HOURS") +
+            "/24)",
           { bg: T.overdueFill, color: T.overdueText, bold: true },
         ),
       );
@@ -3980,7 +4007,7 @@ function nvConditionalRules(sheetKey, T) {
       rules.push(
         nvRule(
           R("clientCost"),
-          "=AND(ISNUMBER(" + ref("clientCost") + "); " + ref("clientCost") + '>INDIRECT("NV_CAC_LIMIT"))',
+          "=AND(ISNUMBER(" + ref("clientCost") + "); " + ref("clientCost") + ">" + nvIndirectName("NV_CAC_LIMIT") + ")",
           hot,
         ),
       );
@@ -4686,19 +4713,28 @@ function nvBuildSettings() {
   nvResetSettingsCache();
 }
 
-function nvSettingValidation(r) {
+/**
+ * The rule of one setting cell. requireNumberBetween and requireNumberGreaterThanOrEqualTo do not ask for a whole
+ * number (1500,5 would pass), so whole numbers are a formula about the cell of this row.
+ */
+function nvSettingValidation(r, row) {
   const b = SpreadsheetApp.newDataValidation().setAllowInvalid(false);
+  const cell = "C" + row;
+  const whole = "ISNUMBER(" + cell + "); " + cell + "=INT(" + cell + "); " + cell + ">=0";
   switch (r.type) {
     case "bp":
       return b
-        .requireNumberBetween(0, 10000)
+        .requireFormulaSatisfied(nvApiFormula("=AND(" + whole + "; " + cell + "<=10000)"))
         .setHelpText("Целое число от 0 до 10 000 (базисные пункты, 1500 = 15 %)")
         .build();
     case "sum":
     case "int":
-      return b.requireNumberGreaterThanOrEqualTo(0).setHelpText("Целое число не меньше 0").build();
+      return b
+        .requireFormulaSatisfied(nvApiFormula("=AND(" + whole + ")"))
+        .setHelpText("Целое число не меньше 0")
+        .build();
     case "bool":
-      return SpreadsheetApp.newDataValidation().requireCheckbox().build();
+      return nvCheckboxRule();
     case "date":
       return b.requireDate().setHelpText("Дата").build();
     case "text":
@@ -4790,7 +4826,9 @@ function nvStyleSettings() {
     }),
   );
   values.setDataValidations(
-    layout.map((x) => [x.isGroup || x.def.readonly || x.def.type === "formula" ? null : nvSettingValidation(x.def)]),
+    layout.map((x) => [
+      x.isGroup || x.def.readonly || x.def.type === "formula" ? null : nvSettingValidation(x.def, x.row),
+    ]),
   );
   sh.getRange(first, NV_SET_COLS.unit, n, 1).setFontColor(T.text2).setHorizontalAlignment("left");
   sh.getRange(first, NV_SET_COLS.name, n, 1).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2);
@@ -4950,6 +4988,19 @@ function nvColumnValidation(sheetKey, col) {
   return null;
 }
 
+/** The checks "number of an existing order" of the sheets that refer to orders, over the whole current range of the orders. */
+function nvRefreshOrderLists() {
+  NV_TABLE_SHEETS.forEach((key) => {
+    const def = NV_SCHEMA[key];
+    const sh = nvSheet(key);
+    def.cols.forEach((c, i) => {
+      if (!c.orderList) return;
+      const rows = sh.getMaxRows() - NV_LAYOUT.firstRow + 1;
+      sh.getRange(NV_LAYOUT.firstRow, NV_LAYOUT.firstCol + i, rows, 1).setDataValidation(nvColumnValidation(key, c));
+    });
+  });
+}
+
 /** Writes headers, formulas, captions, totals, validations and notes of one table sheet. */
 function nvBuildTable(sheetKey) {
   const def = NV_SCHEMA[sheetKey];
@@ -5060,7 +5111,7 @@ function nvFlagValidations(sheetKey, firstRow, count) {
   if (count <= 0) return;
   const def = NV_SCHEMA[sheetKey];
   const sh = nvSheet(sheetKey);
-  const rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+  const rule = nvCheckboxRule();
   def.cols.forEach((c, i) => {
     if (c.type === "flag") sh.getRange(firstRow, NV_LAYOUT.firstCol + i, count, 1).setDataValidation(rule);
   });
@@ -6131,7 +6182,7 @@ function nvBuildThreshold() {
       .setHelpText("Целое число не меньше 0")
       .build();
   sh.getRange("M6:M17").setDataValidation(intRule("M6"));
-  sh.getRange("O6:O17").setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
+  sh.getRange("O6:O17").setDataValidation(nvCheckboxRule());
   sh.getRange("P6:P17").setDataValidation(
     SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build(),
   );
@@ -6247,6 +6298,8 @@ function nvStyleThreshold() {
   sh.getBandings().forEach((b) => {
     b.remove();
   });
+  // The block was filled above; a fill of a cell is drawn over a banding, so the banded cells lose it
+  sh.getRange(NV_TH.other.first, oc, NV_TH.other.rows, 4).setBackground(null);
   sh.getRange(NV_TH.other.first, oc, NV_TH.other.rows, 4)
     .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false)
     .setFirstRowColor(T.surface)
@@ -6254,8 +6307,8 @@ function nvStyleThreshold() {
   const solid = { bg: T.overdueFill, color: T.overdueText, bold: true };
   sh.setConditionalFormatRules([
     nvRule(sh.getRange("N6:O17"), "=AND($N6<TODAY(); $O6<>TRUE; $L6>0)", solid),
-    nvRule(sh.getRange("C10:C11"), '=C10*10000>=INDIRECT("NV_ALERT_5")', solid),
-    nvRule(sh.getRange("C10:C11"), '=C10*10000>=INDIRECT("NV_ALERT_2")', { color: T.accentText, bold: true }),
+    nvRule(sh.getRange("C10:C11"), "=C10*10000>=" + nvIndirectName("NV_ALERT_5"), solid),
+    nvRule(sh.getRange("C10:C11"), "=C10*10000>=" + nvIndirectName("NV_ALERT_2"), { color: T.accentText, bold: true }),
     nvRule(sh.getRange("C13"), '=C13="Да"', solid),
   ]);
   sh.setFrozenRows(L.headerRow);
@@ -6494,7 +6547,7 @@ function nvBuildCalc() {
           .build(),
       );
     } else if (inp.type === "flag") {
-      cell.setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
+      cell.setDataValidation(nvCheckboxRule());
     } else {
       cell.setDataValidation(
         SpreadsheetApp.newDataValidation()
@@ -6510,7 +6563,7 @@ function nvBuildCalc() {
                 inp.row +
                 ">=0; C" +
                 inp.row +
-                "<=NV_MAX_BUDGET)",
+                "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
             ),
           )
           .setAllowInvalid(false)
@@ -6551,7 +6604,7 @@ function nvBuildCalc() {
             rv.budget +
             ">=0; C" +
             rv.budget +
-            "<=NV_MAX_BUDGET)",
+            "<=" + nvIndirectName("NV_MAX_BUDGET") + ")",
         ),
       )
       .setAllowInvalid(false)
@@ -7392,6 +7445,9 @@ function nvStyleToday() {
     b.remove();
   });
   const rows = maxRows - L.firstRow + 1;
+  // A fill of a cell is drawn over a banding: the banded blocks lose the fill of the whole sheet first
+  sh.getRange(L.firstRow, 2, rows, 10).setBackground(null);
+  sh.getRange(L.firstRow, NV_TODAY.manualCol, rows, 5).setBackground(null);
   sh.getRange(L.firstRow, 2, rows, 10)
     .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false)
     .setFirstRowColor(T.surface)
@@ -7442,7 +7498,7 @@ function nvOnTodayEdit(range) {
   const c1 = Math.min(range.getLastColumn(), NV_TODAY.manualCol + 4);
   if (c0 > c1 || range.getLastRow() < NV_TODAY.first) return;
   const first = Math.max(range.getRow(), NV_TODAY.first);
-  const rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+  const rule = nvCheckboxRule();
   sh.getRange(first, NV_TODAY.manualCol + 3, range.getLastRow() - first + 1, 1).setDataValidation(rule);
 }
 
@@ -7597,7 +7653,7 @@ function nvBuildPanel() {
       .setAllowInvalid(false)
       .build(),
   );
-  demo.setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
+  demo.setDataValidation(nvCheckboxRule());
   nvSetName(ss, "P_PERIOD", period);
   nvSetName(ss, "P_YEAR", year);
   nvSetName(ss, "P_DEMO", demo);
@@ -7810,14 +7866,7 @@ function nvStylePanel() {
 
 /** The whole sheet is read-only (a warning) except the three controls. */
 function nvProtectPanel() {
-  const sh = nvSheet("panel");
-  const old = sh.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-  old.forEach((p) => {
-    p.remove();
-  });
-  const p = sh.protect();
-  p.setDescription("Nivel: панель только для чтения, меняются период, год и флажок демо").setWarningOnly(true);
-  p.setUnprotectedRanges([sh.getRange("C3:D3"), sh.getRange("F3"), sh.getRange("I3")]);
+  nvWarnProtect(nvSheet("panel"), "панель только для чтения, меняются период, год и флажок демо", ["C3:D3", "F3", "I3"]);
 }
 
 // ===== 16_charts.js =====
@@ -12174,29 +12223,65 @@ function nvFilterViews() {
   return { created: created, failed: failed };
 }
 
+/**
+ * The protection of a whole sheet, as a warning of Nivel. A protection that is not ours (set by hand, or no longer a
+ * warning) is never removed: protect() on a protected sheet returns the existing protection, so it would be overwritten.
+ * Such a sheet is skipped and the self-check says so. Returns the protection, or null when the sheet was skipped.
+ */
+function nvWarnProtect(sh, text, open) {
+  const note = "Защита: " + sh.getName();
+  const ours = [];
+  let foreign = null;
+  sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach((p) => {
+    if (String(p.getDescription()).indexOf("Nivel:") === 0 && p.isWarningOnly()) ours.push(p);
+    else foreign = p;
+  });
+  if (foreign) {
+    nvSetupNote(
+      note,
+      "лист уже защищён вручную («" + String(foreign.getDescription()).slice(0, 80) + "»): защита Nivel не поставлена, чужая не тронута",
+    );
+    return null;
+  }
+  nvSetupNote(note, "");
+  ours.forEach((p) => {
+    p.remove();
+  });
+  const p = sh.protect();
+  p.setDescription("Nivel: " + text).setWarningOnly(true);
+  if (open?.length) p.setUnprotectedRanges(open.map((a1) => sh.getRange(a1)));
+  return p;
+}
+
+/** A1 ranges of the settings the owner may change: not a heading, not read-only, not a formula. */
+function nvSettingsOpenRanges() {
+  const open = nvSettingsLayout().filter((x) => !x.isGroup && !x.def.readonly && x.def.type !== "formula");
+  const out = [];
+  let i = 0;
+  while (i < open.length) {
+    let j = i;
+    while (j + 1 < open.length && open[j + 1].row === open[j].row + 1) j += 1;
+    out.push(i === j ? "C" + open[i].row : "C" + open[i].row + ":C" + open[j].row);
+    i = j + 1;
+  }
+  return out;
+}
+
 /** Protections of the special sheets: a warning, nothing is locked. */
 function nvProtectSpecial() {
   const ss = nvSpreadsheet();
   const lock = (key, text, open) => {
     const sh = ss.getSheetByName(NV_SN[key]);
-    if (!sh) return;
-    sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach((p) => {
-      p.remove();
-    });
-    const p = sh.protect();
-    p.setDescription("Nivel: " + text).setWarningOnly(true);
-    if (open?.length) p.setUnprotectedRanges(open.map((a1) => sh.getRange(a1)));
+    if (sh) nvWarnProtect(sh, text, open);
   };
   lock("dict", "справочники правит только владелец", []);
-  lock("settings", "настройки правит только владелец; каждое изменение пишется в «Историю»", [
-    "C6:C" + (NV_LAYOUT.firstRow + NV_SETTINGS.length),
-  ]);
+  lock("settings", "настройки правит только владелец; каждое изменение пишется в «Историю»", nvSettingsOpenRanges());
   lock("threshold", "формулы порога и налогов", [
     "M6:M17",
     "O6:P17",
     "R6:U" + (NV_TH.other.first + NV_TH.other.rows - 1),
   ]);
-  lock("calc", "ввод только в светлые ячейки", ["C6:C13", "C23:C24"]);
+  lock("calc", "ввод только в светлые ячейки", ["C6:C13", "C23"]);
   lock("today", "список собирают формулы; мои задачи справа", ["M6:Q" + 305]);
   lock("phone", "только чтение: цифры берутся из тех же ячеек, что и на панели", []);
   lock("data", "служебный лист", []);

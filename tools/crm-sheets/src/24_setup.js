@@ -217,29 +217,65 @@ function nvFilterViews() {
   return { created: created, failed: failed };
 }
 
+/**
+ * The protection of a whole sheet, as a warning of Nivel. A protection that is not ours (set by hand, or no longer a
+ * warning) is never removed: protect() on a protected sheet returns the existing protection, so it would be overwritten.
+ * Such a sheet is skipped and the self-check says so. Returns the protection, or null when the sheet was skipped.
+ */
+function nvWarnProtect(sh, text, open) {
+  const note = "Защита: " + sh.getName();
+  const ours = [];
+  let foreign = null;
+  sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach((p) => {
+    if (String(p.getDescription()).indexOf("Nivel:") === 0 && p.isWarningOnly()) ours.push(p);
+    else foreign = p;
+  });
+  if (foreign) {
+    nvSetupNote(
+      note,
+      "лист уже защищён вручную («" + String(foreign.getDescription()).slice(0, 80) + "»): защита Nivel не поставлена, чужая не тронута",
+    );
+    return null;
+  }
+  nvSetupNote(note, "");
+  ours.forEach((p) => {
+    p.remove();
+  });
+  const p = sh.protect();
+  p.setDescription("Nivel: " + text).setWarningOnly(true);
+  if (open?.length) p.setUnprotectedRanges(open.map((a1) => sh.getRange(a1)));
+  return p;
+}
+
+/** A1 ranges of the settings the owner may change: not a heading, not read-only, not a formula. */
+function nvSettingsOpenRanges() {
+  const open = nvSettingsLayout().filter((x) => !x.isGroup && !x.def.readonly && x.def.type !== "formula");
+  const out = [];
+  let i = 0;
+  while (i < open.length) {
+    let j = i;
+    while (j + 1 < open.length && open[j + 1].row === open[j].row + 1) j += 1;
+    out.push(i === j ? "C" + open[i].row : "C" + open[i].row + ":C" + open[j].row);
+    i = j + 1;
+  }
+  return out;
+}
+
 /** Protections of the special sheets: a warning, nothing is locked. */
 function nvProtectSpecial() {
   const ss = nvSpreadsheet();
   const lock = (key, text, open) => {
     const sh = ss.getSheetByName(NV_SN[key]);
-    if (!sh) return;
-    sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach((p) => {
-      p.remove();
-    });
-    const p = sh.protect();
-    p.setDescription("Nivel: " + text).setWarningOnly(true);
-    if (open?.length) p.setUnprotectedRanges(open.map((a1) => sh.getRange(a1)));
+    if (sh) nvWarnProtect(sh, text, open);
   };
   lock("dict", "справочники правит только владелец", []);
-  lock("settings", "настройки правит только владелец; каждое изменение пишется в «Историю»", [
-    "C6:C" + (NV_LAYOUT.firstRow + NV_SETTINGS.length),
-  ]);
+  lock("settings", "настройки правит только владелец; каждое изменение пишется в «Историю»", nvSettingsOpenRanges());
   lock("threshold", "формулы порога и налогов", [
     "M6:M17",
     "O6:P17",
     "R6:U" + (NV_TH.other.first + NV_TH.other.rows - 1),
   ]);
-  lock("calc", "ввод только в светлые ячейки", ["C6:C13", "C23:C24"]);
+  lock("calc", "ввод только в светлые ячейки", ["C6:C13", "C23"]);
   lock("today", "список собирают формулы; мои задачи справа", ["M6:Q" + 305]);
   lock("phone", "только чтение: цифры берутся из тех же ячеек, что и на панели", []);
   lock("data", "служебный лист", []);
