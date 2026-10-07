@@ -29,7 +29,7 @@ function nvOrderState(o, payments, purchases, orders, s, holidays) {
   const set = s || nvSettings();
   const q = nvComputeQuote(nvOrderInputs(o), set);
   const own = (payments || []).filter((p) => p.order === o.num);
-  const confirmed = (p) => p.status === "Подтверждён";
+  const confirmed = (p) => nvPaymentCounts(p);
   const sumOf = (pred) => own.filter((p) => confirmed(p) && pred(p)).reduce((a, p) => a + (Number(p.amount) || 0), 0);
   const kindOf = (p) => nvPaymentKindByLabel(p.kind);
   const groupOf = (p) => (kindOf(p) ? kindOf(p).group : "");

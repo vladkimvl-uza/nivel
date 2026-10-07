@@ -114,6 +114,8 @@ function nvBuildThreshold() {
     '"; ' +
     P("status") +
     '; "Подтверждён"; ' +
+    P("check") +
+    '; "ОК"; ' +
     P("date") +
     '; ">="&' +
     m +

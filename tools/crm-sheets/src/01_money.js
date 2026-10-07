@@ -19,6 +19,7 @@ const NV_DEFAULTS = {
   minPc: 6700000,
   minWindow: 4500000,
   minSetup: 13300000,
+  minUpgrade: 4000000,
   stageSelectionBp: 2000,
   stagePurchaseBp: 3000,
   stageAssemblyBp: 3500,
@@ -63,9 +64,13 @@ const NV_DEFAULTS = {
   taxRiskBp: 100,
   taxRiskActive: true,
   cacLimit: 500000,
+  worsePct: 20,
   cycleTargetDays: 10,
   maxBudget: 1000000000000,
   hmacSkewSec: 300,
+  xolisWithholds: true,
+  xolisWithdrawBp: 100,
+  alertAckPct: 0,
 };
 
 /** Cancellation points: code, statuses, the share of the fee earned. */
@@ -181,6 +186,8 @@ function nvEligibility(kind, basePc, baseMount, freeWindow, s) {
   if (kind === "Подбор") return "«Подбор»";
   const base = basePc + baseMount;
   if (kind === "Сетап") return base >= s.minSetup ? "Полный цикл" : "Сетап ниже минимума";
+  // An upgrade is a new order by the full scheme and the same scale, from an estimate of 4 million (DECISIONS R-26)
+  if (kind === "Апгрейд") return base >= s.minUpgrade ? "Полный цикл" : "Только «Подбор»";
   if (base >= s.minPc) return "Полный цикл";
   if (base >= s.minWindow) return freeWindow ? "Только в свободное окно" : "Только «Подбор»: окна нет";
   return "Только «Подбор»";
@@ -353,6 +360,32 @@ function nvWorkingHoursBetween(from, to, holidays, fromHm, toHm) {
     day += NV_DAY_MS;
   }
   return total / 3600000;
+}
+
+/**
+ * The moment when `hours` working hours have passed since `from`: the count starts at the opening of the nearest window
+ * (a lead of 23:00 is counted from 10:00 of the next working day), the end of a day carries the rest to the next working
+ * day. The inverse of nvWorkingHoursBetween.
+ */
+function nvAddWorkingHours(from, hours, holidays, fromHm, toHm) {
+  const open = nvParseHm(fromHm || "10:00");
+  const close = nvParseHm(toHm || "19:00");
+  let left = hours * 3600000;
+  let day = nvMidnight(from);
+  let cursor = from.getTime();
+  for (let guard = 0; guard < 400; guard++) {
+    if (nvIsWorkingDay(nvIsoDate(new Date(day)), holidays)) {
+      const a = Math.max(cursor, day + open * 60000);
+      const b = day + close * 60000;
+      if (b > a) {
+        if (left <= b - a) return new Date(a + left);
+        left -= b - a;
+      }
+    }
+    day += NV_DAY_MS;
+    cursor = day;
+  }
+  throw new RangeError("addWorkingHours: no working day within a year");
 }
 
 /** True inside the response hours of a working day. */
@@ -622,4 +655,12 @@ function nvCheckPayment(kindLabel, method, status, receiptNo) {
   if (k.group === "Плата" && status === "Подтверждён" && String(receiptNo || "").trim() === "")
     return "Нужен фискальный чек";
   return "ОК";
+}
+
+/**
+ * Does a payment count as money (received or returned)? Only a confirmed one whose pair of kind and method is allowed
+ * (and, for a fee, with the fiscal receipt): the same rule as the column "Проверка" and the sums of the sheets.
+ */
+function nvPaymentCounts(p) {
+  return p.status === "Подтверждён" && nvCheckPayment(p.kind, p.method, p.status, p.receipt) === "ОК";
 }

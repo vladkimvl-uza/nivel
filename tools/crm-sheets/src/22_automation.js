@@ -69,7 +69,8 @@ function nvNotifyOwner(text) {
       if (res.getResponseCode() === 200) return { ok: true, via: "telegram" };
       Logger.log("Telegram: HTTP " + res.getResponseCode());
     } catch (e) {
-      Logger.log("Telegram: " + (e?.message ? e.message : "ошибка отправки"));
+      // The text of a network error carries the address, and the address carries the token of the bot
+      Logger.log("Telegram: " + nvScrub(e?.message ? e.message : "ошибка отправки", [token]));
     }
   }
   const mail = props.getProperty(NV_PROP.ownerEmail);
@@ -78,7 +79,7 @@ function nvNotifyOwner(text) {
       MailApp.sendEmail(mail, "Nivel CRM", text);
       return { ok: true, via: "mail" };
     } catch (e) {
-      Logger.log("Mail: " + (e?.message ? e.message : "ошибка отправки"));
+      Logger.log("Mail: " + nvScrub(e?.message ? e.message : "ошибка отправки", [token]));
     }
   }
   return { ok: false, via: "" };
@@ -93,39 +94,75 @@ function nvNotifyOwner(text) {
 function nvHourlyJob(opts) {
   const o = opts || {};
   const now = nvNow();
-  const s = nvSettings();
-  const holidays = nvHolidays();
-  const result = { expired: 0, deemed: 0, closed: 0, reminders: 0, skipped: false };
-  if (!o.force && !nvIsResponseHours(now, holidays, s.responseFrom, s.responseTo)) {
-    result.skipped = true;
+  const result = { expired: 0, deemed: 0, closed: 0, reminders: 0, skipped: false, busy: false };
+  // The cheap exit first: Sunday and the hours outside the window are decided without reading a sheet (the window is
+  // remembered in a document property each time the settings are read). Holidays can only shorten it, so a "no" here is final.
+  if (!o.force) {
+    const w = nvRememberedWindow();
+    if (!nvIsResponseHours(now, [], w.from, w.to)) {
+      result.skipped = true;
+      return result;
+    }
+  }
+  try {
+    return nvCached(() => {
+      const s = nvSettings();
+      const holidays = nvHolidays();
+      if (!o.force && !nvIsResponseHours(now, holidays, s.responseFrom, s.responseTo)) {
+        result.skipped = true;
+        return result;
+      }
+      nvWithLock(() => {
+        nvReadTable("orders").forEach((order) => {
+          if (order.demo === true && !o.demo) return;
+          const ctxOrder = order;
+          if (ctxOrder.code === "estimate_sent") {
+            const until = nvToDate(ctxOrder.validUntil);
+            if (until && now.getTime() > until.getTime()) {
+              const r = nvApplyOrderEvent(ctxOrder.num, "EXPIRE", { actor: "system", now: now });
+              if (r.ok) result.expired += 1;
+            }
+          } else if (ctxOrder.code === "report_sent") {
+            const until = nvToDate(ctxOrder.objectionUntil);
+            const open = nvStr(ctxOrder.objection) !== "";
+            const accepted = nvStr(ctxOrder.reportAccepted);
+            if (until && now.getTime() > until.getTime() && !open && (accepted === "Нет" || accepted === "")) {
+              const r = nvApplyOrderEvent(ctxOrder.num, "REPORT_DEEMED_ACCEPTED", { actor: "system", now: now });
+              if (r.ok) result.deemed += 1;
+            }
+          } else if (ctxOrder.code === "handed_over") {
+            const r = nvApplyOrderEvent(ctxOrder.num, "CLOSE", { actor: "system", now: now });
+            if (r.ok) result.closed += 1;
+          }
+        });
+        result.reminders = nvUrgentReminders(now, s, holidays);
+        nvWebhookHourlySummary(now);
+      });
+      return result;
+    });
+  } catch (err) {
+    if (!nvIsLockError(err)) throw err;
+    // Another execution holds the book: the next hour does the same work
+    result.busy = true;
     return result;
   }
-  nvWithLock(() => {
-    nvReadTable("orders").forEach((order) => {
-      if (order.demo === true && !o.demo) return;
-      const ctxOrder = order;
-      if (ctxOrder.code === "estimate_sent") {
-        const until = nvToDate(ctxOrder.validUntil);
-        if (until && now.getTime() > until.getTime()) {
-          const r = nvApplyOrderEvent(ctxOrder.num, "EXPIRE", { actor: "system", now: now });
-          if (r.ok) result.expired += 1;
-        }
-      } else if (ctxOrder.code === "report_sent") {
-        const until = nvToDate(ctxOrder.objectionUntil);
-        const open = nvStr(ctxOrder.objection) !== "";
-        const accepted = nvStr(ctxOrder.reportAccepted);
-        if (until && now.getTime() > until.getTime() && !open && (accepted === "Нет" || accepted === "")) {
-          const r = nvApplyOrderEvent(ctxOrder.num, "REPORT_DEEMED_ACCEPTED", { actor: "system", now: now });
-          if (r.ok) result.deemed += 1;
-        }
-      } else if (ctxOrder.code === "handed_over") {
-        const r = nvApplyOrderEvent(ctxOrder.num, "CLOSE", { actor: "system", now: now });
-        if (r.ok) result.closed += 1;
-      }
-    });
-    result.reminders = nvUrgentReminders(now, s, holidays);
-  });
-  return result;
+}
+
+/** The window of the response hours as it was when the settings were last read; the defaults before that. */
+function nvRememberedWindow() {
+  let from = NV_DEFAULTS.responseFrom;
+  let to = NV_DEFAULTS.responseTo;
+  try {
+    const v = String(nvDocProps().getProperty("NV_RESP_WINDOW") || "");
+    const m = /^(\d\d:\d\d)-(\d\d:\d\d)$/.exec(v);
+    if (m) {
+      from = m[1];
+      to = m[2];
+    }
+  } catch (e) {
+    // the defaults stay
+  }
+  return { from: from, to: to };
 }
 
 /** Urgent reminders in Telegram: a lead without a reply, a report at the hard deadline, a warranty reply due today. Each once. */
@@ -189,7 +226,7 @@ function nvThresholdEntries(includeDemo) {
     if (d && Number(p.amount) > 0) entries.push({ kind: "receipt", amount: Number(p.amount), date: d });
   });
   nvReadTable("payments").forEach((p) => {
-    if ((!includeDemo && p.demo === true) || p.status !== "Подтверждён") return;
+    if ((!includeDemo && p.demo === true) || !nvPaymentCounts(p)) return;
     const k = nvPaymentKindByLabel(p.kind);
     const d = iso(p.date);
     if (!k || !d) return;
@@ -232,7 +269,9 @@ function nvDigestText(now) {
   lines.push("");
   lines.push("Просрочено: " + overdue.length + ", на сегодня: " + today.length);
   show.forEach((t) => {
-    lines.push("• " + (t.num ? t.num + " " : "") + t.what + (t.sum ? " · " + nvMoneyText(t.sum) : ""));
+    // The text of a step is the owner's own words (it can hold a name or a phone): the digest only says that a term is due
+    const what = t.code === "next_step" ? "срок следующего шага" : t.what;
+    lines.push("• " + (t.num ? t.num + " " : "") + what + (t.sum ? " · " + nvMoneyText(t.sum) : ""));
   });
   // Expected payments
   const expected = nvReadTable("payments").filter((p) => p.demo !== true && p.status === "Ожидается");
@@ -262,7 +301,7 @@ function nvDigestText(now) {
   };
   const newLeads = nvReadTable("leads").filter((l) => l.demo !== true && within(l.created)).length;
   const paid = nvReadTable("payments").filter(
-    (p) => p.demo !== true && p.status === "Подтверждён" && within(p.confirmedAt || p.date),
+    (p) => p.demo !== true && nvPaymentCounts(p) && within(p.confirmedAt || p.date),
   );
   const receipts = nvReadTable("purchases").filter((p) => p.demo !== true && within(p.bought));
   lines.push("");
@@ -336,7 +375,10 @@ function nvLastWorkingDay(d, holidays) {
   return day;
 }
 
-/** The list of "Сегодня" as read from the sheet (the spilled formula): [{due, state, what, object, num, sum}]. */
+/**
+ * The list of "Сегодня" as read from the sheet (the spilled formula): [{due, what, num, sum, state, object, client, code}].
+ * The rows of the demo (numbers with the letter D: L-2026-D001) are not in it, whatever the switch of the panel says.
+ */
 function nvReadTodayList() {
   let sh;
   try {
@@ -346,11 +388,22 @@ function nvReadTodayList() {
   }
   const rows = Math.max(0, sh.getMaxRows() - NV_TODAY.first + 1);
   if (!rows) return [];
-  const vals = sh.getRange(NV_TODAY.first, 2, rows, 8).getValues();
+  const vals = sh.getRange(NV_TODAY.first, NV_TODAY_COL.due, rows, 8).getValues();
   const out = [];
   vals.forEach((r) => {
-    if (nvStr(r[1]) === "") return;
-    out.push({ due: r[0], state: r[1], what: r[2], object: r[3], num: nvStr(r[4]), sum: Number(r[6]) || 0 });
+    if (nvStr(r[4]) === "") return;
+    const num = nvStr(r[2]);
+    if (/-D\d{3,}$/.test(num)) return;
+    out.push({
+      due: r[0],
+      what: r[1],
+      num: num,
+      sum: Number(r[3]) || 0,
+      state: r[4],
+      object: r[5],
+      client: r[6],
+      code: nvStr(r[7]),
+    });
   });
   return out;
 }
@@ -369,25 +422,39 @@ function nvDailyDigest(opts) {
 
 /* ---------------------------------------------------------------- weekly copy and monthly cleaning */
 
-/** A copy of the book in the Drive folder «Nivel CRM — копии»; the last eight are kept. */
+/**
+ * A copy of the book in the Drive folder «Nivel CRM — копии»; the last eight are kept. This is the only thing in the project
+ * that needs the full access to the Drive (the scope "drive": a copy into a folder and the removal of the old copies). If the
+ * access is not given, or the copy fails, the owner is told once a week and the rest of the book works as it did.
+ */
 function nvWeeklyBackup() {
   const s = nvSettings();
   if (s.backupOn !== true) return { ok: false, reason: "выключено" };
-  const ss = nvSpreadsheet();
-  const folderName = "Nivel CRM — копии";
-  const it = DriveApp.getFoldersByName(folderName);
-  const folder = it.hasNext() ? it.next() : DriveApp.createFolder(folderName);
-  const name = "Nivel CRM " + nvFormat(nvNow(), "yyyy-MM-dd");
-  DriveApp.getFileById(ss.getId()).makeCopy(name, folder);
-  const files = [];
-  const iter = folder.getFiles();
-  while (iter.hasNext()) files.push(iter.next());
-  files.sort((a, b) => a.getDateCreated().getTime() - b.getDateCreated().getTime());
-  const keep = Math.max(1, Number(s.backupKeep) || 8);
-  files.slice(0, Math.max(0, files.length - keep)).forEach((f) => {
-    f.setTrashed(true);
-  });
-  return { ok: true, kept: Math.min(files.length, keep) };
+  try {
+    const ss = nvSpreadsheet();
+    const folderName = "Nivel CRM — копии";
+    const it = DriveApp.getFoldersByName(folderName);
+    const folder = it.hasNext() ? it.next() : DriveApp.createFolder(folderName);
+    const name = "Nivel CRM " + nvFormat(nvNow(), "yyyy-MM-dd");
+    DriveApp.getFileById(ss.getId()).makeCopy(name, folder);
+    const files = [];
+    const iter = folder.getFiles();
+    while (iter.hasNext()) files.push(iter.next());
+    files.sort((a, b) => a.getDateCreated().getTime() - b.getDateCreated().getTime());
+    const keep = Math.max(1, Number(s.backupKeep) || 8);
+    files.slice(0, Math.max(0, files.length - keep)).forEach((f) => {
+      f.setTrashed(true);
+    });
+    return { ok: true, kept: Math.min(files.length, keep) };
+  } catch (err) {
+    const text = nvScrub(err?.message ? err.message : err);
+    Logger.log("Копия книги: " + text);
+    nvNotifyOwner(
+      "Копия книги на Диск не сделана: нет доступа к Диску или ошибка Google. Копию можно выключить в «Настройках» (Еженедельная копия книги на Drive). " +
+        text.slice(0, 150),
+    );
+    return { ok: false, reason: "нет доступа к Диску или ошибка: " + text.slice(0, 120) };
+  }
 }
 
 /** On the first of the month: the journal of the webhook older than 12 months is cleaned; leads without an order are reminded. */
@@ -490,7 +557,7 @@ function nvSecretEmailUi() {
 /** A new webhook key: 32 random bytes in base64. The old key stays valid for seven days as the previous one. */
 function nvGenerateHmacSecret() {
   const raw = Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid() + String(nvNow().getTime());
-  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw);
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw, Utilities.Charset.UTF_8);
   return Utilities.base64Encode(digest);
 }
 

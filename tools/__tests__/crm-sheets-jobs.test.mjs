@@ -182,27 +182,27 @@ describe("the owner is told by Telegram, and by mail if Telegram fails", () => {
 
 describe("the daily digest", () => {
   beforeAll(() => {
-    // Rows of the sheet «Сегодня» as the formulas would give them
+    // Rows of the sheet «Сегодня» as the formulas would give them: term, what, number, sum, state, object, client, rule
     const sh = sheet("Сегодня");
     [
       [
         "03.11.2026",
-        "Просрочено",
         "Отправить отчёт о закупке (цель 24 ч)",
-        "Заказ",
         "NV-2026-0900",
-        "Тайный Клиент",
         5_000_000,
+        "Просрочено",
+        "Заказ",
+        "Тайный Клиент",
         "report_due",
       ],
       [
         "04.11.2026",
-        "Сегодня",
         "Можно начинать закупку",
-        "Заказ",
         "NV-2026-0901",
-        "Другой Имя",
         20_600_000,
+        "Сегодня",
+        "Заказ",
+        "Другой Имя",
         "can_purchase",
       ],
     ].forEach((row, i) => {

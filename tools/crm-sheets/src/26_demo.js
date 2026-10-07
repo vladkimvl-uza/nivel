@@ -108,7 +108,7 @@ const NV_DEMO_ORDERS = [
       testing: 3,
     },
     ratio: 99,
-    next: "Сдать после теста 8 ч",
+    next: "Сдать по акту после теста 8 ч",
     nextOffset: -2,
   },
   {
@@ -120,7 +120,7 @@ const NV_DEMO_ORDERS = [
     district: "Алмазарский",
     t: { created: 16, sent: 15, accepted: 14, adv: 14, funds: 14, start: 11, done: 7, report: 2 },
     ratio: 96,
-    next: "Возражения до",
+    next: "Узнать, есть ли возражения по отчёту",
     nextOffset: 1,
   },
   {
@@ -135,7 +135,7 @@ const NV_DEMO_ORDERS = [
     district: "Мирабадский",
     t: { created: 13, sent: 12, accepted: 10, adv: 10, funds: 9, start: 5 },
     ratio: 55,
-    next: "Закупка, чеки",
+    next: "Записать чеки закупки",
     nextOffset: 1,
   },
   {
@@ -147,7 +147,7 @@ const NV_DEMO_ORDERS = [
     district: "Шайхантахурский",
     t: { created: 6, sent: 5, accepted: 4, adv: 4 },
     ratio: 0,
-    next: "Аванс и деньги на закупку",
+    next: "Напомнить об авансе и деньгах на закупку",
     nextOffset: 2,
   },
   {
@@ -160,7 +160,7 @@ const NV_DEMO_ORDERS = [
     district: "Учтепинский",
     t: { created: 1, sent: 1 },
     ratio: 0,
-    next: "Смета действует до",
+    next: "Спросить клиента про смету",
     nextOffset: 0,
   },
 ];

@@ -1,6 +1,7 @@
 /**
  * The eight charts of "Панель". They are built and rebuilt by the script from the series of "_Данные", in the colours of
- * the chosen theme: one orange series, comparisons in warm graphite, no rainbow, no legend with many colours, no 3D.
+ * the chosen theme: asphalt and warm graphite, no rainbow, no legend with many colours, no 3D. Orange is on three lines
+ * only, the ones that mark a limit or a miss: the plan of the year, the stages with an overdue step, the cycle above the target.
  * Colours per bar are not available in Apps Script charts, so stages are split into two series (in time / overdue).
  */
 
@@ -28,11 +29,11 @@ function nvChartCommon(T, title, legend) {
   };
 }
 
-/** Composition palette: shades of asphalt and paper, orange only for "Подбор". */
+/** Composition palette: four shades of asphalt and paper. A kind of an order is a category, not a deviation: no orange. */
 function nvCompositionColors(T) {
   const night = T === NV_THEMES.night;
   // Order of the series: ПК, Сетап, Подбор, Апгрейд
-  return night ? ["#F1EFEA", "#A9A59C", T.accent, "#6B6862"] : ["#1D1D1B", "#6E695F", T.accent, "#A9A59C"];
+  return night ? ["#F1EFEA", "#A9A59C", "#6B6862", "#46423C"] : ["#1D1D1B", "#6E695F", "#A9A59C", "#D6D2C8"];
 }
 
 /** Specification of the eight charts: type, ranges in "_Данные", options. */
@@ -45,7 +46,7 @@ function nvChartSpecs(T) {
       type: "COMBO",
       ranges: ["A" + D.monthHead + ":C" + (D.months + 11)],
       options: c("Плата по месяцам, млн сум", true, {
-        series: { 0: { type: "bars", color: T.text }, 1: { type: "line", color: T.accent, lineWidth: 2 } },
+        series: { 0: { type: "bars", color: T.text }, 1: { type: "line", color: T.compare, lineWidth: 2 } },
         "vAxis.format": "0.#",
       }),
     },
@@ -55,9 +56,9 @@ function nvChartSpecs(T) {
       ranges: ["A" + D.dealHead + ":E" + (D.deals + 11)],
       options: c("Сделки года против порога, млн сум", true, {
         series: {
-          0: { color: T.accent, lineWidth: 2 },
-          1: { color: T.accent, lineWidth: 2, lineDashStyle: [4, 4] },
-          2: { color: T.compare, lineWidth: 1, lineDashStyle: [2, 3] },
+          0: { color: T.text, lineWidth: 2 },
+          1: { color: T.compare, lineWidth: 2, lineDashStyle: [4, 4] },
+          2: { color: T.accent, lineWidth: 1, lineDashStyle: [2, 3] },
           3: { color: T.compare, lineWidth: 1, lineDashStyle: [6, 3] },
         },
         "vAxis.format": "0",
@@ -69,7 +70,7 @@ function nvChartSpecs(T) {
       ranges: ["A" + D.funnelHead + ":C" + (D.funnel + 4)],
       options: c("Воронка за период", false, {
         isStacked: true,
-        series: { 0: { color: T.compare }, 1: { color: T.accent } },
+        series: { 0: { color: T.compare }, 1: { color: T.text } },
         "vAxis.textStyle": { color: T.text, fontSize: 9 },
       }),
     },
@@ -78,7 +79,7 @@ function nvChartSpecs(T) {
       type: "BAR",
       ranges: ["A" + D.topHead + ":C" + (D.top + 7)],
       options: c("Заявки и заказы по каналам", true, {
-        series: { 0: { color: T.compare }, 1: { color: T.accent } },
+        series: { 0: { color: T.compare }, 1: { color: T.text } },
         "vAxis.textStyle": { color: T.text, fontSize: 9 },
       }),
     },
@@ -86,7 +87,7 @@ function nvChartSpecs(T) {
       id: "stages_now",
       type: "BAR",
       ranges: ["A" + D.stageHead + ":C" + (D.stages + 5)],
-      options: c("Заказы по этапам сейчас", true, {
+      options: c("Открытые заказы по этапам сейчас", true, {
         isStacked: true,
         series: { 0: { color: T.text }, 1: { color: T.accent } },
         "vAxis.textStyle": { color: T.text, fontSize: 9 },

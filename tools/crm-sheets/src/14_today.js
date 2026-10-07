@@ -6,6 +6,21 @@
 
 const NV_TODAY = { first: 6, manualCol: 13 };
 
+/**
+ * Rules that only warn ("the warranty ends in 30 days", the aftercare, the credit of «Подбор», a border of the threshold):
+ * they are not tasks with a term that can be missed. After their date they are shown as «Предупреждение», without red,
+ * and only for NV_WARN_GRACE_DAYS days; before it they show with the other tasks in the window of seven days.
+ */
+const NV_SOFT_RULES = [
+  "order_warranty_end",
+  "shop_warranty_end",
+  "aftercare_7",
+  "aftercare_30",
+  "podbor_credit",
+  "threshold_alert",
+];
+const NV_WARN_GRACE_DAYS = 2;
+
 function nvSheetGid(sheetKey) {
   return nvSheet(sheetKey).getSheetId();
 }
@@ -54,7 +69,7 @@ function nvTaskRules() {
           sheet: "leads",
           keyCol: "num",
           code: "lead_no_reply",
-          due: L("created") + "+NV_FIRST_RESPONSE_HOURS/24",
+          due: L("replyDue"),
           text: nvQ("Ответить на новую заявку"),
           object: "Заявка",
           num: L("num"),
@@ -231,14 +246,14 @@ function nvTaskRules() {
           "aftercare_7",
           O("aftercare1"),
           nvQ("Сопровождение: 7 дней после сдачи, спросить, как работает сетап"),
-          [O("aftercare1") + '<>""', O("aftercare1") + ">=TODAY()-2"],
+          [O("aftercare1") + '<>""', O("aftercare1") + ">=TODAY()-" + NV_WARN_GRACE_DAYS],
           O("grand"),
         ),
         orderBlock(
           "aftercare_30",
           O("aftercare2"),
           nvQ("Сопровождение: 30 дней после сдачи, спросить об отзыве"),
-          [O("aftercare2") + '<>""', O("aftercare2") + ">=TODAY()-2"],
+          [O("aftercare2") + '<>""', O("aftercare2") + ">=TODAY()-" + NV_WARN_GRACE_DAYS],
           O("grand"),
         ),
       ],
@@ -250,7 +265,7 @@ function nvTaskRules() {
           "order_warranty_end",
           O("warrantyUntil") + "-30",
           nvQ("Гарантия заказа истекает через 30 дней"),
-          [O("warrantyUntil") + '<>""', O("warrantyUntil") + ">=TODAY()"],
+          [O("warrantyUntil") + '<>""', O("warrantyUntil") + "-30>=TODAY()-" + NV_WARN_GRACE_DAYS],
           O("grand"),
         ),
       ],
@@ -258,18 +273,13 @@ function nvTaskRules() {
     {
       code: "shop_warranty_end",
       blocks: [
-        {
-          sheet: "purchases",
-          keyCol: "id",
-          code: "shop_warranty_end",
-          due: Pu("warrantyUntil") + "-30",
-          text: nvQ("Гарантия магазина истекает через 30 дней"),
-          object: "Закупка",
-          num: Pu("id"),
-          client: clientOfPurchase,
-          amount: Pu("amount"),
-          conds: [Pu("warrantyUntil") + '<>""', Pu("warrantyUntil") + ">=TODAY()"],
-        },
+        orderBlock(
+          "shop_warranty_end",
+          O("shopWarrantyNext") + "-30",
+          nvQ("Гарантия магазинов по заказу истекает через 30 дней (ближайшая)"),
+          [O("shopWarrantyNext") + '<>""', O("shopWarrantyNext") + "-30>=TODAY()-" + NV_WARN_GRACE_DAYS],
+          O("grand"),
+        ),
       ],
     },
     {
@@ -340,7 +350,11 @@ function nvTaskRules() {
           "podbor_credit",
           O("podborUntil") + "-7",
           nvQ("Зачёт «Подбора» истекает через 7 дней: предложить заказ"),
-          [O("code") + '="podbor_delivered"', O("podborUntil") + '<>""', O("podborUntil") + ">=TODAY()"],
+          [
+            O("code") + '="podbor_delivered"',
+            O("podborUntil") + '<>""',
+            O("podborUntil") + "-7>=TODAY()-" + NV_WARN_GRACE_DAYS,
+          ],
           O("podborFee"),
         ),
       ],
@@ -366,7 +380,7 @@ function nvTaskRules() {
           formula:
             'ARRAYFORMULA(IFERROR(FILTER({TODAY()\\"Порог года: пройден рубеж "&TEXT(MAX(FILTER(NV_ALERTS_BP;TH_SHARE*10000>=NV_ALERTS_BP))/100;"0")&" %"\\"Порог"\\""\\""\\TH_VOLUME\\"threshold_alert"\\"#gid=' +
             nvSheetGid("threshold") +
-            '"}; {TH_SHARE*10000>=NV_ALERT_1}); ' +
+            '"}; {AND(TH_SHARE*10000>=NV_ALERT_1; MAX(FILTER(NV_ALERTS_BP; TH_SHARE*10000>=NV_ALERTS_BP))/100>NV_ALERT_ACK_PCT)}); ' +
             "{" +
             new Array(8).fill('""').join("\\") +
             "}))",
@@ -401,7 +415,16 @@ function nvTaxTasksFormula() {
   const url = '"#gid=' + nvSheetGid("threshold") + '"';
   const taxPrev = nvKpiRowRef("taxdue");
   const rows = [
-    [day15, '"Уплатить налог с оборота 1 % за прошлый месяц"', '"Налоги"', '""', '""', taxPrev, '"tax_turnover"', url],
+    [
+      day15,
+      'IF(NV_XOLIS_WITHHOLDS; "Сверить налог 1 %, удержанный Xolis за прошлый месяц, с расчётом бухгалтера"; "Уплатить налог с оборота 1 % за прошлый месяц")',
+      '"Налоги"',
+      '""',
+      '""',
+      taxPrev,
+      '"tax_turnover"',
+      url,
+    ],
     [day15, '"Уплатить социальный налог"', '"Налоги"', '""', '""', "NV_SOCIAL_TAX", '"tax_social"', url],
     [
       lastWorking,
@@ -442,9 +465,15 @@ function nvTasksFormula() {
   return "=VSTACK(" + parts.join("; ") + ")";
 }
 
-/** The formula of the list on "Сегодня". */
+/**
+ * The formula of the list on "Сегодня". The columns of _Задачи are 1 term, 2 what, 3 object, 4 number, 5 client, 6 sum,
+ * 7 code of the rule, 8 link. The list shows: term, what to do, number, sum, state, object, client, rule, link. For a phone
+ * the first two columns are the ones that matter. A «Шаг» of the owner is dropped when the same number has a line of a rule
+ * in the window. A warning (see NV_SOFT_RULES) whose date has passed is «Предупреждение», not «Просрочено».
+ */
 function nvTodayFormula() {
   const tasks = nvQuoteSheet(NV_SN.tasks);
+  const soft = "ISNUMBER(MATCH(c; {" + NV_SOFT_RULES.map((c) => '"' + c + '"').join(";") + "}; 0))";
   return (
     "=IFERROR(LET(t; SORT(FILTER(" +
     tasks +
@@ -452,25 +481,32 @@ function nvTodayFormula() {
     tasks +
     '!$A$2:$A<>""; ' +
     tasks +
-    "!$A$2:$A<=TODAY()+7); 1; TRUE); HSTACK(" +
-    'MAP(INDEX(t;;1); LAMBDA(d; TEXT(d; IF(MOD(d;1)=0; "dd.mm.yyyy"; "dd.mm.yyyy hh:mm")))); ' +
-    'MAP(INDEX(t;;1); LAMBDA(d; IFS(IF(MOD(d;1)=0; d<TODAY(); d<NOW()); "Просрочено"; INT(d)=TODAY(); "Сегодня"; INT(d)=TODAY()+1; "Завтра"; TRUE; "На неделе"))); ' +
-    'CHOOSECOLS(t; 2; 3; 4; 5; 6; 7; 8))); "")'
+    "!$A$2:$A<=TODAY()+7); 1; TRUE); " +
+    'u; FILTER(t; MAP(INDEX(t;;4); INDEX(t;;7); LAMBDA(n; c; OR(c<>"next_step"; n=""; COUNTIFS(INDEX(t;;4); n; INDEX(t;;7); "<>next_step")=0)))); ' +
+    "HSTACK(" +
+    'MAP(INDEX(u;;1); LAMBDA(d; TEXT(d; IF(MOD(d;1)=0; "dd.mm.yyyy"; "dd.mm.yyyy hh:mm")))); ' +
+    "CHOOSECOLS(u; 2; 4; 6); " +
+    "MAP(INDEX(u;;1); INDEX(u;;7); LAMBDA(d; c; IFS(IF(MOD(d;1)=0; d<TODAY(); d<NOW()); IF(" +
+    soft +
+    '; "Предупреждение"; "Просрочено"); INT(d)=TODAY(); "Сегодня"; INT(d)=TODAY()+1; "Завтра"; TRUE; "На неделе"))); ' +
+    'CHOOSECOLS(u; 3; 5; 7; 8))); "")'
   );
 }
 
+/** Columns of the list of "Сегодня" (B..K) in the order a phone needs; the number of the column is 2 + index. */
 const NV_TODAY_HEADS = [
   "Срок",
-  "Состояние срока",
   "Что сделать",
-  "Объект",
   "Номер",
-  "Клиент",
   "Сумма, сум",
+  "Состояние срока",
+  "Объект",
+  "Клиент",
   "Правило",
   "Ссылка",
   "Перейти",
 ];
+const NV_TODAY_COL = { due: 2, what: 3, num: 4, sum: 5, state: 6, object: 7, client: 8, rule: 9, link: 10, open: 11 };
 const NV_TODAY_MANUAL_HEADS = ["Дата", "Задача", "Номер", "Готово", "Заметка"];
 
 function nvBuildTasks() {
@@ -500,21 +536,24 @@ function nvBuildToday() {
   );
   sh.getRange(3, 2).setFormula(
     nvApiFormula(
-      '=COUNTIF($C$6:$C;"Просрочено")&" просрочено · "&COUNTIF($C$6:$C;"Сегодня")&" на сегодня · "&COUNTIF($C$6:$C;"Завтра")&" на завтра · "&COUNTIF($C$6:$C;"На неделе")&" на неделе   ·   правила сроков домена, источники — все листы"',
+      '=COUNTIF($F$6:$F;"Просрочено")&" просрочено · "&COUNTIF($F$6:$F;"Сегодня")&" на сегодня · "&COUNTIF($F$6:$F;"Завтра")&" на завтра · "&COUNTIF($F$6:$F;"На неделе")&" на неделе · "&COUNTIF($F$6:$F;"Предупреждение")&" предупреждений"',
     ),
   );
   const rows = sh.getMaxRows() - NV_TODAY.first + 1;
   sh.getRange(NV_TODAY.first, NV_TODAY.manualCol, rows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build(),
   );
-  sh.getRange(L.headerRow, 3).setNote("Просрочено: срок прошёл. Сегодня, Завтра, На неделе: ближайшие дни.");
-  sh.getRange(L.headerRow, 9).setNote("Код правила из «_Задачи».");
+  sh.getRange(L.headerRow, NV_TODAY_COL.state).setNote(
+    "Просрочено: срок прошёл. Предупреждение: дата напоминания прошла, но ничего не пропущено. Сегодня, Завтра, На неделе: ближайшие дни.",
+  );
+  sh.getRange(L.headerRow, NV_TODAY_COL.rule).setNote("Код правила из «_Задачи»; столбец скрыт.");
 }
 
 function nvStyleToday() {
   const sh = nvSheet("today");
   const T = nvThemeFor("today");
   const L = NV_LAYOUT;
+  const C = NV_TODAY_COL;
   const maxRows = sh.getMaxRows();
   const maxCols = sh.getMaxColumns();
   sh.getRange(1, 1, maxRows, maxCols)
@@ -524,17 +563,19 @@ function nvStyleToday() {
     .setFontColor(T.text)
     .setVerticalAlignment("middle");
   sh.setColumnWidth(1, L.gutterWidth);
-  [140, 120, 360, 90, 128, 150, 132, 130, 16, 90, 16, 104, 260, 128, 70, 240].forEach((w, i) => {
+  // The first two columns (gutter + term + what to do) are 408 px: they fit the screen of a phone (412 px) at once
+  [112, 280, 120, 124, 118, 84, 140, 130, 16, 90, 16, 104, 260, 128, 70, 240].forEach((w, i) => {
     sh.setColumnWidth(2 + i, w);
   });
   sh.setColumnWidths(18, Math.max(1, maxCols - 17), L.gutterWidth);
-  sh.hideColumns(10);
+  sh.hideColumns(C.rule);
+  sh.hideColumns(C.link);
   sh.setRowHeight(1, L.rowHeights.top);
   sh.setRowHeight(2, L.rowHeights.title);
   sh.setRowHeight(3, L.rowHeights.caption);
   sh.setRowHeight(4, 24);
   sh.setRowHeight(L.headerRow, L.rowHeights.header);
-  sh.setRowHeights(L.firstRow, maxRows - L.firstRow + 1, 28);
+  sh.setRowHeights(L.firstRow, maxRows - L.firstRow + 1, 34);
   sh.getRange(2, L.firstCol).setRichTextValue(nvTitleRich("Сегодня", T, 18));
   sh.getRange(3, L.firstCol).setFontSize(9).setFontColor(T.text2).setWrap(false);
   [
@@ -570,29 +611,35 @@ function nvStyleToday() {
     .setSecondRowColor(T.band);
   nvRowLines(sh.getRange(L.firstRow, 2, rows, 10), T.rowLine);
   nvRowLines(sh.getRange(L.firstRow, NV_TODAY.manualCol, rows, 5), T.rowLine);
-  sh.getRange(L.firstRow, 2, rows, 2).setFontFamily(NV_FONT_MONO).setFontSize(10);
-  sh.getRange(L.firstRow, 3, rows, 1).setFontFamily(NV_FONT_TEXT).setFontWeight("bold");
-  sh.getRange(L.firstRow, 6, rows, 1).setFontFamily(NV_FONT_MONO);
-  sh.getRange(L.firstRow, 8, rows, 1)
+  // Term and number are figures; what to do is text and wraps to the second line (a phone shows 280 px of it)
+  sh.getRange(L.firstRow, C.due, rows, 1).setFontFamily(NV_FONT_MONO).setFontSize(10);
+  sh.getRange(L.firstRow, C.what, rows, 1).setFontFamily(NV_FONT_TEXT).setFontWeight("bold").setWrap(true);
+  sh.getRange(L.firstRow, C.num, rows, 1).setFontFamily(NV_FONT_MONO);
+  sh.getRange(L.firstRow, C.sum, rows, 1)
     .setFontFamily(NV_FONT_MONO)
     .setNumberFormat(NV_FMT.sum)
     .setHorizontalAlignment("right");
-  sh.getRange(L.firstRow, 9, rows, 1).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2);
-  sh.getRange(L.firstRow, 11, rows, 1).setFontColor(T.accentText).setFontWeight("bold");
+  sh.getRange(L.firstRow, C.state, rows, 1).setFontFamily(NV_FONT_TEXT).setFontSize(9);
+  sh.getRange(L.firstRow, C.rule, rows, 1).setFontFamily(NV_FONT_MONO).setFontSize(9).setFontColor(T.text2);
+  // «Открыть» is a link, in the colour of the text: the orange stays for what is worse than the norm
+  sh.getRange(L.firstRow, C.open, rows, 1).setFontColor(T.text).setFontLine("underline");
   sh.getRange(L.firstRow, NV_TODAY.manualCol, rows, 1).setNumberFormat(NV_FMT.date).setFontFamily(NV_FONT_MONO);
   sh.getRange(L.firstRow, NV_TODAY.manualCol + 2, rows, 1).setFontFamily(NV_FONT_MONO);
   sh.getRange(L.firstRow, NV_TODAY.manualCol + 3, rows, 1).setHorizontalAlignment("center");
-  const state = sh.getRange(L.firstRow, 3, rows, 1);
+  const state = sh.getRange(L.firstRow, C.state, rows, 1);
+  const block = sh.getRange(L.firstRow, C.due, rows, 5);
   const manual = sh.getRange(L.firstRow, NV_TODAY.manualCol, rows, 5);
   sh.setConditionalFormatRules([
-    nvRule(state, '=$C6="Просрочено"', { bg: T.overdueFill, color: T.overdueText, bold: true }),
-    nvRule(state, '=$C6="Сегодня"', { color: T.accentText, bold: true }),
-    nvRule(state, '=$C6="На неделе"', { color: T.text2 }),
-    nvRule(sh.getRange(L.firstRow, 2, rows, 1), '=$C6="Просрочено"', { color: T.accentText, bold: true }),
+    // The state is the colour: overdue is the only solid fill, today is orange text, a warning is quiet grey
+    nvRule(state, '=$F6="Просрочено"', { bg: T.overdueFill, color: T.overdueText, bold: true }),
+    nvRule(state, '=$F6="Сегодня"', { color: T.accentText, bold: true }),
+    nvRule(block, '=$F6="Предупреждение"', { color: T.muted }),
+    nvRule(sh.getRange(L.firstRow, C.due, rows, 1), '=$F6="Просрочено"', { color: T.accentText, bold: true }),
+    nvRule(state, '=$F6="На неделе"', { color: T.text2 }),
     nvRule(manual, "=$P6=TRUE", { color: T.muted, strike: true }),
   ]);
   sh.setFrozenRows(L.headerRow);
-  sh.setFrozenColumns(2);
+  sh.setFrozenColumns(1);
   sh.setHiddenGridlines(true);
   sh.setTabColor(NV_BRAND.orange);
 }

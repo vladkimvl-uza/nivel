@@ -25,10 +25,11 @@ beforeAll(() => {
 }, 120_000);
 
 describe("sheets", () => {
-  it("builds all 19 sheets in the order of the book, without the default one", () => {
+  it("builds all 20 sheets in the order of the book, without the default one", () => {
     expect(ss.sheets.map((s) => s.name)).toEqual([
       "Панель",
       "Сегодня",
+      "Телефон",
       "Заявки",
       "Заказы",
       "Платежи",
@@ -91,11 +92,11 @@ describe("sheets", () => {
 
 describe("columns by the structure", () => {
   const expected = {
-    leads: 25,
-    orders: 98,
+    leads: 26,
+    orders: 101,
     payments: 21,
     purchases: 26,
-    warranty: 24,
+    warranty: 25,
     history: 12,
     webhook: 11,
     selfcheck: 4,
@@ -251,11 +252,14 @@ describe("validations", () => {
   it("money inputs are whole numbers not below zero; the memory share is at most the purchase", () => {
     const sh = sheet("Заказы");
     const keys = def().orders.cols.map((c) => c.key);
+    const letter = (k) => p.call("nvColLetter", "orders", k);
     const base = sh._cell(6, 2 + keys.indexOf("basePc")).dv;
+    const b = `${letter("basePc")}6`;
     expect(base.type).toBe("formula");
-    expect(base.formula).toBe("=AND(ISNUMBER(P6), P6=INT(P6), P6>=0)");
+    expect(base.formula).toBe(`=AND(ISNUMBER(${b}), ${b}=INT(${b}), ${b}>=0)`);
     const mem = sh._cell(6, 2 + keys.indexOf("memory")).dv;
-    expect(mem.formula).toBe("=AND(ISNUMBER(T6), T6=INT(T6), T6>=0, T6<=S6)");
+    const m = `${letter("memory")}6`;
+    expect(mem.formula).toBe(`=AND(ISNUMBER(${m}), ${m}=INT(${m}), ${m}>=0, ${m}<=${letter("purchased")}6)`);
   });
 
   it("payments: the amount is above zero, the order must exist; purchases: quantity 1 or more", () => {
@@ -345,28 +349,11 @@ describe("conditional formatting uses two accents only", () => {
     expect(stamp.formula).toContain('"handed_over"');
   });
 
-  it("only the two accents (orange for action, grey for done) and the neutral tones appear in the rules", () => {
-    const allowed = new Set([
-      "#C2481A",
-      "#FFFFFF",
-      "#A53F17",
-      "#F6E3D6",
-      "#8A867E",
-      "#5E574D",
-      "#1D1D1B",
-      "#F1EFEA",
-      "#EEE7DC",
-      "#F0D9C4",
-      "#6B2E12",
-      "#E8BF9C",
-      "#4A2414",
-      "#DFA27A",
-      "#3A1C10",
-      "#8C4A2B",
-      "#5C3220",
-      "#F6E4D6",
-      "#E4DDD2",
-    ]);
+  it("only the colours of the theme appear in the rules (the orange only for action, grey for done)", () => {
+    // Every colour of a rule is one of the colours of the theme of the paper: nothing is typed into a rule by hand
+    const allowed = new Set(
+      JSON.stringify(JSON.parse(p.run("JSON.stringify(NV_THEMES.passport)"))).match(/#[0-9A-F]{6}/g),
+    );
     for (const n of [
       "Заказы",
       "Заявки",
@@ -468,22 +455,13 @@ describe("the panel", () => {
     expect(img.blob.type).toBe("image/png");
   });
 
-  it("eight charts in the colours of the theme: one orange series, no rainbow", () => {
+  it("eight charts in the colours of the theme: orange on three lines only, no rainbow", () => {
     const charts = sheet("Панель").charts;
     expect(charts).toHaveLength(8);
-    const allowed = new Set([
-      "#1D1D1B",
-      "#D9501A",
-      "#6E695F",
-      "#A9A59C",
-      "#F1EFEA",
-      "#F06A30",
-      "#FBF9F4",
-      "#262522",
-      "#5E574D",
-      "#E4DDD2",
-      "#8F8A80",
-    ]);
+    // Every colour of a chart is a colour of the theme or of the palette of the book
+    const allowed = new Set(
+      JSON.stringify(JSON.parse(p.run("JSON.stringify([NV_THEMES.passport, NV_BOOK_THEME])"))).match(/#[0-9A-F]{6}/g),
+    );
     for (const ch of charts) {
       const o = ch.spec.options;
       expect(o.fontName).toBe("Fira Sans");
@@ -633,7 +611,7 @@ describe("themes", () => {
     expect(sheet("Заказы")._cell(5, 2).bg).toBe("#33302C");
     expect(sheet("Заказы").bandings[0].first).toBe("#262522");
     expect(sheet("Панель").charts[0].spec.options.backgroundColor).toBe("#262522");
-    expect(sheet("Панель").charts[0].spec.options.series[1].color).toBe("#F06A30");
+    expect(sheet("Панель").charts[0].spec.options.series[1].color).toBe("#8F8A80");
   }, 60_000);
 
   it("the night theme for the panel only keeps the data sheets in the paper theme; and back", () => {

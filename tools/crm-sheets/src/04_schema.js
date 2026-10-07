@@ -31,6 +31,56 @@ function nvCol(key, title, type, width, opts) {
   return Object.assign({ key: key, title: title, type: type, width: width }, opts || {});
 }
 
+/**
+ * Working hours of the response window counted from a fixed day (1 Jan 2020) up to the moment x, as a formula: the whole
+ * working days before x (Monday to Saturday, no holidays) times the length of the window, plus the part of the window
+ * that x has passed on its own day, clamped to the window. The difference of two of them is the working hours between
+ * two moments with both ends pressed to the window: a lead of 23:00 and a reply of 10:30 next morning is 0.5 hour.
+ */
+function nvCumWorkHoursFormula(x) {
+  const open = "TIMEVALUE(NV_RESPONSE_FROM)*24";
+  const win = "((TIMEVALUE(NV_RESPONSE_TO)-TIMEVALUE(NV_RESPONSE_FROM))*24)";
+  return (
+    "(NETWORKDAYS.INTL(DATE(2020;1;1); INT(" +
+    x +
+    ')-1; "0000001"; NV_HOLIDAYS)*' +
+    win +
+    "+IF(NETWORKDAYS.INTL(INT(" +
+    x +
+    "); INT(" +
+    x +
+    '); "0000001"; NV_HOLIDAYS)=1; ' +
+    "MAX(0; MIN(" +
+    win +
+    "; MOD(" +
+    x +
+    ";1)*24-" +
+    open +
+    ")); 0))"
+  );
+}
+
+/** The moment when NV_FIRST_RESPONSE_HOURS working hours have passed since x (the inverse of the above). */
+function nvDueWorkHoursFormula(x) {
+  const open = "TIMEVALUE(NV_RESPONSE_FROM)*24";
+  const win = "((TIMEVALUE(NV_RESPONSE_TO)-TIMEVALUE(NV_RESPONSE_FROM))*24)";
+  const total = "(" + nvCumWorkHoursFormula(x) + "+NV_FIRST_RESPONSE_HOURS)";
+  const k = "(INT((" + total + "-0.000001)/" + win + ")+1)";
+  return (
+    "WORKDAY.INTL(DATE(2020;1;1)-1; " +
+    k +
+    '; "0000001"; NV_HOLIDAYS)+(' +
+    open +
+    "+" +
+    total +
+    "-(" +
+    k +
+    "-1)*" +
+    win +
+    ")/24"
+  );
+}
+
 const NV_SCHEMA = {};
 
 NV_SCHEMA.leads = {
@@ -61,7 +111,17 @@ NV_SCHEMA.leads = {
     nvCol("firstReply", "Первый ответ", "dt", 128, { prot: "script" }),
     nvCol("replyH", "Ответ, ч", "num1", 80, {
       prot: "formula",
-      calc: 'IF([firstReply]=""; ""; ROUND((NETWORKDAYS.INTL([created]; [firstReply]; "0000001"; NV_HOLIDAYS)-1)*9+(MOD([firstReply];1)-MOD([created];1))*24; 1))',
+      calc:
+        // the difference is taken in whole minutes first: the float noise of MOD(x;1)*24 never moves a rounding
+        'IF([firstReply]=""; ""; MAX(0; ROUND(ROUND((' +
+        nvCumWorkHoursFormula("[firstReply]") +
+        "-" +
+        nvCumWorkHoursFormula("[created]") +
+        ")*60; 0)/60; 1)))",
+    }),
+    nvCol("replyDue", "Ответить до", "dt", 128, {
+      prot: "formula",
+      calc: 'IF([created]=""; ""; ' + nvDueWorkHoursFormula("[created]") + ")",
     }),
     nvCol("next", "Следующий шаг", "text", 240),
     nvCol("nextDate", "Дата шага", "date", 104, { min: 0 }),
@@ -108,6 +168,8 @@ NV_SCHEMA.orders = {
     // Status
     nvCol("status", "Статус", "text", 168, { prot: "script" }),
     nvCol("action", "Действие", "list", 210, { dynamicList: true }),
+    nvCol("actionText", "Текст к действию", "text", 220),
+    nvCol("lastResult", "Итог действия", "long", 280, { prot: "script" }),
     nvCol("code", "Код статуса", "mono", 130, { prot: "script", hidden: true }),
     nvCol("forClient", "Для клиента", "text", 150, {
       prot: "formula",
@@ -141,7 +203,7 @@ NV_SCHEMA.orders = {
     }),
     nvCol("eligibility", "Допуск", "text", 190, {
       prot: "formula",
-      calc: 'IF([kind]="Подбор"; "«Подбор»"; IF([kind]="Сетап"; IF([basePc]+[baseMount]>=NV_MIN_SETUP; "Полный цикл"; "Сетап ниже минимума"); IF([basePc]+[baseMount]>=NV_MIN_PC; "Полный цикл"; IF([basePc]+[baseMount]>=NV_MIN_WINDOW; IF([slot]="Свободное окно"; "Только в свободное окно"; "Только «Подбор»: окна нет"); "Только «Подбор»"))))',
+      calc: 'IF([kind]="Подбор"; "«Подбор»"; IF([kind]="Сетап"; IF([basePc]+[baseMount]>=NV_MIN_SETUP; "Полный цикл"; "Сетап ниже минимума"); IF([kind]="Апгрейд"; IF([basePc]+[baseMount]>=NV_MIN_UPGRADE; "Полный цикл"; "Только «Подбор»"); IF([basePc]+[baseMount]>=NV_MIN_PC; "Полный цикл"; IF([basePc]+[baseMount]>=NV_MIN_WINDOW; IF([slot]="Свободное окно"; "Только в свободное окно"; "Только «Подбор»: окна нет"); "Только «Подбор»")))))',
     }),
     nvCol("validUntil", "Смета действует до", "dt", 128, { prot: "script" }),
     // Calculation of the estimate (group)
@@ -195,11 +257,11 @@ NV_SCHEMA.orders = {
     // Money (formulas over Платежи and Закупки)
     nvCol("feePaid", "Аванс получен", "text", 96, {
       prot: "formula",
-      calc: 'IF(SUMIFS({payments.amount}; {payments.order}; [num]; {payments.kind}; "Аванс платы 30 %"; {payments.status}; "Подтверждён"; {payments.receipt}; "<>")>=[advance]; "Да"; "Нет")',
+      calc: 'IF(SUMIFS({payments.amount}; {payments.order}; [num]; {payments.kind}; "Аванс платы 30 %"; {payments.status}; "Подтверждён"; {payments.check}; "ОК"; {payments.receipt}; "<>")>=[advance]; "Да"; "Нет")',
     }),
     nvCol("fundsGot", "Получено на закупку", "sum", 132, {
       prot: "formula",
-      calc: 'SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Закупка"; {payments.status}; "Подтверждён")',
+      calc: 'SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Закупка"; {payments.status}; "Подтверждён"; {payments.check}; "ОК")',
     }),
     nvCol("fundsOk", "Деньги получены", "text", 96, {
       prot: "formula",
@@ -207,7 +269,7 @@ NV_SCHEMA.orders = {
     }),
     nvCol("notBefore", "Закупка не раньше", "dt", 128, {
       prot: "formula",
-      calc: 'IF([fundsOk]="Да"; WORKDAY.INTL(INT(MAXIFS({payments.confirmedAt}; {payments.order}; [num]; {payments.group}; "Закупка"; {payments.status}; "Подтверждён")); 1; "0000001"; NV_HOLIDAYS)+TIMEVALUE(NV_RESPONSE_FROM); "")',
+      calc: 'IF([fundsOk]="Да"; WORKDAY.INTL(INT(MAXIFS({payments.confirmedAt}; {payments.order}; [num]; {payments.group}; "Закупка"; {payments.status}; "Подтверждён"; {payments.check}; "ОК")); 1; "0000001"; NV_HOLIDAYS)+TIMEVALUE(NV_RESPONSE_FROM); "")',
     }),
     nvCol("firstOrder", "Первый заказ клиента", "text", 96, {
       prot: "formula",
@@ -229,7 +291,7 @@ NV_SCHEMA.orders = {
     }),
     nvCol("refunded", "Возвращено клиенту", "sum", 132, {
       prot: "formula",
-      calc: 'SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Возврат денег"; {payments.status}; "Подтверждён")',
+      calc: 'SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Возврат денег"; {payments.status}; "Подтверждён"; {payments.check}; "ОК")',
     }),
     nvCol("remainder", "Остаток у ИП", "sum", 132, {
       prot: "formula",
@@ -239,7 +301,7 @@ NV_SCHEMA.orders = {
     nvCol("feeNet", "Плата получена (нетто)", "sum", 132, {
       prot: "formula",
       tot: true,
-      calc: 'SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Плата"; {payments.status}; "Подтверждён")-SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Возврат платы"; {payments.status}; "Подтверждён")',
+      calc: 'SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Плата"; {payments.status}; "Подтверждён"; {payments.check}; "ОК")-SUMIFS({payments.amount}; {payments.order}; [num]; {payments.group}; "Возврат платы"; {payments.status}; "Подтверждён"; {payments.check}; "ОК")',
     }),
     nvCol("recon", "Сверка", "text", 150, {
       prot: "formula",
@@ -276,6 +338,11 @@ NV_SCHEMA.orders = {
     nvCol("warrantyUntil", "Гарантия до", "date", 110, { prot: "script", grp: "dates" }),
     nvCol("aftercare1", "Сопровождение 7 дн.", "dt", 128, { prot: "script", grp: "dates" }),
     nvCol("aftercare2", "Сопровождение 30 дн.", "dt", 128, { prot: "script", grp: "dates" }),
+    nvCol("shopWarrantyNext", "Ближайший конец гарантии магазинов", "date", 130, {
+      prot: "formula",
+      grp: "dates",
+      calc: 'IFERROR(IF(MINIFS({purchases.warrantyUntil}; {purchases.order}; [num]; {purchases.warrantyUntil}; ">="&TODAY())=0; ""; MINIFS({purchases.warrantyUntil}; {purchases.order}; [num]; {purchases.warrantyUntil}; ">="&TODAY())); "")',
+    }),
     // Cancellation (group)
     nvCol("cancelPoint", "Точка отмены", "list", 190, { list: "NVD_CANCEL_POINT", grp: "cancel", prot: "script" }),
     nvCol("cancelReason", "Причина отмены", "long", 240, { grp: "cancel" }),
@@ -386,7 +453,7 @@ NV_SCHEMA.purchases = {
     nvCol("order", "Заказ", "id", 128, { orderList: true }),
     nvCol("item", "Позиция (без ПД)", "text", 240),
     nvCol("category", "Категория", "list", 160, { list: "NVD_CATEGORY" }),
-    nvCol("shop", "Магазин", "list", 150, { list: "NVD_SHOP" }),
+    nvCol("shop", "Магазин", "list", 150, { list: "NVD_SHOP", soft: true }),
     nvCol("qty", "Кол-во", "int", 64, { min1: true }),
     nvCol("amount", "Сумма по чеку, сум", "sum", 132, { int: true, tot: true }),
     nvCol("paidWith", "Оплачено", "list", 160, { list: "NVD_PAID_WITH" }),
@@ -395,7 +462,7 @@ NV_SCHEMA.purchases = {
     nvCol("esf", "№ ЭСФ", "mono", 130),
     nvCol("esfDue", "ЭСФ до (+10 дней)", "date", 110, {
       prot: "formula",
-      calc: 'IF([esf]=""; ""; [bought]+NV_ESF_DAYS)',
+      calc: 'IF(OR([esf]<>""; [docKind]="ЭСФ"); [bought]+NV_ESF_DAYS; "")',
     }),
     nvCol("esfStatus", "Статус ЭСФ", "list", 120, { list: "NVD_ESF_STATUS" }),
     nvCol("discount", "Скидка, сум (вся — клиенту)", "sum", 132, { int: true }),
@@ -444,6 +511,7 @@ NV_SCHEMA.warranty = {
     nvCol("desc", "Описание (без ПД)", "long", 280),
     nvCol("status", "Статус", "text", 150, { prot: "script" }),
     nvCol("action", "Действие", "list", 200, { dynamicList: true }),
+    nvCol("lastResult", "Итог действия", "long", 260, { prot: "script" }),
     nvCol("fixType", "Тип устранения", "list", 110, { list: "NVD_FIX_TYPE" }),
     nvCol("replyBy", "Ответить до", "dt", 128, { prot: "script" }),
     nvCol("diagBy", "Диагностика до", "dt", 128, { prot: "script" }),

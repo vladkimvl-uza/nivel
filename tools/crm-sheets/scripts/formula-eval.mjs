@@ -656,6 +656,13 @@ export function evaluate(tree, ctx) {
         .filter((v) => typeof v === "number");
       return vals.length ? Math.max(...vals) : 0;
     },
+    MINIFS: (a) => {
+      const ref = ev(a[0]);
+      const vals = countMatches(a, 1)
+        .map((idx) => cellValueAt(ref, idx))
+        .filter((v) => typeof v === "number");
+      return vals.length ? Math.min(...vals) : 0;
+    },
     XLOOKUP: (a) => {
       const key = scalar(ev(a[0]));
       const look = cellsOf(ev(a[1]));

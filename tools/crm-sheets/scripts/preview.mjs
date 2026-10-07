@@ -123,7 +123,7 @@ export function bakeValues(p) {
   const tasks = bundle.tasks.slice(0, 22);
   tasks.forEach((t, i) => {
     const r = L.firstRow + i;
-    [fmtDue(t.due), t.state, t.what, t.object, t.num, t.client, t.sum || "", t.code, "", "Открыть"].forEach((v, j) => {
+    [fmtDue(t.due), t.what, t.num, t.sum || "", t.state, t.object, t.client, t.code, "", "Открыть"].forEach((v, j) => {
       const cell = today._cell(r, 2 + j);
       cell.v = v;
       delete cell.f;
@@ -132,7 +132,7 @@ export function bakeValues(p) {
   for (const c of [2, 11]) delete today._cell(L.firstRow, c).f;
   const cap = today._cell(3, 2);
   const count = (s) => tasks.filter((t) => t.state === s).length;
-  cap.v = `${count("Просрочено")} просрочено · ${count("Сегодня")} на сегодня · ${count("Завтра")} на завтра · ${count("На неделе")} на неделе   ·   правила сроков домена, источники — все листы`;
+  cap.v = `${count("Просрочено")} просрочено · ${count("Сегодня")} на сегодня · ${count("Завтра")} на завтра · ${count("На неделе")} на неделе · ${count("Предупреждение")} предупреждений`;
   delete cap.f;
   // Manual tasks of the owner
   [
@@ -290,9 +290,20 @@ function sparkHtml(formula, w, h, ctx) {
   const type = /"charttype","(\w+)"/.exec(formula) || /"charttype"\s*,\s*"(\w+)"/.exec(formula);
   const kind = type ? type[1] : "column";
   const color = (/"color","(#[0-9A-Fa-f]{6})"/.exec(formula) || [])[1];
-  const high = (/"highcolor","(#[0-9A-Fa-f]{6})"/.exec(formula) || [])[1];
+  // A colour option is a literal, or IF($flag=TRUE, orange, text) where the flag of the tile is a cell of the panel
+  const optionColor = (key) => {
+    const m = new RegExp(
+      `"${key}",\\s*(?:IF\\(\\$([A-Z]+)(\\d+)=TRUE,\\s*"(#[0-9A-Fa-f]{6})",\\s*"(#[0-9A-Fa-f]{6})"\\)|"(#[0-9A-Fa-f]{6})")`,
+    ).exec(formula);
+    if (!m) return undefined;
+    if (m[5]) return m[5];
+    const col = m[1].split("").reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0);
+    const flag = ss.getSheetByName("Панель").cells.get(`${m[2]},${col}`);
+    return flag?.v === true ? m[3] : m[4];
+  };
+  const lastColor = optionColor("lastcolor");
   if (kind === "bar") {
-    const c1 = (/"color1","(#[0-9A-Fa-f]{6})"/.exec(formula) || [])[1];
+    const c1 = optionColor("color1");
     const c2 = (/"color2","(#[0-9A-Fa-f]{6})"/.exec(formula) || [])[1];
     const val = (n) => {
       const ref = computer.named(n);
@@ -315,7 +326,7 @@ function sparkHtml(formula, w, h, ctx) {
     const c = ss.getSheetByName("_Данные").cells.get(`${r},${colIdx}`);
     values.push(Number(c?.v) || 0);
   }
-  return drawSparkline(kind, values, { w, h, color, highColor: high || color });
+  return drawSparkline(kind, values, { w, h, color, lastColor: lastColor || color });
 }
 
 /** The HTML of all the sheets in the current theme of the book. */
@@ -343,6 +354,7 @@ export function renderTheme(p, baked, themeName, styles) {
   const sheets = [
     ["Панель", 82, { charts }],
     ["Сегодня", 22, {}],
+    ["Телефон", 29, {}],
     ["Заявки", 20, {}],
     ["Заказы", 18, {}],
     ["Платежи", 28, {}],

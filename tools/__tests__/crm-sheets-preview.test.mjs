@@ -22,12 +22,12 @@ describe("preview/index.html", () => {
     expect(result.errors).toEqual([]);
   });
 
-  it("holds 16 sheets in each of the two themes", () => {
+  it("holds 17 sheets in each of the two themes", () => {
     const sections = [...result.html.matchAll(/<section data-theme="(\w+)" data-sheet="([^"]+)"/g)];
-    expect(sections).toHaveLength(32);
-    expect(sections.filter((s) => s[1] === "passport")).toHaveLength(16);
-    expect(sections.filter((s) => s[1] === "night")).toHaveLength(16);
-    expect(new Set(sections.map((s) => s[2])).size).toBe(16);
+    expect(sections).toHaveLength(34);
+    expect(sections.filter((s) => s[1] === "passport")).toHaveLength(17);
+    expect(sections.filter((s) => s[1] === "night")).toHaveLength(17);
+    expect(new Set(sections.map((s) => s[2])).size).toBe(17);
   });
 
   it("the panel has twelve tiles with their figures, eight charts, the logo and the sparklines in both themes", () => {
@@ -38,13 +38,13 @@ describe("preview/index.html", () => {
       expect(panel).toContain("data:image/png;base64,");
       for (const label of [
         "Плата за период",
-        "Заказы в работе",
+        "Заказы в работе (закупка – доставка)",
         "Сдано за период",
-        "Заявки за период",
+        "Заявки без спама",
         "Порог года",
         "Средства клиентов на счёте ИП",
         "Резерв гарантии",
-        "Налог 1 % к уплате",
+        "Налог 1 % (оценка)",
         "Конверсия заявка → заказ",
         "Средняя плата",
         "Время первого ответа",
@@ -92,6 +92,23 @@ describe("preview/index.html", () => {
     expect(orders).toContain("NV-2026-D001");
     // the stamp of the handover (asphalt fill, paper text, bold) is one of the classes of the sheet
     expect(result.html).toMatch(/td\.s\w+\{[^}]*background:#1D1D1B;color:#F1EFEA[^}]*font-weight:700/);
+  });
+
+  it("the sheet Телефон shows six figures in a column and no chart", () => {
+    for (const theme of ["passport", "night"]) {
+      const start = result.html.indexOf(`<section data-theme="${theme}" data-sheet="Телефон"`);
+      const phone = result.html.slice(start, result.html.indexOf("</section>", start));
+      for (const label of [
+        "Плата за период",
+        "Средства клиентов на счёте ИП",
+        "Заказы в работе (закупка – доставка)",
+        "Заявки без спама",
+        "Просрочено задач",
+        "Порог года",
+      ])
+        expect(phone, label).toContain(label);
+      expect(phone).not.toContain('width="576"');
+    }
   });
 
   it("the sheet Сегодня lists the tasks with the state of the term", () => {

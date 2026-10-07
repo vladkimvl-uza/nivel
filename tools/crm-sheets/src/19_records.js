@@ -162,7 +162,8 @@ function nvCreatePayment(fields, opts) {
   const now = o.now || nvNow();
   return nvWithLock(() => {
     const kind = nvPaymentKindByLabel(fields.kind);
-    const method = fields.method || (kind && kind.methods.length === 1 ? kind.methods[0] : "");
+    // A fee is paid by QR Xolis unless the owner says it was the card of the merchant (DECISIONS R-10)
+    const method = fields.method || (kind ? kind.methods[0] : "");
     const write = (id) => {
       nvAppendRow("payments", {
         id: id,
@@ -193,7 +194,9 @@ function nvCreatePayment(fields, opts) {
 
 /**
  * Rules of a payment row after an edit. Returns messages; may revert a status that is not allowed.
- * `old` is {key: oldValue} of the edited column.
+ * `old` is {key: oldValue} of the edited column. A confirmed payment is checked again whenever its kind, method,
+ * receipt or amount changes: a pair that is not allowed sends it back to "Ожидается" (it is no longer counted), and the
+ * method is not silently changed under a payment that was confirmed (that would hide where the money really came from).
  */
 function nvPaymentAfterEdit(rowNo, editedKey, oldValue) {
   const pay = nvReadTable("payments").find((p) => p._row === rowNo);
@@ -201,14 +204,16 @@ function nvPaymentAfterEdit(rowNo, editedKey, oldValue) {
   const msgs = [];
   const set = {};
   const kind = nvPaymentKindByLabel(pay.kind);
-  if (editedKey === "kind" && kind && kind.methods.length === 1) set.method = kind.methods[0];
-  if (editedKey === "kind" && kind && kind.methods.indexOf(pay.method) < 0 && kind.methods.length > 1) set.method = "";
+  if (editedKey === "kind" && kind && pay.status !== "Подтверждён") {
+    if (kind.methods.length === 1) set.method = kind.methods[0];
+    else if (kind.methods.indexOf(pay.method) < 0) set.method = "";
+  }
   const method = set.method !== undefined ? set.method : pay.method;
-  if (editedKey === "status" || editedKey === "receipt" || editedKey === "method") {
+  if (["status", "receipt", "method", "kind", "amount", "order"].indexOf(editedKey) >= 0) {
     if (pay.status === "Подтверждён") {
       const check = nvCheckPayment(pay.kind, method, pay.status, pay.receipt);
       if (check !== "ОК") {
-        set.status = oldValue && oldValue !== "Подтверждён" ? oldValue : "Ожидается";
+        set.status = oldValue && oldValue !== "Подтверждён" && editedKey === "status" ? oldValue : "Ожидается";
         msgs.push("Платёж не подтверждён: " + check);
       } else {
         if (nvStr(pay.confirmedAt) === "") set.confirmedAt = nvNow();
@@ -221,9 +226,6 @@ function nvPaymentAfterEdit(rowNo, editedKey, oldValue) {
       set.status = oldValue && oldValue !== "Аннулирован" ? oldValue : "Ожидается";
       msgs.push("Для аннулирования укажите причину");
     }
-  }
-  if (nvStr(pay.id) === "") {
-    // A row typed by hand without an id: the script issues it.
   }
   nvWriteCells("payments", rowNo, set);
   if (pay.order) nvSyncAcceptedFlags(pay.order);

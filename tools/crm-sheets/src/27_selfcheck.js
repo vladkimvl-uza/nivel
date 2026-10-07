@@ -168,6 +168,27 @@ function nvSelfCheckRows() {
   const tz = ss.getSpreadsheetTimeZone();
   if (tz === NV_TZ && ss.getSpreadsheetLocale() === NV_LOCALE) ok("Часовой пояс и локаль", tz + ", " + NV_LOCALE);
   else bad("Часовой пояс и локаль", tz + ", " + ss.getSpreadsheetLocale());
+  // The formulas of "Сегодня" and of the panel hold TODAY() and NOW(): they must be recalculated every hour
+  const recalc = typeof ss.getRecalculationInterval === "function" ? String(ss.getRecalculationInterval()) : "HOUR";
+  if (recalc === "HOUR" || recalc === "MINUTE") ok("Пересчёт формул", "каждый час");
+  else
+    warn(
+      "Пересчёт формул",
+      "только при правках (" +
+        recalc +
+        "): «Сегодня» может показать вчерашние состояния. Применить оформление исправит",
+    );
+  // The address of the user: without it nobody but the owner can be told from the owner
+  if (nvHasProp(NV_PROP.ownerEmail)) {
+    let me = "";
+    try {
+      me = Session.getActiveUser().getEmail();
+    } catch (e) {
+      me = "";
+    }
+    if (me) ok("Адрес пользователя", "читается: помощник отличается от владельца");
+    else warn("Адрес пользователя", "не читается: все правки считаются правками помощника (денежные события закрыты)");
+  }
   const head = nvSheet("orders").getRange(NV_LAYOUT.headerRow, NV_LAYOUT.firstCol);
   const mono = nvSheet("orders").getRange(NV_LAYOUT.firstRow, NV_LAYOUT.firstCol);
   const fontOk =

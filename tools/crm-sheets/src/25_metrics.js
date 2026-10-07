@@ -133,7 +133,7 @@ function nvDashboardModel(opts) {
     if (!from) return null;
     let sum = 0;
     data.payments.forEach((p) => {
-      if (p.status !== "Подтверждён" || !within(p.date, from, toX)) return;
+      if (!nvPaymentCounts(p) || !within(p.date, from, toX)) return;
       if (groupOf(p) === "Плата") sum += Number(p.amount) || 0;
       if (groupOf(p) === "Возврат платы") sum -= Number(p.amount) || 0;
     });
@@ -174,18 +174,28 @@ function nvDashboardModel(opts) {
         )
       : null;
   const k = {};
-  const cmp = (key, v, prev, text, lowerIsBetter) => {
-    const worse =
-      prev === null || prev === undefined || prev === "" || v === null ? false : lowerIsBetter ? v > prev : v < prev;
+  // "Worse" is a change that matters (NV_WORSE_PCT or more); a count of the previous period below minPrev alarms nobody
+  const cmp = (key, v, prev, text, lowerIsBetter, minPrev) => {
+    const share = 1 - (Number(s.worsePct) || 0) / 100;
+    const empty = prev === null || prev === undefined || prev === "" || v === null;
+    const moved = empty ? false : lowerIsBetter ? v > prev * (2 - share) : v < prev * share;
+    const worse = empty ? false : minPrev ? prev >= minPrev && moved : moved;
     k[key] = { value: v, prev: prev === undefined ? null : prev, text: text, worse: worse };
   };
   // fee
   const fee = feeIn(b.from, b.toX);
   const feePrev = feeIn(b.prevFrom, b.prevToX);
   const nPay = data.payments.filter(
-    (p) => p.status === "Подтверждён" && groupOf(p) === "Плата" && within(p.date, b.from, b.toX),
+    (p) => nvPaymentCounts(p) && groupOf(p) === "Плата" && within(p.date, b.from, b.toX),
   ).length;
-  cmp("fee", fee, feePrev, ["платежей: " + nPay, nvCompareJs(fee, feePrev)].filter(Boolean).join(" · "));
+  const inHand = Math.floor((fee * (10000 - Number(s.xolisWithdrawBp || 0))) / 10000);
+  void nPay;
+  cmp(
+    "fee",
+    fee,
+    feePrev,
+    ["на руки ≈ " + nvFmtMln(inHand) + " млн", nvCompareJs(fee, feePrev)].filter(Boolean).join(" · "),
+  );
   // wip
   const wip = orders.filter((x) => x.status && x.status.group === "В работе");
   const waiting = orders.filter((x) => x.status && x.status.group === "Ждёт клиента").length;
@@ -217,10 +227,13 @@ function nvDashboardModel(opts) {
     ]
       .filter(Boolean)
       .join(" · "),
+    false,
+    3,
   );
-  // leads
-  const lc = leadsIn(b.from, b.toX).length;
-  const lp = b.prevFrom ? leadsIn(b.prevFrom, b.prevToX).length : null;
+  // leads: without spam (the funnel and the conversion count the same)
+  const notSpam = (l) => l.status !== "Спам";
+  const lc = leadsIn(b.from, b.toX, notSpam).length;
+  const lp = b.prevFrom ? leadsIn(b.prevFrom, b.prevToX, notSpam).length : null;
   cmp(
     "leads",
     lc,
@@ -232,23 +245,31 @@ function nvDashboardModel(opts) {
         leadsIn(b.from, b.toX, (l) => l.status === "Отказ").length,
       nvCompareJs(lc, lp),
     ].join(" · "),
+    false,
+    3,
   );
   // threshold
   const committed = orders
     .filter((x) => x.o.code === "accepted")
     .reduce((a, x) => a + x.st.quote.purchaseLimit + x.st.quote.feeTotal, 0);
   const th = nvThresholdStatus(nvThresholdEntries(o.includeDemo === true), committed, year, s);
+  const plan2026 = year === 2026;
   k.threshold = {
     value: th.shareBp / 10000,
     prev: null,
-    text:
-      nvFmtMln(th.volume) +
-      " из " +
-      nvFmtMln(th.limit) +
-      " млн · с принятыми " +
-      Math.round(th.projectedShareBp / 100) +
-      "%",
-    worse: th.shareBp >= (s.alerts[1] || 7000),
+    // 2026 is limited by the plan (R-7), not by the legal limit
+    text: plan2026
+      ? "до плана 2026 осталось " +
+        nvFmtMln(Math.max(0, s.planCap2026 - th.volume - th.committed)) +
+        " млн · " +
+        Math.round(th.projectedShareBp / 100) +
+        "% порога"
+      : "до порога осталось " +
+        nvFmtMln(th.remaining) +
+        " млн · с принятыми " +
+        Math.round(th.projectedShareBp / 100) +
+        "%",
+    worse: plan2026 ? th.overPlanCap === true : th.shareBp >= (s.alerts[1] || 7000),
     status: th,
   };
   // funds
@@ -286,7 +307,7 @@ function nvDashboardModel(opts) {
   k.taxdue = {
     value: nvTurnoverTax(taxFee, s),
     prev: null,
-    text: "до " + nvFormat(day15, "dd.MM.yyyy") + " · резерв налога " + nvFmtMln(resBal("Налоговый риск")) + " млн",
+    text: s.xolisWithholds === true ? "оценка · удерживает Xolis" : "к уплате до " + nvFormat(day15, "dd.MM.yyyy"),
     worse: false,
   };
   // conversion
@@ -401,7 +422,7 @@ function nvChartSeries(model) {
   const groupOf = (p) => (nvPaymentKindByLabel(p.kind) || { group: "" }).group;
   const feeIn = (from, toX) =>
     data.payments.reduce((a, p) => {
-      if (p.status !== "Подтверждён" || !within(p.date, from, toX)) return a;
+      if (!nvPaymentCounts(p) || !within(p.date, from, toX)) return a;
       if (groupOf(p) === "Плата") return a + (Number(p.amount) || 0);
       if (groupOf(p) === "Возврат платы") return a - (Number(p.amount) || 0);
       return a;
@@ -463,7 +484,7 @@ function nvChartSeries(model) {
     .slice(0, 8);
   series.channels = channels;
   series.stages = NV_STAGES.map((st) => {
-    const list = orders.filter((x) => x.status && x.status.stage === st);
+    const list = orders.filter((x) => x.status && x.status.stage === st && x.o.code !== "estimate_expired");
     const over = list.filter(
       (x) => nvToDate(x.o.nextDate) && nvToDate(x.o.nextDate).getTime() < today.getTime(),
     ).length;
@@ -523,12 +544,14 @@ function nvTaskList(today, includeDemo, data, orders, s, holidays) {
       out.push({ code: code, due: date, what: what, object: object, num: num, client: client || "", sum: sum || 0 });
   };
   const hours = (n) => n * 3600000;
+  const hol = holidays || nvHolidays();
   d.leads.forEach((l) => {
     const created = nvToDate(l.created);
     if (l.status === "Новая" && created && nvStr(l.firstReply) === "")
       add(
         "lead_no_reply",
-        new Date(created.getTime() + hours(set.firstResponseHours)),
+        // the term counts the working hours: a lead of 23:00 is due at 12:00 of the next working day
+        nvAddWorkingHours(created, set.firstResponseHours, hol, set.responseFrom, set.responseTo),
         "Ответить на новую заявку",
         "Заявка",
         l.num,
@@ -635,11 +658,12 @@ function nvTaskList(today, includeDemo, data, orders, s, holidays) {
       ["aftercare2", "aftercare_30", "Сопровождение: 30 дней после сдачи, спросить об отзыве"],
     ].forEach((a) => {
       const due = nvToDate(o[a[0]]);
-      if (due && due.getTime() >= today.getTime() - 2 * NV_DAY_MS)
+      if (due && due.getTime() >= today.getTime() - NV_WARN_GRACE_DAYS * NV_DAY_MS)
         add(a[1], due, a[2], "Заказ", o.num, name, st.quote.grandTotal);
     });
+    const warnFrom = today.getTime() - NV_WARN_GRACE_DAYS * NV_DAY_MS;
     const wu = nvToDate(o.warrantyUntil);
-    if (wu && wu.getTime() >= today.getTime())
+    if (wu && wu.getTime() - 30 * NV_DAY_MS >= warnFrom)
       add(
         "order_warranty_end",
         new Date(wu.getTime() - 30 * NV_DAY_MS),
@@ -649,8 +673,24 @@ function nvTaskList(today, includeDemo, data, orders, s, holidays) {
         name,
         st.quote.grandTotal,
       );
+    // The warranty of the shops: one line for an order, the nearest end of the receipts of the order
+    const shopEnds = d.purchases
+      .filter((p) => p.order === o.num && Number(p.warrantyMonths) > 0 && nvToDate(p.bought))
+      .map((p) => nvMidnightDate(nvAddMonths(nvToDate(p.bought), Number(p.warrantyMonths))))
+      .filter((u) => u.getTime() >= today.getTime())
+      .sort((a, c) => a.getTime() - c.getTime());
+    if (shopEnds.length && shopEnds[0].getTime() - 30 * NV_DAY_MS >= warnFrom)
+      add(
+        "shop_warranty_end",
+        new Date(shopEnds[0].getTime() - 30 * NV_DAY_MS),
+        "Гарантия магазинов по заказу истекает через 30 дней (ближайшая)",
+        "Заказ",
+        o.num,
+        name,
+        st.quote.grandTotal,
+      );
     const pu = nvToDate(o.podborUntil);
-    if (o.code === "podbor_delivered" && pu && pu.getTime() >= today.getTime())
+    if (o.code === "podbor_delivered" && pu && pu.getTime() - 7 * NV_DAY_MS >= warnFrom)
       add(
         "podbor_credit",
         new Date(pu.getTime() - 7 * NV_DAY_MS),
@@ -674,26 +714,11 @@ function nvTaskList(today, includeDemo, data, orders, s, holidays) {
   d.purchases.forEach((p) => {
     const order = d.orders.find((x) => x.num === p.order);
     const name = order ? clientName(order) : "";
-    const esf =
-      nvToDate(p.bought) && nvStr(p.esf) !== ""
-        ? new Date(nvToDate(p.bought).getTime() + set.esfDays * NV_DAY_MS)
-        : null;
+    // The term of the signing starts with the document "ЭСФ" (or a number of it), not only when the number is typed
+    const hasEsf = nvStr(p.esf) !== "" || p.docKind === "ЭСФ";
+    const esf = nvToDate(p.bought) && hasEsf ? new Date(nvToDate(p.bought).getTime() + set.esfDays * NV_DAY_MS) : null;
     if (esf && nvStr(p.esfStatus) !== "Подписана")
       add("esf_due", esf, "Получить подпись ЭСФ", "Закупка", p.id, name, Number(p.amount) || 0);
-    const wm = Number(p.warrantyMonths);
-    if (nvToDate(p.bought) && wm > 0) {
-      const until = nvMidnightDate(nvAddMonths(nvToDate(p.bought), wm));
-      if (until.getTime() >= today.getTime())
-        add(
-          "shop_warranty_end",
-          new Date(until.getTime() - 30 * NV_DAY_MS),
-          "Гарантия магазина истекает через 30 дней",
-          "Закупка",
-          p.id,
-          name,
-          Number(p.amount) || 0,
-        );
-    }
   });
   d.warranty.forEach((w) => {
     const order = d.orders.find((x) => x.num === w.order);
@@ -720,7 +745,17 @@ function nvTaskList(today, includeDemo, data, orders, s, holidays) {
   const t = nvYmd(today);
   const day15 = nvDay(t.y, t.m, 15);
   if (today.getTime() <= day15.getTime() + 3 * NV_DAY_MS) {
-    add("tax_turnover", day15, "Уплатить налог с оборота 1 % за прошлый месяц", "Налоги", "", "", 0);
+    add(
+      "tax_turnover",
+      day15,
+      set.xolisWithholds === true
+        ? "Сверить налог 1 %, удержанный Xolis за прошлый месяц, с расчётом бухгалтера"
+        : "Уплатить налог с оборота 1 % за прошлый месяц",
+      "Налоги",
+      "",
+      "",
+      0,
+    );
     add("tax_social", day15, "Уплатить социальный налог", "Налоги", "", "", set.socialTax);
   }
   add(
@@ -733,7 +768,7 @@ function nvTaskList(today, includeDemo, data, orders, s, holidays) {
     0,
   );
   const th = nvThresholdStatus(nvThresholdEntries(includeDemo === true), 0, t.y, set);
-  if (th.crossedAlerts.length)
+  if (th.crossedAlerts.length && th.crossedAlerts[th.crossedAlerts.length - 1] / 100 > (Number(set.alertAckPct) || 0))
     add(
       "threshold_alert",
       today,
@@ -743,15 +778,30 @@ function nvTaskList(today, includeDemo, data, orders, s, holidays) {
       "",
       th.volume,
     );
-  // The state of the term and the window of seven days
+  // The state of the term and the window of seven days. A warning whose date has passed is a "Предупреждение", not overdue.
   const horizon = today.getTime() + 8 * NV_DAY_MS;
-  const list = out
-    .filter((x) => x.due.getTime() < horizon)
+  const inWindow = out.filter((x) => x.due.getTime() < horizon);
+  // The "Шаг" of the owner is dropped when the same number has a line of a rule in the window
+  const withRule = {};
+  inWindow.forEach((x) => {
+    if (x.code !== "next_step" && x.num) withRule[x.num] = true;
+  });
+  const list = inWindow
+    .filter((x) => x.code !== "next_step" || !x.num || !withRule[x.num])
     .map((x) => {
       const dateOnly = x.due.getTime() === nvMidnight(x.due);
       const overdue = dateOnly ? x.due.getTime() < today.getTime() : x.due.getTime() < now.getTime();
       const dayDiff = Math.round((nvMidnight(x.due) - today.getTime()) / NV_DAY_MS);
-      x.state = overdue ? "Просрочено" : dayDiff === 0 ? "Сегодня" : dayDiff === 1 ? "Завтра" : "На неделе";
+      const soft = NV_SOFT_RULES.indexOf(x.code) >= 0;
+      x.state = overdue
+        ? soft
+          ? "Предупреждение"
+          : "Просрочено"
+        : dayDiff === 0
+          ? "Сегодня"
+          : dayDiff === 1
+            ? "Завтра"
+            : "На неделе";
       return x;
     })
     .sort((a, c) => a.due.getTime() - c.due.getTime());
@@ -778,13 +828,13 @@ function nvWeeklySeries(model) {
       return !!d && d.getTime() >= from.getTime() && d.getTime() < to.getTime();
     };
     const fee = data.payments.reduce((a, p) => {
-      if (p.status !== "Подтверждён" || !within(p.date)) return a;
+      if (!nvPaymentCounts(p) || !within(p.date)) return a;
       if (groupOf(p) === "Плата") return a + (Number(p.amount) || 0);
       if (groupOf(p) === "Возврат платы") return a - (Number(p.amount) || 0);
       return a;
     }, 0);
     const delivered = orders.filter((x) => within(x.o.dHandover));
-    const leads = data.leads.filter((l) => within(l.created));
+    const leads = data.leads.filter((l) => within(l.created) && l.status !== "Спам");
     const conv = leads.length ? leads.filter((l) => l.status === "В заказе").length / leads.length : 0;
     const replies = leads
       .map((l) =>

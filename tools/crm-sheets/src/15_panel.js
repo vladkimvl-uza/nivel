@@ -45,17 +45,29 @@ const NV_PANEL = {
 /** The tiles: key of the KPI, label, number format, kind of the trend under the figure. */
 const NV_TILES = [
   { key: "fee", label: "Плата за период", fmt: NV_FMT.mln, trend: { col: "B", type: "column" } },
-  { key: "wip", label: "Заказы в работе", fmt: "0", trend: { col: "C", type: "column" } },
+  { key: "wip", label: "Заказы в работе (закупка – доставка)", fmt: "0", trend: { col: "C", type: "column" } },
   { key: "delivered", label: "Сдано за период", fmt: "0", trend: { col: "D", type: "column" } },
-  { key: "leads", label: "Заявки за период", fmt: "0", trend: { col: "E", type: "column" } },
+  { key: "leads", label: "Заявки без спама", fmt: "0", trend: { col: "E", type: "column" } },
   { key: "threshold", label: "Порог года", fmt: NV_FMT.pct, trend: { type: "bar" } },
-  { key: "funds", label: "Средства клиентов на счёте ИП", fmt: NV_FMT.mln, trend: null },
+  {
+    key: "funds",
+    label: "Средства клиентов на счёте ИП",
+    fmt: NV_FMT.mln,
+    trend: null,
+    note: "получено на закупку − чеки − возвраты",
+  },
   { key: "wres", label: "Резерв гарантии", fmt: NV_FMT.mln, trend: { range: "reserve", col: "B", type: "line" } },
-  { key: "taxdue", label: "Налог 1 % к уплате", fmt: NV_FMT.sum, trend: { range: "reserve", col: "C", type: "line" } },
+  {
+    key: "taxdue",
+    label: "Налог 1 % (оценка)",
+    fmt: NV_FMT.sum,
+    trend: null,
+    note: "помесячно — на листе «Порог и налоги»",
+  },
   { key: "conv", label: "Конверсия заявка → заказ", fmt: NV_FMT.pct, trend: { col: "F", type: "column" } },
   { key: "avgfee", label: "Средняя плата", fmt: NV_FMT.sum, trend: { col: "G", type: "column" } },
   { key: "reply", label: "Время первого ответа", fmt: '0.0" ч"', trend: { col: "H", type: "column" } },
-  { key: "overdue", label: "Просрочено задач", fmt: "0", trend: null },
+  { key: "overdue", label: "Просрочено задач", fmt: "0", trend: null, note: "по листу «Сегодня»" },
 ];
 
 /** Top-left cell (row, col) of a tile. */
@@ -71,14 +83,18 @@ function nvTileFlagCell(index) {
   return { row: p.row + 2, col: NV_PANEL.helperCol + p.pos };
 }
 
-/** The SPARKLINE formula of a tile for a theme; "" when the tile has no trend. */
-function nvTileTrendFormula(tile, T) {
+/**
+ * The SPARKLINE formula of a tile for a theme; "" when the tile has no trend. The bars are graphite; only the last one is
+ * marked, and it is orange only when the tile is worse than the norm (the flag of the tile decides, on the same sheet).
+ */
+function nvTileTrendFormula(tile, T, flagRef) {
   if (!tile.trend) return "";
+  const worseColor = "IF(" + flagRef + '=TRUE; "' + T.accent + '"; "' + T.text + '")';
   if (tile.trend.type === "bar") {
     return (
-      '=SPARKLINE({TH_VOLUME\\TH_COMMITTED}; {"charttype"\\"bar"; "max"\\TH_LIMIT; "color1"\\"' +
-      T.accent +
-      '"; "color2"\\"' +
+      '=SPARKLINE({TH_VOLUME\\TH_COMMITTED}; {"charttype"\\"bar"; "max"\\TH_LIMIT; "color1"\\' +
+      worseColor +
+      '; "color2"\\"' +
       T.compare +
       '"; "empty"\\"zero"})'
     );
@@ -93,9 +109,9 @@ function nvTileTrendFormula(tile, T) {
     tile.trend.type +
     '"; "color"\\"' +
     color +
-    '"; "highcolor"\\"' +
-    T.accent +
-    '"; "empty"\\"zero"})'
+    '"; "lastcolor"\\' +
+    worseColor +
+    '; "empty"\\"zero"})'
   );
 }
 
@@ -171,9 +187,10 @@ function nvPanelTrends() {
   NV_TILES.forEach((tile, i) => {
     const pos = nvTilePos(i);
     const cell = sh.getRange(pos.row + 3, pos.col);
-    const f = nvTileTrendFormula(tile, T);
+    const flag = nvTileFlagCell(i);
+    const f = nvTileTrendFormula(tile, T, "$" + nvLetter(flag.col) + flag.row);
     if (f) cell.setFormula(nvApiFormula(f));
-    else cell.setValue(i === 5 ? "получено на закупку − чеки − возвраты" : "по листу «Сегодня»");
+    else cell.setValue(tile.note || "");
   });
 }
 

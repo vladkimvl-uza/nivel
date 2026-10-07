@@ -222,7 +222,7 @@ function svg(parts) {
 
 /** A sparkline inside a cell: kind column | line | bar. values: numbers; width and height in px. */
 export function drawSparkline(kind, values, opts) {
-  const { w, h, color, highColor, color2, max } = opts;
+  const { w, h, color, lastColor, color2, max } = opts;
   const parts = [];
   if (kind === "bar") {
     const total = max || 1;
@@ -239,14 +239,16 @@ export function drawSparkline(kind, values, opts) {
       (v, i) => `${(i / Math.max(values.length - 1, 1)) * (w - 2) + 1},${h - 3 - (v / mx) * (h - 6)}`,
     );
     parts.push(`<polyline points="${pts.join(" ")}" fill="none" stroke="${color}" stroke-width="1.5"/>`);
+    const last = pts[pts.length - 1].split(",");
+    parts.push(`<circle cx="${last[0]}" cy="${last[1]}" r="2.2" fill="${lastColor || color}"/>`);
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${parts.join("")}</svg>`;
   }
   const bw = w / values.length;
-  const hi = Math.max(...values);
+  // Only the last bar is marked (as "lastcolor" of SPARKLINE does)
   values.forEach((v, i) => {
     const bh = Math.max((v / mx) * (h - 4), v > 0 ? 1.5 : 0);
     parts.push(
-      `<rect x="${i * bw + 1}" y="${h - 2 - bh}" width="${Math.max(bw - 2, 1)}" height="${bh}" fill="${v === hi && v > 0 ? highColor : color}"/>`,
+      `<rect x="${i * bw + 1}" y="${h - 2 - bh}" width="${Math.max(bw - 2, 1)}" height="${bh}" fill="${i === values.length - 1 ? lastColor || color : color}"/>`,
     );
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${parts.join("")}</svg>`;

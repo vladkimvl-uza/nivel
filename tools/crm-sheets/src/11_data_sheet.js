@@ -88,6 +88,8 @@ function nvFeeIn(from, toX) {
     '"; ' +
     P("status") +
     '; "Подтверждён"; ' +
+    P("check") +
+    '; "ОК"; ' +
     P("date") +
     '; ">="&' +
     from +
@@ -150,20 +152,8 @@ function nvKpiDefs() {
   defs.fee = {
     v: nvFeeIn("ND_FROM", "ND_TO_X"),
     p: prev(nvFeeIn("ND_PREV_FROM", "ND_PREV_TO_X")),
-    sub:
-      '"платежей: "&COUNTIFS(' +
-      nvR("payments", "group") +
-      '; "Плата"; ' +
-      nvR("payments", "status") +
-      '; "Подтверждён"; ' +
-      nvR("payments", "date") +
-      '; ">="&ND_FROM; ' +
-      nvR("payments", "date") +
-      '; "<"&ND_TO_X; ' +
-      nvR("payments", "demo") +
-      "; " +
-      C +
-      ")",
+    // What is really in hand: Xolis keeps 1 % of the fee when it is withdrawn to the account (DECISIONS R-10)
+    sub: '"на руки ≈ "&' + mln(b("fee") + "*(10000-NV_XOLIS_WITHDRAW_BP)/10000") + '&" млн"',
     cmp: true,
   };
   defs.wip = {
@@ -180,6 +170,7 @@ function nvKpiDefs() {
       ")",
   };
   defs.delivered = {
+    minPrev: 3,
     v: ordersIn("dHandover", "ND_FROM", "ND_TO_X"),
     p: prev(ordersIn("dHandover", "ND_PREV_FROM", "ND_PREV_TO_X")),
     sub:
@@ -199,8 +190,9 @@ function nvKpiDefs() {
     cmp: true,
   };
   defs.leads = {
-    v: periodCount("ND_FROM", "ND_TO_X"),
-    p: prev(periodCount("ND_PREV_FROM", "ND_PREV_TO_X")),
+    minPrev: 3,
+    v: periodCount("ND_FROM", "ND_TO_X", L("status") + '; "<>Спам"'),
+    p: prev(periodCount("ND_PREV_FROM", "ND_PREV_TO_X", L("status") + '; "<>Спам"')),
     sub:
       '"спам "&' +
       periodCount("ND_FROM", "ND_TO_X", L("status") + '; "Спам"') +
@@ -211,8 +203,14 @@ function nvKpiDefs() {
   defs.threshold = {
     v: "TH_SHARE",
     p: '""',
-    sub: mln("TH_VOLUME") + '&" из "&' + mln("TH_LIMIT") + '&" млн · с принятыми "&TEXT(TH_PROJ;"0%")',
-    worse: "TH_SHARE*10000>=NV_ALERT_2",
+    // 2026 is limited by the plan (R-7), not by the legal limit: the line says how much is left to the plan
+    sub:
+      'IF(TH_YEAR=2026; "до плана 2026 осталось "&' +
+      mln("MAX(0; NV_PLAN_CAP_2026-TH_VOLUME-TH_COMMITTED)") +
+      '&" млн · "&TEXT(TH_PROJ;"0%")&" порога"; "до порога осталось "&' +
+      mln("TH_LEFT") +
+      '&" млн · с принятыми "&TEXT(TH_PROJ;"0%"))',
+    worse: 'IF(TH_YEAR=2026; TH_OVER="Да"; TH_SHARE*10000>=NV_ALERT_2)',
   };
   defs.funds = {
     v:
@@ -251,12 +249,11 @@ function nvKpiDefs() {
   defs.taxdue = {
     v: "QUOTIENT(MAX(0; " + nvFeeIn(prevStart, thisStart) + ")*NV_TURNOVER_TAX_BP+9999; 10000)",
     p: '""',
-    sub:
-      '"до "&TEXT(DATE(YEAR(TODAY());MONTH(TODAY());15);"dd.mm.yyyy")&" · резерв налога "&' +
-      mln("NV_RES_BAL_T") +
-      '&" млн"',
+    // An estimate. Xolis holds the 1 % itself (R-10), whether an own calculation is needed is not confirmed (R-7): the
+    // owner switches it in the settings; the tax reserve is not mixed in (it is another 1 %, of the receipts)
+    sub: 'IF(NV_XOLIS_WITHHOLDS; "оценка · удерживает Xolis"; "к уплате до "&TEXT(DATE(YEAR(TODAY());MONTH(TODAY());15);"dd.mm.yyyy"))',
     worse:
-      "AND(TODAY()>DATE(YEAR(TODAY());MONTH(TODAY());15); NOT(IFERROR(INDEX(TH_PAID; MATCH(" +
+      "AND(NOT(NV_XOLIS_WITHHOLDS); TODAY()>DATE(YEAR(TODAY());MONTH(TODAY());15); NOT(IFERROR(INDEX(TH_PAID; MATCH(" +
       prevStart +
       "; TH_MONTHS; 0)); FALSE)))",
   };
@@ -338,6 +335,8 @@ function nvKpiDefs() {
     sub:
       '"цель "&NV_FIRST_RESPONSE_HOURS&" ч: в срок "&TEXT(IFERROR(COUNTIFS(' +
       L("replyH") +
+      '; ">=0"; ' +
+      L("replyH") +
       '; "<="&NV_FIRST_RESPONSE_HOURS; ' +
       L("created") +
       '; ">="&ND_FROM; ' +
@@ -361,7 +360,7 @@ function nvKpiDefs() {
     lowerIsBetter: true,
   };
   defs.overdue = {
-    v: "COUNTIF(" + nvQuoteSheet(NV_SN.today) + '!$C$6:$C; "Просрочено")',
+    v: "COUNTIF(" + nvQuoteSheet(NV_SN.today) + '!$F$6:$F; "Просрочено")',
     p: '""',
     sub:
       '"гарантия: открыто "&COUNTIFS(' +
@@ -386,7 +385,19 @@ function nvKpiDefs() {
     const d = defs[k];
     d.text = d.cmp ? d.sub + '&" · "&' + nvCompareText(b(k), c(k)) : d.sub;
     if (d.cmp) {
-      d.worse = "IF(OR(" + c(k) + '="";' + b(k) + '="");FALSE;' + b(k) + (d.lowerIsBetter ? ">" : "<") + c(k) + ")";
+      // "Worse" is a change that matters: the figure is lower (higher, for the time of the reply) than the previous period
+      // by NV_WORSE_PCT or more; a count of the previous period below minPrev is too small to alarm anyone
+      const moved = d.lowerIsBetter
+        ? b(k) + ">" + c(k) + "*(1+NV_WORSE_PCT/100)"
+        : b(k) + "<" + c(k) + "*(1-NV_WORSE_PCT/100)";
+      d.worse =
+        "IF(OR(" +
+        c(k) +
+        '="";' +
+        b(k) +
+        '="");FALSE;' +
+        (d.minPrev ? "AND(" + c(k) + ">=" + d.minPrev + ";" + moved + ")" : moved) +
+        ")";
     } else if (!d.worse) d.worse = "FALSE";
   });
   return defs;
@@ -468,7 +479,7 @@ function nvDataCells() {
     const inWeek = (range) => range + '; ">="&A' + r + "; " + range + '; "<"&A' + r + "+7";
     put("C", r, "=COUNTIFS(" + inWeek(O("created")) + "; " + O("demo") + "; " + C + ")");
     put("D", r, "=COUNTIFS(" + inWeek(O("dHandover")) + "; " + O("demo") + "; " + C + ")");
-    put("E", r, "=COUNTIFS(" + inWeek(L("created")) + "; " + L("demo") + "; " + C + ")");
+    put("E", r, "=COUNTIFS(" + inWeek(L("created")) + "; " + L("status") + '; "<>Спам"; ' + L("demo") + "; " + C + ")");
     put(
       "F",
       r,
@@ -483,6 +494,8 @@ function nvDataCells() {
         ")/COUNTIFS(" +
         inWeek(L("created")) +
         "; " +
+        L("status") +
+        '; "<>Спам"; ' +
         L("demo") +
         "; " +
         C +
@@ -697,7 +710,8 @@ function nvDataCells() {
   });
   NV_STAGES.forEach((st, i) => {
     const r = NV_ND.stages + i;
-    const codes = "FILTER(NVD_STATUS_CODE; NVD_STATUS_STAGE=A" + r + ")";
+    // An expired estimate is not an open order: it is left out of the stages
+    const codes = "FILTER(NVD_STATUS_CODE; NVD_STATUS_STAGE=A" + r + '; NVD_STATUS_CODE<>"estimate_expired")';
     put("A", r, st);
     put("D", r, "=SUMPRODUCT(COUNTIFS(" + O("code") + "; " + codes + "; " + O("demo") + "; " + C + "))");
     put(

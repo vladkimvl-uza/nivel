@@ -2,8 +2,9 @@
  * Nivel CRM for Google Sheets. Apps Script (V8), no modules: every top-level name is global.
  * Files are loaded in the order of their numeric prefix (the bundle keeps the same order).
  *
- * Money rules live in 01_money.js (pure functions, mirrored from packages/domain), the sheet structure in
- * 02_schema.js and 03_dicts.js, everything that touches SpreadsheetApp in the files after them.
+ * Money rules live in 01_money.js (pure functions, mirrored from packages/domain), the dictionaries in 02_dicts.js, the
+ * settings in 03_settings.js, the structure of the sheets in 04_schema.js, everything that touches SpreadsheetApp in the
+ * files after them.
  */
 
 const NV_VERSION = "1.0.0";
@@ -41,6 +42,7 @@ const NV_BRAND = {
 const NV_SN = {
   panel: "Панель",
   today: "Сегодня",
+  phone: "Телефон",
   leads: "Заявки",
   orders: "Заказы",
   payments: "Платежи",
@@ -63,6 +65,7 @@ const NV_SN = {
 const NV_SHEET_ORDER = [
   "panel",
   "today",
+  "phone",
   "leads",
   "orders",
   "payments",
@@ -127,15 +130,15 @@ const NV_THEMES = {
     tileRule: "#1D1D1B",
     tileRuleOn: true,
     input: "#FFFFFF",
-    // Ordinal scale of the stages, light to dark.
-    ordinal: ["#D49874", "#D9773F", "#C2481A", "#8E3511", "#4A2414"],
+    // Ordinal scale of the stages, light to dark: graphite and asphalt (the orange is kept for what is worse than the norm)
+    ordinal: ["#CFC9BD", "#B3ADA0", "#8E887D", "#5C574F", "#2E2C28"],
     status: {
-      s1: { fill: "#EEE7DC", text: "#5E574D", bold: false },
-      s2: { fill: "#F0D9C4", text: "#6B2E12", bold: false },
-      s3: { fill: "#E8BF9C", text: "#4A2414", bold: false },
-      s4: { fill: "#DFA27A", text: "#3A1C10", bold: false },
-      s5: { fill: "#8C4A2B", text: "#FFFFFF", bold: true },
-      s6: { fill: "#5C3220", text: "#F6E4D6", bold: true },
+      s1: { fill: "#EEE9DF", text: "#5E574D", bold: false },
+      s2: { fill: "#E1DCD1", text: "#4A453D", bold: false },
+      s3: { fill: "#D0CABD", text: "#3A362F", bold: false },
+      s4: { fill: "#B6B0A3", text: "#1D1D1B", bold: false },
+      s5: { fill: "#77716A", text: "#FFFFFF", bold: true },
+      s6: { fill: "#4A4640", text: "#F1EFEA", bold: true },
       s7: { fill: "#1D1D1B", text: "#F1EFEA", bold: true },
       archive: { fill: null, text: "#5E574D", bold: false },
       cancelling: { fill: "#E4DDD2", text: "#5E574D", bold: false },
@@ -168,14 +171,14 @@ const NV_THEMES = {
     tileRule: "#262522",
     tileRuleOn: false,
     input: "#2B2926",
-    ordinal: ["#82401F", "#B04B22", "#F06A30", "#F39A6E", "#F6C9AE"],
+    ordinal: ["#46423C", "#6B665E", "#8F8A80", "#BDB7AB", "#E4DDD2"],
     status: {
       s1: { fill: "#2E2B27", text: "#A39C90", bold: false },
-      s2: { fill: "#3A2A20", text: "#E8B595", bold: false },
-      s3: { fill: "#4E3020", text: "#F0C2A3", bold: false },
-      s4: { fill: "#6A3A22", text: "#F6D3BE", bold: false },
-      s5: { fill: "#8C4625", text: "#FFF1E8", bold: true },
-      s6: { fill: "#B4582C", text: "#FFFFFF", bold: true },
+      s2: { fill: "#38352F", text: "#B9B2A6", bold: false },
+      s3: { fill: "#46423B", text: "#CFC9BD", bold: false },
+      s4: { fill: "#5A554D", text: "#E4DDD2", bold: false },
+      s5: { fill: "#787269", text: "#FFFFFF", bold: true },
+      s6: { fill: "#A39C90", text: "#1D1D1B", bold: true },
       s7: { fill: "#F1EFEA", text: "#1D1D1B", bold: true },
       archive: { fill: null, text: "#A39C90", bold: false },
       cancelling: { fill: "#33302C", text: "#A39C90", bold: false },
