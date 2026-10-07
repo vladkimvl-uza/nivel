@@ -2,6 +2,7 @@
 // The package renders what it is given: the worker (apps/worker/src/jobs/pdf) reads the order through @nivel/services and
 // @nivel/db and hands the data over; no money is counted here.
 
+export { ACT_KINDS, renderAct } from "./act.ts";
 export { DocumentDataError } from "./guards.ts";
 export { renderQuote } from "./quote.ts";
 export { PDF_MAX_BYTES, PdfTooLargeError } from "./render.ts";

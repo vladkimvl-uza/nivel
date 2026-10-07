@@ -217,25 +217,27 @@ export function paperDocument(input: FrameInput): DocumentElement {
 
 // ---- blocks ----
 
-/** A numbered or plain heading of a section, in the condensed face, with a thin line over it. */
+/** A section: a heading in the condensed face (none when the title is empty) and its content. */
 export function section(title: string, ...children: ReactNode[]): ReactElement {
   return h(
     View,
     { style: { marginTop: 11 } },
-    h(
-      Text,
-      {
-        style: {
-          fontFamily: CONDENSED,
-          fontWeight: 600,
-          fontSize: 11.5,
-          marginBottom: 4,
-          color: palette.asphalt,
-        },
-        minPresenceAhead: 40,
-      },
-      title,
-    ),
+    title === ""
+      ? null
+      : h(
+          Text,
+          {
+            style: {
+              fontFamily: CONDENSED,
+              fontWeight: 600,
+              fontSize: 11.5,
+              marginBottom: 4,
+              color: palette.asphalt,
+            },
+            minPresenceAhead: 40,
+          },
+          title,
+        ),
     ...children,
   );
 }

@@ -165,5 +165,51 @@
       "accepted": "Mijoz tasdiqladi: {date}",
       "deemed": "Hisobot muddat boʻyicha qabul qilingan: {date}"
     }
+  },
+  "act": {
+    "title": {
+      "material_acceptance": "Mijoz materialini qabul qilish dalolatnomasi",
+      "customer_parts": "Mijoz qismlarini qaytarish dalolatnomasi",
+      "handover": "Topshirish dalolatnomasi"
+    },
+    "intro": {
+      "material_acceptance": "Komissioner xarid qilib bergan butlovchi qismlar mijoz materiali sifatida yigʻishga qabul qilinadi (FK 661-moddasi). Narxlar chek boʻyicha.",
+      "customer_parts": "Buyurtma bekor qilingani sababli mijozga unga tegishli qismlar qaytariladi.",
+      "handover": "Tayyor kompyuter mijozga topshiriladi. Sinov bayonnomasi kompyuter pasportida."
+    },
+    "lines": {
+      "title": "Pozitsiyalar",
+      "none": "Pozitsiyalar koʻrsatilmagan."
+    },
+    "col": {
+      "item": "Nomi",
+      "qty": "Soni",
+      "serial": "Seriya raqami",
+      "doc": "Chek",
+      "sum": "Summa"
+    },
+    "receipts": {
+      "title": "Narxlar chek boʻyicha",
+      "total": "Chek boʻyicha jami",
+      "none": "Chek boʻyicha xaridlar yoʻq."
+    },
+    "handover": {
+      "warranty": "Kafolat muddati: {date} gacha",
+      "warranty_pending": "Kafolat topshirilgan kundan boshlanadi.",
+      "passport": "Kompyuter pasporti ilova qilingan.",
+      "claims": "Mijoz tashqi koʻrinish va butlikka eʼtiroz bildirmaydi."
+    },
+    "sign": {
+      "title": "Imzolar",
+      "ip": "Komissioner / ijrochi (YaTT)",
+      "customer": "Mijoz",
+      "signed": "Imzolangan: {at}, {via}",
+      "unsigned": "Hali imzolanmagan",
+      "via": {
+        "tg_button": "Telegram tugmasi orqali",
+        "paper_photo": "qogʻoz dalolatnomaning fotosi",
+        "site_button": "sayt tugmasi orqali"
+      }
+    }
   }
 }
