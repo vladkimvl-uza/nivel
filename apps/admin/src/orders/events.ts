@@ -104,13 +104,18 @@ export const STATUS_ORDER: readonly OrderStatus[] = [
 const TABLE = orderTransitionTable();
 const isAction = (type: string): type is keyof typeof ACTIONS => Object.hasOwn(ACTIONS, type);
 
-/** The actions the role may start in this status, in the order of the table. */
-export function actionsFor(status: OrderStatus, role: Role): EventAction[] {
+/** Events that belong to one kind of order only: the "Podbor" is delivered, a PC is not. */
+const ONLY_FOR_KIND: Partial<Record<EventType, string>> = { PODBOR_DELIVERED: "podbor" };
+
+/** The actions the role may start in this status for this kind of order, in the order of the table. */
+export function actionsFor(status: OrderStatus, role: Role, kind = "pc"): EventAction[] {
   if (role !== "owner" && role !== "assistant") return [];
   const seen = new Set<string>();
   const out: EventAction[] = [];
   for (const row of TABLE) {
     if (row.from !== status || !row.actors.includes(role) || seen.has(row.event) || !isAction(row.event)) continue;
+    const only = ONLY_FOR_KIND[row.event];
+    if (only !== undefined && only !== kind) continue;
     seen.add(row.event);
     out.push(ACTIONS[row.event]);
   }

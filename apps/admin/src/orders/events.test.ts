@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { ACTIONS, actionsFor, MONEY_EVENTS, STATUS_ORDER } from "./events.ts";
 
 const table = orderTransitionTable();
-const types = (status: Parameters<typeof actionsFor>[0], role: Parameters<typeof actionsFor>[1]) =>
-  actionsFor(status, role).map((a) => a.type);
+const types = (status: Parameters<typeof actionsFor>[0], role: Parameters<typeof actionsFor>[1], kind = "podbor") =>
+  actionsFor(status, role, kind).map((a) => a.type);
 
 describe("the buttons of the card follow the table of the automaton", () => {
   it("offers what the owner may send in the status, and nothing of the customer and the system", () => {
@@ -52,6 +52,13 @@ describe("the buttons of the card follow the table of the automaton", () => {
       expect(a.label, type).toMatch(/[А-Яа-я]/);
       expect(["button", "form", "elsewhere"]).toContain(a.ui);
     }
+  });
+
+  it("offers the delivery of the Podbor only for an order of that kind", () => {
+    expect(types("estimate_sent", "owner", "podbor")).toContain("PODBOR_DELIVERED");
+    for (const kind of ["pc", "setup", "upgrade"])
+      expect(types("estimate_sent", "owner", kind)).not.toContain("PODBOR_DELIVERED");
+    expect(actionsFor("estimate_sent", "owner").map((a) => a.type)).not.toContain("PODBOR_DELIVERED");
   });
 
   it("sends the estimate, the purchases and the report from their own screens, not from a bare button", () => {

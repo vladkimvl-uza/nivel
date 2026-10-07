@@ -203,7 +203,7 @@ const ELSEWHERE_LINK: Record<string, { href: (id: string) => string; label: stri
 };
 
 export function NextSteps({ card, role }: { card: OrderCard; role: Role }) {
-  const actions = actionsFor(card.order.status, role);
+  const actions = actionsFor(card.order.status, role, card.order.kind);
   const waiting = WAITING_FOR[card.order.status];
   const forms = actions.filter((a) => a.ui !== "elsewhere");
   const links = actions.filter((a) => a.ui === "elsewhere");
