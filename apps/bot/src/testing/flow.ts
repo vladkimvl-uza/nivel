@@ -127,6 +127,14 @@ export async function purchasingOrder(w: BotWorld, c: LeadCase): Promise<QuotedO
 /** Every position is bought with a receipt and a photo, and the purchases are closed. */
 export async function purchasedOrder(w: BotWorld, c: LeadCase): Promise<QuotedOrder> {
   const o = await purchasingOrder(w, c);
+  await recordAllPurchases(w, o);
+  const done = await dispatch(o.orderId, { type: "PURCHASE_DONE" }, ownerActor(w), w.admin);
+  if (!done.ok) throw new Error(`the purchases were not closed: ${done.error}`);
+  return o;
+}
+
+/** The admin panel records the purchase of every position of the quote with a fiscal receipt and its photo. */
+export async function recordAllPurchases(w: BotWorld, o: QuotedOrder): Promise<void> {
   for (const p of PC_CATALOG) {
     const { rows } = await w.db.$client.query(
       "select id from sales.quote_lines where quote_id = $1 and product_id = $2",
@@ -151,9 +159,6 @@ export async function purchasedOrder(w: BotWorld, c: LeadCase): Promise<QuotedOr
     );
     if (!r.ok) throw new Error(`the purchase of ${p.key} was refused: ${r.error}`);
   }
-  const done = await dispatch(o.orderId, { type: "PURCHASE_DONE" }, ownerActor(w), w.admin);
-  if (!done.ok) throw new Error(`the purchases were not closed: ${done.error}`);
-  return o;
 }
 
 /** The owner sends the report of the commission (status report_sent). */
