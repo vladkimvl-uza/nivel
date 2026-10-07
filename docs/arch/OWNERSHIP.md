@@ -115,6 +115,7 @@
 
 - `apps/admin/app/{(dashboard),(leads),(orders),(registry)}/**`
 - `apps/admin/src/orders/**`
+- `e2e/orders-*.spec.ts` (заказ от сметы до закрытия, фото чека с мобильного профиля; добавлено интегратором 07.10.2026)
 
 ## WP-12
 
@@ -162,6 +163,7 @@ Worker: каркас, outbox, напоминания, порог, очистка
 - `apps/web/src/{lead-form,i18n}/**`
 - `apps/web/src/csp.ts`
 - `packages/i18n/messages/{uz,ru,meta}/site.json`
+- `e2e/site-*.spec.ts` (одностраничник, заявка, LCP на профиле Pixel 7; добавлено интегратором 07.10.2026)
 
 ## WP-17
 
