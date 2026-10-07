@@ -1,0 +1,72 @@
+/*
+ * The few rules the orders screens add to the admin (night theme of @nivel/ui, ADR-006): the board by stages and the
+ * meter of the purchases. Colours are roles of themes.css, nothing of its own.
+ */
+
+.ord-board {
+  display: grid;
+  gap: 24px;
+}
+
+.ord-stage {
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  background: var(--surface);
+}
+
+.ord-stage > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.ord-stage > .adm-table-wrap {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.ord-count {
+  font-family: var(--mono);
+  color: var(--ink-2);
+}
+
+.ord-late {
+  color: var(--accent-ink);
+}
+
+meter {
+  width: min(320px, 60vw);
+  height: 14px;
+  vertical-align: middle;
+}
+
+.adm-card details > summary,
+details.adm-card > summary {
+  cursor: pointer;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.adm-card h3 {
+  margin: 0 0 8px;
+  font-family: var(--cond);
+  font-size: 18px;
+}
+
+.ord-lines input[type="number"],
+.ord-inline-field {
+  width: 88px;
+}
+
+@media (max-width: 640px) {
+  .adm-grid {
+    grid-template-columns: 1fr;
+  }
+}

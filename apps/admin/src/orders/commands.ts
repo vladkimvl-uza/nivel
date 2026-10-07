@@ -334,3 +334,33 @@ export async function convertLead(ctx: Ctx, leadId: string): Promise<Outcome> {
     return ok(r.created ? `Заказ ${r.number} создан.` : `Заказ ${r.number} уже был создан.`, r.orderId);
   });
 }
+
+// ---- the PDF documents (WP-12) ------------------------------------------------------------------------------------
+export const PDF_DOCS = [
+  "quote",
+  "commission_report",
+  "act_materials",
+  "act_customer_parts",
+  "act_handover",
+  "passport",
+  "warranty",
+] as const;
+
+/** Queues the rendering of a document; the worker (WP-12) makes the file in uz and ru. Only when the switch is on (the page checks). */
+export async function requestPdf(ctx: Ctx, orderId: string, orderNumber: string, form: FormInput): Promise<Outcome> {
+  return guarded(ctx, "pdf.render", async () => {
+    const doc = pick(PDF_DOCS, text(form, "doc"));
+    if (!doc) return fail("Выберите документ.");
+    const actId = text(form, "actId");
+    await ctx.svc.outbox.enqueue(
+      {
+        kind: "job",
+        payload: { job: "pdf.render", orderId, orderNumber, doc, ...(actId === undefined ? {} : { actId }) },
+        dedupeKey: `pdf:${orderId}:${doc}:${actId ?? "-"}:${ctx.now().getTime()}`,
+      },
+      {},
+      ctx.rt,
+    );
+    return ok("Документ поставлен в очередь: файл появится в карточке, когда задача отработает.");
+  });
+}

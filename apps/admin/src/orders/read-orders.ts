@@ -123,6 +123,12 @@ export interface QuoteLineView {
   purchasedByIp: boolean;
 }
 
+/** The files of a document made by the worker (WP-12), by language; empty until it has run. */
+export interface PdfFiles {
+  uz: string | null;
+  ru: string | null;
+}
+
 export interface QuoteView {
   id: string;
   version: number;
@@ -136,6 +142,7 @@ export interface QuoteView {
   compatVerdict: string;
   shelfLifeHours: number | null;
   lines: QuoteLineView[];
+  pdf: PdfFiles;
 }
 
 export interface PaymentView {
@@ -190,6 +197,7 @@ export interface ReportView {
   objection: { text?: string; note?: string; resolved: boolean } | null;
   acceptedAt: Date | null;
   deemedAcceptedAt: Date | null;
+  pdf: PdfFiles;
 }
 
 export interface ActView {
@@ -200,6 +208,7 @@ export interface ActView {
   signedVia: string | null;
   evidenceFileId: string | null;
   createdAt: Date;
+  pdf: PdfFiles;
 }
 
 export interface PassportView {
@@ -211,6 +220,7 @@ export interface PassportView {
   sealPhotoIds: string[];
   labelCode: string | null;
   notes: string | null;
+  pdf: PdfFiles;
 }
 
 export interface WarrantyCaseView {
@@ -296,6 +306,7 @@ async function loadQuote(db: Db, quoteId: string): Promise<QuoteView | null> {
     totals: parseTotals(q.totals, q as never),
     compatVerdict: meta.compatVerdict ?? "incomplete",
     shelfLifeHours: typeof meta.shelfLifeHours === "number" ? meta.shelfLifeHours : null,
+    pdf: { uz: q.pdfUzFileId, ru: q.pdfRuFileId },
     lines: q.lines.map((l) => ({
       id: l.id,
       productId: l.productId,
@@ -378,6 +389,7 @@ function passportView(row: Record<string, unknown> | undefined): PassportView | 
     sealPhotoIds: (row.sealPhotos as string[] | null) ?? [],
     labelCode: (row.labelCode as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
+    pdf: { uz: (row.pdfUzFileId as string | null) ?? null, ru: (row.pdfRuFileId as string | null) ?? null },
   };
 }
 
@@ -504,6 +516,7 @@ export async function getOrderCard(db: Db, orderId: string, opts: { seePhone: bo
           : null,
         acceptedAt: r.acceptedAt,
         deemedAcceptedAt: r.deemedAcceptedAt,
+        pdf: { uz: r.pdfUzFileId, ru: r.pdfRuFileId },
       };
     }),
     acts: acts.map((a) => ({
@@ -514,6 +527,7 @@ export async function getOrderCard(db: Db, orderId: string, opts: { seePhone: bo
       signedVia: a.signedVia,
       evidenceFileId: (a.evidence as { fileId?: string } | null)?.fileId ?? null,
       createdAt: a.createdAt,
+      pdf: { uz: a.pdfUzFileId, ru: a.pdfRuFileId },
     })),
     passport: passportView(pass),
     warranty: warranty.map((w) => ({

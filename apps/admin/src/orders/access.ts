@@ -26,6 +26,8 @@ export const ORDERS_PERMISSIONS = {
   "acts.sign": ["owner"],
   "passport.write": ["owner", "assistant"],
   "warranty.write": ["owner", "assistant"],
+  /** Queue the rendering of a PDF document (WP-12); it moves no money. Behind the switch `feature.pdf`. */
+  "pdf.render": ["owner", "assistant"],
   "registry.read": ["owner", "accountant"],
   "registry.write": ["owner"],
   "registry.export": ["owner", "accountant"],

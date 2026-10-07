@@ -43,3 +43,13 @@ describe("dates in Tashkent", () => {
     expect(formatDate("2026-10-12")).toBe("12.10.2026");
   });
 });
+
+describe("toTashkentLocal", () => {
+  it("writes a moment as the value of a datetime-local field, and parseTashkentLocal reads it back", async () => {
+    const { toTashkentLocal } = await import("./format.ts");
+    const { parseTashkentLocal } = await import("./build-event.ts");
+    const at = new Date("2026-10-12T10:30:00Z");
+    expect(toTashkentLocal(at)).toBe("2026-10-12T15:30");
+    expect(parseTashkentLocal(toTashkentLocal(at))?.toISOString()).toBe("2026-10-12T10:30:00.000Z");
+  });
+});

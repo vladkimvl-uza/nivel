@@ -54,3 +54,9 @@ export function tashkentDay(at: Date): string {
   const w = wall(at);
   return `${w.y}-${w.m}-${w.d}`;
 }
+
+/** The value of a datetime-local field for a moment: the wall clock of Tashkent, 2026-10-12T15:30. */
+export function toTashkentLocal(at: Date): string {
+  const w = wall(at);
+  return `${w.y}-${w.m}-${w.d}T${w.h}:${w.min}`;
+}

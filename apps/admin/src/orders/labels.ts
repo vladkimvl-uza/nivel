@@ -126,3 +126,49 @@ export const FAULT_LABEL: Record<string, string> = {
   overclocking: "разгон",
   third_party_replacement: "замена не исполнителем",
 };
+
+/** The events of the journal of an order, as the owner reads them. */
+export const EVENT_LABEL: Record<string, string> = {
+  SEND_ESTIMATE: "Смета отправлена клиенту",
+  EXPIRE: "Срок сметы истёк",
+  REVISE: "Смета возвращена в работу",
+  ACCEPT: "Клиент принял оферту и смету",
+  FEE_PREPAID: "Аванс платы получен",
+  FUNDS_RECEIVED: "Деньги на закупку получены",
+  MEETING_DONE: "Встреча или видеозвонок состоялись",
+  START_PURCHASE: "Закупка начата",
+  PURCHASE_RECORDED: "Покупка записана",
+  PURCHASE_DONE: "Закупки закрыты",
+  SEND_REPORT: "Отчёт отправлен клиенту",
+  OBJECTION: "Возражение клиента к отчёту",
+  REPORT_ACCEPTED: "Клиент принял отчёт",
+  REPORT_DEEMED_ACCEPTED: "Отчёт принят по сроку",
+  REMAINDER_SETTLED: "Остаток сведён",
+  MATERIALS_ACCEPTED: "Материал клиента принят",
+  ASSEMBLED: "Сборка закончена",
+  TESTS_PASSED: "Тесты пройдены",
+  DISPATCH: "Передано в доставку",
+  HANDOVER: "Передано клиенту",
+  CLOSE: "Заказ закрыт",
+  PODBOR_DELIVERED: "«Подбор» передан",
+  CANCEL: "Заказ отменён по заявлению клиента",
+  CANCEL_SETTLED: "Расчёты по отмене завершены",
+};
+
+export const ACTOR_LABEL: Record<string, string> = {
+  owner: "владелец",
+  assistant: "помощник",
+  customer: "клиент",
+  system: "система",
+};
+
+/** Who is waited for in a status where the owner has no button: said so that an empty list of steps is not a riddle. */
+export const WAITING_FOR: Partial<Record<OrderStatus, string>> = {
+  estimate_sent: "Ждём клиента: он принимает оферту и смету в боте. Срок сметы указан выше.",
+  report_sent:
+    "Ждём клиента: он принимает отчёт или возражает. По истечении срока возражений отчёт считается принятым.",
+  handed_over: "Заказ закроется автоматически, когда сойдутся деньги и будут все документы.",
+  closed: "Заказ закрыт. Гарантия идёт по сроку, указанному выше.",
+  podbor_delivered: "«Подбор» передан. Плата зачтётся, если клиент закажет сборку в срок.",
+  cancelled: "Заказ отменён, расчёты завершены.",
+};
