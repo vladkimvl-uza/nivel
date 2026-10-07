@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { createWorkerDatabase } from "../../packages/testing/src/db.ts";
+import { APP_ROLES_WITH_CONNECT, createWorkerDatabase, productionRightsSql } from "../../packages/testing/src/db.ts";
 import {
   assertTestClusterUrl,
   assertTestDatabaseUrl,
@@ -44,5 +45,23 @@ describe("test database harness guards", () => {
     const target = {};
     await expect(createWorkerDatabase(1, env, target)).rejects.toThrow(/54329 is the development cluster/);
     expect(target).toEqual({});
+  });
+});
+
+describe("the rights of a test database", () => {
+  it("repeat those of the production database: PUBLIC nothing, CONNECT for the four roles, no CREATE for anybody", () => {
+    expect(productionRightsSql("nivel_s0_w1_test")).toEqual([
+      'revoke all on database "nivel_s0_w1_test" from public',
+      'grant connect on database "nivel_s0_w1_test" to nivel_web, nivel_admin, nivel_bot, nivel_worker',
+    ]);
+    expect(productionRightsSql("nivel_s0_w1_test").join(" ")).not.toMatch(/create|temp/i);
+    expect(() => productionRightsSql('x"; drop database y; --')).toThrow(/unsafe identifier/);
+  });
+
+  it("say what infra/postgres/init/01-roles.sh says for `nivel`: the harness copies the script, a clone does not inherit it", () => {
+    const init = readFileSync(new URL("../../infra/postgres/init/01-roles.sh", import.meta.url), "utf8");
+    expect(init).toMatch(/REVOKE ALL ON DATABASE nivel FROM PUBLIC;/);
+    const granted = /GRANT CONNECT ON DATABASE nivel TO ([^;]+);/.exec(init)?.[1];
+    expect(granted?.split(",").map((r) => r.trim())).toEqual([...APP_ROLES_WITH_CONNECT]);
   });
 });

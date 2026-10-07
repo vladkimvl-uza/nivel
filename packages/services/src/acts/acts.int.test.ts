@@ -176,23 +176,47 @@ describe("acts.sign", () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("the bot cannot write acts: the signature goes to the outbox for the admin side, and the act stays as it is", async () => {
+  it("the bot cannot write acts, but signs the press of the button through the function of the database, with its clock", async () => {
     const { o, actId } = await actOf();
     const evidence = await tgOf(o);
+    const before = Date.now();
     const r = await sign({ actId, via: "tg_button", evidence }, customerActor(o), w.bot);
-    expect(r).toEqual({ signed: false, queued: true });
-    expect((await actRow(actId)).signed_at).toBeNull();
-    const job = await w.db.$client.query("select payload from ops.outbox where dedupe_key = $1", [`act:${actId}:sign`]);
-    expect(job.rows[0].payload).toMatchObject({ job: "act.sign", actId, via: "tg_button", orderId: o.orderId });
-    // The same press again does not queue it twice.
-    await sign({ actId, via: "tg_button", evidence }, customerActor(o), w.bot);
-    expect(
-      (
-        await w.db.$client.query("select count(*)::int as n from ops.outbox where dedupe_key = $1", [
-          `act:${actId}:sign`,
-        ])
-      ).rows[0].n,
-    ).toBe(1);
+    expect(r).toEqual({ signed: true, queued: false });
+    const row = await actRow(actId);
+    expect(row.signed_via).toBe("tg_button");
+    expect(row.evidence).toEqual(evidence);
+    // The time is the one of the database (the fake clock of the tests is days ahead of it).
+    expect(Math.abs((row.signed_at as Date).getTime() - before)).toBeLessThan(60_000);
+    // Nothing waits in the outbox for the admin side any more.
+    const queued = await w.db.$client.query("select 1 from ops.outbox where dedupe_key = $1", [`act:${actId}:sign`]);
+    expect(queued.rowCount).toBe(0);
+    // The press of the same person again: the act is signed once.
+    await expect(sign({ actId, via: "tg_button", evidence }, customerActor(o), w.bot)).rejects.toMatchObject({
+      issues: [{ code: "act_already_signed" }],
+    });
+    // The signature has an audit row of the database function, with the role that signed.
+    const audit = await w.db.$client.query(
+      "select actor, after from ops.audit_log where entity_id = $1 and action = 'act.sign'",
+      [actId],
+    );
+    expect(audit.rows).toEqual([
+      {
+        actor: `customer:${o.customerId}`,
+        after: { orderId: o.orderId, via: "tg_button", db_role: "nivel_bot" },
+      },
+    ]);
+  });
+
+  it("two presses at the same moment sign once, through the bot or the admin panel", async () => {
+    const { o, actId } = await actOf();
+    const evidence = await tgOf(o);
+    const results = await Promise.allSettled([
+      sign({ actId, via: "tg_button", evidence }, customerActor(o), w.bot),
+      sign({ actId, via: "tg_button", evidence }, customerActor(o), w.bot),
+    ]);
+    expect(results.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+    const lost = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
+    expect(lost.reason).toMatchObject({ issues: [{ code: "act_already_signed" }] });
   });
 
   it("takes a signature only with its evidence: the file of the paper act, the message of the button, the session of the site", async () => {
@@ -242,7 +266,7 @@ describe("acts.sign", () => {
         sign({ actId, via: "tg_button", evidence: { messageId: 1, telegramUserId: 1 } }, customerActor(o), rt),
       ).rejects.toMatchObject(mismatch);
     }
-    // Nothing was signed and nothing was queued for the admin side.
+    // Nothing was signed and nothing was queued.
     expect((await actRow(actId)).signed_at).toBeNull();
     const queued = await w.db.$client.query("select 1 from ops.outbox where dedupe_key = $1", [`act:${actId}:sign`]);
     expect(queued.rowCount).toBe(0);

@@ -336,8 +336,13 @@ describe("CHECK constraints", () => {
     },
     {
       name: "acts: signature time and channel go together",
-      sql: "insert into sales.acts (order_id, kind, signed_at) values ('$order', 'handover', now())",
+      sql: "insert into sales.acts (order_id, kind, signed_at, evidence) values ('$order', 'handover', now(), '{\"fileId\": \"x\"}')",
       constraint: "acts_signed_chk",
+    },
+    {
+      name: "acts: a signature rests on evidence",
+      sql: "insert into sales.acts (order_id, kind, signed_at, signed_via) values ('$order', 'handover', now(), 'tg_button')",
+      constraint: "acts_evidence_chk",
     },
     {
       name: "market prices: fewer than three vendors give no median",

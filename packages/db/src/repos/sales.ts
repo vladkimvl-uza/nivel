@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { type Sum, sum } from "@nivel/domain/money";
 import type { Actor, OrderEvent, OrderStatus } from "@nivel/domain/order";
-import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { legalDocuments } from "../schema/content.ts";
 import {
   configurations,
@@ -62,6 +62,21 @@ const customerView = {
   age18Confirmed: customers.age18Confirmed,
   createdAt: customers.createdAt,
 };
+
+/**
+ * Holds the row of a customer (FOR SHARE) and answers whether he has been made anonymous by the 12-month erasure; null when
+ * there is no such customer. The erasure takes the same row FOR UPDATE: whoever holds it first makes the other wait, and the
+ * one that waits judges again with what the first has committed, so an order is never opened for a customer who is
+ * being erased and a customer is never erased in the middle of the opening of his order.
+ */
+export async function holdCustomer(db: Executor, customerId: string): Promise<{ erased: boolean } | null> {
+  const [row] = await db
+    .select({ erasedAt: customers.erasedAt })
+    .from(customers)
+    .where(eq(customers.id, customerId))
+    .for("share");
+  return row ? { erased: row.erasedAt !== null } : null;
+}
 
 export async function findCustomerByTelegramId(db: Executor, telegramUserId: number): Promise<CustomerView | null> {
   const [row] = await db.select(customerView).from(customers).where(eq(customers.telegramUserId, telegramUserId));
@@ -135,6 +150,22 @@ export async function setLeadStatus(
       .returning({ id: leads.id }),
   );
   expectUpdated(rows, "lead", id);
+}
+
+/**
+ * Binds a request of the site, which could not be linked to a customer, to the customer the owner chose. The admin
+ * panel's alone (the database refuses the bot with actor_not_allowed) and once (another customer: `immutable`).
+ * True when the request was bound now; false when it already has this customer or does not exist.
+ */
+export async function bindLeadCustomer(db: Executor, leadId: string, customerId: string): Promise<boolean> {
+  const rows = await guarded(() =>
+    db
+      .update(leads)
+      .set({ customerId })
+      .where(and(eq(leads.id, leadId), or(isNull(leads.customerId), ne(leads.customerId, customerId))))
+      .returning({ id: leads.id }),
+  );
+  return rows.length > 0;
 }
 
 // ---- orders -----------------------------------------------------------------------------------------------------
@@ -299,6 +330,36 @@ export async function expectPayment(db: Executor, input: PaymentInput): Promise<
   );
   if (!row) throw new Error("payment was not written");
   return row.id;
+}
+
+export interface ExpectPaymentCall {
+  orderId: string;
+  kind: PaymentRow["kind"];
+  /** The whole sum the caller computed with the domain from the data of the database; the function does not know the quote. */
+  amountSum: number;
+  /** Only for a fee (QR or the card of the merchant); every other kind has one way. */
+  method?: PaymentRow["method"];
+  payerIsCustomer?: boolean;
+}
+
+/**
+ * An expected payment through sales.expect_payment(): the door of the bot and the worker, which have no right to the
+ * table (the site has none to the function either: its job travels through the outbox). The database checks the pair
+ * kind x method x direction, the sum, the order and a repeat; a repeat answers the expectation that is there.
+ */
+export async function expectPaymentAsRole(
+  db: Executor,
+  i: ExpectPaymentCall,
+): Promise<{ id: string; duplicate: boolean }> {
+  const { rows } = await guarded(() =>
+    db.execute<{ out_payment_id: string; out_duplicate: boolean }>(sql`
+      select * from sales.expect_payment(
+        ${i.orderId}::uuid, ${i.kind}::text, ${i.amountSum}::bigint, ${i.method ?? null}::text,
+        ${i.payerIsCustomer ?? true}::boolean)`),
+  );
+  const r = rows[0];
+  if (!r) throw new Error("expect_payment returned no row");
+  return { id: r.out_payment_id, duplicate: r.out_duplicate };
 }
 
 export interface ConfirmInput {
@@ -467,6 +528,15 @@ export async function orderMoney(db: Executor, orderId: string): Promise<OrderMo
   };
 }
 
+/** What was really paid: the confirmed payments of the order of these kinds, the reversals (negative rows) included. */
+export async function confirmedSum(db: Executor, orderId: string, kinds: readonly PaymentRow["kind"][]): Promise<Sum> {
+  const [row] = await db
+    .select({ total: sql<string>`coalesce(sum(${payments.amountSum}), 0)::text` })
+    .from(payments)
+    .where(and(eq(payments.orderId, orderId), eq(payments.status, "confirmed"), inArray(payments.kind, [...kinds])));
+  return sum(Number(row?.total ?? 0));
+}
+
 export interface OrderContext {
   order: OrderRow;
   quote: Awaited<ReturnType<typeof getQuote>>;
@@ -497,6 +567,13 @@ export async function loadOrderContext(db: Executor, orderId: string): Promise<O
 }
 
 // ---- reserves, other income, deals ------------------------------------------------------------------------------
+/**
+ * Appends an entry to the reserve ledger. The admin panel writes what the owner decides; the worker books contributions,
+ * and the database checks them (trigger reserve_ledger_guard): the time is its own clock whatever `at` says, the order has
+ * reached the milestone of the fund (settled for tax_risk, handed_over for warranty) and the sum, with what the order already
+ * has in that fund, is within what the domain computes from the receipts. A refusal is a check_violation named
+ * invalid_reserve, reserve_not_due or reserve_exceeded (a retried job meets the last one: the entry is already there).
+ */
 export async function appendReserve(
   db: Executor,
   r: { fund: "warranty" | "tax_risk"; amountSum: number; reason: string; orderId?: string; at?: Date },
@@ -581,4 +658,67 @@ export async function latestQuoteOfOrder(db: Executor, orderId: string) {
     .orderBy(desc(quotes.version))
     .limit(1);
   return row ?? null;
+}
+
+// ---- acts, the warranty fund, retention (WP-00) -------------------------------------------------------------------
+/**
+ * The signature of an act by the button of the bot, through sales.sign_act(): only the bot may call it, and the database
+ * signs only when the Telegram id of the press is the one of the customer of the order of the act. Answers the time of
+ * the signature (the clock of the database).
+ */
+export async function signActByButton(
+  db: Executor,
+  i: { actId: string; messageId: number; telegramUserId: number },
+): Promise<Date> {
+  const evidence = JSON.stringify({ messageId: i.messageId, telegramUserId: i.telegramUserId });
+  const { rows } = await guarded(() =>
+    db.execute<{ ms: string }>(
+      sql`select (extract(epoch from sales.sign_act(${i.actId}::uuid, 'tg_button', ${evidence}::jsonb)) * 1000)::float8::text as ms`,
+    ),
+  );
+  const ms = rows[0]?.ms;
+  if (ms === undefined) throw new Error("sign_act returned no row");
+  return new Date(Number(ms));
+}
+
+export interface WarrantyFundState {
+  /** Sum of the warranty fund in the ledger. */
+  balance: number;
+  /** Orders that reached `closed`. */
+  closedOrders: number;
+  /** What the cases of the last 12 months took from the fund. */
+  lossesLast12m: number;
+  /** What was bought in the last 12 months, returns to shops taken off. */
+  purchasedLast12m: number;
+}
+
+/** The state of the warranty fund for the contribution at HANDOVER: four aggregates, the same for every role. */
+export async function warrantyFundState(db: Executor, now?: Date): Promise<WarrantyFundState> {
+  const at = now === undefined ? null : now.toISOString();
+  const { rows } = await db.execute<{
+    out_balance: string;
+    out_closed_orders: number;
+    out_losses_12m: string;
+    out_purchased_12m: string;
+  }>(sql`select * from sales.warranty_fund_state(${at}::timestamptz)`);
+  const r = rows[0];
+  if (!r) throw new Error("warranty_fund_state returned no row");
+  return {
+    balance: Number(r.out_balance),
+    closedOrders: Number(r.out_closed_orders),
+    lossesLast12m: Number(r.out_losses_12m),
+    purchasedLast12m: Number(r.out_purchased_12m),
+  };
+}
+
+/**
+ * The 12-month erasure of requests that did not become an order (sales.purge_expired_leads): the personal data of the
+ * request and of its customer go. For the admin panel and the worker. Answers the number of requests cleaned.
+ */
+export async function purgeExpiredLeads(db: Executor, now?: Date): Promise<number> {
+  const at = now === undefined ? null : now.toISOString();
+  const { rows } = await guarded(() =>
+    db.execute<{ n: number }>(sql`select sales.purge_expired_leads(${at}::timestamptz) as n`),
+  );
+  return Number(rows[0]?.n ?? 0);
 }

@@ -1,4 +1,5 @@
 export {
+  bindCustomer,
   budgetBandOf,
   type CreateLeadInput,
   convert,

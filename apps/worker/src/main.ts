@@ -5,16 +5,14 @@ import { PgBoss } from "pg-boss";
 import pino from "pino";
 import { startHealthServer } from "./health.ts";
 import { registerAll } from "./jobs/index.ts";
+import { queueOptions } from "./queue.ts";
 
 const env = loadEnv("worker");
 const log = pino({ name: "worker", redact: [...LOG_REDACT_PATHS] });
 const port = Number(process.env.PORT) || appPort("worker", env.NIVEL_SLOT);
 
-const boss = new PgBoss({
-  connectionString: env.DATABASE_URL_WORKER,
-  schema: "pgboss",
-  application_name: "nivel-worker",
-});
+// The schema pgboss is made by the migration; the worker has no CREATE on the database (see queue.ts).
+const boss = new PgBoss(queueOptions(env.DATABASE_URL_WORKER));
 boss.on("error", (err) => log.error({ err }, "pg-boss error"));
 
 let queue: "starting" | "started" | "stopped" = "starting";

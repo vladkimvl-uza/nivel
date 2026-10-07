@@ -56,6 +56,8 @@ export const ORDER_STATUSES = [
 ] as const satisfies readonly OrderStatus[];
 export type OrderStatusCode = (typeof ORDER_STATUSES)[number];
 export const ORDER_KINDS = ["pc", "setup", "podbor", "upgrade"] as const;
+/** The largest stored size (pg_column_size, bytes) of the free JSON that the public side writes into a configuration. */
+export const FREE_JSON_BYTES = 16_384;
 export const ACTOR_KINDS = ["system", "customer", "owner", "assistant"] as const satisfies readonly Actor[];
 export const QUOTE_STATUSES = ["draft", "sent", "accepted", "expired", "superseded"] as const;
 // The lists of the payment pairs are the contract of packages/domain; the CHECKs below are generated from them.
@@ -143,6 +145,15 @@ export const configurations = sales.table(
     check("configurations_code_chk", sql`${t.publicCode} ~ '^[A-Za-z0-9]{8}$'`),
     check("configurations_via_chk", oneOf(t.createdVia, ["web", "tma", "bot", "ai", "admin", "idea"])),
     check("configurations_items_chk", sql`jsonb_typeof(${t.items}) = 'array'`),
+    // The free JSON of the public side, as it is stored (second line after the check of the services).
+    check(
+      "configurations_prefs_size_chk",
+      sql`${t.prefs} is null or pg_column_size(${t.prefs}) <= ${sql.raw(String(FREE_JSON_BYTES))}`,
+    ),
+    check(
+      "configurations_room_size_chk",
+      sql`${t.room} is null or pg_column_size(${t.room}) <= ${sql.raw(String(FREE_JSON_BYTES))}`,
+    ),
   ],
 );
 
@@ -162,6 +173,13 @@ export const leads = sales.table(
     scope: text("scope").$type<"pc" | "pc_periph" | "setup" | "podbor">().notNull(),
     budgetBand: text("budget_band"),
     comment: text("comment"),
+    /**
+     * The contact of a request of the site that could not be linked to a customer (it used to travel in the comment).
+     * Kept like the request: sales.purge_expired_leads() clears it after 12 months. The site cannot read it back.
+     */
+    contactPhone: text("contact_phone"),
+    contactName: text("contact_name"),
+    contactUsername: text("contact_username"),
     status: text("status").$type<"new" | "in_review" | "converted" | "rejected" | "spam">().notNull().default("new"),
     /** Reference-list code of the rejection reason (DECISIONS R-26 journal). */
     rejectReason: text("reject_reason"),
@@ -177,6 +195,9 @@ export const leads = sales.table(
     check("leads_scope_chk", oneOf(t.scope, ["pc", "pc_periph", "setup", "podbor"])),
     check("leads_lang_chk", oneOf(t.lang, ["uz", "ru"])),
     check("leads_reject_chk", sql`${t.status} <> 'rejected' or ${t.rejectReason} is not null`),
+    check("leads_contact_phone_chk", sql`${t.contactPhone} is null or ${t.contactPhone} ~ '^\\+[1-9][0-9]{7,14}$'`),
+    check("leads_contact_name_chk", sql`${t.contactName} is null or char_length(${t.contactName}) <= 120`),
+    check("leads_contact_username_chk", sql`${t.contactUsername} is null or char_length(${t.contactUsername}) <= 64`),
   ],
 );
 
@@ -536,6 +557,12 @@ export const acts = sales.table(
     check("acts_kind_chk", oneOf(t.kind, ["material_acceptance", "customer_parts", "handover"])),
     check("acts_signed_via_chk", oneOf(t.signedVia, ["tg_button", "paper_photo", "site_button"])),
     check("acts_signed_chk", sql`(${t.signedAt} is null) = (${t.signedVia} is null)`),
+    // A signature always rests on evidence (the id of the press, the file of the paper act): a JSON object. The JSON null,
+    // a list or a text is not an SQL NULL and would pass `is not null`.
+    check(
+      "acts_evidence_chk",
+      sql`${t.signedAt} is null or (${t.evidence} is not null and jsonb_typeof(${t.evidence}) = 'object')`,
+    ),
   ],
 );
 

@@ -156,6 +156,26 @@ describe("consents.record: the free evidence of a journal that is never cleaned"
   });
 });
 
+describe("consents.record: the size of the evidence as it is kept", () => {
+  it("answers the same validation error when the database refuses evidence that is small as text and large as stored", async () => {
+    const { customerId } = await newOrder();
+    const ok = { kind: "pd_processing", customerId, granted: true, channel: "site" } as const;
+    // 700 small numbers are about 3 KB of text, but every one is an entry and a numeric in the binary form the database keeps.
+    const numbers = { n: Array.from({ length: 700 }, (_, i) => i) };
+    expect(JSON.stringify(numbers).length).toBeLessThan(4096);
+    for (const rt of [w.web, w.bot]) {
+      await expect(record({ ...ok, evidence: numbers }, rt)).rejects.toMatchObject({
+        name: "ValidationError",
+        issues: [{ path: "evidence", code: "json_too_large" }],
+      });
+    }
+    const { rows } = await w.db.$client.query("select count(*)::int as n from ops.consents where customer_id = $1", [
+      customerId,
+    ]);
+    expect(rows[0].n).toBe(0);
+  });
+});
+
 describe("verifyAcceptConsents", () => {
   it("accepts the consents named by the event when they are the latest of their kinds", async () => {
     const { orderId, customerId } = await newOrder();

@@ -80,11 +80,14 @@ describe.each(["WEB", "BOT"] as const)("repositories the public processes use, a
   });
 
   it("creates a customer and a lead with the next number", async () => {
-    const customerId = await createCustomer(dbs[role], {
-      displayName: `Roles ${role}`,
-      telegramUserId: 7_100_000_000 + uniq() + (role === "BOT" ? 1000 : 0),
+    // One transaction: the site may name only a customer it made in the same transaction (sales.guard_lead).
+    const lead = await dbs[role].transaction(async (tx) => {
+      const customerId = await createCustomer(tx, {
+        displayName: `Roles ${role}`,
+        telegramUserId: 7_100_000_000 + uniq() + (role === "BOT" ? 1000 : 0),
+      });
+      return createLead(tx, { customerId, channel: "site", scope: "pc" });
     });
-    const lead = await createLead(dbs[role], { customerId, channel: "site", scope: "pc" });
     expect(lead.number).toMatch(/^L-\d{4}-\d{4,}$/);
   });
 });

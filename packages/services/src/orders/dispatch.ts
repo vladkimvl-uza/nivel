@@ -21,7 +21,6 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors.ts";
 import { serviceGuard } from "./guards.ts";
 import { canonicalJson, eventDigest, eventIdentity } from "./keys.ts";
 import { lockBy } from "./lock.ts";
-import { markQuoteAccepted } from "./quote-accept.ts";
 import { type Runtime, runtimeOf } from "./runtime.ts";
 import { loadCalendar, loadFeeSettings } from "./settings.ts";
 import { assembleSnapshot, loadSnapshotInputs, type OrderRow, resolvedAfterSeqOf } from "./snapshot.ts";
@@ -297,15 +296,6 @@ export async function dispatchInTx(
     effects,
   );
 
-  if (event.type === "ACCEPT" && loaded.inputs.quote) {
-    await markQuoteAccepted(rt, tx, loaded.inputs.quote.id, now, {
-      channel: event.channel,
-      consentIds: event.consentIds,
-      offerVersionUzId: loaded.offers.uzId,
-      offerVersionRuId: loaded.offers.ruId,
-      actorId: actor.id,
-    });
-  }
   await hooks.after?.(tx, { order, status: applied.to, now });
   return { ok: true, status: applied.to };
 }

@@ -163,7 +163,7 @@ export async function loadWebInputs(
     firstOrderOfCustomer: Number(s?.others ?? 0) === 0,
     offer: offers.status,
     appMode: rt.appMode,
-    reserves: await loadReserves(rt, ex, now),
+    reserves: await loadReserves(ex, now),
   };
   return { inputs, offers };
 }

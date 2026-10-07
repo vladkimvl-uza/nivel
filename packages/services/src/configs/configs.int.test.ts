@@ -166,6 +166,17 @@ describe("configs.save", () => {
     ).rejects.toMatchObject({ issues: [{ path: "prefs", code: "json_too_large" }] });
   });
 
+  it("answers the same validation error when the database refuses a room or preferences that are small as text and large as stored", async () => {
+    // 3000 small numbers are about 14 KB of text, but about 24 KB in the binary form the database keeps.
+    const numbers = { n: Array.from({ length: 3000 }, (_, i) => i) };
+    expect(JSON.stringify(numbers).length).toBeLessThan(16_384);
+    for (const field of ["prefs", "room"] as const) {
+      await expect(
+        save({ kind: "pc", lines: pcLines(w), createdVia: "web", [field]: numbers }, w.web),
+      ).rejects.toMatchObject({ name: "ValidationError", issues: [{ path: field, code: "json_too_large" }] });
+    }
+  });
+
   it("keeps the budget the client named within the limit of the money rules", async () => {
     const ok = await save({ kind: "pc", lines: pcLines(w), createdVia: "web", budgetSum: MAX_BUDGET_SUM }, w.web);
     expect((await row(ok.id)).prefs).toMatchObject({ budgetSum: MAX_BUDGET_SUM });

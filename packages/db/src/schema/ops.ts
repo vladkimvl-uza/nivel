@@ -37,6 +37,23 @@ export const CONSENT_KINDS = [
   "third_party_payer",
 ] as const;
 export const RETENTION_CLASSES = ["lead_12m", "order_warranty_plus_3y", "tax_5y", "ai_90d", "media"] as const;
+/**
+ * The kinds of files the services register (ops.files.kind). The list is open on purpose: the database checks only the
+ * form of the name (`files_kind_chk`), so that the worker can add a document kind without a migration; the kinds the
+ * scenarios rely on are named here. `act_photo` is the photo of a paper act, the evidence of acts.sign by `paper_photo`.
+ */
+export const FILE_KINDS = [
+  "act_photo",
+  "receipt_photo",
+  "third_party_statement",
+  "quote_pdf",
+  "report_pdf",
+  "act_pdf",
+  "passport_pdf",
+  "dsr_export",
+] as const;
+/** The largest stored size (pg_column_size, bytes) of the evidence of a consent. */
+export const CONSENT_EVIDENCE_BYTES = 4096;
 
 export const files = ops.table(
   "files",
@@ -59,6 +76,14 @@ export const files = ops.table(
     check("files_sha256_chk", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
     check("files_bytes_chk", sql`${t.bytes} >= 0`),
     check("files_retention_chk", oneOf(t.retentionClass, RETENTION_CLASSES)),
+    check("files_kind_chk", sql`${t.kind} ~ '^[a-z][a-z0-9_]{1,39}$'`),
+    // The key is a relative path under the directory of the files, one segment at a time: it never starts with a slash or
+    // a dot, has no empty or dotted segment, no backslash and no control character. The purge hands the keys to the worker
+    // to remove from the disk, so a key that could climb out of the directory would reach any file the worker can write.
+    check(
+      "files_storage_key_chk",
+      sql`${t.storageKey} ~ '^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$' and char_length(${t.storageKey}) <= 300`,
+    ),
     // Personal data never sits in a public file.
     check("files_public_no_pd_chk", sql`not (${t.isPublic} and ${t.containsPd})`),
   ],
@@ -161,6 +186,11 @@ export const consents = ops.table(
     index("consents_order_kind_idx").on(t.orderId, t.kind, t.at),
     index("consents_customer_idx").on(t.customerId, t.at),
     check("consents_kind_chk", oneOf(t.kind, CONSENT_KINDS)),
+    // The journal is for good and the site and the bot write into it: what stays in it stays small.
+    check(
+      "consents_evidence_size_chk",
+      sql`${t.evidence} is null or pg_column_size(${t.evidence}) <= ${sql.raw(String(CONSENT_EVIDENCE_BYTES))}`,
+    ),
     check("consents_subject_chk", sql`${t.customerId} is not null or ${t.subjectRefHash} is not null`),
     // Order-level consents always name the order.
     check(

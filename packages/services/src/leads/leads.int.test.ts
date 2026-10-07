@@ -2,7 +2,7 @@ import { MAX_BUDGET_SUM } from "@nivel/domain/fee";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ForbiddenError, NotFoundError, ValidationError } from "../orders/errors.ts";
 import { createWorld, type World } from "../orders/test-support/world.ts";
-import { budgetBandOf, convert, create } from "./index.ts";
+import { bindCustomer, budgetBandOf, convert, create } from "./index.ts";
 
 let w: World;
 beforeAll(async () => {
@@ -111,11 +111,20 @@ describe("leads.create", () => {
     );
     expect(Object.keys(again).sort()).toEqual(Object.keys(first).sort());
     expect(again.number).toMatch(/^L-2026-\d{4}$/);
-    const row = (await w.db.$client.query("select customer_id, comment from sales.leads where id = $1", [again.leadId]))
-      .rows[0];
-    expect(row.customer_id).toBeNull();
-    expect(row.comment).toContain("+998901112244");
-    expect(row.comment).toContain("Second try");
+    const row = (
+      await w.db.$client.query(
+        "select customer_id, comment, contact_phone, contact_name, contact_username from sales.leads where id = $1",
+        [again.leadId],
+      )
+    ).rows[0];
+    // The contact has its own columns (kept like the request); the comment is the words of the person and nothing else.
+    expect(row).toEqual({
+      customer_id: null,
+      comment: "Second try",
+      contact_phone: "+998901112244",
+      contact_name: null,
+      contact_username: null,
+    });
     // The owner is told about it like about any lead.
     expect(await outboxOf(again.leadId)).toHaveLength(1);
     // The lead without a customer cannot become an order until the owner links it.
@@ -132,6 +141,13 @@ describe("leads.create", () => {
     await expect(
       create({ channel: "web", scope: "pc", customer: { telegramUserId: Number(stolen) } }, w.web),
     ).rejects.toMatchObject({ issues: [{ path: "customer.telegramUserId", code: "telegram_id_not_allowed" }] });
+  });
+
+  it("refuses a customer id from the site: it reads the ids of all customers and a request must not be attached to one of them", async () => {
+    const bot = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
+    await expect(
+      create({ channel: "web", scope: "pc", customerId: bot.customerId as string }, w.web),
+    ).rejects.toMatchObject({ issues: [{ path: "customerId", code: "customer_id_not_allowed" }] });
   });
 
   it("gives one customer to two requests that come at once with the same new Telegram id or phone, for every role that can look", async () => {
@@ -379,5 +395,194 @@ describe("leads.convert", () => {
     expect(rows).toEqual([
       { actor: `owner:${w.owner.id}`, action: "lead.convert", after: { orderId: r.orderId, number: r.number } },
     ]);
+  });
+});
+
+describe("leads.create: the contact of a request that has no customer", () => {
+  it("keeps the name, the phone and the Telegram name of the site in the columns of the request, not in the comment", async () => {
+    await create({ channel: "web", scope: "pc", customer: { phoneE164: "+998901112255", displayName: "Aziz" } }, w.web);
+    const again = await create(
+      {
+        channel: "web",
+        scope: "pc",
+        comment: "After five please",
+        customer: { phoneE164: "+998901112255", displayName: "Aziz T.", telegramUsername: "aziz_t" },
+      },
+      w.web,
+    );
+    const row = (
+      await w.db.$client.query(
+        "select customer_id, comment, contact_phone, contact_name, contact_username from sales.leads where id = $1",
+        [again.leadId],
+      )
+    ).rows[0];
+    expect(row).toEqual({
+      customer_id: null,
+      comment: "After five please",
+      contact_phone: "+998901112255",
+      contact_name: "Aziz T.",
+      contact_username: "aziz_t",
+    });
+  });
+
+  it("leaves the columns empty when the request has a customer, and a request without a comment has no comment", async () => {
+    const r = await create(
+      { channel: "web", scope: "pc", customer: { phoneE164: "+998901112266", displayName: "Dilnoza" } },
+      w.web,
+    );
+    const row = (
+      await w.db.$client.query("select comment, contact_phone, contact_name from sales.leads where id = $1", [r.leadId])
+    ).rows[0];
+    expect(row).toEqual({ comment: null, contact_phone: null, contact_name: null });
+    const twin = await create({ channel: "web", scope: "pc", customer: { phoneE164: "+998901112266" } }, w.web);
+    const twinRow = (
+      await w.db.$client.query("select comment, contact_phone from sales.leads where id = $1", [twin.leadId])
+    ).rows[0];
+    expect(twinRow).toEqual({ comment: null, contact_phone: "+998901112266" });
+  });
+});
+
+describe("leads.bindCustomer", () => {
+  async function unlinked(phone: string) {
+    await create({ channel: "web", scope: "pc", customer: { phoneE164: phone, displayName: "First" } }, w.web);
+    return create({ channel: "web", scope: "pc", customer: { phoneE164: phone } }, w.web);
+  }
+  const customerOfLead = async (leadId: string) =>
+    (await w.db.$client.query("select customer_id from sales.leads where id = $1", [leadId])).rows[0].customer_id;
+
+  it("links the request to the customer the owner chose, writes the audit row, and lets the request become an order", async () => {
+    const lead = await unlinked("+998901113301");
+    const customerId = await newCustomerId();
+    const r = await bindCustomer({ leadId: lead.leadId, customerId }, owner(), w.admin);
+    expect(r).toEqual({ bound: true });
+    expect(await customerOfLead(lead.leadId)).toBe(customerId);
+    const { rows } = await w.db.$client.query(
+      "select actor, action, before, after from ops.audit_log where entity = 'sales.leads' and entity_id = $1",
+      [lead.leadId],
+    );
+    expect(rows).toEqual([
+      {
+        actor: `owner:${w.owner.id}`,
+        action: "lead.bind_customer",
+        before: { customerId: null },
+        after: { customerId },
+      },
+    ]);
+    const order = await convert({ leadId: lead.leadId }, owner(), w.admin);
+    expect(order.created).toBe(true);
+  });
+
+  it("is for the assistant too, and repeated for the same customer it does nothing and writes no second audit row", async () => {
+    const lead = await unlinked("+998901113302");
+    const customerId = await newCustomerId();
+    const a = { kind: "assistant" as const, id: w.assistant.id };
+    expect(await bindCustomer({ leadId: lead.leadId, customerId }, a, w.admin)).toEqual({ bound: true });
+    expect(await bindCustomer({ leadId: lead.leadId, customerId }, owner(), w.admin)).toEqual({ bound: false });
+    const audit = await w.db.$client.query(
+      "select 1 from ops.audit_log where entity = 'sales.leads' and entity_id = $1 and action = 'lead.bind_customer'",
+      [lead.leadId],
+    );
+    expect(audit.rowCount).toBe(1);
+  });
+
+  it("never replaces a customer: another customer is a validation error and the request stays as it was", async () => {
+    const lead = await unlinked("+998901113303");
+    const first = await newCustomerId();
+    const second = await newCustomerId();
+    await bindCustomer({ leadId: lead.leadId, customerId: first }, owner(), w.admin);
+    await expect(bindCustomer({ leadId: lead.leadId, customerId: second }, owner(), w.admin)).rejects.toMatchObject({
+      issues: [{ path: "leadId", code: "lead_already_bound" }],
+    });
+    expect(await customerOfLead(lead.leadId)).toBe(first);
+  });
+
+  it("is the admin role's alone: the bot, the site and the worker are refused, and so are the customer and the system", async () => {
+    const lead = await unlinked("+998901113304");
+    const customerId = await newCustomerId();
+    for (const rt of [w.bot, w.web, w.worker]) {
+      await expect(bindCustomer({ leadId: lead.leadId, customerId }, owner(), rt)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+    }
+    for (const actor of [
+      { kind: "customer" as const, id: customerId },
+      { kind: "system" as const, id: "system" },
+    ]) {
+      await expect(bindCustomer({ leadId: lead.leadId, customerId }, actor, w.admin)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+    }
+    expect(await customerOfLead(lead.leadId)).toBeNull();
+  });
+
+  it("refuses an unknown request or customer and an id that is not a uuid", async () => {
+    const lead = await unlinked("+998901113305");
+    const customerId = await newCustomerId();
+    const missing = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+    await expect(bindCustomer({ leadId: missing, customerId }, owner(), w.admin)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(bindCustomer({ leadId: lead.leadId, customerId: missing }, owner(), w.admin)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    await expect(bindCustomer({ leadId: "L-1", customerId }, owner(), w.admin)).rejects.toBeInstanceOf(ValidationError);
+    await expect(bindCustomer({ leadId: lead.leadId, customerId: "x" }, owner(), w.admin)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(await customerOfLead(lead.leadId)).toBeNull();
+  });
+
+  it("serves two owners who press at once: one customer wins, the other is told the request is bound", async () => {
+    const lead = await unlinked("+998901113306");
+    const a = await newCustomerId();
+    const b = await newCustomerId();
+    const results = await Promise.allSettled([
+      bindCustomer({ leadId: lead.leadId, customerId: a }, owner(), w.admin),
+      bindCustomer({ leadId: lead.leadId, customerId: b }, owner(), w.admin),
+    ]);
+    expect(results.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+    const lost = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
+    expect(lost.reason).toMatchObject({ issues: [{ code: "lead_already_bound" }] });
+    expect([a, b]).toContain(await customerOfLead(lead.leadId));
+  });
+});
+
+async function newCustomerId(): Promise<string> {
+  const lead = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
+  return lead.customerId as string;
+}
+
+describe("a customer that the 12-month erasure made anonymous", () => {
+  const erase = (customerId: string) =>
+    w.db.$client.query(
+      `update sales.customers set erased_at = now(), display_name = null, phone_e164 = null, telegram_user_id = null,
+              telegram_username = null, address = null where id = $1`,
+      [customerId],
+    );
+
+  it("does not become an order: the owner cannot convert a request of an erased customer", async () => {
+    const lead = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
+    await erase(lead.customerId as string);
+    await expect(convert({ leadId: lead.leadId }, owner(), w.admin)).rejects.toMatchObject({
+      issues: [{ path: "leadId", code: "customer_erased" }],
+    });
+    const orders = await w.db.$client.query("select count(*)::int as n from sales.orders where lead_id = $1", [
+      lead.leadId,
+    ]);
+    expect(orders.rows[0].n).toBe(0);
+  });
+
+  it("is not bound to a request: the owner cannot choose an erased customer", async () => {
+    const lead = await create(
+      { channel: "web", scope: "pc", customer: { phoneE164: "+998901113399", displayName: "First" } },
+      w.web,
+    );
+    const second = await create({ channel: "web", scope: "pc", customer: { phoneE164: "+998901113399" } }, w.web);
+    expect(lead.leadId).not.toBe(second.leadId);
+    const customerId = await newCustomerId();
+    await erase(customerId);
+    await expect(bindCustomer({ leadId: second.leadId, customerId }, owner(), w.admin)).rejects.toMatchObject({
+      issues: [{ path: "customerId", code: "customer_erased" }],
+    });
+    const row = await w.db.$client.query("select customer_id from sales.leads where id = $1", [second.leadId]);
+    expect(row.rows[0].customer_id).toBeNull();
   });
 });

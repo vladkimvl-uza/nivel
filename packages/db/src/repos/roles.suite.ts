@@ -5,6 +5,7 @@ import {
   connectAs,
   createOrder,
   createVendor,
+  driveTo,
   insertPayment,
   insertPurchase,
   one,
@@ -89,6 +90,8 @@ describe("nivel_web", () => {
 
   it("creates customers, leads, configurations, consents and outbox rows, and reads only safe columns back", async () => {
     const n = uniq();
+    // The site names only a customer it made in the same transaction (sales.guard_lead).
+    await web.query("begin");
     const customer = await one<{ id: string }>(
       web,
       "insert into sales.customers (display_name, telegram_user_id, lang) values ('Web guest', $1, 'uz') returning id",
@@ -99,6 +102,7 @@ describe("nivel_web", () => {
       "insert into sales.leads (number, customer_id, channel, scope) values ($1, $2, 'web', 'pc') returning number",
       [`L-2026-${7000 + n}`, customer.id],
     );
+    await web.query("commit");
     expect(lead.number).toMatch(/^L-2026-/);
     await web.query("insert into sales.configurations (public_code, kind, created_via) values ($1, 'pc', 'web')", [
       `WB${String(n).padStart(6, "0")}`,
@@ -233,9 +237,20 @@ describe("nivel_worker", () => {
     ).toBe(DENIED);
   });
 
-  it("writes the reserve ledger and purges expired AI conversations", async () => {
+  it("writes the reserve ledger for an order that owes the reserve and purges expired AI conversations", async () => {
+    // The guard of the ledger (insert-guards.suite.ts) reads the journal of the order: the warranty reserve is booked once
+    // the order has been handed over, and no more than its receipts allow (150 000 at least, 2 % of the receipts).
+    const handed = await createOrder(migrator);
+    await receiveFunds(migrator, handed.orderId, 2_000_000);
+    await insertPurchase(migrator, {
+      orderId: handed.orderId,
+      vendorId: await createVendor(migrator),
+      amount: 500_000,
+    });
+    await driveTo(migrator, handed.orderId, "handed_over");
     await worker.query(
-      "insert into sales.reserve_ledger (fund, amount_sum, reason) values ('warranty', 150000, 'contribution')",
+      "insert into sales.reserve_ledger (fund, order_id, amount_sum, reason) values ('warranty', $1, 150000, 'contribution')",
+      [handed.orderId],
     );
     await worker.query("select ai.purge_expired()");
   });
@@ -326,6 +341,12 @@ describe("functions", () => {
     "sales.apply_transition(uuid,jsonb,text,text,text,jsonb,jsonb)": ROLES,
     "ai.purge_expired(timestamp with time zone)": ["nivel_admin", "nivel_worker"],
     "ops.next_number(text,integer)": ["nivel_web", "nivel_admin", "nivel_bot"],
+    // WP-00: what the bot, the site and the worker need and may not do on the tables themselves.
+    "sales.expect_payment(uuid,text,bigint,text,boolean)": ["nivel_worker", "nivel_bot"],
+    "sales.sign_act(uuid,text,jsonb)": ["nivel_bot"],
+    "sales.warranty_fund_state(timestamp with time zone)": ROLES,
+    "sales.purge_expired_leads(timestamp with time zone)": ["nivel_admin", "nivel_worker"],
+    "ops.purge_expired_files(timestamp with time zone)": ["nivel_admin", "nivel_worker"],
     "ops.consent_granted(uuid,text)": ROLES,
     // A trigger function: it runs with the trigger, nobody calls it.
     "ops.guard_consent()": [],

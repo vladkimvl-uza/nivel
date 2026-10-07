@@ -6,12 +6,8 @@ import { type Executor, ops, sales } from "@nivel/db/repos";
 import { type Bp, bp, sum } from "@nivel/domain/money";
 import type { OfferStatus, OrderSnapshot } from "@nivel/domain/order";
 import { readStoredTotals, type StoredTotals } from "../quotes/stored.ts";
-import { dsl } from "./dsl.ts";
-import { can, type Runtime } from "./runtime.ts";
+import type { Runtime } from "./runtime.ts";
 import { loadTaxRiskActive } from "./settings.ts";
-
-const DAY_MS = 86_400_000;
-const YEAR_MS = 365 * DAY_MS;
 
 export interface SnapshotOrder {
   status: OrderSnapshot["status"];
@@ -229,25 +225,20 @@ export async function loadOffers(ex: Executor, fixed: { uz: string | null; ru: s
   return { uzId: uz.id, ruId: ru.id, status: { uz: uz.status, ru: ru.status } };
 }
 
-/** What the warranty fund looks like now. Roles that cannot read the ledger get a young fund: the rate is never too low. */
-export async function loadReserves(rt: Runtime, ex: Executor, now: Date): Promise<OrderSnapshot["reserves"]> {
+/**
+ * What the warranty fund looks like now, for every role alike: sales.warranty_fund_state() answers four aggregates and no
+ * row of a register, so the site and the bot, which cannot read the ledger, the orders or the cases, no longer count a
+ * young fund (the rate of 2 %) while the worker counts a mature one: the contribution does not depend on who pressed.
+ */
+export async function loadReserves(ex: Executor, now: Date): Promise<OrderSnapshot["reserves"]> {
+  // One after the other: inside a transaction both go through the same connection, which serves one query at a time.
   const taxRiskActive = await loadTaxRiskActive(ex);
-  if (!can(rt, "ledger.read")) {
-    return { warranty: { balance: sum(0), closedOrders: 0, lossesLast12mBp: bp(0) }, taxRiskActive };
-  }
-  const { sql } = dsl(ex);
-  const since = new Date(now.getTime() - YEAR_MS);
-  const balance = await sales.reserveBalance(ex, "warranty");
-  const { rows } = await ex.execute<{ closed: string; losses: string; purchased: string }>(sql`
-    select (select count(*) from sales.orders where status = 'closed')::text as closed,
-           coalesce((select sum(cost_from_reserve_sum) from sales.warranty_cases where opened_at >= ${since}), 0)::text as losses,
-           coalesce((select sum(amount_sum) from sales.purchases where bought_at >= ${since}), 0)::text as purchased`);
-  const r = rows[0];
+  const fund = await sales.warrantyFundState(ex, now);
   return {
     warranty: {
-      balance: sum(balance),
-      closedOrders: Number(r?.closed ?? 0),
-      lossesLast12mBp: lossesBp(Number(r?.losses ?? 0), Number(r?.purchased ?? 0)),
+      balance: sum(fund.balance),
+      closedOrders: fund.closedOrders,
+      lossesLast12mBp: lossesBp(fund.lossesLast12m, fund.purchasedLast12m),
     },
     taxRiskActive,
   };
@@ -325,7 +316,7 @@ export async function loadSnapshotInputs(
     firstOrderOfCustomer: await isFirstOrder(ex, order.customerId, order.id),
     offer: offers.status,
     appMode: rt.appMode,
-    reserves: await loadReserves(rt, ex, now),
+    reserves: await loadReserves(ex, now),
   };
   return { inputs, offers, quote };
 }

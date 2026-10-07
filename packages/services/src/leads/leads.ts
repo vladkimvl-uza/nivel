@@ -97,6 +97,11 @@ function validate(input: CreateLeadInput, rt: Runtime): ValidationIssue[] {
   if (input.comment !== undefined && (typeof input.comment !== "string" || input.comment.length > 2000)) {
     bad("comment", "text_invalid", "comment must be a text of at most 2000 characters");
   }
+  if (rt.role === "web" && input.customerId !== undefined) {
+    // The site reads the ids of all customers: a request it attaches to one of them would erase him (a day in the past) or
+    // keep him alive (a fresh one). The database refuses it too (sales.guard_lead); the site names a customer it makes.
+    bad("customerId", "customer_id_not_allowed", "the site does not name a customer by id");
+  }
   if (input.customerId === undefined && input.customer === undefined) {
     bad("customer", "customer_missing", "a lead needs a customer or a customer id");
   }
@@ -188,18 +193,6 @@ async function findExisting(ex: Executor, c: NewCustomerInput): Promise<string |
   return null;
 }
 
-/** The contact of a lead that the site could not link to a customer travels in the comment, for the owner to merge by hand. */
-function unlinkedComment(input: CreateLeadInput): string {
-  const c = input.customer;
-  const who = [c?.displayName, c?.phoneE164, c?.telegramUsername].filter((x) => x !== undefined).join(", ");
-  return `[contact, not linked to a customer: ${who}]${
-    input.comment
-      ? `
-${input.comment}`
-      : ""
-  }`;
-}
-
 /**
  * Opens a lead of a person who wrote on the site or in the bot. Returns the number the person is told. The id of the
  * customer is for the bot and the staff only: the site gets none, so that it cannot be used to find out who is a customer.
@@ -236,7 +229,16 @@ export async function create(
       wantedBy: input.wantedBy ?? null,
       scope: input.scope,
       budgetBand,
-      comment: customerId === null ? unlinkedComment(input) : (input.comment ?? null),
+      comment: input.comment ?? null,
+      // A request that could not be linked to a customer keeps the contact of the person in its own columns, for the
+      // owner to merge by hand (bindCustomer); the 12-month retention of the request clears them too.
+      ...(customerId === null
+        ? {
+            contactPhone: input.customer?.phoneE164 ?? null,
+            contactName: input.customer?.displayName ?? null,
+            contactUsername: input.customer?.telegramUsername ?? null,
+          }
+        : {}),
       now,
     });
     await ops.enqueueOutbox(tx, {
@@ -292,6 +294,11 @@ export async function convert(
     if (lead.customerId === null) {
       throw ValidationError.of("leadId", "lead_without_customer", `the lead ${lead.number} has no customer`);
     }
+    // A customer made anonymous by the 12-month erasure has nothing left to build for; the row is held so that an erasure
+    // that runs now waits for this order instead of clearing the customer of it.
+    if ((await sales.holdCustomer(tx, lead.customerId))?.erased !== false) {
+      throw ValidationError.of("leadId", "customer_erased", `the customer of the lead ${lead.number} has been erased`);
+    }
     const order = await sales.createOrder(tx, {
       customerId: lead.customerId,
       kind: LEAD_KIND[lead.scope],
@@ -308,5 +315,51 @@ export async function convert(
       after: { orderId: order.id, number: order.number },
     });
     return { orderId: order.id, number: order.number, created: true };
+  });
+}
+
+/**
+ * The owner links a request of the site that had no customer to the customer he chose (the site cannot tell who a phone
+ * belongs to). Once: a request that has a customer is never rebound. Only the admin panel does it (the database refuses
+ * the bot), the owner or the assistant, with a row in the audit log. `bound` is false when the request already has this
+ * very customer.
+ */
+export async function bindCustomer(
+  input: { leadId: string; customerId: string },
+  actor: ActorRef,
+  rt?: Runtime,
+): Promise<{ bound: boolean }> {
+  const r = runtimeOf(rt);
+  requireStaff(actor, "binding a request to a customer");
+  requireCapability(r, "leads.bind");
+  const leadId = assertUuid(input.leadId, "leadId");
+  const customerId = assertUuid(input.customerId, "customerId");
+  return r.db.transaction(async (tx) => {
+    await lockBy(tx, `lead:${leadId}`);
+    const lead = await tx.query.leads.findFirst({
+      columns: { id: true, customerId: true },
+      where: (t, { eq }) => eq(t.id, leadId),
+    });
+    if (!lead) throw new NotFoundError("lead");
+    const customer = await sales.holdCustomer(tx, customerId);
+    if (!customer) throw new NotFoundError("customer");
+    if (lead.customerId === customerId) return { bound: false };
+    if (lead.customerId !== null) {
+      throw ValidationError.of("leadId", "lead_already_bound", "the request already has another customer");
+    }
+    // An anonymous customer (erased after 12 months) is no one to bind a request to.
+    if (customer.erased) {
+      throw ValidationError.of("customerId", "customer_erased", "the customer has been erased and cannot be chosen");
+    }
+    if (!(await sales.bindLeadCustomer(tx, leadId, customerId))) throw new NotFoundError("lead");
+    await ops.appendAudit(tx, {
+      actor: auditActor(actor),
+      action: "lead.bind_customer",
+      entity: "sales.leads",
+      entityId: leadId,
+      before: { customerId: null },
+      after: { customerId },
+    });
+    return { bound: true };
   });
 }
