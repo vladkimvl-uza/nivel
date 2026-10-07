@@ -289,6 +289,11 @@ export async function convert(
     if (lead.customerId === null) {
       throw ValidationError.of("leadId", "lead_without_customer", `the lead ${lead.number} has no customer`);
     }
+    // A customer made anonymous by the 12-month erasure has nothing left to build for; the row is held so that an erasure
+    // that runs now waits for this order instead of clearing the customer of it.
+    if ((await sales.holdCustomer(tx, lead.customerId))?.erased !== false) {
+      throw ValidationError.of("leadId", "customer_erased", `the customer of the lead ${lead.number} has been erased`);
+    }
     const order = await sales.createOrder(tx, {
       customerId: lead.customerId,
       kind: LEAD_KIND[lead.scope],
@@ -331,14 +336,15 @@ export async function bindCustomer(
       where: (t, { eq }) => eq(t.id, leadId),
     });
     if (!lead) throw new NotFoundError("lead");
-    const customer = await tx.query.customers.findFirst({
-      columns: { id: true },
-      where: (t, { eq }) => eq(t.id, customerId),
-    });
+    const customer = await sales.holdCustomer(tx, customerId);
     if (!customer) throw new NotFoundError("customer");
     if (lead.customerId === customerId) return { bound: false };
     if (lead.customerId !== null) {
       throw ValidationError.of("leadId", "lead_already_bound", "the request already has another customer");
+    }
+    // An anonymous customer (erased after 12 months) is no one to bind a request to.
+    if (customer.erased) {
+      throw ValidationError.of("customerId", "customer_erased", "the customer has been erased and cannot be chosen");
     }
     if (!(await sales.bindLeadCustomer(tx, leadId, customerId))) throw new NotFoundError("lead");
     await ops.appendAudit(tx, {

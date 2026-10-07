@@ -180,6 +180,43 @@ describe("payments.expectFromJob: the payments after the cancellation and the re
     expect(Object.keys(made).length).toBeGreaterThan(0);
   });
 
+  it("a job that is delivered again after the owner confirmed the payment finds nothing to expect (refunds and extra fee)", async () => {
+    const o = await paidOrder(w);
+    await cancel({ orderId: o.orderId, reason: "test" }, ownerActor(w), w.admin);
+    const kept = (await w.db.$client.query("select cancel from sales.orders where id = $1", [o.orderId])).rows[0].cancel
+      .settlement as { feeToRefund: number; feeToInvoice: number; fundsToRefund: number };
+    await w.db.$client.query("update sales.payments set status = 'void' where order_id = $1 and status = 'expected'", [
+      o.orderId,
+    ]);
+    let checked = 0;
+    for (const [paymentKind, sumOf] of [
+      ["fee_refund", kept.feeToRefund],
+      ["fee_extra", kept.feeToInvoice],
+      ["funds_refund", kept.fundsToRefund],
+    ] as const) {
+      if (sumOf === 0) continue;
+      const made = await expectFromJob({ orderId: o.orderId, paymentKind }, w.worker);
+      // The owner confirms it (the bank document, or the receipt of the fee), as the admin panel does.
+      await w.db.$client.query(
+        `update sales.payments set status = 'confirmed', bank_doc_no = 'BD-1', fiscal_receipt_no = case when direction = 'in' then 'F-1' end,
+                confirmed_by = 'test', confirmed_at = now()
+          where id = $1`,
+        [made.paymentId],
+      );
+      // The same job again (a retry of the outbox): the whole settlement is paid, nothing is expected twice.
+      await expect(expectFromJob({ orderId: o.orderId, paymentKind }, w.worker)).rejects.toMatchObject({
+        issues: [{ code: "amount_zero" }],
+      });
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(0);
+    const open = await w.db.$client.query(
+      "select count(*)::int as n from sales.payments where order_id = $1 and status = 'expected'",
+      [o.orderId],
+    );
+    expect(open.rows[0].n).toBe(0);
+  });
+
   it("takes the refund of the remainder from the money of the order, not from the job, once the report is out", async () => {
     const o = await purchasedOrder(w);
     const report = await generateReport({ orderId: o.orderId }, ownerActor(w), w.admin);

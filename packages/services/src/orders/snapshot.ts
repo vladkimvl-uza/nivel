@@ -231,7 +231,9 @@ export async function loadOffers(ex: Executor, fixed: { uz: string | null; ru: s
  * young fund (the rate of 2 %) while the worker counts a mature one: the contribution does not depend on who pressed.
  */
 export async function loadReserves(ex: Executor, now: Date): Promise<OrderSnapshot["reserves"]> {
-  const [taxRiskActive, fund] = await Promise.all([loadTaxRiskActive(ex), sales.warrantyFundState(ex, now)]);
+  // One after the other: inside a transaction both go through the same connection, which serves one query at a time.
+  const taxRiskActive = await loadTaxRiskActive(ex);
+  const fund = await sales.warrantyFundState(ex, now);
   return {
     warranty: {
       balance: sum(fund.balance),

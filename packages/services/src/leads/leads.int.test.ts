@@ -542,3 +542,40 @@ async function newCustomerId(): Promise<string> {
   const lead = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
   return lead.customerId as string;
 }
+
+describe("a customer that the 12-month erasure made anonymous", () => {
+  const erase = (customerId: string) =>
+    w.db.$client.query(
+      `update sales.customers set erased_at = now(), display_name = null, phone_e164 = null, telegram_user_id = null,
+              telegram_username = null, address = null where id = $1`,
+      [customerId],
+    );
+
+  it("does not become an order: the owner cannot convert a request of an erased customer", async () => {
+    const lead = await create({ channel: "bot", scope: "pc", customer: { telegramUserId: newTelegram() } }, w.bot);
+    await erase(lead.customerId as string);
+    await expect(convert({ leadId: lead.leadId }, owner(), w.admin)).rejects.toMatchObject({
+      issues: [{ path: "leadId", code: "customer_erased" }],
+    });
+    const orders = await w.db.$client.query("select count(*)::int as n from sales.orders where lead_id = $1", [
+      lead.leadId,
+    ]);
+    expect(orders.rows[0].n).toBe(0);
+  });
+
+  it("is not bound to a request: the owner cannot choose an erased customer", async () => {
+    const lead = await create(
+      { channel: "web", scope: "pc", customer: { phoneE164: "+998901113399", displayName: "First" } },
+      w.web,
+    );
+    const second = await create({ channel: "web", scope: "pc", customer: { phoneE164: "+998901113399" } }, w.web);
+    expect(lead.leadId).not.toBe(second.leadId);
+    const customerId = await newCustomerId();
+    await erase(customerId);
+    await expect(bindCustomer({ leadId: second.leadId, customerId }, owner(), w.admin)).rejects.toMatchObject({
+      issues: [{ path: "customerId", code: "customer_erased" }],
+    });
+    const row = await w.db.$client.query("select customer_id from sales.leads where id = $1", [second.leadId]);
+    expect(row.rows[0].customer_id).toBeNull();
+  });
+});

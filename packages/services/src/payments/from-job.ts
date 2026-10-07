@@ -74,7 +74,9 @@ async function derive(tx: Executor, order: OrderRow, kind: JobKind): Promise<num
       `the order keeps no settlement of the cancellation with ${field}`,
     );
   }
-  return value;
+  // What the owner has already confirmed of the settlement is paid: a job delivered again after that (a retry of the outbox)
+  // finds nothing left, and the customer is not shown a second expectation of the same refund.
+  return value - (await sales.confirmedSum(tx, order.id, [kind]));
 }
 
 /**

@@ -3,8 +3,10 @@
 // telegramUserId? (customer only), topicId? (owner topic, when the order has one) }; a `job` carries { job, ... }.
 // Jobs that change a status do not exist: the worker applies events with `orders.dispatch` as the system.
 //
-// The jobs payment.expect and ledger.append are queued by the site (it may not write payments or the ledger), and act.sign is
-// reserved: the bot signs the press of the button itself through sales.sign_act, and nothing queues it any more. Their payload is a
+// The job payment.expect is queued by the site only (it may not write payments, and the bot expects its own payments through
+// sales.expect_payment); ledger.append is queued by the site and by the bot (neither may write the ledger: the worker computes
+// the contribution); act.sign is reserved: the bot signs the press of the button itself through sales.sign_act, and nothing
+// queues it any more. Their payload is a
 // hint, not a fact. Whoever runs them must take every sum, every address and every signature from the database and the domain,
 // never from the payload:
 //  - payment.expect: payments.expectFromJob (the worker, or the bot) does it: the amounts the quote fixes (advance, final fee,
