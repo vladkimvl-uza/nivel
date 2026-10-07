@@ -10,8 +10,10 @@ const calls = vi.hoisted(() => ({
 }));
 
 class Redirect extends Error {
-  constructor(readonly to: string) {
+  to: string;
+  constructor(to: string) {
     super(to);
+    this.to = to;
   }
 }
 vi.mock("next/navigation", () => ({

@@ -8,8 +8,10 @@ const state = vi.hoisted(() => ({
   admin: {} as Record<string, unknown>,
 }));
 class Redirect extends Error {
-  constructor(readonly to: string) {
+  to: string;
+  constructor(to: string) {
     super(to);
+    this.to = to;
   }
 }
 vi.mock("next/navigation", () => ({
