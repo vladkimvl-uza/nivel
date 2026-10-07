@@ -16,7 +16,10 @@ function poolFor(connectionString: string): pg.Pool {
 /** Short public reason; the raw driver message never leaves the server (it may name roles, hosts or ports). */
 export type DbHealthError = "not_configured" | "db_auth" | "db_unreachable" | "db_error";
 
-/** `error` is safe to return from /healthz; `detail` is for server-side logs only. */
+/**
+ * `error` is safe to return from /healthz; `detail` is for server-side logs only. `queueSchema` is true when pg-boss has
+ * installed its tables, that is, when the worker has started at least once (QUEUE_INSTALLED_SQL).
+ */
 export type DbHealth =
   | { ok: true; ms: number; queueSchema: boolean }
   | { ok: false; error: DbHealthError; detail?: string };
@@ -32,14 +35,21 @@ export function classifyDbError(e: unknown): DbHealthError {
   return "db_error";
 }
 
-/** select 1 plus presence of the pg-boss schema; never throws. */
+/**
+ * Whether pg-boss has installed its tables. The schema `pgboss` itself is made by the migration (the worker may not make
+ * a schema), so its presence says nothing about the queue; the table `version` is what pg-boss makes first. Read from the
+ * catalog: the site and the admin panel have no right on the schema, and a lookup of `pgboss.version` by name would be refused.
+ */
+export const QUEUE_INSTALLED_SQL = `select exists (
+  select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'pgboss' and c.relname = 'version' and c.relkind in ('r', 'p')) as q`;
+
+/** select 1 plus whether the queue of pg-boss is installed (`queueSchema`); never throws. */
 export async function pingDatabase(connectionString: string | undefined): Promise<DbHealth> {
   if (!connectionString) return { ok: false, error: "not_configured" };
   const started = performance.now();
   try {
-    const { rows } = await poolFor(connectionString).query<{ q: boolean }>(
-      "select to_regnamespace('pgboss') is not null as q",
-    );
+    const { rows } = await poolFor(connectionString).query<{ q: boolean }>(QUEUE_INSTALLED_SQL);
     return { ok: true, ms: Math.round(performance.now() - started), queueSchema: rows[0]?.q === true };
   } catch (e) {
     return { ok: false, error: classifyDbError(e), detail: e instanceof Error ? e.message : String(e) };

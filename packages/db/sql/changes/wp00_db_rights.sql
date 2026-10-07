@@ -18,11 +18,13 @@
 --   sales.guard_quote, sales.guard_payment  let the file purge empty a link to a file that has expired, nothing else
 --   ai.guard_conversation    the term of a dialogue of the AI (purge_after) is 90 days from the database clock at INSERT, whatever is sent
 --   sales.guard_reserve_entry  the worker books the reserve of an order that owes it, at the database clock, up to what the receipts allow
+--   schema pgboss            made here for the queue (the worker may use it and create in it); CREATE on the database is taken from the worker
 
 -- ---- the functions do not take the search_path of the caller ------------------------------------------------------
 -- A guard is a plain function: the operators it uses (=, <, IS DISTINCT FROM) were looked up in the search_path of
--- whoever ran the statement. The worker may create a schema (pg-boss needs CREATE on the database) and an operator in it,
--- put the schema first in its path and make "x IS DISTINCT FROM y" say "not distinct" for the guard. The same for a
+-- whoever ran the statement. The worker could create a schema (pg-boss needed CREATE on the database; the end of this file
+-- takes it away) and still creates objects in the schema of the queue, so it can make an operator there, put the schema
+-- first in its path and make "x IS DISTINCT FROM y" say "not distinct" for the guard. The same for a
 -- temporary table named pg_proc, which ops.in_owner_context read instead of the catalog. So the path is pinned: first the
 -- catalog, the temporary schema last. The functions that are written below pin it themselves; the loop at the end of the
 -- file pins the rest (the base migration is not touched), and the test of packages/db fails for a function without it.
@@ -917,6 +919,25 @@ $$;
 --> statement-breakpoint
 CREATE TRIGGER reserve_ledger_guard BEFORE INSERT ON sales.reserve_ledger
   FOR EACH ROW EXECUTE FUNCTION sales.guard_reserve_entry();
+--> statement-breakpoint
+-- ---- nobody but the owner makes a schema; the schema of the queue is made here --------------------------------------------
+-- pg-boss made its schema itself, so the worker held CREATE on the database. Whoever held the password of the worker could
+-- make a schema of its own, even one named like a role ("$user" is the first stop of every search_path, and what such a
+-- schema holds stands in for the table, the function or the operator of the role of that name). Now the migration makes
+-- the schema pgboss (the migrator owns it; the worker may use it and create in it; nobody else may look into it) and takes
+-- CREATE on the database away from the worker. The worker starts pg-boss with createSchema: false (apps/worker/src/queue.ts):
+-- the statement it runs by default, CREATE SCHEMA IF NOT EXISTS, asks for the right on the database before it looks whether
+-- the schema is there, so it fails without CREATE even when the schema exists. A database in which the worker has
+-- made the schema already (development) keeps it as it is: the worker owns it and holds what it needs.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = 'pgboss') THEN
+    CREATE SCHEMA pgboss;
+    GRANT USAGE, CREATE ON SCHEMA pgboss TO nivel_worker;
+  END IF;
+  EXECUTE format('REVOKE CREATE ON DATABASE %I FROM nivel_worker', current_database());
+END
+$$;
 --> statement-breakpoint
 -- ---- rights ---------------------------------------------------------------------------------------------------------
 -- The bot and the worker expect payments; the site queues a job and cannot call it. The admin panel writes the table.

@@ -16,11 +16,12 @@ import {
 } from "./testkit.ts";
 
 // The review of WP-00, second round. (1) A guard is a plain function: the operators it uses (=, <, IS DISTINCT FROM)
-// were looked up in the search_path of the caller, and the worker may create a schema with an operator of its own
-// (pg-boss needs CREATE on the database). So every function of the application schemas pins its search_path, and the
-// guards hold for the holder of the credentials of the worker, the bot and the admin panel. (2) The id of a file is as
-// much an input of the retention as its class and its day. (3) A request is written by the site and the bot with the day
-// of the database and, for the site, only with a customer it made in the same transaction.
+// were looked up in the search_path of the caller, and the worker could create a schema with an operator of its own
+// (pg-boss needed CREATE on the database; the third round took it away, and the worker still creates objects in pgboss,
+// the schema of its queue). So every function of the application schemas pins its search_path, and the guards hold for the
+// holder of the credentials of the worker, the bot and the admin panel. (2) The id of a file is as much an input of the
+// retention as its class and its day. (3) A request is written by the site and the bot with the day of the database and,
+// for the site, only with a customer it made in the same transaction.
 let migrator: pg.Client;
 let web: pg.Client;
 let admin: pg.Client;
@@ -51,13 +52,25 @@ const exists = async (id: string) =>
   Number((await one<{ n: string }>(migrator, "select count(*)::text as n from ops.files where id = $1", [id])).n) === 1;
 
 /**
- * A schema of the worker with an operator of its own: `=` of the given types says "equal" and `<` of integers says "not
- * less". Without a fixed search_path of the guard, `x IS DISTINCT FROM y` there says "not distinct" for anything. The
+ * A schema where the worker creates an operator of its own: `=` of the given types says "equal" and `<` of integers says
+ * "not less". Without a fixed search_path of the guard, `x IS DISTINCT FROM y` there says "not distinct" for anything. The
  * types are only the ones the guard under test compares: the statement of the caller must still find its own row.
+ * The worker cannot make a schema (no CREATE on the database), so the migrator makes one and lets the worker create in it,
+ * as the worker may in pgboss, the one schema it keeps; with `schema` given, the operators are made in that schema and
+ * removed afterwards.
  */
-async function withShadow(types: string[], users: pg.Client[], run: (path: string) => Promise<void>): Promise<void> {
-  const name = `shadow_${uniq()}`;
-  await worker.query(`create schema ${name}`);
+async function withShadow(
+  types: string[],
+  users: pg.Client[],
+  run: (path: string) => Promise<void>,
+  schema?: string,
+): Promise<void> {
+  const name = schema ?? `shadow_${uniq()}`;
+  if (!schema) {
+    await migrator.query(`create schema ${name}`);
+    await migrator.query(`grant usage, create on schema ${name} to nivel_worker`);
+    await migrator.query(`grant usage on schema ${name} to nivel_bot, nivel_admin, nivel_web`);
+  }
   try {
     for (const t of types) {
       await worker.query(`create function ${name}.eq_${t}(${t}, ${t}) returns boolean language sql as 'select true'`);
@@ -67,11 +80,19 @@ async function withShadow(types: string[], users: pg.Client[], run: (path: strin
       `create function ${name}.lt_int(integer, integer) returns boolean language sql as 'select false'`,
     );
     await worker.query(`create operator ${name}.< (leftarg = integer, rightarg = integer, function = ${name}.lt_int)`);
-    await worker.query(`grant usage on schema ${name} to nivel_bot, nivel_admin, nivel_web`);
     await run(`${name}, pg_catalog`);
   } finally {
     for (const c of [worker, ...users]) await c.query("reset search_path").catch(() => undefined);
-    await worker.query(`drop schema ${name} cascade`);
+    if (schema) {
+      for (const t of types) {
+        await worker.query(`drop operator if exists ${name}.= (${t}, ${t})`);
+        await worker.query(`drop function if exists ${name}.eq_${t}(${t}, ${t})`);
+      }
+      await worker.query(`drop operator if exists ${name}.< (integer, integer)`);
+      await worker.query(`drop function if exists ${name}.lt_int(integer, integer)`);
+    } else {
+      await migrator.query(`drop schema ${name} cascade`);
+    }
   }
 }
 
@@ -90,36 +111,49 @@ describe("every function of the application schemas pins its search_path", () =>
   });
 });
 
-describe("the guards hold against an operator the caller made (the worker may create schemas)", () => {
-  it("files_guard: the day of a receipt cannot be moved, and the purge keeps the receipt", async () => {
-    const o = await createOrder(migrator);
-    await migrator.query("update sales.orders set warranty_until = now() - interval '10 years' where id = $1", [
-      o.orderId,
-    ]);
-    const receipt = await insertFile(migrator, { retention: "tax_5y", age: "10 days" });
-    await receiveFunds(migrator, o.orderId, 1_000_000);
-    const p = await insertPurchase(migrator, {
-      orderId: o.orderId,
-      vendorId: await createVendor(migrator),
-      amount: 1000,
-    });
-    await migrator.query("insert into sales.purchase_files (purchase_id, file_id, kind) values ($1, $2, 'receipt')", [
-      p,
-      receipt.id,
-    ]);
-    expect(await purge(worker)).not.toContain(receipt.storageKey);
-    await withShadow(["timestamptz"], [], async (path) => {
-      await worker.query(`set search_path = ${path}`);
-      const e = await pgError(worker, "update ops.files set created_at = now() - interval '6 years' where id = $1", [
+describe("the guards hold against an operator the caller made (the worker creates objects in the schema of its queue)", () => {
+  it.each([
+    ["a schema the worker may create in", undefined],
+    ["pgboss, the schema of its queue", "pgboss"],
+  ])(
+    "files_guard: the day of a receipt cannot be moved, and the purge keeps the receipt (operator in %s)",
+    async (_name, schema) => {
+      const o = await createOrder(migrator);
+      await migrator.query("update sales.orders set warranty_until = now() - interval '10 years' where id = $1", [
+        o.orderId,
+      ]);
+      const receipt = await insertFile(migrator, { retention: "tax_5y", age: "10 days" });
+      await receiveFunds(migrator, o.orderId, 1_000_000);
+      const p = await insertPurchase(migrator, {
+        orderId: o.orderId,
+        vendorId: await createVendor(migrator),
+        amount: 1000,
+      });
+      await migrator.query("insert into sales.purchase_files (purchase_id, file_id, kind) values ($1, $2, 'receipt')", [
+        p,
         receipt.id,
       ]);
-      expect(e.code).toBe(CHECK);
-      expect(e.message).toMatch(/^immutable:/);
-      await worker.query("reset search_path");
-    });
-    expect(await purge(worker)).not.toContain(receipt.storageKey);
-    expect(await exists(receipt.id)).toBe(true);
-  });
+      expect(await purge(worker)).not.toContain(receipt.storageKey);
+      await withShadow(
+        ["timestamptz"],
+        [],
+        async (path) => {
+          await worker.query(`set search_path = ${path}`);
+          const e = await pgError(
+            worker,
+            "update ops.files set created_at = now() - interval '6 years' where id = $1",
+            [receipt.id],
+          );
+          expect(e.code).toBe(CHECK);
+          expect(e.message).toMatch(/^immutable:/);
+          await worker.query("reset search_path");
+        },
+        schema,
+      );
+      expect(await purge(worker)).not.toContain(receipt.storageKey);
+      expect(await exists(receipt.id)).toBe(true);
+    },
+  );
 
   it("files_guard: the class of a file is not shortened by a '<' of the caller", async () => {
     const f = await insertFile(migrator, { retention: "tax_5y", age: "1 day" });
@@ -166,9 +200,9 @@ describe("the guards hold against an operator the caller made (the worker may cr
     });
   });
 
-  it("in_owner_context: a table named pg_proc in the path of the caller does not make the caller the owner", async () => {
-    const name = `fakeproc_${uniq()}`;
-    await worker.query(`create schema ${name}`);
+  it("in_owner_context: a table named pg_proc in the schema of the queue and in the path of the caller does not make the caller the owner", async () => {
+    // The worker owns the tables of pgboss, the one schema it may create in.
+    const name = "pgboss";
     try {
       await worker.query(`create table ${name}.pg_proc (oid oid, proowner oid)`);
       await worker.query(
@@ -189,31 +223,29 @@ describe("the guards hold against an operator the caller made (the worker may cr
     } finally {
       await worker.query("reset search_path");
       await worker.query("reset nivel.files_purge");
-      await worker.query(`drop schema ${name} cascade`);
+      await worker.query(`drop table if exists ${name}.pg_proc`);
     }
   });
 
   /**
    * The way of the review: a temporary table named pg_proc whose row says that the caller owns the function, then the flag.
-   * Where the role may make a temporary table (the clone of the template keeps the default right of PUBLIC; the database
-   * `nivel` revokes it) the table is there, and the guard must still not read it.
+   * The database `nivel` and its clones revoke TEMP from PUBLIC, so no role can make such a table; the test lends the right
+   * to the admin role for its duration, as if a deployment had not revoked it. The table must be made (the test fails if it
+   * is refused: it would prove nothing), and the guard must still not read it.
    */
-  async function fakeOwner(fn: string): Promise<boolean> {
-    const made = await admin.query("create temp table pg_proc (oid oid, proowner oid)").then(
-      () => true,
-      () => false,
+  const database = async () => (await one<{ d: string }>(migrator, "select quote_ident(current_database()) as d")).d;
+  async function fakeOwner(fn: string): Promise<void> {
+    await migrator.query(`grant temporary on database ${await database()} to nivel_admin`);
+    await admin.query("create temp table pg_proc (oid oid, proowner oid)");
+    await admin.query(
+      "insert into pg_temp.pg_proc select $1::regproc::oid, r.oid from pg_roles r where r.rolname = current_user",
+      [fn],
     );
-    if (made) {
-      await admin.query(
-        "insert into pg_temp.pg_proc select $1::regproc::oid, r.oid from pg_roles r where r.rolname = current_user",
-        [fn],
-      );
-    }
-    return made;
   }
   const dropFake = async () => {
     await admin.query("drop table if exists pg_temp.pg_proc");
     await admin.query("reset all");
+    await migrator.query(`revoke temporary on database ${await database()} from nivel_admin`);
   };
 
   it("guard_quote: an admin cannot fake the owner of the purge to empty the PDF link of an accepted quote", async () => {

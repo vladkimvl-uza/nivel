@@ -54,6 +54,25 @@ const ident = (name: string) => {
   return `"${name}"`;
 };
 
+/** The roles of the applications: they connect to the database and hold no other right on it. */
+export const APP_ROLES_WITH_CONNECT = ["nivel_web", "nivel_admin", "nivel_bot", "nivel_worker"] as const;
+
+/**
+ * The rights on the database itself, as infra/postgres/init/01-roles.sh gives them to `nivel`: PUBLIC holds nothing, the
+ * four application roles may connect, the owner (nivel_migrator) holds the rest. CREATE DATABASE ... TEMPLATE copies
+ * the data and not these rights: a clone would keep the defaults of PostgreSQL (CONNECT and TEMP for PUBLIC) and,
+ * as it used to, whatever the harness granted by hand, so a test would never see what production refuses
+ * (a role that makes a schema or a temporary table). The migrations take care of the rest (REVOKE CREATE of the worker,
+ * REVOKE TEMPORARY of PUBLIC) in the template, where they are not copied either.
+ */
+export function productionRightsSql(database: string): string[] {
+  const db = ident(database);
+  return [
+    `revoke all on database ${db} from public`,
+    `grant connect on database ${db} to ${APP_ROLES_WITH_CONNECT.join(", ")}`,
+  ];
+}
+
 /** Creates or refreshes nivel_s<slot>_template_test with all migrations applied as nivel_migrator. */
 export async function prepareTemplate(env: EnvLike = process.env): Promise<{ name: string; rebuilt: boolean }> {
   const slot = slotOf(env);
@@ -102,8 +121,8 @@ export async function createWorkerDatabase(
   await withSuper(env, async (c) => {
     await c.query(`drop database if exists ${ident(names.worker)} with (force)`);
     await c.query(`create database ${ident(names.worker)} template ${ident(names.template)} owner nivel_migrator`);
-    // Database-level grants are not copied from the template.
-    await c.query(`grant create on database ${ident(names.worker)} to nivel_worker`);
+    // Database-level rights are not copied from the template: give the clone those of the production database.
+    for (const statement of productionRightsSql(names.worker)) await c.query(statement);
   });
 
   for (const k of APP_DB_KEYS) target[`DATABASE_URL_${k}`] = urls[k];
