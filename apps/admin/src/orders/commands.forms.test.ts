@@ -216,6 +216,34 @@ describe("the report, the acts, the requests, the documents", () => {
     expect(commands.parseActLines("")).toEqual([]);
   });
 
+  it("reads a quantity only where it is written as one: a model name that ends in x and digits stays whole", () => {
+    expect(commands.parseActLines("NZXT Kraken X63\nNoctua NF-A12x25\nASUS Zenbook UX33")).toEqual([
+      { title: "NZXT Kraken X63", qty: 1 },
+      { title: "Noctua NF-A12x25", qty: 1 },
+      { title: "ASUS Zenbook UX33", qty: 1 },
+    ]);
+    expect(commands.parseActLines("Вентилятор Noctua NF-A12x25 × 3\nSSD Samsung 1TB x 2\nКулер ×10")).toEqual([
+      { title: "Вентилятор Noctua NF-A12x25", qty: 3 },
+      { title: "SSD Samsung 1TB", qty: 2 },
+      { title: "Кулер", qty: 10 },
+    ]);
+  });
+
+  it("refuses a list that is too long and answers at once to a line of a hundred thousand spaces", async () => {
+    expect(commands.parseActLines(Array.from({ length: 51 }, (_, i) => `Деталь ${i}`).join("\n"))).toBeNull();
+    expect(commands.parseActLines(`${"я".repeat(301)}`)).toBeNull();
+    const hostile = `a${" ".repeat(100_000)}a`;
+    const started = performance.now();
+    expect(commands.parseActLines(hostile)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(200);
+    const generate = vi.fn();
+    const ctx = ctxOf("assistant", { acts: { generate } } as unknown as Partial<Svc>);
+    const r = await commands.generateAct(ctx, ORDER, form({ kind: "customer_parts", lines: hostile }));
+    expect(r).toMatchObject({ ok: false });
+    expect(r.message).toContain("Список");
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("the request for a PDF queues the job of the worker, with the act when there is one; the assistant may ask", async () => {
     const enqueue = vi.fn(async () => ({ id: "j1", duplicate: false }));
     const ctx = ctxOf("assistant", { outbox: { enqueue } } as unknown as Partial<Svc>);

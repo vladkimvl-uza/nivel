@@ -281,16 +281,30 @@ export async function resolveObjection(ctx: Ctx, orderId: string, form: FormInpu
 // ---- acts ---------------------------------------------------------------------------------------------------------
 const ACT_KINDS = ["material_acceptance", "customer_parts", "handover"] as const;
 
-/** "SSD Samsung 1TB x 2" -> { title, qty }: one line per row; no quantity means one. */
-export function parseActLines(raw: string): { title: string; qty: number }[] {
-  return raw
+const MAX_ACT_LINES = 50;
+/** The limit of the title in `acts.generate`. */
+const MAX_ACT_TITLE = 300;
+/** The quantity is looked for in the tail of a line only, so the work does not grow with the length of the line. */
+const QTY_TAIL = 24;
+/** "× 3" (the sign may stand close), or "x 3" / "х 3" with spaces on both sides: "Kraken X63" and "NF-A12x25" are names. */
+const QTY_MARK = /(?:\s*×\s*|\s[xх]\s+)(\d{1,2})$/i;
+
+/**
+ * "SSD Samsung 1TB x 2" -> { title, qty }: one line per row; no quantity means one. Null when the list is longer than an
+ * act takes (50 lines, 300 characters in a title).
+ */
+export function parseActLines(raw: string): { title: string; qty: number }[] | null {
+  const rows = raw
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l !== "")
-    .map((l) => {
-      const m = /^(.*?)\s*[x×х]\s*(\d{1,2})$/i.exec(l);
-      return m?.[1] ? { title: m[1].trim(), qty: Number(m[2]) } : { title: l, qty: 1 };
-    });
+    .filter((l) => l !== "");
+  if (rows.length > MAX_ACT_LINES || rows.some((l) => l.length > MAX_ACT_TITLE)) return null;
+  return rows.map((l) => {
+    const tail = l.slice(-QTY_TAIL);
+    const m = QTY_MARK.exec(tail);
+    const title = m ? l.slice(0, l.length - tail.length + m.index).trim() : "";
+    return m?.[1] && title !== "" ? { title, qty: Number(m[1]) } : { title: l, qty: 1 };
+  });
 }
 
 export async function generateAct(ctx: Ctx, orderId: string, form: FormInput): Promise<Outcome> {
@@ -298,6 +312,9 @@ export async function generateAct(ctx: Ctx, orderId: string, form: FormInput): P
     const kind = pick(ACT_KINDS, text(form, "kind"));
     if (!kind) return fail("Выберите вид акта.");
     const lines = parseActLines(form.get("lines") ?? "");
+    if (lines === null) {
+      return fail(`Список в акте: не больше ${MAX_ACT_LINES} строк, в каждой не больше ${MAX_ACT_TITLE} знаков.`);
+    }
     const r = await ctx.svc.acts.generate(
       { orderId, kind, ...(lines.length === 0 ? {} : { lines }) },
       actorOf(ctx),
