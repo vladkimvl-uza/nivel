@@ -282,6 +282,15 @@ function linesOfRuns(runs: readonly Run[]): string[] {
   return out;
 }
 
+/** A text string of the info dictionary: UTF-16BE after the mark FE FF, or plain bytes. */
+function pdfString(raw: string): string {
+  if (!raw.startsWith("þÿ")) return raw;
+  let out = "";
+  for (let i = 2; i + 1 < raw.length; i += 2)
+    out += String.fromCharCode((raw.charCodeAt(i) << 8) | raw.charCodeAt(i + 1));
+  return out;
+}
+
 function infoOf(objects: Map<number, PdfObject>): Record<string, string> {
   const info: Record<string, string> = {};
   for (const o of objects.values()) {
@@ -289,7 +298,7 @@ function infoOf(objects: Map<number, PdfObject>): Record<string, string> {
     for (const k of ["Title", "Author", "Subject", "Creator"]) {
       const ref = new RegExp(`/${k} (\\d+) 0 R`).exec(o.dict);
       const lit = ref ? /^\((.*)\)\s*$/s.exec((objects.get(Number(ref[1]))?.dict ?? "").trim()) : null;
-      if (lit) info[k] = lit[1] as string;
+      if (lit) info[k] = pdfString(lit[1] as string);
     }
   }
   return info;

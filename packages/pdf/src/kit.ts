@@ -250,9 +250,9 @@ export interface Column {
 /** A cell: a text, or any element (a name with notes under it). */
 export type Cell = ReactNode;
 
-const cellBox = (col: Column): PdfStyle => ({
+const cellBox = (col: Column, first = false): PdfStyle => ({
   flex: col.flex,
-  paddingLeft: 4,
+  paddingLeft: first ? 0 : 4,
   paddingRight: 4,
   alignItems: col.align === "right" ? "flex-end" : "flex-start",
 });
@@ -289,7 +289,7 @@ export function table(
         const cell = cells[i];
         return h(
           View,
-          { key: i, style: cellBox(col) },
+          { key: i, style: cellBox(col, i === 0) },
           typeof cell === "string" || typeof cell === "number"
             ? h(Text, { style: col.align === "right" ? { ...style.mono, textAlign: "right" } : {} }, String(cell))
             : (cell ?? null),
@@ -310,7 +310,7 @@ export function table(
     ...columns.map((col, i) =>
       h(
         View,
-        { key: i, style: cellBox(col) },
+        { key: i, style: cellBox(col, i === 0) },
         h(Text, { style: { ...style.caption, textAlign: col.align === "right" ? "right" : "left" } }, col.label),
       ),
     ),
@@ -339,7 +339,7 @@ export function table(
 export function amountRow(
   label: ReactNode,
   value: string,
-  opts: { strong?: boolean; negative?: boolean; note?: string } = {},
+  opts: { strong?: boolean; negative?: boolean; note?: string; rule?: boolean } = {},
 ): ReactElement {
   return h(
     View,
@@ -351,7 +351,7 @@ export function amountRow(
         alignItems: "flex-start",
         paddingTop: 3,
         paddingBottom: 3,
-        borderBottomWidth: 0.5,
+        borderBottomWidth: opts.rule === false ? 0 : 0.5,
         borderBottomColor: palette.line,
         gap: 10,
       },

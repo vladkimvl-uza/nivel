@@ -29,6 +29,26 @@
     "maxLen": 30,
     "status": "draft"
   },
+  "common.customer": {
+    "context": "label before the name of the customer",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "common.version": {
+    "context": "version number of an estimate or a report",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "common.sum_unit": {
+    "context": "unit of the sums in the heading of a column of a table",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "common.unknown_customer": {
+    "context": "customer without a name in the order",
+    "maxLen": 20,
+    "status": "draft"
+  },
   "requisites.title": {
     "context": "heading of the block with the account of the sole proprietor",
     "maxLen": 50,
@@ -77,6 +97,241 @@
   "requisites.fee_channel": {
     "context": "line under the requisites: the fee is paid by QR Xolis with a receipt, a different flow of money",
     "maxLen": 100,
+    "status": "draft"
+  },
+  "quote.title": {
+    "context": "title of the estimate document",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.price_date": {
+    "context": "metadata label: date of the prices",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.valid_until": {
+    "context": "metadata label: the estimate is valid until",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fx": {
+    "context": "metadata label: exchange rate of the Central Bank",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fx_value": {
+    "context": "exchange rate: {ccy} is the code of the currency (given by the program), {rate} the rate, {date} its date",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.group.pc": {
+    "context": "heading of the group of lines: computer and parts",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.group.mount": {
+    "context": "heading of the group of lines: mounting and workplace",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.group.outside_scale": {
+    "context": "heading of the group of lines outside the fee scale (no fee is charged on them)",
+    "maxLen": 90,
+    "status": "draft"
+  },
+  "quote.group.customer_owned": {
+    "context": "heading of the group of lines the customer owns",
+    "maxLen": 80,
+    "status": "draft"
+  },
+  "quote.col.n": {
+    "context": "table column: row number",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.item": {
+    "context": "table column: item",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.qty": {
+    "context": "table column: quantity",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.price": {
+    "context": "table column: unit price, sums",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.col.sum": {
+    "context": "table column: sum of the line, sums",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.price_date": {
+    "context": "note under a line: the price is the median on the date",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.vendor": {
+    "context": "note under a line: the seller of reference (shown only when the seller allows his name)",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.line.confidence.high": {
+    "context": "note under a line: confidence of the price is high",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.confidence.medium": {
+    "context": "note under a line: confidence of the price is medium",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.line.confidence.low": {
+    "context": "note under a line: confidence of the price is low",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.line.no_return": {
+    "context": "note under a line: the shop does not take the item back",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.line.return_unknown": {
+    "context": "note under a line: return terms are not known yet",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.totals.title": {
+    "context": "heading of the block of totals",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.totals.components": {
+    "context": "row of totals: the sum the fee is counted from",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "quote.totals.outside": {
+    "context": "row of totals: lines outside the fee scale",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.totals.reserve": {
+    "context": "row of totals: reserve against price growth, {rate} is the rate in percent",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.totals.limit": {
+    "context": "row of totals: the limit of the purchase (money for purchases)",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.totals.limit_note": {
+    "context": "note under the limit: over the limit only with written consent; the rest is returned after the report",
+    "maxLen": 170,
+    "status": "draft"
+  },
+  "quote.fee.title": {
+    "context": "heading of the block of the fee",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.base": {
+    "context": "column of the fee table: base of the rate",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.rate": {
+    "context": "column of the fee table: rate in percent",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.amount": {
+    "context": "column of the fee table: amount",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.rule.pc_low": {
+    "context": "fee rule: computer below the threshold",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fee.rule.pc_high": {
+    "context": "fee rule: computer from the threshold",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.fee.rule.pc_high_min": {
+    "context": "fee rule: the minimum fee for a computer from the threshold",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fee.rule.mount": {
+    "context": "fee rule: mounting of a workplace",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.rule.complex": {
+    "context": "fee rule: complex build",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.fee.commission": {
+    "context": "line of the fee 1: reward for the purchase and the guarantee",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "quote.fee.works": {
+    "context": "line of the fee 2: works",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "quote.fee.total": {
+    "context": "total of the fee",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.stages.title": {
+    "context": "heading of the block with the two stages of the fee",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.stages.advance": {
+    "context": "stage 1 of the fee",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.stages.final": {
+    "context": "stage 2 of the fee",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.total.grand": {
+    "context": "grand total: the limit of the purchase plus the fee",
+    "maxLen": 50,
+    "status": "draft"
+  },
+  "quote.nonreturn.title": {
+    "context": "heading of the list of lines the shop does not take back",
+    "maxLen": 40,
+    "status": "draft"
+  },
+  "quote.nonreturn.body": {
+    "context": "text over the list of non-returnable lines: separate consent is needed",
+    "maxLen": 120,
+    "status": "draft"
+  },
+  "quote.stamp_checked": {
+    "context": "word of the stamp on the estimate: the owner has checked it by hand before sending",
+    "maxLen": 30,
+    "status": "draft"
+  },
+  "quote.expiry": {
+    "context": "note at the end of the estimate: prices hold until the date",
+    "maxLen": 80,
     "status": "draft"
   }
 }
