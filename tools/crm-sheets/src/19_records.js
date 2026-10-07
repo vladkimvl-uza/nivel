@@ -87,7 +87,8 @@ function nvLeadAfterEdit(rowNo, oldStatus) {
   if (lead.status === "Отказ" && nvStr(lead.reason) === "")
     msgs.push("Укажите причину отказа: без неё заявка не считается закрытой");
   nvWriteCells("leads", rowNo, set);
-  if (oldStatus !== undefined && oldStatus !== lead.status && lead.status !== "") {
+  // The conversion writes its own line (LEAD_CONVERTED): "В заказе" is not logged twice
+  if (oldStatus !== undefined && oldStatus !== lead.status && lead.status !== "" && lead.status !== "В заказе") {
     nvHistoryAppend({
       time: now,
       object: "Заявка",

@@ -24,6 +24,7 @@ function nvBuildMenu() {
     .addItem("Секреты: почта владельца", "nvMenuSecretEmail")
     .addItem("Секреты: ключ вебхука", "nvMenuSecretWebhook")
     .addItem("Установить триггеры", "nvMenuInstallTriggers")
+    .addItem("Обезличить старые заявки", "nvMenuAnonymize")
     .addItem("Журнал вебхука", "nvMenuWebhookLog");
   ui.createMenu("Nivel CRM")
     .addItem("Новая заявка", "nvMenuNewLead")
@@ -92,6 +93,18 @@ function nvMenuSecretEmail() {
 }
 function nvMenuSecretWebhook() {
   nvSecretWebhookUi();
+}
+function nvMenuAnonymize() {
+  const n = nvStaleLeads(nvNow()).length;
+  if (n === 0) return nvToast("Заявок без заказа старше 12 месяцев нет");
+  const a = nvAsk(
+    "Обезличить",
+    "Заявок без заказа старше 12 месяцев: " +
+      n +
+      ". Имя и Telegram станут «удалено», номер и суммы останутся. Продолжить?",
+  );
+  if (a === "YES") nvToast("Обезличено заявок: " + nvAnonymizeStaleLeads(nvNow()));
+  return null;
 }
 function nvMenuWebhookLog() {
   nvSheet("webhook").activate();

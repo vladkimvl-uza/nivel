@@ -215,7 +215,7 @@ function nvSelfCheckRows() {
     if (["settled", "assembling", "testing", "ready", "delivering", "handed_over", "closed"].indexOf(o.code) < 0)
       return;
     const st = nvOrderState(o, payments, purchases, orders, s, []);
-    if (st.recon !== "Сходится") recBad.push(o.num + ": " + st.recon);
+    if (!st.reconciled) recBad.push(o.num + ": " + st.recon);
   });
   if (recBad.length) warn("Сверка «получено = чеки + возвращено»", recBad.slice(0, 6).join("; "));
   else ok("Сверка «получено = чеки + возвращено»", "расхождений нет");

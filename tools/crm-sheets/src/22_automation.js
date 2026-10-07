@@ -400,7 +400,7 @@ function nvMonthlyJob() {
         stale.length +
         " (" +
         stale.slice(0, 10).join(", ") +
-        "). Меню «Nivel CRM → Демо-данные» не затрагивается; имя и Telegram можно заменить на «удалено», номер и суммы остаются.",
+        "). Меню «Nivel CRM → Настройка → Обезличить старые заявки» заменит имя и Telegram на «удалено»; номер и суммы остаются.",
     );
   return { cleaned: cleaned, stale: stale.length };
 }

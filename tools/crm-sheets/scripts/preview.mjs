@@ -319,7 +319,20 @@ function sparkHtml(formula, w, h, ctx) {
 }
 
 /** The HTML of all the sheets in the current theme of the book. */
-export function renderTheme(p, baked, themeName) {
+export function createStyleRegistry() {
+  const map = new Map();
+  return {
+    classOf(css) {
+      if (!map.has(css)) map.set(css, `s${map.size.toString(36)}`);
+      return map.get(css);
+    },
+    css() {
+      return [...map].map(([css, cls]) => `table.sheet td.${cls}{${css}}`).join("\n");
+    },
+  };
+}
+
+export function renderTheme(p, baked, themeName, styles) {
   const { computer, bundle } = baked;
   const ss = p.env.ss;
   const T = JSON.parse(p.run(`JSON.stringify(NV_THEMES.${themeName})`));
@@ -355,6 +368,7 @@ export function renderTheme(p, baked, themeName) {
       pageBg,
       charts: extra.charts,
       sparkline: (f, w, h) => sparkHtml(f, w, h, sparkCtx),
+      styles,
     });
     return { name, theme: themeName, html: r.html, width: r.width, height: r.height };
   });
@@ -380,7 +394,7 @@ table.sheet td{padding:0 7px;overflow:hidden;white-space:nowrap;text-overflow:cl
 .chart{line-height:0}
 `;
 
-export function buildHtml(passport, night) {
+export function buildHtml(passport, night, styles) {
   const names = passport.map((s) => s.name);
   const sections = [...passport, ...night]
     .map(
@@ -391,7 +405,8 @@ export function buildHtml(passport, night) {
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Nivel CRM — превью оформления</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap&subset=cyrillic" rel="stylesheet">
-<style>${CSS}</style></head><body>
+<style>${CSS}
+${styles.css()}</style></head><body>
 <div id="bar"><b>Nivel · CRM</b><div class="themes"><button data-theme="passport" class="on">Паспорт</button><button data-theme="night">Ночная панель</button></div>
 <div class="tabs">${names.map((n, i) => `<button data-sheet="${esc(n)}"${i === 0 ? ' class="on"' : ""}>${esc(n)}</button>`).join("")}</div></div>
 ${sections}
@@ -412,10 +427,11 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").repl
 export function generatePreview() {
   const p = buildPreviewProject();
   const baked = bakeValues(p);
-  const passport = renderTheme(p, baked, "passport");
+  const styles = createStyleRegistry();
+  const passport = renderTheme(p, baked, "passport", styles);
   p.call("nvSetTheme", "night", "all");
-  const night = renderTheme(p, baked, "night");
-  return { html: buildHtml(passport, night), errors: baked.computer.errors, project: p };
+  const night = renderTheme(p, baked, "night", styles);
+  return { html: buildHtml(passport, night, styles), errors: baked.computer.errors, project: p };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

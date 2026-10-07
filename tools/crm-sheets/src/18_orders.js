@@ -82,6 +82,8 @@ function nvOrderState(o, payments, purchases, orders, s, holidays) {
     refunded: refunded,
     remainder: remainder,
     feeNet: feeNet,
+    // The rule of the domain: money received = receipts + refunded (nothing received and nothing spent also reconciles)
+    reconciled: fundsGot === receipts + refunded,
     recon: fundsGot === 0 ? "—" : fundsGot === receipts + refunded ? "Сходится" : "Остаток " + remainder + " сум",
     finalPaid: finalPaid,
     podborPaid: podborPaid,
@@ -290,7 +292,7 @@ function nvOrderChecks(ctx, eventCode, input, now) {
     case "REMAINDER_SETTLED":
       if (nvStr(o.reportAccepted) === "" || nvStr(o.reportAccepted) === "Нет" || nvStr(o.objection))
         add("report_objection_open", "Отчёт не принят или есть возражение");
-      if (st.recon !== "Сходится") add("not_reconciled", "Сверка не сходится: " + st.recon);
+      if (!st.reconciled) add("not_reconciled", "Сверка не сходится: " + st.recon);
       break;
     case "MATERIALS_ACCEPTED":
       if (!nvStr(input)) add("act_missing", "Нужен номер акта приёма материала");
@@ -304,7 +306,7 @@ function nvOrderChecks(ctx, eventCode, input, now) {
       break;
     case "CLOSE":
       if (nvStr(o.objection)) add("report_objection_open", "Есть открытое возражение клиента", true);
-      if (st.recon !== "Сходится") add("not_reconciled", "Сверка не сходится: " + st.recon);
+      if (!st.reconciled) add("not_reconciled", "Сверка не сходится: " + st.recon);
       break;
     case "PODBOR_DELIVERED":
       if (o.kind !== "Подбор") add("invalid_transition", "Только для вида «Подбор»", true);
@@ -465,9 +467,8 @@ function nvApplyOrderEvent(num, eventCode, opts) {
         set.podborUntil = new Date(now.getTime() + s.podborCreditDays * NV_DAY_MS);
         break;
       case "CANCEL": {
-        const merged = Object.assign({}, order, set);
-        const c2 = { order: merged, state: ctx.state, settings: s, holidays: ctx.holidays };
-        const res = nvCancelSettlement(c2, now);
+        // The point comes from the status the order is in now, not from "Отмена: расчёт" that the event sets
+        const res = nvCancelSettlement({ order: order, state: ctx.state, settings: s, holidays: ctx.holidays }, now);
         const pointLabel = NV_CANCEL_POINTS.find((p) => p.code === res.point).label;
         Object.assign(set, nvSettlementCells(res, pointLabel));
         set.cancelReason = nvStr(input);

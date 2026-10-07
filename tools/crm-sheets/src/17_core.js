@@ -34,7 +34,11 @@ function nvIssueNumber(prefix, opts, write) {
     const year = o.year || nvYear(o.date);
     const props = nvScriptProps();
     const key = nvCounterKey(prefix, year, o.demo);
-    const current = Number(props.getProperty(key) || 0);
+    // The counter can never be below the numbers already in the sheet (a lost property must not repeat a number)
+    const current = Math.max(
+      Number(props.getProperty(key) || 0),
+      nvMaxNumber(NV_PREFIX_SHEET[prefix], prefix, year, o.demo),
+    );
     const next = current + 1;
     const number = nvFormatNumber(prefix, year, next, o.demo);
     const result = write(number);
@@ -57,15 +61,18 @@ function nvBumpCounter(number) {
 }
 
 /** Largest sequence number among the existing numbers of a prefix and year; used by the self-check. */
-function nvMaxNumber(sheetKey, prefix, year) {
+function nvMaxNumber(sheetKey, prefix, year, demo) {
   const def = NV_SCHEMA[sheetKey];
   let max = 0;
   nvReadTable(sheetKey).forEach((r) => {
     const p = nvParseNumber(r[def.keyCol]);
-    if (p && p.prefix === prefix && !p.demo && (prefix === "K" || p.year === year) && p.n > max) max = p.n;
+    if (p && p.prefix === prefix && !!p.demo === !!demo && (prefix === "K" || p.year === year) && p.n > max) max = p.n;
   });
   return max;
 }
+
+/** The sheet that holds the numbers of a prefix. */
+const NV_PREFIX_SHEET = { L: "leads", NV: "orders", G: "warranty", P: "payments", Z: "purchases", K: "clients" };
 
 /* ---------------------------------------------------------------- history */
 

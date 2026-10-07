@@ -267,7 +267,7 @@ export function renderSheet(sheet, opts) {
         inner = esc(text);
       }
       html.push(
-        `<td${colspan > 1 ? ` colspan="${colspan}"` : ""}${rowspan > 1 ? ` rowspan="${rowspan}"` : ""} style="${style.join(";")}">${inner}</td>`,
+        `<td${colspan > 1 ? ` colspan="${colspan}"` : ""}${rowspan > 1 ? ` rowspan="${rowspan}"` : ""} class="${opts.styles.classOf(style.join(";"))}">${inner}</td>`,
       );
       ci += colspan;
       void colIndex;
