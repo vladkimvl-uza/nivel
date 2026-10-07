@@ -1,0 +1,3 @@
+ALTER TABLE "sales"."acts" DROP CONSTRAINT "acts_evidence_chk";--> statement-breakpoint
+ALTER TABLE "ops"."files" ADD CONSTRAINT "files_storage_key_chk" CHECK ("ops"."files"."storage_key" ~ '^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$' and char_length("ops"."files"."storage_key") <= 300);--> statement-breakpoint
+ALTER TABLE "sales"."acts" ADD CONSTRAINT "acts_evidence_chk" CHECK ("sales"."acts"."signed_at" is null or ("sales"."acts"."evidence" is not null and jsonb_typeof("sales"."acts"."evidence") = 'object'));

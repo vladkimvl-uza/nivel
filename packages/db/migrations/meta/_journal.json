@@ -50,6 +50,13 @@
       "when": 1791292777125,
       "tag": "20261006131937_wp00_db_rights",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791346963916,
+      "tag": "20261007042243_wp00_db_checks",
+      "breakpoints": true
     }
   ]
 }
