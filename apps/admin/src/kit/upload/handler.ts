@@ -5,8 +5,9 @@
 // so the limit of this file (12 MB) is checked here, from the declared length, before the body is read.
 //
 // Memory is what is guarded (384 MB in the container): the place among the uploads is taken before the first byte of
-// the body is read; the body is read with a limit and a time (not trusting the declared length); the parts of the form
-// are counted before they are built (multipart.ts); the parts are slices of the one buffer.
+// the body is read; the body is read into one buffer of the declared length, with a time that follows the length, a
+// bound on the pieces and a stop when the client leaves; the parts of the form are counted before they are built
+// (multipart.ts); the parts are slices of the one buffer.
 import { revalidatePath } from "next/cache";
 import { guardAction, NOT_ALLOWED } from "../../auth/next.ts";
 import { isSameOriginRequest } from "../../auth/origin.ts";
@@ -33,49 +34,93 @@ const reply = (status: number, state: UploadState, extra: Record<string, string>
 
 const TOO_BIG = "Файл больше 12 МБ.";
 const NOT_A_FORM = "Не удалось прочитать форму.";
-/** A phone on a bad connection sends 12 MB in well under a minute; a client that is slower than this holds a place for nothing. */
-const BODY_TIMEOUT_MS = 60_000;
+/**
+ * Time for the body (a place among the uploads is held all that time): a grace for the connection to come up, then a
+ * modest speed of 100 KB/s (a phone on a poor mobile network has that), and never above two minutes. A small file gets
+ * little time, a file of 12 MB gets all of it.
+ */
+export const BODY_GRACE_MS = 10_000;
+export const BODY_MIN_BYTES_PER_SECOND = 100 * 1024;
+export const BODY_TIMEOUT_MAX_MS = 120_000;
+/** A client that sends nothing for this long has stopped: its place is given to the next. */
+const BODY_IDLE_MS = 15_000;
+/**
+ * The pieces in which the body may come. A plain connection gives pieces of kilobytes (12 MB is a few thousand of them);
+ * a client that sends one byte at a time is not sending a photo. Each piece costs a turn of the event loop even when
+ * nothing is kept, and nothing that is slow in this way is worth a place.
+ */
+export const MAX_BODY_CHUNKS = 100_000;
 
-/** The body as one buffer; `"too_big"` past the limit (whatever was declared), `"slow"` when it does not arrive in time. */
-async function readBody(
-  request: Request,
-  limit: number,
-  timeoutMs: number,
-): Promise<Buffer | "too_big" | "slow" | null> {
+export const bodyDeadlineMs = (declaredBytes: number): number =>
+  Math.min(BODY_TIMEOUT_MAX_MS, BODY_GRACE_MS + Math.ceil((declaredBytes / BODY_MIN_BYTES_PER_SECOND) * 1000));
+
+interface BodyTiming {
+  totalMs: number;
+  idleMs: number;
+}
+
+/**
+ * The body as one buffer; `"slow"` when it does not arrive in time, stops, comes in too many pieces or the client
+ * leaves, null when it cannot be read (or is longer than it declared).
+ *
+ * The buffer is made once, of the declared length (checked against the limit by the caller), and every piece is copied
+ * into it and let go: what the body costs does not depend on the number of the pieces. (Keeping each piece as an object
+ * of its own took 430 MB for half a megabyte sent by single bytes.) A body longer than declared is not a form this
+ * admin made: it is cut there.
+ */
+async function readBody(request: Request, declared: number, timing: BodyTiming): Promise<Buffer | "slow" | null> {
   if (!request.body) return null;
   const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const body = Buffer.allocUnsafe(declared);
   let total = 0;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<"slow">((resolve) => {
-    timer = setTimeout(() => resolve("slow"), timeoutMs);
-  });
+  let pieces = 0;
+  const state = { stopped: false };
+  const started = Date.now();
+  let lastAt = started;
+  const stop = () => {
+    state.stopped = true;
+    void reader.cancel().catch(() => {});
+  };
+  // One timer for the whole body (not one per piece): it also watches for a client that has stopped.
+  const watch = setInterval(
+    () => {
+      const t = Date.now();
+      if (t - started >= timing.totalMs || t - lastAt >= timing.idleMs) stop();
+    },
+    Math.max(10, Math.min(1000, Math.floor(Math.min(timing.totalMs, timing.idleMs) / 4))),
+  );
+  request.signal.addEventListener("abort", stop, { once: true });
   try {
     for (;;) {
-      const step = await Promise.race([reader.read(), late]);
-      if (step === "slow") {
+      const step = await reader.read();
+      if (state.stopped) return "slow";
+      if (step.done) break;
+      pieces += 1;
+      if (pieces > MAX_BODY_CHUNKS) {
         await reader.cancel().catch(() => {});
         return "slow";
       }
-      if (step.done) break;
-      total += step.value.length;
-      if (total > limit) {
+      const piece = step.value;
+      if (total + piece.length > declared) {
         await reader.cancel().catch(() => {});
-        return "too_big";
+        return null;
       }
-      chunks.push(step.value);
+      body.set(piece, total);
+      total += piece.length;
+      lastAt = Date.now();
     }
   } catch {
-    return null;
+    return state.stopped ? "slow" : null;
   } finally {
-    clearTimeout(timer);
+    clearInterval(watch);
+    request.signal.removeEventListener("abort", stop);
   }
-  return Buffer.concat(chunks, total);
+  return body.subarray(0, total);
 }
 
 export async function handleUploadRequest(
   request: Request,
-  options: { bodyTimeoutMs?: number } = {},
+  options: { bodyTimeoutMs?: number; idleTimeoutMs?: number } = {},
 ): Promise<Response> {
   if (!isSameOriginRequest(request.headers)) {
     return reply(403, { ok: false, message: "Запрос не из этой админки отклонён." });
@@ -93,15 +138,14 @@ export async function handleUploadRequest(
   if (!boundary) return reply(400, { ok: false, message: NOT_A_FORM });
 
   // The place first, the body after: a request that has to wait, or is turned away, has taken no memory for its body.
-  const slot = await takeUploadSlot();
+  // A waiter leaves the queue when the client leaves (request.signal), and does not wait without end.
+  const slot = await takeUploadSlot({ signal: request.signal });
   if (!slot) return reply(503, { ok: false, message: BUSY }, { "retry-after": "60" });
   try {
-    const body = await readBody(
-      request,
-      MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD,
-      options.bodyTimeoutMs ?? BODY_TIMEOUT_MS,
-    );
-    if (body === "too_big") return reply(413, { ok: false, message: TOO_BIG });
+    const body = await readBody(request, Number(declared), {
+      totalMs: options.bodyTimeoutMs ?? bodyDeadlineMs(Number(declared)),
+      idleMs: options.idleTimeoutMs ?? BODY_IDLE_MS,
+    });
     if (body === "slow") return reply(408, { ok: false, message: "Файл передаётся слишком медленно. Повторите." });
     const parts = body ? parseMultipart(body, boundary) : null;
     if (!parts) return reply(400, { ok: false, message: NOT_A_FORM });

@@ -28,11 +28,38 @@ export interface UploadSlot {
   release(): void;
 }
 
-/** The place, or null when the queue is full. */
-export async function takeUploadSlot(): Promise<UploadSlot | null> {
+/** How long a request may wait for a place: the waiters hold a connection, and a place is never worth more than this. */
+export const MAX_WAIT_FOR_PLACE_MS = 30_000;
+
+/**
+ * The place, or null when the queue is full, the request was cancelled (`signal`: the client left) or it waited longer
+ * than `maxWaitMs`. A waiter that goes away leaves the queue at once, so that it does not hold a seat for nobody.
+ */
+export async function takeUploadSlot(
+  options: { signal?: AbortSignal; maxWaitMs?: number } = {},
+): Promise<UploadSlot | null> {
+  const { signal, maxWaitMs = MAX_WAIT_FOR_PLACE_MS } = options;
+  if (signal?.aborted) return null;
   if (cleaning.active >= MAX_PARALLEL_CLEANINGS) {
     if (cleaning.waiting.length >= MAX_WAITING_CLEANINGS) return null;
-    await new Promise<void>((resolve) => cleaning.waiting.push(resolve));
+    const granted = await new Promise<boolean>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const settle = (value: boolean) => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", leave);
+        resolve(value);
+      };
+      const turn = () => settle(true);
+      function leave() {
+        const at = cleaning.waiting.indexOf(turn);
+        if (at >= 0) cleaning.waiting.splice(at, 1);
+        settle(false);
+      }
+      timer = setTimeout(leave, maxWaitMs);
+      signal?.addEventListener("abort", leave, { once: true });
+      cleaning.waiting.push(turn);
+    });
+    if (!granted) return null;
   } else {
     cleaning.active += 1;
   }

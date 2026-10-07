@@ -13,6 +13,7 @@ import {
   MAX_UPLOAD_BYTES,
   MAX_WAITING_CLEANINGS,
   saveUpload,
+  takeUploadSlot,
   UPLOAD_KINDS,
 } from "./save.ts";
 
@@ -230,5 +231,57 @@ describe("saveUpload: the work on a picture is limited, so that a flood of big f
     }
     const ok = await saveUpload(deps, { actor: assistant, bytes: photo(), kind: "receipt" });
     expect(ok.ok).toBe(true);
+  });
+});
+
+describe("the queue for a place: whoever waits can leave, and does not wait for ever", () => {
+  const fill = async () => {
+    const held = [];
+    for (let i = 0; i < MAX_PARALLEL_CLEANINGS; i += 1) {
+      const slot = await takeUploadSlot();
+      if (!slot) throw new Error("expected a place");
+      held.push(slot);
+    }
+    return held;
+  };
+
+  it("takes a waiter out of the queue when the request is cancelled, so that its place is free for the next", async () => {
+    const held = await fill();
+    const leave = new AbortController();
+    const first = takeUploadSlot({ signal: leave.signal });
+    const others = Array.from({ length: MAX_WAITING_CLEANINGS - 1 }, () => takeUploadSlot());
+    // The queue is full now.
+    expect(await takeUploadSlot()).toBeNull();
+    leave.abort();
+    expect(await first).toBeNull();
+    // The seat of the one that left is free: a new waiter is queued, not turned away.
+    const next = takeUploadSlot();
+    for (const slot of held) slot.release();
+    for (const waiter of [...others, next]) {
+      const got = await waiter;
+      expect(got).not.toBeNull();
+      got?.release();
+    }
+  });
+
+  it("a waiter that was cancelled before it asked gets nothing and takes nothing", async () => {
+    const held = await fill();
+    const gone = AbortSignal.abort();
+    expect(await takeUploadSlot({ signal: gone })).toBeNull();
+    for (const slot of held) slot.release();
+    const again = await takeUploadSlot();
+    expect(again).not.toBeNull();
+    again?.release();
+  });
+
+  it("turns away a waiter that has waited too long, and the places still go round", async () => {
+    const held = await fill();
+    expect(await takeUploadSlot({ maxWaitMs: 30 })).toBeNull();
+    const next = takeUploadSlot();
+    held[0]?.release();
+    const got = await next;
+    expect(got).not.toBeNull();
+    got?.release();
+    held[1]?.release();
   });
 });

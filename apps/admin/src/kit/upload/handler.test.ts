@@ -8,7 +8,8 @@ vi.mock("next/headers", async () => (await import("../test-support/fake-app.ts")
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { createFakeApp } = await import("../test-support/fake-app.ts");
-const { handleUploadRequest, UPLOAD_PATH } = await import("./handler.ts");
+const { BODY_GRACE_MS, BODY_TIMEOUT_MAX_MS, bodyDeadlineMs, handleUploadRequest, MAX_BODY_CHUNKS, UPLOAD_PATH } =
+  await import("./handler.ts");
 const { MAX_PARALLEL_CLEANINGS, MAX_UPLOAD_BYTES, MAX_WAITING_CLEANINGS } = await import("./save.ts");
 
 let fake: Awaited<ReturnType<typeof createFakeApp>>;
@@ -265,6 +266,105 @@ describe("POST /files/upload", () => {
       status: 408,
       body: { ok: false, message: "Файл передаётся слишком медленно. Повторите." },
     });
+    expect((await handleUploadRequest(await post({ bytes: photo("x") }))).status).toBe(200);
+  });
+
+  // Second adversarial round: the bytes are counted, but the way they come was not (561 thousand pieces of one byte took
+  // 430 MB in 12 seconds with the old reading, which kept every piece as an object of its own).
+  const streamed = (source: UnderlyingDefaultSource<Uint8Array>, declared: number, signal?: AbortSignal) =>
+    new Request(`http://admin.test${UPLOAD_PATH}`, {
+      method: "POST",
+      body: new ReadableStream(source),
+      headers: {
+        "content-type": "multipart/form-data; boundary=B",
+        "content-length": String(declared),
+        origin: "http://admin.test",
+        host: "admin.test",
+      },
+      ...(signal ? { signal } : {}),
+      duplex: "half",
+    } as RequestInit);
+
+  it("stops a body that comes in pieces of one byte after a bound on the number of pieces, not after the time", async () => {
+    await fake.signInAs("owner");
+    let pulled = 0;
+    const request = streamed(
+      {
+        pull(controller) {
+          pulled += 1;
+          controller.enqueue(new Uint8Array(1));
+        },
+      },
+      MAX_UPLOAD_BYTES,
+    );
+    const reply = await answer(await handleUploadRequest(request, { bodyTimeoutMs: 20_000 }));
+    expect(reply.status).toBe(408);
+    expect(pulled).toBeLessThanOrEqual(MAX_BODY_CHUNKS + 2);
+    expect(fake.storedFiles.size).toBe(0);
+  });
+
+  it("keeps no object per piece: a good form that comes in pieces of seven bytes is read whole", async () => {
+    await fake.signInAs("owner");
+    const sent = await post({ bytes: photo("PIECES") });
+    const whole = Buffer.from(await sent.arrayBuffer());
+    let at = 0;
+    const request = new Request(sent.url, {
+      method: "POST",
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (at >= whole.length) return controller.close();
+          controller.enqueue(new Uint8Array(whole.subarray(at, at + 7)));
+          at += 7;
+        },
+      }),
+      headers: sent.headers,
+      duplex: "half",
+    } as RequestInit);
+    expect((await handleUploadRequest(request)).status).toBe(200);
+    expect(fake.storedFiles.size).toBe(1);
+  });
+
+  it("gives up on a client that stops in the middle of the body, long before the time of the whole body is over", async () => {
+    await fake.signInAs("owner");
+    let sent = false;
+    const request = streamed(
+      {
+        pull(controller) {
+          if (sent) return new Promise(() => {});
+          sent = true;
+          controller.enqueue(new Uint8Array(100));
+        },
+      },
+      1000,
+    );
+    const started = Date.now();
+    const reply = await answer(await handleUploadRequest(request, { bodyTimeoutMs: 20_000, idleTimeoutMs: 80 }));
+    expect(reply.status).toBe(408);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect((await handleUploadRequest(await post({ bytes: photo("x") }))).status).toBe(200);
+  });
+
+  it("lets the body of a big file as much time as a modest connection needs, and a small one much less", () => {
+    expect(bodyDeadlineMs(0)).toBe(BODY_GRACE_MS);
+    expect(bodyDeadlineMs(1024 * 1024)).toBeLessThan(bodyDeadlineMs(8 * 1024 * 1024));
+    expect(bodyDeadlineMs(1024 * 1024)).toBeGreaterThan(BODY_GRACE_MS + 5_000);
+    // A hundred kilobytes a second is the least that holds a place; the whole of it is never longer than two minutes.
+    expect(bodyDeadlineMs(MAX_UPLOAD_BYTES)).toBe(BODY_TIMEOUT_MAX_MS);
+    expect(BODY_TIMEOUT_MAX_MS).toBeLessThanOrEqual(120_000);
+  });
+
+  it("lets go of the place when the client leaves in the middle of the body", async () => {
+    await fake.signInAs("owner");
+    const leave = new AbortController();
+    const request = streamed({ pull: () => new Promise(() => {}) }, 1000, leave.signal);
+    const pending = handleUploadRequest(request, { bodyTimeoutMs: 20_000, idleTimeoutMs: 20_000 });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    leave.abort();
+    const outcome = await Promise.race([
+      pending.then((r) => r.status),
+      new Promise((r) => setTimeout(() => r("hung"), 3_000)),
+    ]);
+    expect(outcome).toBe(408);
     expect((await handleUploadRequest(await post({ bytes: photo("x") }))).status).toBe(200);
   });
 
