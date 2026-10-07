@@ -1,11 +1,11 @@
 // The job the bot queues when the owner or the assistant puts the photo of a receipt or of a paper act into a topic
 // (ARCHITECTURE 7.2 «Фото чеков»). The bot may not write files or purchases (DATA-MAP 2: it reads `ops.files`, `sales.purchases`),
 // so it hands over what Telegram gave it: the worker (it holds the token and the directory of the files) downloads the
-// photo, registers it in `ops.files` (kind `receipt_photo` or `act_photo`, DATA-MAP 5) and leaves it for the admin panel,
+// photo, registers it in `ops.files` (kind `receipt_photo` or `act_photo`) and leaves it for the admin panel,
 // which records the purchase or the paper signature. Every sum in it is the owner's word under the photo, a hint and not a fact.
 
 /** The name of the job in `ops.outbox` (kind `job`). */
-export const BOT_JOB = { FILE_INTAKE: "telegram.file_intake" } as const;
+export const BOT_JOB = { FILE_INTAKE: "telegram.file_intake", WARRANTY_REPORT: "warranty.report" } as const;
 
 export interface FileIntakePayload {
   job: typeof BOT_JOB.FILE_INTAKE;
@@ -66,4 +66,47 @@ export function parseFileIntake(raw: unknown): FileIntakePayload | null {
     out.actId = p.actId;
   }
   return out;
+}
+
+/**
+ * A customer reports a problem (ARCHITECTURE 7.2 «Гарантия»). The bot may not write `sales.warranty_cases` (it only reads
+ * them), so the report goes to the worker with the exact time of the customer's words; the worker or the admin panel opens
+ * the case with it. The owner sees the same words in the topic of the order at once.
+ */
+export interface WarrantyReportPayload {
+  job: typeof BOT_JOB.WARRANTY_REPORT;
+  orderId: string;
+  orderNumber: string;
+  /** ISO time of the moment the customer pressed «Done» (the clock of the bot process; the owner's reaction time counts from it). */
+  reportedAt: string;
+  text: string;
+  /** Telegram file ids of the photos, up to ten; the worker downloads them like the photos of receipts. */
+  photoFileIds: string[];
+  byTelegramId: number;
+}
+
+export const MAX_WARRANTY_TEXT = 2000;
+export const MAX_WARRANTY_PHOTOS = 10;
+
+export function parseWarrantyReport(raw: unknown): WarrantyReportPayload | null {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const p = raw as Record<string, unknown>;
+  if (p.job !== BOT_JOB.WARRANTY_REPORT) return null;
+  if (typeof p.orderId !== "string" || !UUID.test(p.orderId)) return null;
+  if (typeof p.orderNumber !== "string" || !ORDER_NUMBER.test(p.orderNumber)) return null;
+  if (typeof p.reportedAt !== "string" || Number.isNaN(Date.parse(p.reportedAt))) return null;
+  if (typeof p.text !== "string" || p.text.length > MAX_WARRANTY_TEXT) return null;
+  if (!Array.isArray(p.photoFileIds) || p.photoFileIds.length > MAX_WARRANTY_PHOTOS) return null;
+  if (!p.photoFileIds.every((id) => isText(id, 200))) return null;
+  if (p.text.trim() === "" && p.photoFileIds.length === 0) return null;
+  if (typeof p.byTelegramId !== "number" || !Number.isSafeInteger(p.byTelegramId) || p.byTelegramId <= 0) return null;
+  return {
+    job: BOT_JOB.WARRANTY_REPORT,
+    orderId: p.orderId,
+    orderNumber: p.orderNumber,
+    reportedAt: p.reportedAt,
+    text: p.text,
+    photoFileIds: p.photoFileIds as string[],
+    byTelegramId: p.byTelegramId,
+  };
 }

@@ -17,6 +17,7 @@ import { request } from "./handlers/request.ts";
 import { select } from "./handlers/select.ts";
 import { staff } from "./handlers/staff.ts";
 import { askLanguage, start } from "./handlers/start.ts";
+import { warranty } from "./handlers/warranty.ts";
 import { dbStorage, initialSession, sessionKey } from "./session.ts";
 import { ack, button, say } from "./ui.ts";
 
@@ -62,6 +63,7 @@ function customerComposer(deps: BotDeps): Composer<BotContext> {
   c.use(request);
   c.use(actButtons);
   c.use(info);
+  c.use(warranty);
   c.use(myOrders);
   c.on("message", async (ctx) => {
     const isCommand = ctx.message.entities?.some((e) => e.type === "bot_command" && e.offset === 0) === true;

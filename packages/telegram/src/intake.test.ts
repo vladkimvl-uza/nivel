@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BOT_JOB, type FileIntakePayload, parseFileIntake } from "./intake.ts";
+import {
+  BOT_JOB,
+  type FileIntakePayload,
+  parseFileIntake,
+  parseWarrantyReport,
+  type WarrantyReportPayload,
+} from "./intake.ts";
 
 const receipt: FileIntakePayload = {
   job: "telegram.file_intake",
@@ -49,5 +55,38 @@ describe("the job «telegram.file_intake» the bot queues for the worker", () =>
     expect(parseFileIntake(null)).toBeNull();
     expect(parseFileIntake("x")).toBeNull();
     expect(parseFileIntake([])).toBeNull();
+  });
+});
+
+describe("the job «warranty.report» of a customer who reports a problem", () => {
+  const report: WarrantyReportPayload = {
+    job: "warranty.report",
+    orderId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+    orderNumber: "NV-2026-0001",
+    reportedAt: "2026-10-20T07:15:30.000Z",
+    text: "The PC does not start after the move",
+    photoFileIds: ["AgAC-1", "AgAC-2"],
+    byTelegramId: 7_100_000_001,
+  };
+
+  it("has a name the worker can register", () => {
+    expect(BOT_JOB.WARRANTY_REPORT).toBe("warranty.report");
+  });
+
+  it("is read back as it was written", () => {
+    expect(parseWarrantyReport(report)).toEqual(report);
+    expect(parseWarrantyReport({ ...report, text: "", photoFileIds: ["AgAC-1"] })).toMatchObject({
+      photoFileIds: ["AgAC-1"],
+    });
+  });
+
+  it("refuses what the bot never writes: no time, no description and no photo, too many photos, a time that is not a date", () => {
+    expect(parseWarrantyReport({ ...report, reportedAt: "yesterday" })).toBeNull();
+    expect(parseWarrantyReport({ ...report, text: "", photoFileIds: [] })).toBeNull();
+    expect(parseWarrantyReport({ ...report, photoFileIds: Array.from({ length: 11 }, (_, i) => `f${i}`) })).toBeNull();
+    expect(parseWarrantyReport({ ...report, text: "x".repeat(2001) })).toBeNull();
+    expect(parseWarrantyReport({ ...report, job: "other" })).toBeNull();
+    expect(parseWarrantyReport({ ...report, orderNumber: "x" })).toBeNull();
+    expect(parseWarrantyReport(null)).toBeNull();
   });
 });

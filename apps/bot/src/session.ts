@@ -20,7 +20,7 @@ export interface Draft {
   /** The order the next free text is about (a question about the report, a report of a problem). */
   orderNumber?: string;
   /** The text of a report of a problem, collected over several messages. */
-  warrantyParts?: { text: string; photoFileIds: string[] };
+  warrantyParts?: { text: string; photoFileIds: string[]; messageIds: number[] };
 }
 
 export interface Session {
