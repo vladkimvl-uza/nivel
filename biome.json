@@ -4,12 +4,29 @@
   "extends": ["./packages/config/biome.base.json"],
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!docs", "!**/migrations", "!**/.next", "!**/dist", "!pnpm-lock.yaml"]
+    "includes": [
+      "**",
+      "!docs",
+      "!**/migrations",
+      "!**/.next",
+      "!**/dist",
+      "!pnpm-lock.yaml",
+      "!tools/crm-sheets/preview"
+    ]
   },
   "overrides": [
     {
       "includes": ["tools/**"],
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    },
+    {
+      "includes": ["tools/crm-sheets/src/**"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUnusedVariables": "off", "noUnusedFunctionParameters": "off" },
+          "style": { "useTemplate": "off" }
+        }
+      }
     }
   ]
 }
