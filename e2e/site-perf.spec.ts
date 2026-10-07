@@ -10,7 +10,7 @@ test.describe.configure({ retries: 2 });
 
 for (const locale of ["uz", "ru"] as const) {
   test.describe(`бюджеты /${locale}`, () => {
-    test.beforeEach(({}, testInfo) => {
+    test.beforeEach(({ browserName: _browser }, testInfo) => {
       test.skip(testInfo.project.name !== "pixel7", "бюджеты сняты на профиле Pixel 7");
     });
 

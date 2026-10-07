@@ -91,7 +91,7 @@ test.describe("переключатель «Без анимации»", () => {
 });
 
 test.describe("прокрутка и фон", () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach(({ browserName: _browser }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "движение проверено на компьютере; телефон — снимками и бюджетами");
   });
 
