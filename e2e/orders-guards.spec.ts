@@ -249,7 +249,7 @@ test.describe("помощник и бухгалтер", () => {
       receipt: "CH-HELPER-1",
     });
     await form.getByRole("button", { name: "Записать покупку" }).click();
-    await expect(form.locator(".adm-flash--ok")).toContainText("Покупка записана");
+    await expect(form.getByTestId("record-purchase-message")).toContainText("Покупка записана");
     const by = await admin.query<{ bought_by: string }>("select bought_by from sales.purchases where order_id = $1", [
       buying.orderId,
     ]);

@@ -3,7 +3,7 @@
 // A form of the orders screens that calls a server action and shows its answer next to itself: the text of a refusal in
 // Russian, or what was done. It holds no business state; the action comes bound to its ids by the page.
 import { Button } from "@nivel/ui/react";
-import { type ReactNode, useActionState, useEffect, useRef } from "react";
+import { type FormEvent, type ReactNode, startTransition, useActionState, useEffect, useRef } from "react";
 import { type ActionState, IDLE } from "../action-state.ts";
 
 export interface ActionFormProps {
@@ -33,8 +33,16 @@ export function ActionForm({
     if (state.ok && resetOnSuccess) ref.current?.reset();
   }, [state.ok, state.at, resetOnSuccess]);
   const failed = state.ok === false;
+  // React empties the uncontrolled fields of a form after its action, a refusal too: the person would retype everything.
+  // The action is therefore started by hand, and the fields are cleared only after a success (the effect above).
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const data = new FormData(event.currentTarget, submitter instanceof HTMLElement ? submitter : null);
+    startTransition(() => formAction(data));
+  }
   return (
-    <form ref={ref} action={formAction} className={className} data-testid={testId} noValidate>
+    <form ref={ref} onSubmit={onSubmit} className={className} data-testid={testId} noValidate>
       {state.message ? (
         <p
           className={failed ? "adm-flash adm-flash--error" : "adm-flash adm-flash--ok"}

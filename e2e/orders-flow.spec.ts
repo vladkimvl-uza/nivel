@@ -317,13 +317,11 @@ test.describe("заказ от сметы до закрытия, с телефо
       await ok(generate, "Акт составлен");
       const sign = page.getByTestId("sign-act");
       const picker = sign.getByTestId("act-picker");
-      await picker
-        .locator('input[type="file"]')
-        .setInputFiles({
-          name: "handover.jpg",
-          mimeType: "image/jpeg",
-          buffer: phonePhoto("GPS-HANDOVER", "act-handover"),
-        });
+      await picker.locator('input[type="file"]').setInputFiles({
+        name: "handover.jpg",
+        mimeType: "image/jpeg",
+        buffer: phonePhoto("GPS-HANDOVER", "act-handover"),
+      });
       await expect(picker.getByTestId("act-picker-message")).toContainText("Файл загружен");
       await sign.getByRole("button", { name: "Записать подпись" }).click();
       await expect(page.getByTestId("act-handover")).toHaveAttribute("data-signed", "yes");
