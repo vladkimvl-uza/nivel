@@ -1,5 +1,6 @@
 // The QR code of the passport as vectors: the matrix of `qrcode` drawn by runs of dark modules (a few hundred rectangles
 // instead of a picture, nothing to fetch). The level of correction is M: a smudge on the sticker does not kill the code.
+/// <reference path="./qrcode.d.ts" />
 import { Rect, Svg } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { createElement as h, type ReactElement } from "react";

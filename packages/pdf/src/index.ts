@@ -9,5 +9,7 @@ export { renderQuote } from "./quote.ts";
 export { PDF_MAX_BYTES, PdfTooLargeError } from "./render.ts";
 export { renderCommissionReport } from "./report.ts";
 export { CardNumberError } from "./requisites.ts";
+// The reader of the PDF the package writes: for the tests of whoever uses the documents (the worker, the bot).
+export { flat as flatText, parsePdf } from "./testkit.ts";
 export type * from "./types.ts";
 export { renderWarrantyCard } from "./warranty.ts";
