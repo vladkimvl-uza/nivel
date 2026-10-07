@@ -1,7 +1,9 @@
-// From the rows of the database to the data of the documents of @nivel/pdf. Nothing is counted here: the sums are those the services
+// From the rows of the database to the data of the documents of @nivel/pdf. No money is decided here: the sums are those the services
 // and the domain wrote (the columns of the quote, the snapshot of the report, the purchases, the payments); this file picks them, names
-// them and hands them over. What it decides itself: whether the document is a sample (the offer is a stub, or demo data are in it),
-// where its files lie and where their ids are written.
+// them and hands them over. Two sums are restated from rows that are handed over beside them, by the rule the database itself uses:
+// the returns of a report (the sum of its own return rows) and the sum of a line of the estimate (quantity times the price).
+// What it decides itself: whether the document is a sample (the offer is a stub, or demo data are in it), when the document is
+// ready to be made, where its files lie and where their ids are written.
 
 import { isoDateInTashkent } from "@nivel/domain/calendar";
 import type {
@@ -15,6 +17,7 @@ import type {
   ReportLineDoc,
   WarrantyDoc,
 } from "@nivel/pdf";
+import { BuildDataError, NotReadyError } from "./errors.ts";
 import type { PdfDoc, PdfRequest } from "./payload.ts";
 import type {
   ActRow,
@@ -32,31 +35,26 @@ import type {
 /** ops.settings: the account of the sole proprietor, { holder, inn, bank, account, mfo, purpose }; the bot reads the same key. */
 export const REQUISITES_KEY = "requisites.ip";
 
+/**
+ * Where the ids of the two files are written. `replace`: the document has stages (an act before and after the signature, a passport
+ * before and after the handover) and the link moves on to the file of the later stage; a document with one file keeps its link once
+ * written (the quote and the report are versions of their own).
+ */
 export type LinkTarget =
-  | { table: "quotes"; keyColumn: "id"; key: string }
-  | { table: "commission_reports"; keyColumn: "id"; key: string }
-  | { table: "acts"; keyColumn: "id"; key: string }
-  | { table: "build_passports"; keyColumn: "order_id"; key: string };
+  | { table: "quotes"; keyColumn: "id"; key: string; replace: false }
+  | { table: "commission_reports"; keyColumn: "id"; key: string; replace: false }
+  | { table: "acts"; keyColumn: "id"; key: string; replace: true }
+  | { table: "build_passports"; keyColumn: "order_id"; key: string; replace: true };
 
-/** The data of the order are damaged or do not fit the document: a second try gives the same answer. */
-export class BuildDataError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BuildDataError";
-  }
-}
-
-/** The order has not got the document yet (a report that comes a moment later): the job may try again. */
-export class NotReadyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NotReadyError";
-  }
-}
+export { BuildDataError, NotReadyError };
 
 export interface Prepared {
   orderNumber: string;
-  /** The name of the document inside the folder of the order: "quote-2", "report-1", "act-handover-0199ab12". */
+  /**
+   * The name of the document inside the folder of the order: "quote-2", "report-1", the whole id of the act and its stage
+   * ("act-handover-<id>", "act-handover-<id>-signed"), "passport" and "passport-handed-over". What is made once under a name is kept:
+   * a document whose data move on (a signature, a handover) gets a new name when they have.
+   */
   base: string;
   fileKind: "quote_pdf" | "report_pdf" | "act_pdf" | "passport_pdf" | "warranty_pdf";
   retention: "tax_5y" | "order_warranty_plus_3y";
@@ -67,12 +65,14 @@ export interface Prepared {
   doc: PdfDoc;
 }
 
-export interface Built {
-  prepared: Prepared;
-  /** The data of the document; the renderer of @nivel/pdf for it is chosen by `doc`. */
-  data: QuoteDoc | CommissionReportDoc | ActDoc | PassportDoc | WarrantyDoc;
-  actKind?: ActKind;
-}
+/** A document with its data: the kind says which renderer of @nivel/pdf takes them, so the pair cannot come apart. */
+export type Built = { prepared: Prepared } & (
+  | { kind: "quote"; data: QuoteDoc }
+  | { kind: "report"; data: CommissionReportDoc }
+  | { kind: "act"; actKind: ActKind; data: ActDoc }
+  | { kind: "passport"; data: PassportDoc }
+  | { kind: "warranty"; data: WarrantyDoc }
+);
 
 export interface BuildContext {
   /** PUBLIC_BASE_URL of the site: the QR code of a passport points at its page. */
@@ -119,6 +119,16 @@ export function rateText(rate: string): string {
 }
 
 // ---- the estimate ----------------------------------------------------------------------------------------------------------
+
+const FEE_RULES = ["pc_low", "pc_high", "pc_high_min", "mount", "complex"] as const;
+
+/** The rule of a part of the fee as the domain names it (the stored totals are JSON: what is not on the list is damage). */
+function feeRule(value: unknown, i: number): QuoteDoc["totals"]["feeParts"][number]["rule"] {
+  const rule = FEE_RULES.find((r) => r === value);
+  if (rule === undefined)
+    throw new BuildDataError(`fee part ${i} has the rule ${String(value)}, the domain has no such`);
+  return rule;
+}
 
 export function quoteDoc(
   order: OrderRow,
@@ -168,7 +178,7 @@ export function quoteDoc(
           base: int(p.base, `fee part ${i} base`),
           rateBp: int(p.rateBp, `fee part ${i} rate`),
           amount: int(p.amount, `fee part ${i} amount`),
-          rule: p.rule as QuoteDoc["totals"]["feeParts"][number]["rule"],
+          rule: feeRule(p.rule, i),
         };
       }),
       feeTotal: quote.feeTotal,
@@ -238,6 +248,9 @@ export function reportDoc(
       qty: s.qty,
       serials: p?.serials ?? [],
       vendor: p?.vendorName ?? null,
+      // The tax number of the shop and the VAT in the price are parts of the table of the report (PKM 489, item 28), but the database
+      // holds neither (pricing.vendors has no INN, a purchase has no VAT): the fields stay empty until the integrator adds the
+      // columns (request in the report of WP-12); the template prints them as soon as they are filled.
       vendorInn: null,
       boughtAt: s.boughtAt,
       receiptKind: s.receiptKind,
@@ -269,6 +282,7 @@ export function reportDoc(
     spentSum: report.spentSum,
     discountsSum: report.discountsSum,
     remainderSum: report.remainderSum,
+    // restated from the rows of the report itself (the report keeps no such sum): the returns, positive
     refundsSum: lines.filter((l) => l.isReturn).reduce((n, l) => n - l.amountSum, 0),
     purchaseLimit: quote?.purchaseLimit ?? null,
     lines,
@@ -292,10 +306,12 @@ const ACT_OF_DOC = {
   act_handover: "handover",
 } as const;
 
+/** The act of acceptance has the purchases the customer paid for (net of the returns) and their sum as the database holds it. */
 export function actDoc(
   order: OrderRow,
   act: ActRow,
   purchases: readonly PurchaseRow[],
+  receiptsTotal: number,
   requisites: IpRequisites | null,
 ): ActDoc {
   if (!Array.isArray(act.lines)) throw new BuildDataError("the lines of the act are not a list");
@@ -313,10 +329,11 @@ export function actDoc(
           receipts: purchases.map((p) => ({
             title: p.title ?? "—",
             qty: p.qty,
-            amountSum: p.amountSum,
+            amountSum: p.netSum,
             receiptNo: p.receiptNo ?? p.esfNo,
             boughtAt: isoStamp(p.boughtAt),
           })),
+          receiptsTotal,
         }
       : {}),
     signed: act.signedAt && act.signedVia ? { at: isoStamp(act.signedAt), via: act.signedVia } : null,
@@ -397,7 +414,10 @@ export function warrantyDoc(
 
 // ---- the choice ------------------------------------------------------------------------------------------------------------
 
-/** Loads what the document needs and decides how it is named, kept and linked. Throws `BuildDataError` for an order that cannot have it. */
+/**
+ * Loads what the document needs and decides how it is named, kept and linked. Throws `NotReadyError` for a document the order has
+ * not got yet (the job tries again), `BuildDataError` for data no second try can mend.
+ */
 export async function build(req: PdfRequest, rows: PdfRows, ctx: BuildContext, now: Date): Promise<Built> {
   const order = await rows.order(req.orderId);
   if (!order) throw new NotReadyError(`the order ${req.orderId} does not exist`);
@@ -410,17 +430,21 @@ export async function build(req: PdfRequest, rows: PdfRows, ctx: BuildContext, n
 
   switch (req.doc) {
     case "quote": {
-      if (!order.currentQuoteId) throw new NotReadyError(`the order ${order.number} has no current quote`);
-      const q = await rows.quote(order.currentQuoteId);
+      // The estimate that went out, never a draft: the paper is what the customer was sent, with the sums he accepts. A draft that
+      // the owner is still mending is not rendered under the name of the version it will become.
+      const quoteId = await rows.sentQuoteId(order.id);
+      if (!quoteId) throw new NotReadyError(`the order ${order.number} has no sent quote`);
+      const q = await rows.quote(quoteId);
       if (!q) throw new NotReadyError(`the quote of the order ${order.number} does not exist`);
       return {
+        kind: "quote",
         prepared: {
           ...base,
           base: `quote-${q.row.version}`,
           fileKind: "quote_pdf",
           retention: "tax_5y",
           demo: q.lines.some((l) => l.demo),
-          link: { table: "quotes", keyColumn: "id", key: q.row.id },
+          link: { table: "quotes", keyColumn: "id", key: q.row.id, replace: false },
         },
         data: quoteDoc(order, q.row, q.lines, requisites),
       };
@@ -429,16 +453,20 @@ export async function build(req: PdfRequest, rows: PdfRows, ctx: BuildContext, n
       const report = await rows.report(order.id);
       if (!report) throw new NotReadyError(`the order ${order.number} has no report`);
       const snapshot = readSnapshot(report.lines);
-      const purchases = await rows.purchasesByIds(snapshot.map((s) => s.purchaseId));
+      const purchases = await rows.purchasesByIds(
+        snapshot.map((s) => s.purchaseId),
+        order.id,
+      );
       const quote = order.currentQuoteId ? ((await rows.quote(order.currentQuoteId))?.row ?? null) : null;
       return {
+        kind: "report",
         prepared: {
           ...base,
           base: `report-${report.version}`,
           fileKind: "report_pdf",
           retention: "tax_5y",
           demo: purchases.some((p) => p.demo),
-          link: { table: "commission_reports", keyColumn: "id", key: report.id },
+          link: { table: "commission_reports", keyColumn: "id", key: report.id, replace: false },
         },
         data: reportDoc(order, report, purchases, await rows.feePayments(order.id), quote, requisites),
       };
@@ -450,18 +478,27 @@ export async function build(req: PdfRequest, rows: PdfRows, ctx: BuildContext, n
       const act = await rows.act(order.id, req.actId, kind);
       if (!act) throw new NotReadyError(`the order ${order.number} has no act ${kind}`);
       if (act.kind !== kind) throw new BuildDataError(`the act ${act.id} is ${act.kind}, not ${kind}`);
-      const purchases = kind === "material_acceptance" ? await rows.purchasesOfOrder(order.id) : [];
+      const kept = await rows.purchasesOfOrder(order.id);
+      const signed = act.signedAt !== null && act.signedVia !== null;
       return {
+        kind: "act",
+        actKind: kind,
         prepared: {
           ...base,
-          base: `act-${kind.replace("_", "-")}-${act.id.slice(0, 8)}`,
+          // the whole id: the first characters of a time-ordered id are the same for acts made within a minute of each other
+          base: `act-${kind.replace("_", "-")}-${act.id}${signed ? "-signed" : ""}`,
           fileKind: "act_pdf",
           retention: "tax_5y",
-          demo: purchases.some((p) => p.demo),
-          link: { table: "acts", keyColumn: "id", key: act.id },
+          demo: kept.some((p) => p.demo),
+          link: { table: "acts", keyColumn: "id", key: act.id, replace: true },
         },
-        data: actDoc(order, act, purchases, requisites),
-        actKind: kind,
+        data: actDoc(
+          order,
+          act,
+          kind === "material_acceptance" ? kept : [],
+          kind === "material_acceptance" ? await rows.receiptsTotal(order.id) : 0,
+          requisites,
+        ),
       };
     }
     case "passport": {
@@ -472,24 +509,31 @@ export async function build(req: PdfRequest, rows: PdfRows, ctx: BuildContext, n
         testsAt: await rows.testsPassedAt(order.id),
         actAt: await rows.handoverSignedAt(order.id),
       };
+      // The passport is made when the tests are passed and not before: the row of the master exists from the first photo, and a
+      // paper without the protocol of the tests must not take the name of the passport.
+      if (dates.testsAt === null) throw new NotReadyError(`the tests of the order ${order.number} are not passed yet`);
+      const handedOver = order.warrantyUntil !== null && dates.actAt !== null;
       return {
+        kind: "passport",
         prepared: {
           ...base,
-          base: "passport",
+          base: handedOver ? "passport-handed-over" : "passport",
           fileKind: "passport_pdf",
           retention: "order_warranty_plus_3y",
           demo: (await rows.purchasesOfOrder(order.id)).some((p) => p.demo),
-          link: { table: "build_passports", keyColumn: "order_id", key: order.id },
+          link: { table: "build_passports", keyColumn: "order_id", key: order.id, replace: true },
         },
         data: passportDoc(order, passport, dates, ctx, now),
       };
     }
     case "warranty": {
       const purchases = await rows.purchasesOfOrder(order.id);
+      const handedOver = order.warrantyUntil !== null && order.handedOverAt !== null;
       return {
+        kind: "warranty",
         prepared: {
           ...base,
-          base: "warranty",
+          base: handedOver ? "warranty-handed-over" : "warranty",
           fileKind: "warranty_pdf",
           retention: "order_warranty_plus_3y",
           demo: purchases.some((p) => p.demo),

@@ -2,10 +2,11 @@
 // asks @nivel/pdf for the Uzbek and the Russian paper, writes the bytes under FILES_DIR, registers them in ops.files and writes their
 // ids into the row of the document. It can run twice or stop half way: a file that is registered under its key is not made again,
 // and the links, written once, keep what they have.
-import type { ActDoc, CommissionReportDoc, PassportDoc, QuoteDoc, RenderOptions, WarrantyDoc } from "@nivel/pdf";
+import type { RenderOptions } from "@nivel/pdf";
 import type { Logger } from "pino";
 import { PermanentJobError } from "../../queues/define.ts";
-import { type BuildContext, BuildDataError, type Built, build } from "./build.ts";
+import { type BuildContext, type Built, build } from "./build.ts";
+import { BuildDataError } from "./errors.ts";
 import { type DocFiles, type LinkResult, sha256Of, storageKeyOf } from "./files.ts";
 import { parsePdfRequest } from "./payload.ts";
 import type { PdfRows } from "./rows.ts";
@@ -43,36 +44,29 @@ const pdfPackage = (): Promise<typeof import("@nivel/pdf")> => {
 
 async function render(b: Built, options: RenderOptions): Promise<Buffer> {
   const pdf = await pdfPackage();
-  switch (b.prepared.doc) {
-    case "quote":
-      return pdf.renderQuote(b.data as QuoteDoc, options);
-    case "commission_report":
-      return pdf.renderCommissionReport(b.data as CommissionReportDoc, options);
-    case "act_materials":
-    case "act_customer_parts":
-    case "act_handover":
-      return pdf.renderAct(b.actKind as NonNullable<Built["actKind"]>, b.data as ActDoc, options);
-    case "passport":
-      return pdf.renderPassport(b.data as PassportDoc, options);
-    case "warranty":
-      return pdf.renderWarrantyCard(b.data as WarrantyDoc, options);
+  try {
+    switch (b.kind) {
+      case "quote":
+        return await pdf.renderQuote(b.data, options);
+      case "report":
+        return await pdf.renderCommissionReport(b.data, options);
+      case "act":
+        return await pdf.renderAct(b.actKind, b.data, options);
+      case "passport":
+        return await pdf.renderPassport(b.data, options);
+      case "warranty":
+        return await pdf.renderWarrantyCard(b.data, options);
+    }
+  } catch (error) {
+    // what the package itself calls data that no second try can mend (a sum that does not add up, a card number, a paper too
+    // heavy); any other failure of the renderer (memory, a damaged font) may pass and is tried again
+    throw pdf.isPermanentPdfError(error) && error instanceof Error ? permanent(error) : error;
   }
 }
 
-/** The names of the errors the package raises for data that no second try can mend (matched by name: the package is not loaded yet). */
-const PERMANENT_NAMES: ReadonlySet<string> = new Set(["DocumentDataError", "CardNumberError", "PdfTooLargeError"]);
-
-/** What no second try can mend (the data do not add up, a card number, a document too heavy) stops the job for good. */
-function permanent(error: unknown): unknown {
-  if (
-    error instanceof BuildDataError ||
-    error instanceof RangeError ||
-    (error instanceof Error && PERMANENT_NAMES.has(error.name))
-  ) {
-    return new PermanentJobError(`${error.name}: ${error.message}`);
-  }
-  return error;
-}
+/** What no second try can mend stops the job for good; the original error is kept as the cause, with its stack. */
+const permanent = (error: Error): PermanentJobError =>
+  Object.assign(new PermanentJobError(`${error.name}: ${error.message}`), { cause: error });
 
 export async function handlePdfRender(deps: PdfJobDeps, data: unknown): Promise<PdfJobResult> {
   const request = parsePdfRequest(data);
@@ -82,7 +76,7 @@ export async function handlePdfRender(deps: PdfJobDeps, data: unknown): Promise<
   try {
     built = await build(request, deps.rows, deps.ctx, deps.now());
   } catch (error) {
-    throw permanent(error);
+    throw error instanceof BuildDataError ? permanent(error) : error;
   }
   const p = built.prepared;
   const ids: Record<(typeof LANGS)[number], { id: string; created: boolean }> = {
@@ -96,12 +90,7 @@ export async function handlePdfRender(deps: PdfJobDeps, data: unknown): Promise<
       ids[lang] = { id: have, created: false };
       continue;
     }
-    let bytes: Buffer;
-    try {
-      bytes = await render(built, { lang, stub: p.stub, demo: p.demo });
-    } catch (error) {
-      throw permanent(error);
-    }
+    const bytes = await render(built, { lang, stub: p.stub, demo: p.demo });
     await deps.files.save(key, bytes);
     const id = await deps.files.register({
       sha256: sha256Of(bytes),

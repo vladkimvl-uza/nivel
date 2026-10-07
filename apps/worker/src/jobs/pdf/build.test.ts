@@ -1,4 +1,5 @@
 import {
+  type ActDoc,
   type ActKind,
   type CommissionReportDoc,
   type PassportDoc,
@@ -14,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import {
   BuildDataError,
   build,
+  NotReadyError,
   offersAreStub,
   parseRequisites,
   quoteDoc,
@@ -21,6 +23,7 @@ import {
   rateText,
   readSnapshot,
 } from "./build.ts";
+import { assertStorageKey, storageKeyOf } from "./files.ts";
 import type { PdfRequest } from "./payload.ts";
 import {
   ACT_ID,
@@ -32,6 +35,8 @@ import {
   ORDER_ID,
   order,
   P1,
+  P4,
+  P5,
   PURCHASES,
   passport,
   purchase,
@@ -169,6 +174,15 @@ describe("the estimate", () => {
       quoteDoc(order(), quote({ totals: { totals: { grandTotal: 1, fee: { parts: [null] } } } }), quoteLines(), null),
     ).toThrow(/fee part 0/);
   });
+
+  it("refuses a rule of the fee that the domain does not have, as damage of the stored totals and not as a second try", () => {
+    const parts = (rule: unknown) => ({
+      totals: { grandTotal: 1, fee: { parts: [{ group: "pc", base: 1, rateBp: 1, amount: 1, rule }] } },
+    });
+    expect(() => quoteDoc(order(), quote({ totals: parts("pc_low") }), quoteLines(), null)).not.toThrow();
+    expect(() => quoteDoc(order(), quote({ totals: parts("pc_medium") }), quoteLines(), null)).toThrow(BuildDataError);
+    expect(() => quoteDoc(order(), quote({ totals: parts(undefined) }), quoteLines(), null)).toThrow(/no such/);
+  });
 });
 
 describe("the report", () => {
@@ -226,7 +240,7 @@ describe("the report", () => {
 describe("the acts", () => {
   it("makes the act of handover with the signature and the end of the warranty as a day in Tashkent", async () => {
     const b = await built(req("act_handover", ACT_ID));
-    expect(b.actKind).toBe("handover");
+    expect(b).toMatchObject({ kind: "act", actKind: "handover" });
     expect(b.data).toMatchObject({
       orderNumber: "NV-2026-0001",
       signed: { at: "2026-10-12T04:15:00.000Z", via: "tg_button" },
@@ -235,15 +249,83 @@ describe("the acts", () => {
     expect((b.data as { receipts?: unknown }).receipts).toBeUndefined();
   });
 
-  it("gives the act of acceptance the prices by the receipts of the purchases, without the returns", async () => {
+  it("gives the act of acceptance the prices by the receipts of the purchases, the part returned to the shop taken off, and the total of the database", async () => {
     const b = await built(req("act_materials"), { acts: [act({ kind: "material_acceptance" })] });
-    const receipts = (
-      b.data as unknown as { receipts: { title: string; amountSum: number; receiptNo: string | null }[] }
-    ).receipts;
-    expect(receipts.map((r) => [r.title, r.amountSum, r.receiptNo])).toEqual([
-      ["AMD Ryzen 5 9600X", 4_150_000, "0004457812"],
+    const doc = b.data as ActDoc;
+    expect((doc.receipts ?? []).map((r) => [r.title, r.amountSum, r.receiptNo])).toEqual([
+      ["AMD Ryzen 5 9600X", 4_010_000, "0004457812"],
       ["GeForce RTX 5070 12 GB", 9_500_000, "ESF-2026-118342"],
     ]);
+    // 4 150 000 + 9 500 000 - 140 000: the sum of all the purchases of the order, as the report calls "spent"
+    expect(doc.receiptsTotal).toBe(13_510_000);
+    expect(doc.receiptsTotal).toBe(report().spentSum);
+    expect((doc.receipts ?? []).reduce((n, r) => n + r.amountSum, 0)).toBe(doc.receiptsTotal);
+  });
+
+  it("leaves out a purchase that was returned whole, in the act of acceptance and in the warranty card", async () => {
+    const returned = purchase({
+      id: P4,
+      title: "Kingston Fury 32",
+      amountSum: 1_100_000,
+      netSum: 0,
+      serials: ["RAM-1"],
+    });
+    const refund = purchase({
+      id: P5,
+      title: "Kingston Fury 32",
+      amountSum: -1_100_000,
+      netSum: -1_100_000,
+      refundOf: P4,
+    });
+    const purchases = [...PURCHASES, returned, refund];
+    const a = await built(req("act_materials"), { acts: [act({ kind: "material_acceptance" })], purchases });
+    const doc = a.data as ActDoc;
+    expect((doc.receipts ?? []).map((r) => r.title)).not.toContain("Kingston Fury 32");
+    expect(doc.receiptsTotal).toBe(13_510_000);
+    const w = await built(req("warranty"), { purchases });
+    expect((w.data as WarrantyDoc).items.map((i) => i.title)).not.toContain("Kingston Fury 32");
+    expect((w.data as WarrantyDoc).items).toHaveLength(2);
+  });
+
+  it("names an act by its whole id, so that two acts of one kind made within a minute keep two files", async () => {
+    // the first characters of a time-ordered id are the same for ids made within about a minute of each other
+    const first = "01a115db-8370-7000-8000-000000000001";
+    const second = "01a115db-f8a0-7000-8000-000000000002";
+    expect(first.slice(0, 8)).toBe(second.slice(0, 8));
+    const acts = [
+      act({ id: first, signedAt: null, signedVia: null }),
+      act({ id: second, signedAt: null, signedVia: null }),
+    ];
+    const a = await built(req("act_handover", first), { acts });
+    const b = await built(req("act_handover", second), { acts });
+    expect(a.prepared.base).toBe(`act-handover-${first}`);
+    expect(b.prepared.base).toBe(`act-handover-${second}`);
+    expect(a.prepared.base).not.toBe(b.prepared.base);
+    expect(storageKeyOf("NV-2026-0001", a.prepared.base, "uz")).not.toBe(
+      storageKeyOf("NV-2026-0001", b.prepared.base, "uz"),
+    );
+    expect(() => assertStorageKey(storageKeyOf("NV-2026-0001", a.prepared.base, "uz"))).not.toThrow();
+  });
+
+  it("names the signed act apart from the unsigned one: the paper that was signed is a file of its own and the link moves on", async () => {
+    const open = await built(req("act_handover", ACT_ID), { acts: [act({ signedAt: null, signedVia: null })] });
+    const signed = await built(req("act_handover", ACT_ID));
+    expect(open.prepared.base).toBe(`act-handover-${ACT_ID}`);
+    expect(signed.prepared.base).toBe(`act-handover-${ACT_ID}-signed`);
+    expect(signed.prepared.link).toMatchObject({ table: "acts", replace: true });
+  });
+
+  it("marks every act as a sample when the order stands on demo data, the act of handover and of return too", async () => {
+    for (const [doc, kind] of [
+      ["act_handover", "handover"],
+      ["act_customer_parts", "customer_parts"],
+      ["act_materials", "material_acceptance"],
+    ] as const) {
+      const demo = await built(req(doc), { acts: [act({ kind })], purchases: [purchase({ demo: true })] });
+      expect(demo.prepared.demo, doc).toBe(true);
+      const clean = await built(req(doc), { acts: [act({ kind })] });
+      expect(clean.prepared.demo, doc).toBe(false);
+    }
   });
 
   it("takes the latest act of the kind when no id is named, and says so when the order has none", async () => {
@@ -297,6 +379,37 @@ describe("the passport and the warranty card", () => {
     });
   });
 
+  it("is made once the tests are passed and not before, and says so to the job that is early", async () => {
+    await expect(built(req("passport"), { testsPassedAt: null })).rejects.toBeInstanceOf(NotReadyError);
+    await expect(built(req("passport"), { testsPassedAt: null })).rejects.toThrow(/tests .* not passed/);
+  });
+
+  it("is a file of its own once the order is handed over (the date of the act and the end of the warranty are in it), the link moves on", async () => {
+    const before = await built(req("passport"), {
+      order: order({ warrantyUntil: null, handedOverAt: null }),
+      handoverSignedAt: null,
+    });
+    const after = await built(req("passport"));
+    expect(before.prepared.base).toBe("passport");
+    expect(after.prepared.base).toBe("passport-handed-over");
+    expect((before.data as PassportDoc).dates).toMatchObject({ actAt: null, warrantyUntil: null });
+    expect((after.data as PassportDoc).dates).toMatchObject({
+      actAt: "2026-10-12T04:15:00.000Z",
+      warrantyUntil: "2027-10-12",
+    });
+    expect(after.prepared.link).toMatchObject({ table: "build_passports", replace: true });
+    // the act signed without the end of the warranty (the handover is not through yet) is still the first stage
+    const half = await built(req("passport"), { order: order({ warrantyUntil: null }) });
+    expect(half.prepared.base).toBe("passport");
+  });
+
+  it("makes the warranty card a file of its own once the order is handed over", async () => {
+    const before = await built(req("warranty"), { order: order({ warrantyUntil: null, handedOverAt: null }) });
+    const after = await built(req("warranty"));
+    expect(before.prepared.base).toBe("warranty");
+    expect(after.prepared.base).toBe("warranty-handed-over");
+  });
+
   it("copes with a passport that is half empty: no tests, no photos, no code", async () => {
     const b = await built(req("passport"), {
       passport: passport({
@@ -310,7 +423,6 @@ describe("the passport and the warranty card", () => {
         notes: null,
       }),
       estimateSentAt: null,
-      testsPassedAt: null,
       handoverSignedAt: null,
     });
     expect(b.data).toMatchObject({
@@ -319,7 +431,7 @@ describe("the passport and the warranty card", () => {
       photos: 0,
       sealPhotos: 0,
       qr: null,
-      dates: { estimateAt: null, testsAt: null, actAt: null },
+      dates: { estimateAt: null, testsAt: "2026-10-11T14:00:00.000Z", actAt: null },
     });
   });
 
@@ -361,8 +473,9 @@ describe("how a document is named, kept and linked", () => {
       retention: "tax_5y",
       stub: false,
       demo: false,
-      link: { table: "quotes", keyColumn: "id" },
+      link: { table: "quotes", keyColumn: "id", replace: false },
     });
+    expect((await built(req("commission_report"))).prepared.link).toMatchObject({ replace: false });
   });
 
   it("names the report, the act and the passport", async () => {
@@ -372,15 +485,15 @@ describe("how a document is named, kept and linked", () => {
       link: { table: "commission_reports" },
     });
     expect((await built(req("act_handover"))).prepared).toMatchObject({
-      base: `act-handover-${ACT_ID.slice(0, 8)}`,
+      base: `act-handover-${ACT_ID}-signed`,
       fileKind: "act_pdf",
       link: { table: "acts", key: ACT_ID },
     });
     expect((await built(req("act_customer_parts"), { acts: [act({ kind: "customer_parts" })] })).prepared.base).toBe(
-      `act-customer-parts-${ACT_ID.slice(0, 8)}`,
+      `act-customer-parts-${ACT_ID}-signed`,
     );
     expect((await built(req("passport"))).prepared).toMatchObject({
-      base: "passport",
+      base: "passport-handed-over",
       fileKind: "passport_pdf",
       retention: "order_warranty_plus_3y",
       link: { table: "build_passports", keyColumn: "order_id", key: ORDER_ID },
@@ -406,10 +519,34 @@ describe("how a document is named, kept and linked", () => {
 
   it("refuses an order that does not exist and an order that has not got the document yet", async () => {
     await expect(built(req("quote"), { order: null })).rejects.toThrow(/does not exist/);
-    await expect(built(req("quote"), { order: order({ currentQuoteId: null }) })).rejects.toThrow(/no current quote/);
-    await expect(built(req("quote"), { quote: null })).rejects.toThrow(/quote of the order/);
+    await expect(built(req("quote"), { quote: null })).rejects.toThrow(/no sent quote/);
     await expect(built(req("commission_report"), { report: null })).rejects.toThrow(/no report/);
     await expect(built(req("passport"), { passport: null })).rejects.toThrow(/no passport/);
+  });
+});
+
+describe("the estimate is the one that went out", () => {
+  it("is not made from a draft: the quote that has not been sent is nobody's paper yet", async () => {
+    const draft = { row: quote({ sentAt: null }), lines: quoteLines() };
+    await expect(built(req("quote"), { quote: draft })).rejects.toBeInstanceOf(NotReadyError);
+    await expect(built(req("quote"), { quote: draft })).rejects.toThrow(/no sent quote/);
+    expect((await built(req("quote"))).prepared.base).toBe("quote-2");
+  });
+
+  it("asks for the newest sent version, not for the one the order points at", async () => {
+    const rows = fakeRows(fakeData({ order: order({ currentQuoteId: null }) }));
+    await build(req("quote"), rows, CTX, NOW);
+    expect(rows.calls).toContain("sentQuoteId");
+  });
+});
+
+describe("what the report leaves empty because the database has nothing to put there", () => {
+  it("has no tax number of the shop and no VAT in the price (the database holds neither), and says nothing instead of guessing", async () => {
+    const b = await built(req("commission_report"));
+    for (const l of (b.data as CommissionReportDoc).lines) {
+      expect(l.vendorInn).toBeNull();
+      expect(l.vatSum).toBeNull();
+    }
   });
 });
 

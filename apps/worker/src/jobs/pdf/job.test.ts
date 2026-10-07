@@ -94,7 +94,10 @@ describe("pdf.render: the estimate", () => {
       expect(reg.sha256).toMatch(/^[0-9a-f]{64}$/);
     }
     expect(files.links).toEqual([
-      { target: { table: "quotes", keyColumn: "id", key: quote().id }, ids: { uz: "file-1", ru: "file-2" } },
+      {
+        target: { table: "quotes", keyColumn: "id", key: quote().id, replace: false },
+        ids: { uz: "file-1", ru: "file-2" },
+      },
     ]);
   });
 
@@ -144,6 +147,48 @@ describe("pdf.render: the other documents", () => {
     });
   });
 
+  it("keeps two acts of one kind made within a minute in two files, each with its own lines", async () => {
+    const first = "01a115db-8370-7000-8000-000000000001";
+    const second = "01a115db-f8a0-7000-8000-000000000002";
+    const acts = [
+      act({ id: first, signedAt: null, signedVia: null, lines: [{ title: "Old line with a slip", qty: 1 }] }),
+      act({ id: second, signedAt: null, signedVia: null, lines: [{ title: "Mended line", qty: 1 }] }),
+    ];
+    const { d, files } = deps({ acts });
+    const a = await handlePdfRender(d, payload("act_handover", { actId: first }));
+    const b = await handlePdfRender(d, payload("act_handover", { actId: second }));
+    expect(b.uz.created).toBe(true);
+    expect(b.uz.id).not.toBe(a.uz.id);
+    expect(files.rows.size).toBe(4);
+    const textOf = (id: string, lang: string) =>
+      parsePdf(files.disk.get(`documents/NV-2026-0001/act-handover-${id}-${lang}.pdf`) as Buffer).text;
+    expect(textOf(first, "uz")).toContain("Old line with a slip");
+    expect(textOf(second, "uz")).toContain("Mended line");
+    expect(textOf(second, "uz")).not.toContain("Old line with a slip");
+    expect(files.links.map((l) => l.target.key)).toEqual([first, second]);
+  });
+
+  it("makes the signed act a new file and moves the link to it, the unsigned one stays where it was", async () => {
+    const files = new MemoryFiles();
+    const open = deps({ acts: [act({ signedAt: null, signedVia: null })] }, files);
+    await handlePdfRender(open.d, payload("act_handover", { actId: ACT_ID }));
+    const signed = deps({ acts: [act()] }, files);
+    const res = await handlePdfRender(signed.d, payload("act_handover", { actId: ACT_ID }));
+    expect(res.uz.created).toBe(true);
+    expect([...files.rows.keys()].sort()).toEqual([
+      `documents/NV-2026-0001/act-handover-${ACT_ID}-ru.pdf`,
+      `documents/NV-2026-0001/act-handover-${ACT_ID}-signed-ru.pdf`,
+      `documents/NV-2026-0001/act-handover-${ACT_ID}-signed-uz.pdf`,
+      `documents/NV-2026-0001/act-handover-${ACT_ID}-uz.pdf`,
+    ]);
+    expect(files.links.at(-1)?.target).toMatchObject({ table: "acts", replace: true });
+    const text = parsePdf(files.disk.get(`documents/NV-2026-0001/act-handover-${ACT_ID}-signed-uz.pdf`) as Buffer).text;
+    expect(text).not.toContain("imzolanmagan");
+    expect(parsePdf(files.disk.get(`documents/NV-2026-0001/act-handover-${ACT_ID}-uz.pdf`) as Buffer).text).toContain(
+      "Hali imzolanmagan",
+    );
+  });
+
   it("renders each of the three acts as its own kind of act", async () => {
     for (const [doc, kind, title] of [
       ["act_materials", "material_acceptance", "qabul qilish"],
@@ -163,7 +208,9 @@ describe("pdf.render: the other documents", () => {
     const p = deps();
     await handlePdfRender(p.d, payload("passport"));
     expect(p.files.links[0]?.target).toMatchObject({ table: "build_passports", keyColumn: "order_id", key: ORDER_ID });
-    expect((p.files.rows.get("documents/NV-2026-0001/passport-uz.pdf") as { file: NewFile }).file).toMatchObject({
+    expect(
+      (p.files.rows.get("documents/NV-2026-0001/passport-handed-over-uz.pdf") as { file: NewFile }).file,
+    ).toMatchObject({
       kind: "passport_pdf",
       retentionClass: "order_warranty_plus_3y",
     });
@@ -172,8 +219,8 @@ describe("pdf.render: the other documents", () => {
     expect(res.linked).toBe("none");
     expect(w.files.links).toEqual([]);
     expect([...w.files.rows.keys()].sort()).toEqual([
-      "documents/NV-2026-0001/warranty-ru.pdf",
-      "documents/NV-2026-0001/warranty-uz.pdf",
+      "documents/NV-2026-0001/warranty-handed-over-ru.pdf",
+      "documents/NV-2026-0001/warranty-handed-over-uz.pdf",
     ]);
   });
 });
@@ -217,6 +264,19 @@ describe("pdf.render: what it cannot do", () => {
     expect(rows.calls).toEqual([]);
   });
 
+  it("lets the estimate that is still a draft, and a passport whose tests are not passed, be tried again", async () => {
+    const draft = deps({ quote: { row: quote({ sentAt: null }), lines: quoteLines() } });
+    const early = await handlePdfRender(draft.d, payload("quote")).catch((e) => e);
+    expect(early).toBeInstanceOf(Error);
+    expect(early).not.toBeInstanceOf(PermanentJobError);
+    expect(draft.files.rows.size).toBe(0);
+    const untested = deps({ testsPassedAt: null });
+    const err = await handlePdfRender(untested.d, payload("passport")).catch((e) => e);
+    expect(err).not.toBeInstanceOf(PermanentJobError);
+    expect(err.message).toMatch(/not passed/);
+    expect(untested.files.rows.size).toBe(0);
+  });
+
   it("lets a document that is not there yet be tried again (the report may come a moment later)", async () => {
     const { d } = deps({ report: null });
     const err = await handlePdfRender(d, payload("commission_report")).catch((e) => e);
@@ -233,6 +293,12 @@ describe("pdf.render: what it cannot do", () => {
     await expect(handlePdfRender(card.d, payload("quote"))).rejects.toThrow(/card/);
     await expect(handlePdfRender(card.d, payload("quote"))).rejects.toBeInstanceOf(PermanentJobError);
     expect(card.files.rows.size).toBe(0);
+    // the original error is kept as the cause, with its stack, for the log of the errors
+    const failure = (await handlePdfRender(card.d, payload("quote")).catch((e: unknown) => e)) as Error;
+    const cause = failure.cause;
+    expect(cause).toBeInstanceOf(Error);
+    expect((cause as Error).name).toBe("CardNumberError");
+    expect((cause as Error).stack).toMatch(/CardNumberError/);
     const first = (report().lines as Record<string, unknown>[])[0] as Record<string, unknown>;
     const fraction = deps({ report: report({ lines: [{ ...first, amountSum: 10.5 }] }) });
     await expect(handlePdfRender(fraction.d, payload("commission_report"))).rejects.toBeInstanceOf(PermanentJobError);

@@ -2,13 +2,13 @@
 // address of a customer, on catalog, pricing and content). The rows are plain data: the sums are whole numbers (bigint columns are
 // read as text and checked), the times are dates. `build.ts` turns them into the data of the documents; nothing here is counted.
 import type { Db } from "@nivel/db";
+import { BuildDataError } from "./errors.ts";
 
 export type OfferStatus = "stub" | "lawyer_approved" | "published";
 
 export interface OrderRow {
   id: string;
   number: string;
-  status: string;
   currentQuoteId: string | null;
   offerUzId: string | null;
   offerRuId: string | null;
@@ -82,7 +82,10 @@ export interface PurchaseRow {
   vendorWarrantyUntil: string | null;
   files: number;
   qty: number;
+  /** As written on the receipt; a return to the shop is a row of its own with a negative sum (`refundOf`). */
   amountSum: number;
+  /** What is left of the purchase once the returns to the shop are taken off: the sum the customer really paid for it. */
+  netSum: number;
   refundOf: string | null;
   receiptKind: "fiscal" | "esf" | "none_with_consent";
   receiptNo: string | null;
@@ -127,11 +130,20 @@ export interface PdfRows {
    */
   offerStatus(lang: "uz" | "ru", fixedId: string | null): Promise<OfferStatus>;
   quote(quoteId: string): Promise<{ row: QuoteRow; lines: QuoteLineRow[] } | null>;
+  /** The newest estimate of the order that has gone out to the customer (a draft is nobody's paper), or null. */
+  sentQuoteId(orderId: string): Promise<string | null>;
   /** The latest version of the report of the order. */
   report(orderId: string): Promise<ReportRow | null>;
-  purchasesByIds(ids: readonly string[]): Promise<PurchaseRow[]>;
-  /** Every purchase of the order that is not a return, in the order they were made. */
+  /** The purchases of the order with these ids (the snapshot of the report); an id of another order finds nothing. */
+  purchasesByIds(ids: readonly string[], orderId: string): Promise<PurchaseRow[]>;
+  /**
+   * What the order has bought and kept, in the order the purchases were made: the returns to the shops are not rows of their own
+   * but taken off the purchase they belong to (`netSum`), and a purchase that was returned whole is not here at all.
+   */
   purchasesOfOrder(orderId: string): Promise<PurchaseRow[]>;
+  /** The sum of all the purchases of the order, the returns included: what the report calls "spent". */
+  receiptsTotal(orderId: string): Promise<number>;
+  /** The fee that stands paid: a payment less its reversals, and none that was reversed whole; the newest of a kind last. */
   feePayments(orderId: string): Promise<FeePaymentRow[]>;
   act(orderId: string, actId: string | null, kind: ActRow["kind"] | null): Promise<ActRow | null>;
   passport(orderId: string): Promise<PassportRow | null>;
@@ -147,11 +159,9 @@ export interface PdfRows {
 const toInt = (v: unknown, label: string): number => {
   const n = typeof v === "string" ? Number(v) : v;
   if (typeof n !== "number" || !Number.isSafeInteger(n))
-    throw new RangeError(`${label}: ${String(v)} is not a whole number`);
+    throw new BuildDataError(`${label}: ${String(v)} is not a whole number`);
   return n;
 };
-const toIntOrNull = (v: unknown, label: string): number | null =>
-  v === null || v === undefined ? null : toInt(v, label);
 
 type Q = Db["$client"];
 
@@ -163,7 +173,9 @@ export function createPgPdfRows(db: Db): PdfRows {
     select p.id, coalesce(ql.title_snapshot, nullif(btrim(pr.brand || ' ' || pr.model), '')) as title, p.serials,
            v.name as vendor_name, p.bonus_note, p.vendor_warranty_months, p.vendor_warranty_until::text as vendor_warranty_until,
            (select count(*) from sales.purchase_files pf where pf.purchase_id = p.id)::int as files,
-           p.qty, p.amount_sum::text as amount_sum, p.refund_of, p.receipt_kind, p.receipt_no, p.esf_no,
+           p.qty, p.amount_sum::text as amount_sum,
+           (p.amount_sum + coalesce((select sum(r.amount_sum) from sales.purchases r where r.refund_of = p.id), 0))::text as net_sum,
+           p.refund_of, p.receipt_kind, p.receipt_no, p.esf_no,
            p.discount_sum::text as discount_sum, p.bought_at, (coalesce(v.is_demo, false) or coalesce(pr.is_demo, false)) as demo
       from sales.purchases p
       left join sales.quote_lines ql on ql.id = p.quote_line_id
@@ -180,6 +192,7 @@ export function createPgPdfRows(db: Db): PdfRows {
     files: Number(r.files),
     qty: Number(r.qty),
     amountSum: toInt(r.amount_sum, "purchase amount"),
+    netSum: toInt(r.net_sum, "purchase net amount"),
     refundOf: (r.refund_of as string | null) ?? null,
     receiptKind: r.receipt_kind as PurchaseRow["receiptKind"],
     receiptNo: (r.receipt_no as string | null) ?? null,
@@ -191,7 +204,7 @@ export function createPgPdfRows(db: Db): PdfRows {
   return {
     async order(orderId) {
       const [r] = await all<Record<string, unknown>>(
-        `select o.id, o.number, o.status, o.current_quote_id, o.offer_version_uz_id, o.offer_version_ru_id,
+        `select o.id, o.number, o.current_quote_id, o.offer_version_uz_id, o.offer_version_ru_id,
                 o.warranty_until, o.handed_over_at, o.objection_until, o.refund_due_at, c.display_name
            from sales.orders o join sales.customers c on c.id = o.customer_id where o.id = $1`,
         [orderId],
@@ -200,7 +213,6 @@ export function createPgPdfRows(db: Db): PdfRows {
       return {
         id: r.id as string,
         number: r.number as string,
-        status: r.status as string,
         currentQuoteId: (r.current_quote_id as string | null) ?? null,
         offerUzId: (r.offer_version_uz_id as string | null) ?? null,
         offerRuId: (r.offer_version_ru_id as string | null) ?? null,
@@ -219,6 +231,13 @@ export function createPgPdfRows(db: Db): PdfRows {
         [lang, fixedId],
       );
       return r?.status ?? "stub";
+    },
+    async sentQuoteId(orderId) {
+      const [r] = await all<{ id: string }>(
+        "select id from sales.quotes where order_id = $1 and sent_at is not null order by version desc limit 1",
+        [orderId],
+      );
+      return r?.id ?? null;
     },
     async quote(quoteId) {
       const [r] = await all<Record<string, unknown>>(
@@ -300,28 +319,47 @@ export function createPgPdfRows(db: Db): PdfRows {
         deemedAcceptedAt: (r.deemed_accepted_at as Date | null) ?? null,
       };
     },
-    async purchasesByIds(ids) {
+    async purchasesByIds(ids, orderId) {
       if (ids.length === 0) return [];
-      return (await all<Record<string, unknown>>(`${purchaseSql} where p.id = any($1::uuid[])`, [ids])).map(purchase);
+      return (
+        await all<Record<string, unknown>>(`${purchaseSql} where p.order_id = $2 and p.id = any($1::uuid[])`, [
+          ids,
+          orderId,
+        ])
+      ).map(purchase);
     },
     async purchasesOfOrder(orderId) {
       return (
         await all<Record<string, unknown>>(
-          `${purchaseSql} where p.order_id = $1 and p.refund_of is null order by p.bought_at, p.id`,
+          `select * from (${purchaseSql} where p.order_id = $1 and p.refund_of is null) kept
+            where kept.net_sum::bigint > 0 order by kept.bought_at, kept.id`,
           [orderId],
         )
       ).map(purchase);
     },
+    async receiptsTotal(orderId) {
+      const [r] = await all<{ total: string }>(
+        "select coalesce(sum(amount_sum), 0)::text as total from sales.purchases where order_id = $1",
+        [orderId],
+      );
+      return toInt(r?.total ?? "0", "receipts total");
+    },
     async feePayments(orderId) {
+      // A confirmed payment is never edited: a mistake is mended by a row of the negative sum that points at it (`reversal_of`),
+      // so what stands paid is the payment less its reversals; one that was reversed whole stands for nothing.
       const rows = await all<Record<string, unknown>>(
-        `select kind, amount_sum::text, fiscal_receipt_no, confirmed_at from sales.payments
-          where order_id = $1 and kind in ('fee_advance', 'fee_final') and status = 'confirmed' and reversal_of is null
-          order by confirmed_at`,
+        `select * from (
+           select p.kind, p.fiscal_receipt_no, p.confirmed_at,
+                  (p.amount_sum + coalesce((select sum(r.amount_sum) from sales.payments r
+                                             where r.reversal_of = p.id and r.status = 'confirmed'), 0))::text as net_sum
+             from sales.payments p
+            where p.order_id = $1 and p.kind in ('fee_advance', 'fee_final') and p.status = 'confirmed' and p.reversal_of is null
+         ) standing where standing.net_sum::bigint > 0 order by standing.confirmed_at, standing.fiscal_receipt_no`,
         [orderId],
       );
       return rows.map((r) => ({
         kind: r.kind as FeePaymentRow["kind"],
-        sum: toInt(r.amount_sum, "payment amount"),
+        sum: toInt(r.net_sum, "payment amount"),
         receiptNo: (r.fiscal_receipt_no as string | null) ?? null,
         confirmedAt: (r.confirmed_at as Date | null) ?? null,
       }));
@@ -388,4 +426,4 @@ export function createPgPdfRows(db: Db): PdfRows {
   };
 }
 
-export { toInt, toIntOrNull };
+export { toInt };

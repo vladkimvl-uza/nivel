@@ -1,6 +1,7 @@
 // Where the bytes of a document lie and how the database knows them: the file goes under FILES_DIR (a relative key of plain names,
 // as ops.files demands), its row goes into ops.files, and the ids of the two languages go into the row of the document
-// (sales.quotes, commission_reports, acts, build_passports: `pdf_uz_file_id`, `pdf_ru_file_id`, written once).
+// (sales.quotes, commission_reports, acts, build_passports: `pdf_uz_file_id`, `pdf_ru_file_id`; the quote and the report keep the first
+// link, the act and the passport move it on with their stage).
 import { createHash } from "node:crypto";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, resolve, sep } from "node:path";
@@ -95,11 +96,15 @@ export function createPgDocFiles(db: Db, writer: Pick<DocFiles, "save">): DocFil
     },
     async link(target, ids) {
       try {
-        // The names come from the closed list of LinkTarget; the links are written once: what is there stays.
+        // The names come from the closed list of LinkTarget. A document with one file keeps the link once written; one with stages
+        // (the act signed, the passport handed over) moves it to the file of the stage it has reached.
         const { rowCount } = await q.query(
-          `update sales.${target.table}
-              set pdf_uz_file_id = coalesce(pdf_uz_file_id, $1), pdf_ru_file_id = coalesce(pdf_ru_file_id, $2)
-            where ${target.keyColumn} = $3 and (pdf_uz_file_id is null or pdf_ru_file_id is null)`,
+          target.replace
+            ? `update sales.${target.table} set pdf_uz_file_id = $1::uuid, pdf_ru_file_id = $2::uuid
+                where ${target.keyColumn} = $3 and (pdf_uz_file_id is distinct from $1::uuid or pdf_ru_file_id is distinct from $2::uuid)`
+            : `update sales.${target.table}
+                  set pdf_uz_file_id = coalesce(pdf_uz_file_id, $1), pdf_ru_file_id = coalesce(pdf_ru_file_id, $2)
+                where ${target.keyColumn} = $3 and (pdf_uz_file_id is null or pdf_ru_file_id is null)`,
           [ids.uz, ids.ru, target.key],
         );
         return rowCount === 0 ? "already" : "linked";

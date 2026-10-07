@@ -25,13 +25,14 @@ export const OFFER_RU = "0199aaaa-bbbb-7ccc-8ddd-0000000000d2";
 export const P1 = "0199aaaa-bbbb-7ccc-8ddd-0000000000e1";
 export const P2 = "0199aaaa-bbbb-7ccc-8ddd-0000000000e2";
 export const P3 = "0199aaaa-bbbb-7ccc-8ddd-0000000000e3";
+export const P4 = "0199aaaa-bbbb-7ccc-8ddd-0000000000e4";
+export const P5 = "0199aaaa-bbbb-7ccc-8ddd-0000000000e5";
 
 export const T_SENT = new Date("2026-10-05T10:02:00.000Z");
 
 export const order = (over: Partial<OrderRow> = {}): OrderRow => ({
   id: ORDER_ID,
   number: "NV-2026-0001",
-  status: "ready",
   currentQuoteId: QUOTE_ID,
   offerUzId: OFFER_UZ,
   offerRuId: OFFER_RU,
