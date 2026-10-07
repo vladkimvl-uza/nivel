@@ -694,6 +694,11 @@
     "maxLen": 60,
     "status": "draft"
   },
+  "common.stale": {
+    "context": "a button of an old message was pressed",
+    "maxLen": 50,
+    "status": "draft"
+  },
   "common.error": {
     "context": "unexpected error",
     "maxLen": 60,
@@ -966,6 +971,56 @@
   },
   "owner.status.cancelled": {
     "context": "status cancelled of the order in the card of the owner",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.topic.title": {
+    "context": "name of the topic of a lead in the owner's group (up to 128 characters)",
+    "maxLen": 60,
+    "status": "draft"
+  },
+  "owner.scope_short.pc": {
+    "context": "short scope in the name of a topic",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.scope_short.pc_periph": {
+    "context": "short scope in the name of a topic",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.scope_short.setup": {
+    "context": "short scope in the name of a topic",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.scope_short.podbor": {
+    "context": "short scope in the name of a topic",
+    "maxLen": 10,
+    "status": "draft"
+  },
+  "owner.band_short.lt_6_7m": {
+    "context": "short budget in the name of a topic",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.band_short.6_7m_12m": {
+    "context": "short budget in the name of a topic",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.band_short.12m_20m": {
+    "context": "short budget in the name of a topic",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.band_short.20m_35m": {
+    "context": "short budget in the name of a topic",
+    "maxLen": 20,
+    "status": "draft"
+  },
+  "owner.band_short.gte_35m": {
+    "context": "short budget in the name of a topic",
     "maxLen": 20,
     "status": "draft"
   },

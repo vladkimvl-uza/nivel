@@ -189,6 +189,7 @@
   },
   "common": {
     "unknown": "Tugmalardan foydalaning yoki /start ni bosing.",
+    "stale": "Tugma eskirgan: /start ni bosing.",
     "error": "Xatolik yuz berdi. Qayta urinib koʻring.",
     "cancelled": "Bekor qilindi.",
     "send_as_photo": "Rasmni fayl sifatida emas, foto sifatida yuboring: HEIC fayl ochilmaydi.",
@@ -253,6 +254,22 @@
       "podbor_delivered": "Tanlov topshirildi",
       "cancelling": "Bekor qilish rasmiylashtirilmoqda",
       "cancelled": "Bekor qilindi"
+    },
+    "topic": {
+      "title": "{number} · {district} · {scope} {budget}"
+    },
+    "scope_short": {
+      "pc": "PK",
+      "pc_periph": "PK+periferiya",
+      "setup": "Setap",
+      "podbor": "Tanlov"
+    },
+    "band_short": {
+      "lt_6_7m": "6,7 mln gacha",
+      "6_7m_12m": "6,7–12 mln",
+      "12m_20m": "12–20 mln",
+      "20m_35m": "20–35 mln",
+      "gte_35m": "35 mln dan"
     },
     "lead": {
       "work": "Ishga olish",
