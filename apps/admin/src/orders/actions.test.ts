@@ -253,7 +253,8 @@ describe("what the actions pass on", () => {
     const call = calls.commands[0];
     expect(call?.args[0]).toEqual({ ctx: "orders", user: { id: "u1", role: "owner" } });
     expect(call?.args.slice(1, 3)).toEqual([O, "FEE_PREPAID"]);
-    expect((call?.args[3] as { get(n: string): string | null }).get("paymentId")).toBe("p1");
+    const given = call?.args[3] as { get(n: string): string | null };
+    expect(given.get("paymentId")).toBe("p1");
   });
 
   it("refreshes the page of the estimate after a change of the lines and the sending", async () => {

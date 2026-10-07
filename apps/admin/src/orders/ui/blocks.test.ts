@@ -222,7 +222,7 @@ describe("next steps", () => {
   });
 
   it("links the estimate, the purchases and the report to their own places", () => {
-    expect(steps("estimate_draft", "owner")).toContain("/orders/" + ID(1) + "/quote");
+    expect(steps("estimate_draft", "owner")).toContain(`/orders/${ID(1)}/quote`);
     expect(steps("purchasing", "owner")).toContain('href="#purchases"');
     expect(steps("report_due", "owner")).toContain('href="#report"');
   });
