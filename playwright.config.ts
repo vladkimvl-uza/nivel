@@ -13,6 +13,9 @@ export default defineConfig({
   outputDir: "test-results",
   reporter: [["list"]],
   retries: 0,
+  // Four browsers, not half of the cores: the machine is shared by the worktrees of several packages, and eight headless Edges
+  // next to their test runs pushed it into swapping (pages answered in 30-40 s, the run failed by timeouts). PW_WORKERS overrides.
+  workers: Number(process.env.PW_WORKERS) || 4,
   use: { baseURL, trace: "off" },
   projects: [
     { name: "pixel7", use: { ...devices["Pixel 7"], ...(channel ? { channel } : {}) } },
